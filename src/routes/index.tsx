@@ -266,8 +266,8 @@ function Dashboard() {
     setIsSyncing(false);
     showToast(
       data.source === "supabase"
-        ? "Synced live records from Supabase"
-        : "Unable to reach Supabase — check connection settings",
+        ? "Synced live records from SparrowX Cloud"
+        : "Unable to reach cloud backend — check connection settings",
     );
   };
 
@@ -276,7 +276,7 @@ function Dashboard() {
     await clearAllIncidentsFromBackend();
     setIncidents([]);
     setIsSyncing(false);
-    showToast("All incident records purged from Supabase");
+    showToast("All incident records purged");
   };
 
   const handleAddProtectedService = async (event: React.FormEvent) => {
@@ -364,7 +364,7 @@ function Dashboard() {
     };
     setIncidents((current) => [created, ...current]);
     await persistIncidentToBackend(created);
-    showToast(`Verification event ${created.id} persisted to Supabase`);
+    showToast(`Verification event ${created.id} persisted to SparrowX Cloud`);
   };
 
   const selectedIncident = useMemo(
@@ -497,7 +497,7 @@ function Dashboard() {
     setNewSummary("");
     setSelectedIncidentId(created.id);
     await persistIncidentToBackend(created);
-    showToast(`${created.id} created and persisted to Supabase`);
+    showToast(`${created.id} created and persisted to SparrowX Cloud`);
   };
 
   const exportIncidents = () => {
@@ -1015,7 +1015,7 @@ function Dashboard() {
     };
     setCurrentUser(updatedUser);
     await persistAppUserToBackend(updatedUser);
-    showToast("Account profile updated in Supabase");
+    showToast("Account profile updated");
   };
 
   const handleSignOut = () => {
@@ -1223,7 +1223,7 @@ function Dashboard() {
             </span>
             <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex">
               <Database className="size-3 text-primary" />
-              {backendSource === "supabase" ? "Supabase Live" : "Offline"}
+              {backendSource === "supabase" ? "SparrowX Cloud Live" : "Offline"}
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -1329,7 +1329,7 @@ function Dashboard() {
                     size="sm"
                     variant="ghost"
                   >
-                    <Database /> Supabase connection
+                    <Database /> Cloud & telemetry pipelines
                   </Button>
                 </>
               )}
@@ -1419,7 +1419,7 @@ function Dashboard() {
                     Security overview
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Live security posture computed from your Supabase production records.
+                    Live security posture computed from your production telemetry records.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 self-start sm:self-auto">
@@ -1462,14 +1462,14 @@ function Dashboard() {
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {protectedServices.length} onboarded service(s) · {assets.length} monitored host(s) ·{" "}
-                      {incidents.length} incident(s) in Supabase
+                      {incidents.length} incident(s) in SparrowX Cloud
                     </span>
                   </div>
                   <h2 className="mt-1.5 text-sm font-semibold">
                     Onboard your Web Apps, Cloud APIs, and AI Agents (LLM / MCP)
                   </h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Register production endpoints to generate live SDK keys and stream security events directly into Supabase.
+                    Register production endpoints to generate live SDK keys and stream security events directly into SparrowX Cloud.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1907,7 +1907,7 @@ function Dashboard() {
                   <ShieldCheck className="mx-auto size-6 text-primary" />
                   <h2 className="mt-3 text-sm font-semibold">No production services onboarded yet</h2>
                   <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-                    Use the form above to register your first Web App, Cloud API, or AI Agent and generate its live Supabase ingestion SDK snippet.
+                    Use the form above to register your first Web App, Cloud API, or AI Agent and generate its live SparrowX Cloud ingestion SDK snippet.
                   </p>
                 </section>
               )}
@@ -1975,7 +1975,7 @@ function Dashboard() {
                     Threat intel & IOCs
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Correlate indicators of compromise and enforce perimeter firewall blocklists in Supabase.
+                    Correlate indicators of compromise and enforce perimeter firewall blocklists in SparrowX Cloud.
                   </p>
                 </div>
               </section>
@@ -2281,7 +2281,7 @@ function Dashboard() {
                     Vulnerabilities
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Track production CVEs by CVSS score and record package remediation rollouts in Supabase.
+                    Track production CVEs by CVSS score and record package remediation rollouts in SparrowX Cloud.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border bg-card p-1">
@@ -2676,15 +2676,15 @@ function Dashboard() {
                     Backend & telemetry pipelines
                   </div>
                   <h1 className="text-2xl font-semibold text-foreground sm:text-[28px]">
-                    Integrations & Supabase backend
+                    Integrations & Cloud Backend
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Manage your live Supabase PostgreSQL connection and external telemetry pipelines.
+                    Manage your live SparrowX Cloud database connection and external telemetry pipelines.
                   </p>
                 </div>
                 <Button disabled={isSyncing} onClick={syncWithBackend}>
                   <RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  Sync Supabase now
+                  Sync Cloud now
                 </Button>
               </section>
 
@@ -2692,7 +2692,7 @@ function Dashboard() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-semibold">Supabase Production Database</h2>
+                      <h2 className="text-base font-semibold">SparrowX Production Database</h2>
                       <span
                         className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold ${
                           backendSource === "supabase"
@@ -2704,39 +2704,25 @@ function Dashboard() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Endpoint: <code className="text-foreground">{supabaseUrl}</code>. Execute{" "}
-                      <code className="text-foreground">supabase/schema.sql</code> in the Supabase SQL
-                      Editor to ensure all production tables (<code className="text-foreground">incidents</code>,{" "}
+                      Provision your production database schema to ensure all security tables (<code className="text-foreground">incidents</code>,{" "}
                       <code className="text-foreground">threat_feeds</code>,{" "}
                       <code className="text-foreground">assets</code>,{" "}
                       <code className="text-foreground">vulnerabilities</code>,{" "}
                       <code className="text-foreground">reports</code>,{" "}
                       <code className="text-foreground">protected_services</code>,{" "}
                       <code className="text-foreground">team_members</code>,{" "}
-                      <code className="text-foreground">integrations</code>) are provisioned.
+                      <code className="text-foreground">integrations</code>) are active.
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       onClick={() => {
                         navigator.clipboard?.writeText(supabaseSchemaSql);
-                        showToast("Copied full 10-table SQL schema to clipboard");
+                        showToast("Copied full SQL schema to clipboard");
                       }}
                       size="sm"
                     >
                       <Copy className="size-3.5" /> Copy Full SQL Schema
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        navigator.clipboard?.writeText(
-                          `VITE_SUPABASE_URL=${supabaseUrl}\nVITE_SUPABASE_ANON_KEY=${supabaseAnonKey}`,
-                        );
-                        showToast("Copied .env configuration to clipboard");
-                      }}
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Copy className="size-3.5" /> Copy .env variables
                     </Button>
                   </div>
                 </div>
@@ -2832,7 +2818,7 @@ function Dashboard() {
                   <Boxes className="mx-auto size-5 text-muted-foreground" />
                   <p className="mt-3 text-sm font-medium">No external connectors registered</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Add your SIEM, EDR, or cloud log connectors above to track external ingestion pipelines alongside Supabase.
+                    Add your SIEM, EDR, or cloud log connectors above to track external ingestion pipelines alongside SparrowX Cloud.
                   </p>
                 </section>
               )}
@@ -2851,7 +2837,7 @@ function Dashboard() {
                     Help center & playbooks
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Production operating procedures for onboarding services, Supabase schema setup, and incident containment.
+                    Production operating procedures for onboarding services, cloud database schema setup, and incident containment.
                   </p>
                 </div>
               </section>
@@ -2861,7 +2847,7 @@ function Dashboard() {
                   <Terminal className="size-5 text-primary" />
                   <h2 className="mt-3 text-base font-semibold">Web & AI Agent SDK Integration</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Onboard any web application or LLM/MCP agent to generate a live ingestion snippet that streams incidents directly into Supabase.
+                    Onboard any web application or LLM/MCP agent to generate a live ingestion snippet that streams incidents directly into SparrowX Cloud.
                   </p>
                   <Button
                     className="mt-4 h-8 px-3 text-xs"
@@ -2874,9 +2860,9 @@ function Dashboard() {
                 </article>
                 <article className="border border-border bg-card p-5">
                   <Database className="size-5 text-success" />
-                  <h2 className="mt-3 text-base font-semibold">Supabase Schema Provisioning</h2>
+                  <h2 className="mt-3 text-base font-semibold">Database Schema Provisioning</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Run <code className="text-foreground">supabase/schema.sql</code> in your Supabase SQL Editor to create all production tables with Row-Level Security.
+                    Provision all production security tables with Row-Level Security in your cloud database engine.
                   </p>
                   <Button
                     className="mt-4 h-8 px-3 text-xs"
@@ -3286,7 +3272,7 @@ function Dashboard() {
               if (!targetSrv) return null;
               const snippet = `// SparrowX Production Guardrail SDK (${targetSrv.name})
 // Service ID: ${targetSrv.id} | Key: ${targetSrv.apiKey}
-const SPARROWX_SUPABASE_URL = "${supabaseUrl}";
+const SPARROWX_CLOUD_URL = "${supabaseUrl}";
 const SPARROWX_INGEST_KEY = "${supabaseAnonKey}";
 
 export async function reportThreatToSparrowX(event: {
@@ -3294,7 +3280,7 @@ export async function reportThreatToSparrowX(event: {
   severity: "Critical" | "High" | "Medium";
   summary: string;
 }) {
-  await fetch(\`\${SPARROWX_SUPABASE_URL}/rest/v1/incidents\`, {
+  await fetch(\`\${SPARROWX_CLOUD_URL}/rest/v1/incidents\`, {
     method: "POST",
     headers: {
       apikey: SPARROWX_INGEST_KEY,
@@ -3323,7 +3309,7 @@ export async function reportThreatToSparrowX(event: {
                         Connect {targetSrv.name} to SparrowX
                       </h2>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Add this guardrail helper to your production Web App middleware or AI Agent tool-runner to stream security incidents directly into Supabase.
+                        Add this guardrail helper to your production Web App middleware or AI Agent tool-runner to stream security incidents directly into SparrowX Cloud.
                       </p>
                     </div>
                     <Button
@@ -3430,7 +3416,7 @@ function IncidentsSection({
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Real-time security incidents persisted in Supabase.
+            Real-time security incidents persisted in SparrowX Cloud.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

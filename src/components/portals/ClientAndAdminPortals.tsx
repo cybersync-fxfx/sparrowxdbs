@@ -810,7 +810,7 @@ export function ClientPortalView({
           <section className="max-w-2xl border border-border bg-card p-6">
             <h2 className="text-base font-semibold">Profile & Account Security</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Update your account holder name, email address, and password stored in Supabase.
+              Update your account holder name, email address, and password.
             </p>
             <form
               className="mt-5 space-y-4"
@@ -1032,7 +1032,7 @@ export async function emitSecurityTelemetry(event: {
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  Send an automated verification ping to confirm your endpoint streams to Supabase.
+                  Send an automated verification ping to confirm your endpoint streams to SparrowX Cloud.
                 </p>
                 {!activeTenant.sdkVerified && (
                   <Button
@@ -2141,7 +2141,7 @@ export function PortalLoginScreen({
                 backendSource === "supabase" ? "bg-success" : "bg-warning"
               }`}
             />
-            {backendSource === "supabase" ? "Supabase Auth & Telemetry Live" : "Offline"}
+            {backendSource === "supabase" ? "SparrowX Cloud Live" : "Offline"}
           </div>
         </div>
       </header>
