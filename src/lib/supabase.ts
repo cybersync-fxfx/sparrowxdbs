@@ -103,6 +103,42 @@ export type ProtectedService = {
   lastHeartbeat: string;
 };
 
+export type ServiceModuleId =
+  | "web_security"
+  | "ai_shield"
+  | "cloud_security"
+  | "compliance";
+
+export type PlanTier = "Starter" | "Growth" | "Enterprise";
+export type TenantStatus = "Active" | "Trial" | "Lockdown";
+
+export type ClientTenant = {
+  id: string;
+  name: string;
+  contactEmail: string;
+  primaryDomain: string;
+  planTier: PlanTier;
+  status: TenantStatus;
+  enabledModules: ServiceModuleId[];
+  apiKey: string;
+  sdkVerified: boolean;
+  guardrailsActive: boolean;
+  requestsPerMin: number;
+  blockedThreats: number;
+  avgLatencyMs: number;
+  quotaUsedPct: number;
+};
+
+export type AuditLogEntry = {
+  id: string;
+  actor: string;
+  role: string;
+  action: string;
+  target: string;
+  severity: "Info" | "Warning" | "Critical";
+  timestamp: string;
+};
+
 export type RangeSnapshot = {
   securityScore: string;
   scoreChange: string;
@@ -157,6 +193,8 @@ const STORAGE_KEYS = {
   services: "spx_prod_services_v1",
   team: "spx_prod_team_v1",
   integrations: "spx_prod_integrations_v1",
+  tenants: "spx_prod_tenants_v1",
+  auditLogs: "spx_prod_audit_logs_v1",
   demoPurged: "spx_legacy_demo_purged_v1",
 } as const;
 
@@ -561,6 +599,67 @@ export async function fetchIntegrationsFromBackend(): Promise<IntegrationItem[]>
   }
 }
 
+export async function fetchClientTenantsFromBackend(): Promise<ClientTenant[]> {
+  const cached = readLocalCache<ClientTenant>(STORAGE_KEYS.tenants);
+  if (!isSupabaseConfigured || !supabaseUrl) return cached;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/client_tenants?select=*&order=created_at.desc`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return cached;
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return cached;
+    const mapped: ClientTenant[] = data.map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      contactEmail: String(row.contact_email ?? ""),
+      primaryDomain: String(row.primary_domain ?? ""),
+      planTier: (row.plan_tier as PlanTier) ?? "Growth",
+      status: (row.status as TenantStatus) ?? "Active",
+      enabledModules: Array.isArray(row.enabled_modules)
+        ? (row.enabled_modules as ServiceModuleId[])
+        : ["web_security"],
+      apiKey: String(row.api_key ?? ""),
+      sdkVerified: Boolean(row.sdk_verified ?? false),
+      guardrailsActive: Boolean(row.guardrails_active ?? true),
+      requestsPerMin: Number(row.requests_per_min ?? 0),
+      blockedThreats: Number(row.blocked_threats ?? 0),
+      avgLatencyMs: Number(row.avg_latency_ms ?? 12),
+      quotaUsedPct: Number(row.quota_used_pct ?? 1),
+    }));
+    writeLocalCache(STORAGE_KEYS.tenants, mapped);
+    return mapped;
+  } catch {
+    return cached;
+  }
+}
+
+export async function fetchAuditLogsFromBackend(): Promise<AuditLogEntry[]> {
+  const cached = readLocalCache<AuditLogEntry>(STORAGE_KEYS.auditLogs);
+  if (!isSupabaseConfigured || !supabaseUrl) return cached;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/audit_logs?select=*&order=created_at.desc`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return cached;
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return cached;
+    const mapped: AuditLogEntry[] = data.map((row) => ({
+      id: String(row.id ?? ""),
+      actor: String(row.actor ?? "System Automation"),
+      role: String(row.role ?? "Platform"),
+      action: String(row.action ?? ""),
+      target: String(row.target ?? ""),
+      severity: (row.severity as AuditLogEntry["severity"]) ?? "Info",
+      timestamp: String(row.timestamp ?? "Just now"),
+    }));
+    writeLocalCache(STORAGE_KEYS.auditLogs, mapped);
+    return mapped;
+  } catch {
+    return cached;
+  }
+}
+
 export async function fetchAllWorkspaceData() {
   const [
     incidentsResult,
@@ -571,6 +670,8 @@ export async function fetchAllWorkspaceData() {
     protectedServices,
     teamMembers,
     integrations,
+    clientTenants,
+    auditLogs,
   ] = await Promise.all([
     fetchIncidentsFromBackend(),
     fetchThreatIndicatorsFromBackend(),
@@ -580,6 +681,8 @@ export async function fetchAllWorkspaceData() {
     fetchProtectedServicesFromBackend(),
     fetchTeamMembersFromBackend(),
     fetchIntegrationsFromBackend(),
+    fetchClientTenantsFromBackend(),
+    fetchAuditLogsFromBackend(),
   ]);
 
   return {
@@ -592,6 +695,8 @@ export async function fetchAllWorkspaceData() {
     protectedServices,
     teamMembers,
     integrations,
+    clientTenants,
+    auditLogs,
   };
 }
 
@@ -617,7 +722,9 @@ export async function deleteRecordFromBackend(
     | "reports"
     | "protected_services"
     | "team_members"
-    | "integrations",
+    | "integrations"
+    | "client_tenants"
+    | "audit_logs",
   id: string,
 ): Promise<boolean> {
   if (table === "protected_services") {
@@ -631,6 +738,12 @@ export async function deleteRecordFromBackend(
       (i) => i.id !== id,
     );
     writeLocalCache(STORAGE_KEYS.integrations, next);
+  } else if (table === "client_tenants") {
+    const next = readLocalCache<ClientTenant>(STORAGE_KEYS.tenants).filter((i) => i.id !== id);
+    writeLocalCache(STORAGE_KEYS.tenants, next);
+  } else if (table === "audit_logs") {
+    const next = readLocalCache<AuditLogEntry>(STORAGE_KEYS.auditLogs).filter((i) => i.id !== id);
+    writeLocalCache(STORAGE_KEYS.auditLogs, next);
   }
 
   if (!isSupabaseConfigured || !supabaseUrl) return false;
@@ -860,6 +973,69 @@ export async function persistIntegrationToBackend(integration: IntegrationItem):
         connected: integration.connected,
         events_per_min: integration.eventsPerMin,
         last_sync: integration.lastSync,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function persistClientTenantToBackend(tenant: ClientTenant): Promise<boolean> {
+  const existing = readLocalCache<ClientTenant>(STORAGE_KEYS.tenants);
+  const updated = [tenant, ...existing.filter((item) => item.id !== tenant.id)];
+  writeLocalCache(STORAGE_KEYS.tenants, updated);
+
+  if (!isSupabaseConfigured || !supabaseUrl) return false;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/client_tenants`, {
+      method: "POST",
+      headers: getSupabaseHeaders({
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      }),
+      body: JSON.stringify({
+        id: tenant.id,
+        name: tenant.name,
+        contact_email: tenant.contactEmail,
+        primary_domain: tenant.primaryDomain,
+        plan_tier: tenant.planTier,
+        status: tenant.status,
+        enabled_modules: tenant.enabledModules,
+        api_key: tenant.apiKey,
+        sdk_verified: tenant.sdkVerified,
+        guardrails_active: tenant.guardrailsActive,
+        requests_per_min: tenant.requestsPerMin,
+        blocked_threats: tenant.blockedThreats,
+        avg_latency_ms: tenant.avgLatencyMs,
+        quota_used_pct: tenant.quotaUsedPct,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function persistAuditLogToBackend(entry: AuditLogEntry): Promise<boolean> {
+  const existing = readLocalCache<AuditLogEntry>(STORAGE_KEYS.auditLogs);
+  const updated = [entry, ...existing.filter((item) => item.id !== entry.id)].slice(0, 150);
+  writeLocalCache(STORAGE_KEYS.auditLogs, updated);
+
+  if (!isSupabaseConfigured || !supabaseUrl) return false;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/audit_logs`, {
+      method: "POST",
+      headers: getSupabaseHeaders({
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      }),
+      body: JSON.stringify({
+        id: entry.id,
+        actor: entry.actor,
+        role: entry.role,
+        action: entry.action,
+        target: entry.target,
+        severity: entry.severity,
+        timestamp: entry.timestamp,
       }),
     });
     return response.ok;

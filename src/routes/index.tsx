@@ -61,8 +61,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
+  AdminPortalView,
+  ClientPortalView,
+  SERVICE_MODULES,
+} from "@/components/portals/ClientAndAdminPortals";
+import supabaseSchemaSql from "../../supabase/schema.sql?raw";
+import {
   type Asset,
+  type AuditLogEntry,
   clearAllIncidentsFromBackend,
+  type ClientTenant,
   computeLiveSnapshot,
   deleteRecordFromBackend,
   fetchAllWorkspaceData,
@@ -71,6 +79,8 @@ import {
   type IntegrationItem,
   isSupabaseConfigured,
   persistAssetToBackend,
+  persistAuditLogToBackend,
+  persistClientTenantToBackend,
   persistIncidentToBackend,
   persistIntegrationToBackend,
   persistProtectedServiceToBackend,
@@ -78,11 +88,13 @@ import {
   persistTeamMemberToBackend,
   persistThreatIndicatorToBackend,
   persistVulnerabilityToBackend,
+  type PlanTier,
   type ProtectedService,
   type ProtectionMode,
   type RangeOption,
   type ReportItem,
   type ServiceCategory,
+  type ServiceModuleId,
   type Severity,
   supabaseAnonKey,
   supabaseUrl,
@@ -120,6 +132,17 @@ function Dashboard() {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
   const [protectedServices, setProtectedServices] = useState<ProtectedService[]>([]);
+  const [clientTenants, setClientTenants] = useState<ClientTenant[]>([]);
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+
+  // 3-Tier Portal Mode: "client" (Dynamic Client Portal) | "soc" (SparrowX SOC) | "admin" (Subscriptions & Access Control)
+  const [portalMode, setPortalMode] = useState<"client" | "soc" | "admin">("soc");
+
+  // Internal SparrowX Access Control policies
+  const [staffMfaEnforced, setStaffMfaEnforced] = useState(true);
+  const [jitTenantApproval, setJitTenantApproval] = useState(true);
+  const [ipAllowlistStrict, setIpAllowlistStrict] = useState(true);
 
   // Web App & AI Agent onboarding state
   const [newServiceName, setNewServiceName] = useState("");
@@ -205,6 +228,11 @@ function Dashboard() {
       setProtectedServices(data.protectedServices);
       setTeamMembers(data.teamMembers);
       setIntegrations(data.integrations);
+      setClientTenants(data.clientTenants);
+      if (data.clientTenants.length > 0) {
+        setSelectedTenantId((prev) => prev ?? data.clientTenants[0].id);
+      }
+      setAuditLogs(data.auditLogs);
       setIsLoadingWorkspace(false);
     });
     return () => {
@@ -224,6 +252,8 @@ function Dashboard() {
     setProtectedServices(data.protectedServices);
     setTeamMembers(data.teamMembers);
     setIntegrations(data.integrations);
+    setClientTenants(data.clientTenants);
+    setAuditLogs(data.auditLogs);
     setIsSyncing(false);
     showToast(
       data.source === "supabase"
@@ -762,6 +792,193 @@ function Dashboard() {
 
   const primaryOperator = teamMembers[0] ?? null;
 
+  const recordAudit = async (
+    action: string,
+    target: string,
+    severity: AuditLogEntry["severity"] = "Info",
+  ) => {
+    const entry: AuditLogEntry = {
+      id: `AUD-${Date.now().toString().slice(-4)}`,
+      actor: primaryOperator ? primaryOperator.name : "SparrowX Admin",
+      role: primaryOperator ? primaryOperator.role : "Security Admin",
+      action,
+      target,
+      severity,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    setAuditLogs((prev) => [entry, ...prev]);
+    await persistAuditLogToBackend(entry);
+  };
+
+  const handleCreateTenant = async (input: {
+    name: string;
+    contactEmail: string;
+    primaryDomain: string;
+    planTier: PlanTier;
+    enabledModules: ServiceModuleId[];
+  }) => {
+    const created: ClientTenant = {
+      id: `TNT-${Date.now().toString().slice(-4)}`,
+      name: input.name,
+      contactEmail: input.contactEmail,
+      primaryDomain: input.primaryDomain,
+      planTier: input.planTier,
+      status: "Active",
+      enabledModules: input.enabledModules,
+      apiKey: `spx_tenant_live_${Math.random().toString(16).slice(2, 12)}`,
+      sdkVerified: false,
+      guardrailsActive: true,
+      requestsPerMin: 0,
+      blockedThreats: 0,
+      avgLatencyMs: 11,
+      quotaUsedPct: 1,
+    };
+    setClientTenants((prev) => [created, ...prev]);
+    setSelectedTenantId(created.id);
+    await persistClientTenantToBackend(created);
+    await recordAudit(
+      `Provisioned client tenant (${input.planTier}) with modules: ${input.enabledModules.join(", ")}`,
+      created.name,
+      "Info",
+    );
+    setPortalMode("client");
+    setActiveNav("Client Overview");
+    showToast(`${created.name} onboarded — dynamic client workspace ready`);
+  };
+
+  const handleToggleTenantModule = async (tenantId: string, moduleId: ServiceModuleId) => {
+    let updatedTenant: ClientTenant | null = null;
+    setClientTenants((prev) =>
+      prev.map((tenant) => {
+        if (tenant.id !== tenantId) return tenant;
+        const exists = tenant.enabledModules.includes(moduleId);
+        if (exists && tenant.enabledModules.length <= 1) {
+          showToast("At least one protection module must remain active");
+          return tenant;
+        }
+        const nextModules = exists
+          ? tenant.enabledModules.filter((m) => m !== moduleId)
+          : [...tenant.enabledModules, moduleId];
+        updatedTenant = { ...tenant, enabledModules: nextModules };
+        return updatedTenant;
+      }),
+    );
+    if (updatedTenant) {
+      await persistClientTenantToBackend(updatedTenant);
+      const modMeta = SERVICE_MODULES.find((m) => m.id === moduleId);
+      const isNowActive = (updatedTenant as ClientTenant).enabledModules.includes(moduleId);
+      await recordAudit(
+        `${isNowActive ? "Enabled" : "Disabled"} module "${modMeta?.shortLabel ?? moduleId}"`,
+        (updatedTenant as ClientTenant).name,
+        "Info",
+      );
+      showToast(
+        `${modMeta?.shortLabel ?? moduleId} ${isNowActive ? "added to" : "removed from"} ${(updatedTenant as ClientTenant).name} dashboard`,
+      );
+    }
+  };
+
+  const handleVerifyTenantSdk = async (tenant: ClientTenant) => {
+    const updated: ClientTenant = {
+      ...tenant,
+      sdkVerified: true,
+      requestsPerMin: Math.max(1, tenant.requestsPerMin + 1),
+    };
+    setClientTenants((prev) => prev.map((t) => (t.id === tenant.id ? updated : t)));
+    await persistClientTenantToBackend(updated);
+
+    const verificationIncident: Incident = {
+      id: `INC-${Date.now().toString().slice(-4)}`,
+      title: `[${tenant.name}] Automated SDK Telemetry Handshake Verified`,
+      source: tenant.primaryDomain,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      severity: "Medium",
+      status: "Contained",
+      assignee: primaryOperator ? primaryOperator.name : "Autonomous Guardrail",
+      summary: `Client workspace ${tenant.name} (${tenant.id}) completed automated SDK webhook verification across modules: ${tenant.enabledModules.join(", ")}.`,
+      playbook: "Automated Client Onboarding Verification",
+      affectedAssets: 1,
+    };
+    setIncidents((prev) => [verificationIncident, ...prev]);
+    await persistIncidentToBackend(verificationIncident);
+    await recordAudit("Verified live SDK telemetry webhook", tenant.name, "Info");
+    showToast(`SDK verified for ${tenant.name} — live telemetry connected`);
+  };
+
+  const handleToggleTenantLockdown = async (tenantId: string) => {
+    let updated: ClientTenant | null = null;
+    setClientTenants((prev) =>
+      prev.map((t) => {
+        if (t.id !== tenantId) return t;
+        const nextStatus = t.status === "Lockdown" ? "Active" : "Lockdown";
+        updated = { ...t, status: nextStatus };
+        return updated;
+      }),
+    );
+    if (updated) {
+      await persistClientTenantToBackend(updated);
+      const isLockdown = (updated as ClientTenant).status === "Lockdown";
+      await recordAudit(
+        isLockdown
+          ? "Triggered emergency tenant kill-switch lockdown"
+          : "Lifted tenant lockdown and restored Active state",
+        (updated as ClientTenant).name,
+        isLockdown ? "Critical" : "Info",
+      );
+      showToast(
+        isLockdown
+          ? `${(updated as ClientTenant).name} placed in emergency Lockdown`
+          : `${(updated as ClientTenant).name} restored to Active`,
+      );
+    }
+  };
+
+  const handleRotateTenantKey = async (tenantId: string) => {
+    let updated: ClientTenant | null = null;
+    setClientTenants((prev) =>
+      prev.map((t) => {
+        if (t.id !== tenantId) return t;
+        updated = {
+          ...t,
+          apiKey: `spx_tenant_live_${Math.random().toString(16).slice(2, 12)}`,
+        };
+        return updated;
+      }),
+    );
+    if (updated) {
+      await persistClientTenantToBackend(updated);
+      await recordAudit("Rotated production tenant API key", (updated as ClientTenant).name, "Warning");
+      showToast(`Rotated API key for ${(updated as ClientTenant).name}`);
+    }
+  };
+
+  const handleDeleteTenant = async (tenantId: string) => {
+    const target = clientTenants.find((t) => t.id === tenantId);
+    setClientTenants((prev) => prev.filter((t) => t.id !== tenantId));
+    if (selectedTenantId === tenantId) {
+      setSelectedTenantId(null);
+    }
+    await deleteRecordFromBackend("client_tenants", tenantId);
+    if (target) {
+      await recordAudit("Removed client tenant subscription", target.name, "Warning");
+    }
+    showToast("Client tenant removed");
+  };
+
+  const activeClientTenant =
+    clientTenants.find((t) => t.id === selectedTenantId) ?? clientTenants[0] ?? null;
+
+  const switchPortalMode = (mode: "client" | "soc" | "admin") => {
+    setPortalMode(mode);
+    if (mode === "client") {
+      setActiveNav("Client Overview");
+    } else if (mode === "admin") {
+      setActiveNav("Client Subscriptions");
+    } else {
+      setActiveNav("Overview");
+    }
+  };
+
   return (
     <SidebarProvider
       className="bg-background"
@@ -769,14 +986,18 @@ function Dashboard() {
       open={sidebarOpen}
     >
       <AppSidebar
+        activeClientTenant={activeClientTenant}
         activeNav={activeNav}
+        auditCount={auditLogs.length}
         backendSource={backendSource}
         collapseMode={sidebarCollapseMode}
         incidentCount={openIncidentCount}
         onCollapseModeChange={setSidebarCollapseMode}
         onNavigate={setActiveNav}
+        portalMode={portalMode}
         primaryOperator={primaryOperator}
         serviceCount={protectedServices.length}
+        tenantCount={clientTenants.length}
         vulnCount={openVulnCount}
       />
       <SidebarInset className="min-h-svh bg-background">
@@ -806,10 +1027,52 @@ function Dashboard() {
                 </>
               )}
             </Button>
-            <span className="hidden text-muted-foreground sm:block">Workspace</span>
-            <span className="hidden text-muted-foreground/60 sm:block">/</span>
-            <span className="truncate text-sm font-semibold text-foreground">{activeNav}</span>
-            <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground md:inline-flex">
+
+            {/* 3-Portal Mode Switcher */}
+            <div
+              aria-label="Switch dashboard portal"
+              className="flex items-center gap-1 rounded-md border border-border bg-card p-1"
+            >
+              <button
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  portalMode === "client"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => switchPortalMode("client")}
+                type="button"
+              >
+                Client Portal
+              </button>
+              <button
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  portalMode === "soc"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => switchPortalMode("soc")}
+                type="button"
+              >
+                SOC Triage
+              </button>
+              <button
+                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
+                  portalMode === "admin"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => switchPortalMode("admin")}
+                type="button"
+              >
+                Admin & Subscriptions
+              </button>
+            </div>
+
+            <span className="hidden text-muted-foreground/60 xl:block">/</span>
+            <span className="hidden truncate text-sm font-semibold text-foreground xl:block">
+              {activeNav}
+            </span>
+            <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground 2xl:inline-flex">
               <Database className="size-3 text-primary" />
               {backendSource === "supabase" ? "Supabase Live" : "Offline"}
             </span>
@@ -912,7 +1175,59 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
-          {activeNav === "Overview" && (
+          {portalMode === "client" &&
+            activeNav !== "Help center" &&
+            activeNav !== "Settings" && (
+            <ClientPortalView
+              activeNav={activeNav}
+              assets={assets}
+              incidents={incidents}
+              onCreateTenant={handleCreateTenant}
+              onGenerateReport={generateNewReport}
+              onNavigate={setActiveNav}
+              onOpenServiceSdk={(id) => setSdkServiceId(id)}
+              onSelectTenant={setSelectedTenantId}
+              onToggleTenantModule={handleToggleTenantModule}
+              onVerifyTenantSdk={handleVerifyTenantSdk}
+              protectedServices={protectedServices}
+              reports={reports}
+              selectedTenantId={selectedTenantId}
+              showToast={showToast}
+              supabaseAnonKey={supabaseAnonKey}
+              supabaseUrl={supabaseUrl}
+              tenants={clientTenants}
+              vulnerabilities={vulnerabilities}
+            />
+          )}
+
+          {portalMode === "admin" &&
+            activeNav !== "Help center" &&
+            activeNav !== "Settings" && (
+            <AdminPortalView
+              activeNav={activeNav}
+              auditLogs={auditLogs}
+              ipAllowlistStrict={ipAllowlistStrict}
+              jitTenantApproval={jitTenantApproval}
+              onCreateTenant={handleCreateTenant}
+              onDeleteTenant={handleDeleteTenant}
+              onPreviewClientPortal={(tenantId) => {
+                setSelectedTenantId(tenantId);
+                setPortalMode("client");
+                setActiveNav("Client Overview");
+              }}
+              onRecordAudit={recordAudit}
+              onRotateTenantKey={handleRotateTenantKey}
+              onToggleTenantLockdown={handleToggleTenantLockdown}
+              onToggleTenantModule={handleToggleTenantModule}
+              setIpAllowlistStrict={setIpAllowlistStrict}
+              setJitTenantApproval={setJitTenantApproval}
+              setStaffMfaEnforced={setStaffMfaEnforced}
+              staffMfaEnforced={staffMfaEnforced}
+              tenants={clientTenants}
+            />
+          )}
+
+          {portalMode === "soc" && activeNav === "Overview" && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2225,18 +2540,29 @@ function Dashboard() {
                       <code className="text-foreground">integrations</code>) are provisioned.
                     </p>
                   </div>
-                  <Button
-                    onClick={() => {
-                      navigator.clipboard?.writeText(
-                        `VITE_SUPABASE_URL=${supabaseUrl}\nVITE_SUPABASE_ANON_KEY=${supabaseAnonKey}`,
-                      );
-                      showToast("Copied .env configuration to clipboard");
-                    }}
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Copy className="size-3.5" /> Copy .env variables
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(supabaseSchemaSql);
+                        showToast("Copied full 10-table SQL schema to clipboard");
+                      }}
+                      size="sm"
+                    >
+                      <Copy className="size-3.5" /> Copy Full SQL Schema
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(
+                          `VITE_SUPABASE_URL=${supabaseUrl}\nVITE_SUPABASE_ANON_KEY=${supabaseAnonKey}`,
+                        );
+                        showToast("Copied .env configuration to clipboard");
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Copy className="size-3.5" /> Copy .env variables
+                    </Button>
+                  </div>
                 </div>
               </section>
 
@@ -3083,25 +3409,33 @@ function AppSidebar({
   incidentCount,
   vulnCount,
   serviceCount,
+  tenantCount,
+  auditCount,
   backendSource,
   collapseMode,
   onCollapseModeChange,
   primaryOperator,
+  portalMode,
+  activeClientTenant,
 }: {
   activeNav: string;
   onNavigate: (label: string) => void;
   incidentCount: number;
   vulnCount: number;
   serviceCount: number;
+  tenantCount: number;
+  auditCount: number;
   backendSource: "supabase" | "offline";
   collapseMode: "icon" | "offcanvas";
   onCollapseModeChange: (mode: "icon" | "offcanvas") => void;
   primaryOperator: TeamMember | null;
+  portalMode: "client" | "soc" | "admin";
+  activeClientTenant: ClientTenant | null;
 }) {
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const navItems = [
+  const socNavItems = [
     { label: "Overview", icon: Activity },
     {
       label: "Web & AI Shield",
@@ -3123,6 +3457,47 @@ function AppSidebar({
     { label: "Reports", icon: FileSearch },
   ];
 
+  // Dynamic Client Sidebar: Only renders modules enabled on the client's subscription!
+  const clientEnabledModules = activeClientTenant?.enabledModules ?? [];
+  const clientNavItems: Array<{ label: string; icon: typeof Activity; count?: string }> = [
+    { label: "Client Overview", icon: Sparkles },
+    ...(clientEnabledModules.includes("web_security")
+      ? [{ label: "Web & WAF Security", icon: Globe2 }]
+      : []),
+    ...(clientEnabledModules.includes("ai_shield")
+      ? [{ label: "AI Agent & LLM Shield", icon: ShieldCheck }]
+      : []),
+    ...(clientEnabledModules.includes("cloud_security")
+      ? [{ label: "Cloud & Endpoint Security", icon: Server }]
+      : []),
+    ...(clientEnabledModules.includes("compliance")
+      ? [{ label: "Compliance & Evidence", icon: FileSearch }]
+      : []),
+    { label: "Subscription & Modules", icon: Wrench },
+  ];
+
+  // SparrowX Admin & Subscription Command Center Sidebar
+  const adminNavItems: Array<{ label: string; icon: typeof Activity; count?: string }> = [
+    {
+      label: "Client Subscriptions",
+      icon: Users,
+      count: tenantCount > 0 ? String(tenantCount) : undefined,
+    },
+    { label: "Performance & Kill-Switch", icon: Activity },
+    {
+      label: "Access Control & Audit",
+      icon: LockKeyhole,
+      count: auditCount > 0 ? String(auditCount) : undefined,
+    },
+  ];
+
+  const navItems =
+    portalMode === "client"
+      ? clientNavItems
+      : portalMode === "admin"
+        ? adminNavItems
+        : socNavItems;
+
   return (
     <Sidebar
       collapsible={collapseMode}
@@ -3133,8 +3508,18 @@ function AppSidebar({
           <button
             aria-label={isCollapsed ? "Expand sidebar" : "SparrowX Home"}
             className="grid size-9 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
-            onClick={() => (isCollapsed ? toggleSidebar() : onNavigate("Overview"))}
-            title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Overview"}
+            onClick={() =>
+              isCollapsed
+                ? toggleSidebar()
+                : onNavigate(
+                    portalMode === "client"
+                      ? "Client Overview"
+                      : portalMode === "admin"
+                        ? "Client Subscriptions"
+                        : "Overview",
+                  )
+            }
+            title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Home"}
             type="button"
           >
             <ShieldCheck className="size-5" />
@@ -3143,7 +3528,13 @@ function AppSidebar({
             <div className="font-display text-base font-semibold">
               sparrow<span className="text-primary">x</span>
             </div>
-            <div className="text-[10px] uppercase text-muted-foreground">Security platform</div>
+            <div className="text-[10px] uppercase text-muted-foreground">
+              {portalMode === "client"
+                ? "Client Portal"
+                : portalMode === "admin"
+                  ? "Admin Command"
+                  : "SOC Platform"}
+            </div>
           </div>
           <Button
             aria-label={isCollapsed ? "Expand sidebar" : "Minimize sidebar"}
@@ -3162,15 +3553,33 @@ function AppSidebar({
               backendSource === "supabase" ? "bg-success" : "bg-warning"
             }`}
           />
-          <span className="text-xs font-medium">Production</span>
+          <span className="truncate text-xs font-medium">
+            {portalMode === "client"
+              ? activeClientTenant
+                ? activeClientTenant.name
+                : "New Client Setup"
+              : portalMode === "admin"
+                ? "Master Control"
+                : "Production SOC"}
+          </span>
           <span className="ml-auto text-[10px] text-muted-foreground">
-            {backendSource === "supabase" ? "SUPABASE" : "OFFLINE"}
+            {portalMode === "client" && activeClientTenant
+              ? activeClientTenant.planTier.toUpperCase()
+              : backendSource === "supabase"
+                ? "SUPABASE"
+                : "OFFLINE"}
           </span>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup className="group-data-[collapsible=icon]:items-center">
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            {portalMode === "client"
+              ? "Subscribed Services"
+              : portalMode === "admin"
+                ? "Admin & Governance"
+                : "SOC Workspace"}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="group-data-[collapsible=icon]:items-center">
               {navItems.map(({ label, icon: Icon, count }) => (
@@ -3189,33 +3598,35 @@ function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
-          <SidebarGroupLabel>Manage</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeNav === "Team & access"}
-                  onClick={() => onNavigate("Team & access")}
-                  tooltip="Team & access"
-                >
-                  <Users />
-                  <span>Team & access</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeNav === "Integrations"}
-                  onClick={() => onNavigate("Integrations")}
-                  tooltip="Integrations"
-                >
-                  <Boxes />
-                  <span>Integrations</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {portalMode === "soc" && (
+          <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+            <SidebarGroupLabel>Manage</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={activeNav === "Team & access"}
+                    onClick={() => onNavigate("Team & access")}
+                    tooltip="Team & access"
+                  >
+                    <Users />
+                    <span>Team & access</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={activeNav === "Integrations"}
+                    onClick={() => onNavigate("Integrations")}
+                    tooltip="Integrations"
+                  >
+                    <Boxes />
+                    <span>Integrations</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
         <SidebarMenu className="group-data-[collapsible=icon]:items-center">

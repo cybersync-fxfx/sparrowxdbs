@@ -147,3 +147,42 @@ alter table public.integrations enable row level security;
 drop policy if exists "Allow access on integrations" on public.integrations;
 create policy "Allow access on integrations"
   on public.integrations for all using (true) with check (true);
+
+-- 9. Client Tenants & Dynamic Service Subscriptions
+create table if not exists public.client_tenants (
+  id text primary key,
+  name text not null,
+  contact_email text not null,
+  primary_domain text not null,
+  plan_tier text not null default 'Growth',
+  status text not null default 'Active',
+  enabled_modules jsonb not null default '["web_security"]'::jsonb,
+  api_key text not null,
+  sdk_verified boolean not null default false,
+  guardrails_active boolean not null default true,
+  requests_per_min integer not null default 0,
+  blocked_threats integer not null default 0,
+  avg_latency_ms integer not null default 12,
+  quota_used_pct integer not null default 1,
+  created_at timestamptz not null default now()
+);
+alter table public.client_tenants enable row level security;
+drop policy if exists "Allow access on client_tenants" on public.client_tenants;
+create policy "Allow access on client_tenants"
+  on public.client_tenants for all using (true) with check (true);
+
+-- 10. Internal Access Control & Security Audit Logs
+create table if not exists public.audit_logs (
+  id text primary key,
+  actor text not null,
+  role text not null,
+  action text not null,
+  target text not null,
+  severity text not null default 'Info',
+  timestamp text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.audit_logs enable row level security;
+drop policy if exists "Allow access on audit_logs" on public.audit_logs;
+create policy "Allow access on audit_logs"
+  on public.audit_logs for all using (true) with check (true);
