@@ -103,65 +103,6 @@ export type ProtectedService = {
   lastHeartbeat: string;
 };
 
-export const initialProtectedServices: ProtectedService[] = [
-  {
-    id: "SRV-01",
-    name: "Customer Portal & Marketing Web App",
-    category: "Web App & Website",
-    endpoint: "https://app.sparrowx-client.io",
-    mode: "Active Shield",
-    requests24h: "142,800",
-    blockedThreats: 318,
-    apiKey: "spx_live_web_98a4f2c1",
-    promptShield: false,
-    piiRedaction: true,
-    toolCallFirewall: false,
-    lastHeartbeat: "4 sec ago",
-  },
-  {
-    id: "SRV-02",
-    name: "Autonomous Support & Billing AI Agent",
-    category: "AI Agent (LLM / MCP)",
-    endpoint: "agent://support-copilot-prod (GPT-4o + MCP)",
-    mode: "Active Shield",
-    requests24h: "28,450",
-    blockedThreats: 94,
-    apiKey: "spx_live_ai_77d1e9b0",
-    promptShield: true,
-    piiRedaction: true,
-    toolCallFirewall: true,
-    lastHeartbeat: "2 sec ago",
-  },
-  {
-    id: "SRV-03",
-    name: "DevOps Code & SQL Execution Agent",
-    category: "AI Agent (LLM / MCP)",
-    endpoint: "agent://devops-sql-runner (Claude + DB Tools)",
-    mode: "Active Shield",
-    requests24h: "6,120",
-    blockedThreats: 41,
-    apiKey: "spx_live_ai_34c8a112",
-    promptShield: true,
-    piiRedaction: true,
-    toolCallFirewall: true,
-    lastHeartbeat: "9 sec ago",
-  },
-  {
-    id: "SRV-04",
-    name: "Core Payments & Identity Gateway API",
-    category: "Cloud API & Microservice",
-    endpoint: "https://api.sparrowx-client.io/v2",
-    mode: "Active Shield",
-    requests24h: "419,200",
-    blockedThreats: 612,
-    apiKey: "spx_live_api_51f0b8e4",
-    promptShield: false,
-    piiRedaction: true,
-    toolCallFirewall: false,
-    lastHeartbeat: "1 sec ago",
-  },
-];
-
 export type RangeSnapshot = {
   securityScore: string;
   scoreChange: string;
@@ -181,425 +122,131 @@ export type RangeSnapshot = {
   };
 };
 
-export const rangeSnapshots: Record<RangeOption, RangeSnapshot> = {
-  "24 hours": {
-    securityScore: "92",
-    scoreChange: "+4.2%",
-    protectedAssets: "248",
-    assetsChange: "+12",
-    meanResponse: "14",
-    responseChange: "−18%",
-    totalEvents: "1,284",
-    eventsDelta: "12.8%",
-    riskPoints: [22, 28, 25, 34, 31, 45, 39, 44, 36, 50, 48, 58, 47, 54, 49, 65, 58, 69, 57, 64, 55, 71, 65, 76],
-    labels: ["12:00 AM", "6:00 AM", "12:00 PM", "6:00 PM", "Now"],
-    postureBreakdown: { critical: 3, high: 12, medium: 28, low: 91 },
-  },
-  "7 days": {
-    securityScore: "94",
-    scoreChange: "+6.1%",
-    protectedAssets: "248",
-    assetsChange: "+19",
-    meanResponse: "11",
-    responseChange: "−24%",
-    totalEvents: "8,940",
-    eventsDelta: "7.4%",
-    riskPoints: [30, 35, 29, 42, 38, 46, 40, 52, 47, 43, 56, 50, 61, 53, 48, 62, 59, 66, 60, 68, 63, 70, 67, 74],
-    labels: ["Mon", "Tue", "Wed", "Thu", "Now"],
-    postureBreakdown: { critical: 2, high: 9, medium: 24, low: 99 },
-  },
-  "30 days": {
-    securityScore: "89",
-    scoreChange: "+9.5%",
-    protectedAssets: "248",
-    assetsChange: "+34",
-    meanResponse: "16",
-    responseChange: "−31%",
-    totalEvents: "34,612",
-    eventsDelta: "19.2%",
-    riskPoints: [18, 24, 21, 29, 36, 33, 41, 38, 49, 45, 53, 60, 52, 58, 64, 55, 62, 70, 61, 67, 73, 68, 79, 82],
-    labels: ["Oct 1", "Oct 8", "Oct 15", "Oct 22", "Now"],
-    postureBreakdown: { critical: 4, high: 15, medium: 33, low: 82 },
-  },
-};
+const LEGACY_DEMO_INCIDENT_IDS = new Set([
+  "INC-2847",
+  "INC-2846",
+  "INC-2845",
+  "INC-2844",
+  "INC-2843",
+  "INC-2842",
+]);
 
-export const initialIncidents: Incident[] = [
-  {
-    id: "INC-2847",
-    title: "Unusual sign-in activity detected",
-    source: "Identity · accounts.sparrowx.io",
-    time: "2 min ago",
-    severity: "Critical",
-    status: "Investigating",
-    assignee: "Jordan Davis",
-    summary:
-      "Multiple impossible-travel OAuth token exchanges observed from ASN 4134 followed by privilege escalation attempts against production identity roles.",
-    playbook: "Identity Compromise Response",
-    affectedAssets: 3,
-  },
-  {
-    id: "INC-2846",
-    title: "Possible data exfiltration over DNS",
-    source: "Network · 10.24.8.142",
-    time: "18 min ago",
-    severity: "High",
-    status: "Open",
-    assignee: "Elena Rostova",
-    summary:
-      "High-entropy TXT queries burst to an uncategorized external resolver exceeding 48 MB over 12 minutes from workload subnet.",
-    playbook: "DNS Tunneling Containment",
-    affectedAssets: 2,
-  },
-  {
-    id: "INC-2845",
-    title: "Outdated OpenSSL on production host",
-    source: "Vulnerability · prod-api-03",
-    time: "41 min ago",
-    severity: "High",
-    status: "Open",
-    assignee: "Marcus Vance",
-    summary:
-      "Runtime library scan detected OpenSSL 3.0.1 prior to CVE remediation window on public-facing edge gateway.",
-    playbook: "Zero-Downtime Hotpatch",
-    affectedAssets: 4,
-  },
-  {
-    id: "INC-2844",
-    title: "Suspicious PowerShell execution",
-    source: "Endpoint · FINANCE-LAPTOP-12",
-    time: "1 hr ago",
-    severity: "Medium",
-    status: "Contained",
-    assignee: "Jordan Davis",
-    summary:
-      "Encoded command invocation spawned by macro-enabled attachment; child process tree terminated automatically by EDR sensor.",
-    playbook: "Endpoint Isolation & Forensics",
-    affectedAssets: 1,
-  },
-  {
-    id: "INC-2843",
-    title: "New admin token used from unknown IP",
-    source: "Identity · admin.sparrowx.io",
-    time: "2 hrs ago",
-    severity: "Medium",
-    status: "Investigating",
-    assignee: "Priya Nair",
-    summary:
-      "Service principal token issued outside scheduled CI window accessed audit log configuration endpoints.",
-    playbook: "API Key Rotation",
-    affectedAssets: 1,
-  },
-  {
-    id: "INC-2842",
-    title: "Container privilege escalation attempt",
-    source: "Cloud · k8s-prod-us-east",
-    time: "3 hrs ago",
-    severity: "Critical",
-    status: "Open",
-    assignee: "Marcus Vance",
-    summary:
-      "Worker pod attempted hostPath mount and Linux capabilities expansion via unapproved admission request.",
-    playbook: "Kubernetes Runtime Lockdown",
-    affectedAssets: 5,
-  },
-];
+const STORAGE_KEYS = {
+  services: "spx_prod_services_v1",
+  team: "spx_prod_team_v1",
+  integrations: "spx_prod_integrations_v1",
+  demoPurged: "spx_legacy_demo_purged_v1",
+} as const;
 
-export const initialThreatIndicators: ThreatIndicator[] = [
-  {
-    id: "IOC-901",
-    indicator: "185.220.101.47",
-    type: "IPv4",
-    actor: "UNC-4812 · Velvet Tempest",
-    confidence: 98,
-    severity: "Critical",
-    region: "Frankfurt, DE",
-    blocked: true,
-    lastSeen: "4 min ago",
-  },
-  {
-    id: "IOC-902",
-    indicator: "auth-sync-sparrowx.net",
-    type: "Domain",
-    actor: "Scattered Spider Cluster",
-    confidence: 94,
-    severity: "Critical",
-    region: "Reykjavik, IS",
-    blocked: false,
-    lastSeen: "11 min ago",
-  },
-  {
-    id: "IOC-903",
-    indicator: "e3b0c44298fc1c149afbf4c8996fb924",
-    type: "SHA-256",
-    actor: "BlackCat Loader",
-    confidence: 89,
-    severity: "High",
-    region: "Global CDN",
-    blocked: true,
-    lastSeen: "27 min ago",
-  },
-  {
-    id: "IOC-904",
-    indicator: "AS4134 · No.31 Jin-rong Backbones",
-    type: "ASN",
-    actor: "Automated Credential Stuffing",
-    confidence: 82,
-    severity: "High",
-    region: "APAC",
-    blocked: false,
-    lastSeen: "39 min ago",
-  },
-  {
-    id: "IOC-905",
-    indicator: "telemetry-dns-tunnel.io",
-    type: "Domain",
-    actor: "Exfil Beacon Group",
-    confidence: 91,
-    severity: "Medium",
-    region: "Bucharest, RO",
-    blocked: false,
-    lastSeen: "1 hr ago",
-  },
-];
+function readLocalCache<T>(key: string): T[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
 
-export const initialAssets: Asset[] = [
-  {
-    id: "AST-101",
-    hostname: "prod-api-03.sparrowx.internal",
-    type: "API Gateway",
-    ip: "10.24.4.19",
-    environment: "Production",
-    owner: "Platform Core",
-    riskScore: 78,
-    status: "Attention",
-    lastCheckin: "30 sec ago",
-  },
-  {
-    id: "AST-102",
-    hostname: "k8s-prod-us-east-node-07",
-    type: "Kubernetes Node",
-    ip: "10.24.8.142",
-    environment: "Production",
-    owner: "Cloud Infra",
-    riskScore: 84,
-    status: "Attention",
-    lastCheckin: "1 min ago",
-  },
-  {
-    id: "AST-103",
-    hostname: "FINANCE-LAPTOP-12",
-    type: "Workstation",
-    ip: "172.16.42.88",
-    environment: "Corporate",
-    owner: "Finance Ops",
-    riskScore: 24,
-    status: "Isolated",
-    lastCheckin: "3 min ago",
-  },
-  {
-    id: "AST-104",
-    hostname: "pg-ledger-primary-01",
-    type: "Database",
-    ip: "10.24.12.5",
-    environment: "Production",
-    owner: "Data Engineering",
-    riskScore: 12,
-    status: "Protected",
-    lastCheckin: "15 sec ago",
-  },
-  {
-    id: "AST-105",
-    hostname: "accounts.sparrowx.io",
-    type: "Identity Provider",
-    ip: "10.24.1.10",
-    environment: "Production",
-    owner: "Identity & Access",
-    riskScore: 62,
-    status: "Protected",
-    lastCheckin: "10 sec ago",
-  },
-];
+function writeLocalCache<T>(key: string, items: T[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(items));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
 
-export const initialVulnerabilities: Vulnerability[] = [
-  {
-    id: "VUL-401",
-    cve: "CVE-2026-2148",
-    packageName: "openssl-libssl3 (3.0.1)",
-    cvss: 9.8,
-    severity: "Critical",
-    affectedHosts: 4,
-    status: "Open",
-    fixVersion: "3.0.15-r2",
-  },
-  {
-    id: "VUL-402",
-    cve: "CVE-2026-1892",
-    packageName: "containerd-shim (1.7.11)",
-    cvss: 8.8,
-    severity: "Critical",
-    affectedHosts: 6,
-    status: "In Progress",
-    fixVersion: "1.7.22",
-  },
-  {
-    id: "VUL-403",
-    cve: "CVE-2026-1104",
-    packageName: "nginx-ingress-controller (1.9.4)",
-    cvss: 7.5,
-    severity: "High",
-    affectedHosts: 3,
-    status: "Open",
-    fixVersion: "1.11.2",
-  },
-  {
-    id: "VUL-404",
-    cve: "CVE-2025-9941",
-    packageName: "libcurl4-gnutls (8.4.0)",
-    cvss: 6.4,
-    severity: "Medium",
-    affectedHosts: 11,
-    status: "Patched",
-    fixVersion: "8.9.1",
-  },
-];
+export function computeLiveSnapshot(
+  range: RangeOption,
+  incidents: Incident[],
+  assets: Asset[],
+  vulnerabilities: Vulnerability[],
+  threatIndicators: ThreatIndicator[],
+  protectedServices: ProtectedService[],
+): RangeSnapshot {
+  const openIncidents = incidents.filter((i) => i.status !== "Contained");
+  const openVulns = vulnerabilities.filter((v) => v.status !== "Patched");
 
-export const initialReports: ReportItem[] = [
-  {
-    id: "RPT-701",
-    title: "Q4 SOC 2 Continuous Controls Attestation",
-    framework: "SOC 2 Type II",
-    period: "Oct 1 – Oct 25, 2026",
-    generatedAt: "Today, 09:15 AM",
-    author: "Jordan Davis",
-    status: "Ready",
-  },
-  {
-    id: "RPT-702",
-    title: "Weekly Executive Threat & Posture Digest",
-    framework: "Executive Summary",
-    period: "Oct 18 – Oct 25, 2026",
-    generatedAt: "Today, 06:00 AM",
-    author: "SparrowX Automation",
-    status: "Ready",
-  },
-  {
-    id: "RPT-703",
-    title: "ISO 27001 Annex A Vulnerability Remediation Log",
-    framework: "ISO 27001",
-    period: "October 2026",
-    generatedAt: "Yesterday, 04:45 PM",
-    author: "Priya Nair",
-    status: "Ready",
-  },
-  {
-    id: "RPT-704",
-    title: "NIST CSF 2.0 Incident Response Readiness Drill",
-    framework: "NIST CSF",
-    period: "Q4 2026",
-    generatedAt: "Scheduled · Tomorrow",
-    author: "Elena Rostova",
-    status: "Scheduled",
-  },
-];
+  const criticalCount =
+    openIncidents.filter((i) => i.severity === "Critical").length +
+    openVulns.filter((v) => v.severity === "Critical").length;
+  const highCount =
+    openIncidents.filter((i) => i.severity === "High").length +
+    openVulns.filter((v) => v.severity === "High").length +
+    assets.filter((a) => a.status === "Attention").length;
+  const mediumCount =
+    openIncidents.filter((i) => i.severity === "Medium").length +
+    openVulns.filter((v) => v.severity === "Medium").length +
+    threatIndicators.filter((t) => !t.blocked).length;
+  const lowCount =
+    assets.filter((a) => a.status === "Protected").length +
+    protectedServices.filter((s) => s.mode === "Active Shield").length +
+    incidents.filter((i) => i.status === "Contained").length;
 
-export const initialTeamMembers: TeamMember[] = [
-  {
-    id: "USR-01",
-    name: "Jordan Davis",
-    initials: "JD",
-    email: "jordan.davis@sparrowx.io",
-    role: "Security Admin",
-    mfaEnabled: true,
-    onCall: true,
-    shift: "Primary On-Call · US-East",
-  },
-  {
-    id: "USR-02",
-    name: "Elena Rostova",
-    initials: "ER",
-    email: "elena.rostova@sparrowx.io",
-    role: "Incident Responder",
-    mfaEnabled: true,
-    onCall: true,
-    shift: "Secondary On-Call · EU-Central",
-  },
-  {
-    id: "USR-03",
-    name: "Marcus Vance",
-    initials: "MV",
-    email: "marcus.vance@sparrowx.io",
-    role: "Threat Hunter",
-    mfaEnabled: true,
-    onCall: false,
-    shift: "Cloud & Kubernetes SecOps",
-  },
-  {
-    id: "USR-04",
-    name: "Priya Nair",
-    initials: "PN",
-    email: "priya.nair@sparrowx.io",
-    role: "Compliance Auditor",
-    mfaEnabled: true,
-    onCall: false,
-    shift: "GRC & Identity Governance",
-  },
-];
+  const penalty = criticalCount * 12 + highCount * 5 + mediumCount * 2;
+  const score = Math.max(0, Math.min(100, 100 - penalty));
 
-export const initialIntegrations: IntegrationItem[] = [
-  {
-    id: "INT-01",
-    name: "Supabase Security Backend",
-    category: "Database & Realtime",
-    description: "Stores live incidents, assets, vulnerabilities, and audit logs with Row-Level Security.",
-    connected: true,
-    eventsPerMin: "Realtime",
-    lastSync: "Live",
-  },
-  {
-    id: "INT-02",
-    name: "AWS CloudTrail & GuardDuty",
-    category: "Cloud Telemetry",
-    description: "Ingests IAM activity, VPC flow logs, and EKS runtime findings across 6 production accounts.",
-    connected: true,
-    eventsPerMin: "4,820 / min",
-    lastSync: "12 sec ago",
-  },
-  {
-    id: "INT-03",
-    name: "CrowdStrike Falcon EDR",
-    category: "Endpoint Sensor",
-    description: "Streams process trees, host isolation commands, and kernel telemetry from 248 endpoints.",
-    connected: true,
-    eventsPerMin: "3,190 / min",
-    lastSync: "8 sec ago",
-  },
-  {
-    id: "INT-04",
-    name: "Okta Workforce Identity",
-    category: "Identity Provider",
-    description: "Monitors OAuth token grants, impossible travel anomalies, and admin role changes.",
-    connected: true,
-    eventsPerMin: "940 / min",
-    lastSync: "20 sec ago",
-  },
-  {
-    id: "INT-05",
-    name: "PagerDuty Incident Escalation",
-    category: "SOAR & Alerting",
-    description: "Triggers high-urgency pages for Critical severity incidents and tracks SLA acknowledgement.",
-    connected: false,
-    eventsPerMin: "Standby",
-    lastSync: "Paused",
-  },
-];
+  const totalProtected = assets.length + protectedServices.length;
+  const blockedTotal =
+    protectedServices.reduce((sum, s) => sum + (Number(s.blockedThreats) || 0), 0) +
+    threatIndicators.filter((t) => t.blocked).length;
+  const totalEventsCount = incidents.length + blockedTotal + threatIndicators.length;
+
+  const containedCount = incidents.filter((i) => i.status === "Contained").length;
+  const containmentRatio =
+    incidents.length > 0 ? Math.round((containedCount / incidents.length) * 100) : 100;
+
+  const baseActivity = Math.min(85, Math.max(4, totalEventsCount * 3));
+  const riskPoints = Array.from({ length: 12 }, (_, idx) => {
+    if (totalEventsCount === 0 && openIncidents.length === 0) {
+      return 6;
+    }
+    const factor = (idx + 1) / 12;
+    const wave = idx % 2 === 0 ? 4 : -2;
+    return Math.min(110, Math.max(6, Math.round(baseActivity * factor + criticalCount * 6 + wave)));
+  });
+
+  const labels: [string, string, string, string, string] =
+    range === "24 hours"
+      ? ["00:00", "06:00", "12:00", "18:00", "Now"]
+      : range === "7 days"
+        ? ["-6d", "-4d", "-2d", "-1d", "Now"]
+        : ["-30d", "-21d", "-14d", "-7d", "Now"];
+
+  return {
+    securityScore: String(score),
+    scoreChange:
+      criticalCount === 0 ? "Optimal posture" : `${criticalCount} critical open`,
+    protectedAssets: String(totalProtected),
+    assetsChange: `${assets.length} hosts · ${protectedServices.length} services`,
+    meanResponse: incidents.length === 0 ? "0" : `${containmentRatio}%`,
+    responseChange:
+      incidents.length === 0
+        ? "No active incidents"
+        : `${containedCount}/${incidents.length} contained`,
+    totalEvents: totalEventsCount.toLocaleString(),
+    eventsDelta: `${blockedTotal} blocked`,
+    riskPoints,
+    labels,
+    postureBreakdown: {
+      critical: criticalCount,
+      high: highCount,
+      medium: mediumCount,
+      low: lowCount,
+    },
+  };
+}
 
 const DEFAULT_SUPABASE_URL = "https://yidqdgufjgfyxflgvbqq.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-";
 
-const supabaseUrl = (
+export const supabaseUrl = (
   (import.meta.env.VITE_SUPABASE_URL as string | undefined) || DEFAULT_SUPABASE_URL
 ).replace(/\/$/, "");
-const supabaseAnonKey =
+export const supabaseAnonKey =
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(
@@ -618,13 +265,34 @@ function getSupabaseHeaders(extra?: Record<string, string>): HeadersInit {
   };
 }
 
+async function purgeLegacyDemoIncidentsOnce(): Promise<void> {
+  if (!isSupabaseConfigured || !supabaseUrl) return;
+  if (typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEYS.demoPurged)) {
+    return;
+  }
+  try {
+    const ids = Array.from(LEGACY_DEMO_INCIDENT_IDS).join(",");
+    const res = await fetch(`${supabaseUrl}/rest/v1/incidents?id=in.(${ids})`, {
+      method: "DELETE",
+      headers: getSupabaseHeaders(),
+    });
+    if (res.ok && typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEYS.demoPurged, "1");
+    }
+  } catch {
+    // Ignore network error during cleanup
+  }
+}
+
 export async function fetchIncidentsFromBackend(): Promise<{
   incidents: Incident[];
-  source: "supabase" | "demo";
+  source: "supabase" | "offline";
 }> {
   if (!isSupabaseConfigured || !supabaseUrl) {
-    return { incidents: initialIncidents, source: "demo" };
+    return { incidents: [], source: "offline" };
   }
+
+  await purgeLegacyDemoIncidentsOnce();
 
   try {
     const response = await fetch(
@@ -635,31 +303,248 @@ export async function fetchIncidentsFromBackend(): Promise<{
     );
 
     if (!response.ok) {
-      return { incidents: initialIncidents, source: "demo" };
+      return { incidents: [], source: "offline" };
     }
 
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) {
-      return { incidents: initialIncidents, source: "demo" };
+      return { incidents: [], source: "offline" };
     }
 
-    const mapped: Incident[] = data.map((row) => ({
-      id: String(row.id ?? ""),
-      title: String(row.title ?? ""),
-      source: String(row.source ?? ""),
-      time: String(row.time ?? "Just now"),
-      severity: (row.severity as Severity) ?? "Medium",
-      status: (row.status as IncidentStatus) ?? "Open",
-      assignee: String(row.assignee ?? "Jordan Davis"),
-      summary: String(row.summary ?? ""),
-      playbook: String(row.playbook ?? "Standard Triage Playbook"),
-      affectedAssets: Number(row.affected_assets ?? 1),
-    }));
+    const mapped: Incident[] = data
+      .filter((row) => !LEGACY_DEMO_INCIDENT_IDS.has(String(row.id ?? "")))
+      .map((row) => ({
+        id: String(row.id ?? ""),
+        title: String(row.title ?? ""),
+        source: String(row.source ?? ""),
+        time: String(row.time ?? "Just now"),
+        severity: (row.severity as Severity) ?? "Medium",
+        status: (row.status as IncidentStatus) ?? "Open",
+        assignee: String(row.assignee ?? "Unassigned"),
+        summary: String(row.summary ?? ""),
+        playbook: String(row.playbook ?? "Standard Triage Playbook"),
+        affectedAssets: Number(row.affected_assets ?? 1),
+      }));
 
     return { incidents: mapped, source: "supabase" };
   } catch {
-    return { incidents: initialIncidents, source: "demo" };
+    return { incidents: [], source: "offline" };
   }
+}
+
+export async function fetchThreatIndicatorsFromBackend(): Promise<ThreatIndicator[]> {
+  if (!isSupabaseConfigured || !supabaseUrl) return [];
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/threat_feeds?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return [];
+    return data.map((row) => ({
+      id: String(row.id ?? ""),
+      indicator: String(row.indicator ?? ""),
+      type: (row.type as ThreatIndicator["type"]) ?? "IPv4",
+      actor: String(row.actor ?? "Unknown"),
+      confidence: Number(row.confidence ?? 85),
+      severity: (row.severity as Severity) ?? "High",
+      region: String(row.region ?? "Global"),
+      blocked: Boolean(row.blocked ?? false),
+      lastSeen: String(row.last_seen ?? "Just now"),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchAssetsFromBackend(): Promise<Asset[]> {
+  if (!isSupabaseConfigured || !supabaseUrl) return [];
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/assets?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return [];
+    return data.map((row) => ({
+      id: String(row.id ?? ""),
+      hostname: String(row.hostname ?? ""),
+      type: (row.type as Asset["type"]) ?? "API Gateway",
+      ip: String(row.ip ?? ""),
+      environment: (row.environment as Asset["environment"]) ?? "Production",
+      owner: String(row.owner ?? ""),
+      riskScore: Number(row.risk_score ?? 10),
+      status: (row.status as Asset["status"]) ?? "Protected",
+      lastCheckin: String(row.last_checkin ?? "Just now"),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchVulnerabilitiesFromBackend(): Promise<Vulnerability[]> {
+  if (!isSupabaseConfigured || !supabaseUrl) return [];
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/vulnerabilities?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return [];
+    return data.map((row) => ({
+      id: String(row.id ?? ""),
+      cve: String(row.cve ?? ""),
+      packageName: String(row.package_name ?? ""),
+      cvss: Number(row.cvss ?? 5.0),
+      severity: (row.severity as Severity) ?? "Medium",
+      affectedHosts: Number(row.affected_hosts ?? 1),
+      status: (row.status as Vulnerability["status"]) ?? "Open",
+      fixVersion: String(row.fix_version ?? ""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchReportsFromBackend(): Promise<ReportItem[]> {
+  if (!isSupabaseConfigured || !supabaseUrl) return [];
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/reports?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return [];
+    return data.map((row) => ({
+      id: String(row.id ?? ""),
+      title: String(row.title ?? ""),
+      framework: (row.framework as ReportItem["framework"]) ?? "SOC 2 Type II",
+      period: String(row.period ?? ""),
+      generatedAt: String(row.generated_at ?? "Just now"),
+      author: String(row.author ?? ""),
+      status: (row.status as ReportItem["status"]) ?? "Ready",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchProtectedServicesFromBackend(): Promise<ProtectedService[]> {
+  const cached = readLocalCache<ProtectedService>(STORAGE_KEYS.services);
+  if (!isSupabaseConfigured || !supabaseUrl) return cached;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/protected_services?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return cached;
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return cached;
+    const mapped: ProtectedService[] = data.map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      category: (row.category as ServiceCategory) ?? "Web App & Website",
+      endpoint: String(row.endpoint ?? ""),
+      mode: (row.mode as ProtectionMode) ?? "Active Shield",
+      requests24h: String(row.requests_24h ?? "0"),
+      blockedThreats: Number(row.blocked_threats ?? 0),
+      apiKey: String(row.api_key ?? ""),
+      promptShield: Boolean(row.prompt_shield ?? false),
+      piiRedaction: Boolean(row.pii_redaction ?? true),
+      toolCallFirewall: Boolean(row.tool_call_firewall ?? false),
+      lastHeartbeat: String(row.last_heartbeat ?? "Connected"),
+    }));
+    writeLocalCache(STORAGE_KEYS.services, mapped);
+    return mapped;
+  } catch {
+    return cached;
+  }
+}
+
+export async function fetchTeamMembersFromBackend(): Promise<TeamMember[]> {
+  const cached = readLocalCache<TeamMember>(STORAGE_KEYS.team);
+  if (!isSupabaseConfigured || !supabaseUrl) return cached;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/team_members?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return cached;
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return cached;
+    const mapped: TeamMember[] = data.map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      initials: String(row.initials ?? "OP"),
+      email: String(row.email ?? ""),
+      role: (row.role as TeamMember["role"]) ?? "Incident Responder",
+      mfaEnabled: Boolean(row.mfa_enabled ?? true),
+      onCall: Boolean(row.on_call ?? false),
+      shift: String(row.shift ?? "Primary Shift"),
+    }));
+    writeLocalCache(STORAGE_KEYS.team, mapped);
+    return mapped;
+  } catch {
+    return cached;
+  }
+}
+
+export async function fetchIntegrationsFromBackend(): Promise<IntegrationItem[]> {
+  const cached = readLocalCache<IntegrationItem>(STORAGE_KEYS.integrations);
+  if (!isSupabaseConfigured || !supabaseUrl) return cached;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/integrations?select=*`, {
+      headers: getSupabaseHeaders(),
+    });
+    if (!response.ok) return cached;
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return cached;
+    const mapped: IntegrationItem[] = data.map((row) => ({
+      id: String(row.id ?? ""),
+      name: String(row.name ?? ""),
+      category: String(row.category ?? ""),
+      description: String(row.description ?? ""),
+      connected: Boolean(row.connected ?? true),
+      eventsPerMin: String(row.events_per_min ?? "Active"),
+      lastSync: String(row.last_sync ?? "Live"),
+    }));
+    writeLocalCache(STORAGE_KEYS.integrations, mapped);
+    return mapped;
+  } catch {
+    return cached;
+  }
+}
+
+export async function fetchAllWorkspaceData() {
+  const [
+    incidentsResult,
+    threatIndicators,
+    assets,
+    vulnerabilities,
+    reports,
+    protectedServices,
+    teamMembers,
+    integrations,
+  ] = await Promise.all([
+    fetchIncidentsFromBackend(),
+    fetchThreatIndicatorsFromBackend(),
+    fetchAssetsFromBackend(),
+    fetchVulnerabilitiesFromBackend(),
+    fetchReportsFromBackend(),
+    fetchProtectedServicesFromBackend(),
+    fetchTeamMembersFromBackend(),
+    fetchIntegrationsFromBackend(),
+  ]);
+
+  return {
+    incidents: incidentsResult.incidents,
+    source: incidentsResult.source,
+    threatIndicators,
+    assets,
+    vulnerabilities,
+    reports,
+    protectedServices,
+    teamMembers,
+    integrations,
+  };
 }
 
 export async function clearAllIncidentsFromBackend(): Promise<boolean> {
@@ -675,28 +560,40 @@ export async function clearAllIncidentsFromBackend(): Promise<boolean> {
   }
 }
 
-export async function seedDemoIncidentsToBackend(): Promise<boolean> {
+export async function deleteRecordFromBackend(
+  table:
+    | "incidents"
+    | "threat_feeds"
+    | "assets"
+    | "vulnerabilities"
+    | "reports"
+    | "protected_services"
+    | "team_members"
+    | "integrations",
+  id: string,
+): Promise<boolean> {
+  if (table === "protected_services") {
+    const next = readLocalCache<ProtectedService>(STORAGE_KEYS.services).filter((i) => i.id !== id);
+    writeLocalCache(STORAGE_KEYS.services, next);
+  } else if (table === "team_members") {
+    const next = readLocalCache<TeamMember>(STORAGE_KEYS.team).filter((i) => i.id !== id);
+    writeLocalCache(STORAGE_KEYS.team, next);
+  } else if (table === "integrations") {
+    const next = readLocalCache<IntegrationItem>(STORAGE_KEYS.integrations).filter(
+      (i) => i.id !== id,
+    );
+    writeLocalCache(STORAGE_KEYS.integrations, next);
+  }
+
   if (!isSupabaseConfigured || !supabaseUrl) return false;
   try {
-    const payload = initialIncidents.map((incident) => ({
-      id: incident.id,
-      title: incident.title,
-      source: incident.source,
-      time: incident.time,
-      severity: incident.severity,
-      status: incident.status,
-      assignee: incident.assignee,
-      summary: incident.summary,
-      playbook: incident.playbook,
-      affected_assets: incident.affectedAssets,
-    }));
-    const response = await fetch(`${supabaseUrl}/rest/v1/incidents`, {
-      method: "POST",
-      headers: getSupabaseHeaders({
-        Prefer: "resolution=merge-duplicates,return=minimal",
-      }),
-      body: JSON.stringify(payload),
-    });
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        headers: getSupabaseHeaders(),
+      },
+    );
     return response.ok;
   } catch {
     return false;
@@ -823,6 +720,98 @@ export async function persistReportToBackend(report: ReportItem): Promise<boolea
         generated_at: report.generatedAt,
         author: report.author,
         status: report.status,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function persistProtectedServiceToBackend(
+  service: ProtectedService,
+): Promise<boolean> {
+  const existing = readLocalCache<ProtectedService>(STORAGE_KEYS.services);
+  const updated = [service, ...existing.filter((item) => item.id !== service.id)];
+  writeLocalCache(STORAGE_KEYS.services, updated);
+
+  if (!isSupabaseConfigured || !supabaseUrl) return false;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/protected_services`, {
+      method: "POST",
+      headers: getSupabaseHeaders({
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      }),
+      body: JSON.stringify({
+        id: service.id,
+        name: service.name,
+        category: service.category,
+        endpoint: service.endpoint,
+        mode: service.mode,
+        requests_24h: service.requests24h,
+        blocked_threats: service.blockedThreats,
+        api_key: service.apiKey,
+        prompt_shield: service.promptShield,
+        pii_redaction: service.piiRedaction,
+        tool_call_firewall: service.toolCallFirewall,
+        last_heartbeat: service.lastHeartbeat,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function persistTeamMemberToBackend(member: TeamMember): Promise<boolean> {
+  const existing = readLocalCache<TeamMember>(STORAGE_KEYS.team);
+  const updated = [member, ...existing.filter((item) => item.id !== member.id)];
+  writeLocalCache(STORAGE_KEYS.team, updated);
+
+  if (!isSupabaseConfigured || !supabaseUrl) return false;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/team_members`, {
+      method: "POST",
+      headers: getSupabaseHeaders({
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      }),
+      body: JSON.stringify({
+        id: member.id,
+        name: member.name,
+        initials: member.initials,
+        email: member.email,
+        role: member.role,
+        mfa_enabled: member.mfaEnabled,
+        on_call: member.onCall,
+        shift: member.shift,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function persistIntegrationToBackend(integration: IntegrationItem): Promise<boolean> {
+  const existing = readLocalCache<IntegrationItem>(STORAGE_KEYS.integrations);
+  const updated = [integration, ...existing.filter((item) => item.id !== integration.id)];
+  writeLocalCache(STORAGE_KEYS.integrations, updated);
+
+  if (!isSupabaseConfigured || !supabaseUrl) return false;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/integrations`, {
+      method: "POST",
+      headers: getSupabaseHeaders({
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      }),
+      body: JSON.stringify({
+        id: integration.id,
+        name: integration.name,
+        category: integration.category,
+        description: integration.description,
+        connected: integration.connected,
+        events_per_min: integration.eventsPerMin,
+        last_sync: integration.lastSync,
       }),
     });
     return response.ok;

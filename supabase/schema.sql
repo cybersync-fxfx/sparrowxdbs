@@ -1,5 +1,5 @@
--- SparrowX Security Operations Platform - Supabase Schema & Seed Data
--- Run this full script in your Supabase SQL Editor (make sure no partial text is highlighted when clicking Run).
+-- SparrowX Security Operations Platform - Production Supabase Schema
+-- Run this full script in your Supabase SQL Editor.
 
 create table if not exists public.incidents (
   id text primary key,
@@ -24,7 +24,8 @@ create table if not exists public.threat_feeds (
   severity text not null check (severity in ('Critical', 'High', 'Medium')),
   region text not null,
   blocked boolean not null default false,
-  last_seen text not null default '5 min ago'
+  last_seen text not null default 'Just now',
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.assets (
@@ -34,9 +35,10 @@ create table if not exists public.assets (
   ip text not null,
   environment text not null,
   owner text not null,
-  risk_score integer not null default 12,
+  risk_score integer not null default 10,
   status text not null check (status in ('Protected', 'Isolated', 'Attention')),
-  last_checkin text not null default '1 min ago'
+  last_checkin text not null default 'Just now',
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.vulnerabilities (
@@ -47,7 +49,8 @@ create table if not exists public.vulnerabilities (
   severity text not null check (severity in ('Critical', 'High', 'Medium')),
   affected_hosts integer not null default 1,
   status text not null check (status in ('Open', 'In Progress', 'Patched')),
-  fix_version text not null
+  fix_version text not null,
+  created_at timestamptz not null default now()
 );
 
 create table if not exists public.reports (
@@ -57,7 +60,47 @@ create table if not exists public.reports (
   period text not null,
   generated_at text not null,
   author text not null,
-  status text not null check (status in ('Ready', 'Scheduled'))
+  status text not null check (status in ('Ready', 'Scheduled')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.protected_services (
+  id text primary key,
+  name text not null,
+  category text not null,
+  endpoint text not null,
+  mode text not null default 'Active Shield',
+  requests_24h text not null default '0',
+  blocked_threats integer not null default 0,
+  api_key text not null,
+  prompt_shield boolean not null default false,
+  pii_redaction boolean not null default true,
+  tool_call_firewall boolean not null default false,
+  last_heartbeat text not null default 'Connected',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.team_members (
+  id text primary key,
+  name text not null,
+  initials text not null,
+  email text not null,
+  role text not null,
+  mfa_enabled boolean not null default true,
+  on_call boolean not null default false,
+  shift text not null default 'Primary Shift',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.integrations (
+  id text primary key,
+  name text not null,
+  category text not null,
+  description text not null,
+  connected boolean not null default true,
+  events_per_min text not null default 'Active',
+  last_sync text not null default 'Live',
+  created_at timestamptz not null default now()
 );
 
 alter table public.incidents enable row level security;
@@ -65,33 +108,46 @@ alter table public.threat_feeds enable row level security;
 alter table public.assets enable row level security;
 alter table public.vulnerabilities enable row level security;
 alter table public.reports enable row level security;
+alter table public.protected_services enable row level security;
+alter table public.team_members enable row level security;
+alter table public.integrations enable row level security;
 
 drop policy if exists "Allow public read/write on incidents for demo" on public.incidents;
-create policy "Allow public read/write on incidents for demo"
+drop policy if exists "Allow access on incidents" on public.incidents;
+create policy "Allow access on incidents"
   on public.incidents for all using (true) with check (true);
 
 drop policy if exists "Allow public read/write on threat_feeds for demo" on public.threat_feeds;
-create policy "Allow public read/write on threat_feeds for demo"
+drop policy if exists "Allow access on threat_feeds" on public.threat_feeds;
+create policy "Allow access on threat_feeds"
   on public.threat_feeds for all using (true) with check (true);
 
 drop policy if exists "Allow public read/write on assets for demo" on public.assets;
-create policy "Allow public read/write on assets for demo"
+drop policy if exists "Allow access on assets" on public.assets;
+create policy "Allow access on assets"
   on public.assets for all using (true) with check (true);
 
 drop policy if exists "Allow public read/write on vulnerabilities for demo" on public.vulnerabilities;
-create policy "Allow public read/write on vulnerabilities for demo"
+drop policy if exists "Allow access on vulnerabilities" on public.vulnerabilities;
+create policy "Allow access on vulnerabilities"
   on public.vulnerabilities for all using (true) with check (true);
 
 drop policy if exists "Allow public read/write on reports for demo" on public.reports;
-create policy "Allow public read/write on reports for demo"
+drop policy if exists "Allow access on reports" on public.reports;
+create policy "Allow access on reports"
   on public.reports for all using (true) with check (true);
 
-insert into public.incidents (id, title, source, time, severity, status, assignee, summary, playbook, affected_assets)
-values
-  ('INC-2847', 'Unusual sign-in activity detected', 'Identity · accounts.sparrowx.io', '2 min ago', 'Critical', 'Investigating', 'Jordan Davis', 'Multiple impossible-travel OAuth token exchanges observed from ASN 4134 followed by privilege escalation attempts.', 'Identity Compromise Response', 3),
-  ('INC-2846', 'Possible data exfiltration over DNS', 'Network · 10.24.8.142', '18 min ago', 'High', 'Open', 'Elena Rostova', 'High-entropy TXT queries burst to uncategorized resolver exceeding 48 MB over 12 minutes.', 'DNS Tunneling Containment', 2),
-  ('INC-2845', 'Outdated OpenSSL on production host', 'Vulnerability · prod-api-03', '41 min ago', 'High', 'Open', 'Marcus Vance', 'Runtime library scan detected OpenSSL 3.0.1 prior to CVE remediation window on edge gateway.', 'Zero-Downtime Hotpatch', 4),
-  ('INC-2844', 'Suspicious PowerShell execution', 'Endpoint · FINANCE-LAPTOP-12', '1 hr ago', 'Medium', 'Contained', 'Jordan Davis', 'Encoded command invocation spawned by macro-enabled attachment; process tree terminated by EDR sensor.', 'Endpoint Isolation & Forensics', 1),
-  ('INC-2843', 'New admin token used from unknown IP', 'Identity · admin.sparrowx.io', '2 hrs ago', 'Medium', 'Investigating', 'Priya Nair', 'Service principal token issued outside scheduled CI window accessed audit log configuration.', 'API Key Rotation', 1),
-  ('INC-2842', 'Container privilege escalation attempt', 'Cloud · k8s-prod-us-east', '3 hrs ago', 'Critical', 'Open', 'Marcus Vance', 'Worker pod attempted hostPath mount and capabilities expansion via unapproved admission controller.', 'Kubernetes Runtime Lockdown', 5)
-on conflict (id) do nothing;
+drop policy if exists "Allow access on protected_services" on public.protected_services;
+create policy "Allow access on protected_services"
+  on public.protected_services for all using (true) with check (true);
+
+drop policy if exists "Allow access on team_members" on public.team_members;
+create policy "Allow access on team_members"
+  on public.team_members for all using (true) with check (true);
+
+drop policy if exists "Allow access on integrations" on public.integrations;
+create policy "Allow access on integrations"
+  on public.integrations for all using (true) with check (true);
+
+-- Remove any legacy seeded demo incidents if present
+delete from public.incidents where id in ('INC-2847', 'INC-2846', 'INC-2845', 'INC-2844', 'INC-2843', 'INC-2842');
