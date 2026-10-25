@@ -63,10 +63,12 @@ import {
 import {
   AdminPortalView,
   ClientPortalView,
+  PortalLoginScreen,
   SERVICE_MODULES,
 } from "@/components/portals/ClientAndAdminPortals";
 import supabaseSchemaSql from "../../supabase/schema.sql?raw";
 import {
+  type AppUser,
   type Asset,
   type AuditLogEntry,
   clearAllIncidentsFromBackend,
@@ -78,6 +80,7 @@ import {
   type IncidentStatus,
   type IntegrationItem,
   isSupabaseConfigured,
+  persistAppUserToBackend,
   persistAssetToBackend,
   persistAuditLogToBackend,
   persistClientTenantToBackend,
@@ -137,7 +140,13 @@ function Dashboard() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // 3-Tier Portal Mode: "client" (Dynamic Client Portal) | "soc" (SparrowX SOC) | "admin" (Subscriptions & Access Control)
-  const [portalMode, setPortalMode] = useState<"client" | "soc" | "admin">("soc");
+  const [portalMode, setPortalMode] = useState<"client" | "soc" | "admin">("client");
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
+  const [authSession, setAuthSession] = useState<
+    | { role: "unauthenticated" }
+    | { role: "client"; tenantId: string | null; userEmail: string }
+    | { role: "admin"; operatorName: string; operatorEmail: string }
+  >({ role: "unauthenticated" });
 
   // Internal SparrowX Access Control policies
   const [staffMfaEnforced, setStaffMfaEnforced] = useState(true);
@@ -841,9 +850,13 @@ function Dashboard() {
       created.name,
       "Info",
     );
-    setPortalMode("client");
-    setActiveNav("Client Overview");
-    showToast(`${created.name} onboarded — dynamic client workspace ready`);
+    if (authSession.role === "client") {
+      setPortalMode("client");
+      setActiveNav("My Services");
+      showToast(`${created.name} added to My Services — click it to open dashboard or manage`);
+    } else {
+      showToast(`${created.name} provisioned`);
+    }
   };
 
   const handleToggleTenantModule = async (tenantId: string, moduleId: ServiceModuleId) => {
@@ -960,24 +973,198 @@ function Dashboard() {
     }
     await deleteRecordFromBackend("client_tenants", tenantId);
     if (target) {
-      await recordAudit("Removed client tenant subscription", target.name, "Warning");
+      await recordAudit("Removed client service subscription", target.name, "Warning");
     }
-    showToast("Client tenant removed");
+    showToast("Service removed from your account");
   };
+
+  const handleRenameOrUpdateTenant = async (
+    tenantId: string,
+    updates: Partial<Pick<ClientTenant, "name" | "primaryDomain" | "planTier">>,
+  ) => {
+    let updatedItem: ClientTenant | null = null;
+    setClientTenants((prev) =>
+      prev.map((t) => {
+        if (t.id !== tenantId) return t;
+        updatedItem = { ...t, ...updates };
+        return updatedItem;
+      }),
+    );
+    if (updatedItem) {
+      await persistClientTenantToBackend(updatedItem);
+      await recordAudit(
+        `Updated service configuration (${(updatedItem as ClientTenant).name})`,
+        (updatedItem as ClientTenant).name,
+        "Info",
+      );
+      showToast(`Updated service ${(updatedItem as ClientTenant).name}`);
+    }
+  };
+
+  const handleUpdateUserProfile = async (updates: {
+    fullName: string;
+    email: string;
+    newPassword?: string;
+  }) => {
+    if (!currentUser) return;
+    const updatedUser: AppUser = {
+      ...currentUser,
+      fullName: updates.fullName,
+      email: updates.email.toLowerCase(),
+      password: updates.newPassword ? updates.newPassword : currentUser.password,
+    };
+    setCurrentUser(updatedUser);
+    await persistAppUserToBackend(updatedUser);
+    showToast("Account profile updated in Supabase");
+  };
+
+  const handleSignOut = () => {
+    setCurrentUser(null);
+    setAuthSession({ role: "unauthenticated" });
+    setMenuOpen(false);
+    showToast("Logged out of account");
+  };
+
+  const visibleClientTenants =
+    authSession.role === "client"
+      ? clientTenants.filter(
+          (t) =>
+            t.contactEmail.toLowerCase() === authSession.userEmail.toLowerCase() ||
+            t.id === authSession.tenantId,
+        )
+      : clientTenants;
 
   const activeClientTenant =
-    clientTenants.find((t) => t.id === selectedTenantId) ?? clientTenants[0] ?? null;
+    visibleClientTenants.find((t) => t.id === selectedTenantId) ??
+    visibleClientTenants[0] ??
+    null;
 
-  const switchPortalMode = (mode: "client" | "soc" | "admin") => {
-    setPortalMode(mode);
-    if (mode === "client") {
-      setActiveNav("Client Overview");
-    } else if (mode === "admin") {
-      setActiveNav("Client Subscriptions");
+  const handleNavigate = (navLabel: string) => {
+    if (authSession.role === "admin") {
+      if (
+        navLabel === "Client Subscriptions" ||
+        navLabel === "Performance & Kill-Switch" ||
+        navLabel === "Access Control & Audit"
+      ) {
+        setPortalMode("admin");
+      } else {
+        setPortalMode("soc");
+      }
     } else {
-      setActiveNav("Overview");
+      setPortalMode("client");
     }
+    setActiveNav(navLabel);
   };
+
+  if (authSession.role === "unauthenticated") {
+    return (
+      <PortalLoginScreen
+        backendSource={backendSource}
+        onRegisterAndLoginUser={async (input) => {
+          let createdTenant: ClientTenant | null = null;
+          if (input.orgName && input.primaryDomain) {
+            createdTenant = {
+              id: `TNT-${Date.now().toString().slice(-4)}`,
+              name: input.orgName,
+              contactEmail: input.email,
+              primaryDomain: input.primaryDomain,
+              planTier: input.planTier,
+              status: "Active",
+              enabledModules: input.enabledModules,
+              apiKey: `spx_tenant_live_${Math.random().toString(16).slice(2, 12)}`,
+              sdkVerified: false,
+              guardrailsActive: true,
+              requestsPerMin: 0,
+              blockedThreats: 0,
+              avgLatencyMs: 11,
+              quotaUsedPct: 1,
+            };
+            setClientTenants((prev) => [createdTenant as ClientTenant, ...prev]);
+            setSelectedTenantId(createdTenant.id);
+            await persistClientTenantToBackend(createdTenant);
+          }
+
+          const createdUser: AppUser = {
+            id: `USR-${Date.now().toString().slice(-4)}`,
+            email: input.email.toLowerCase(),
+            password: input.password,
+            fullName: input.fullName,
+            admin: "no",
+            tenantId: createdTenant?.id ?? null,
+          };
+
+          await persistAppUserToBackend(createdUser);
+          await recordAudit(
+            `Registered user ${createdUser.email} (admin=no)`,
+            createdTenant?.name ?? createdUser.email,
+            "Info",
+          );
+
+          setCurrentUser(createdUser);
+          setAuthSession({
+            role: "client",
+            tenantId: createdTenant?.id ?? null,
+            userEmail: createdUser.email,
+          });
+          setPortalMode("client");
+          setActiveNav("My Services");
+          showToast(`Welcome ${createdUser.fullName} — Client Area ready`);
+          return {};
+        }}
+        onUserAuthenticated={(user) => {
+          setCurrentUser(user);
+          if (user.admin === "yes") {
+            setAuthSession({
+              role: "admin",
+              operatorName: user.fullName || "SparrowX Admin",
+              operatorEmail: user.email,
+            });
+            setPortalMode("admin");
+            setActiveNav("Client Subscriptions");
+            void recordAudit(
+              `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
+              "Admin & Subscriptions Portal",
+              "Info",
+            );
+            showToast(`Admin session active (${user.email})`);
+          } else {
+            const matchedTenant =
+              clientTenants.find(
+                (t) =>
+                  t.id === user.tenantId ||
+                  t.contactEmail.toLowerCase() === user.email.toLowerCase(),
+              ) ?? null;
+            if (matchedTenant) {
+              setSelectedTenantId(matchedTenant.id);
+            }
+            setAuthSession({
+              role: "client",
+              tenantId: matchedTenant?.id ?? user.tenantId,
+              userEmail: user.email,
+            });
+            setPortalMode("client");
+            setActiveNav("My Services");
+            void recordAudit(
+              `Client user ${user.email} (admin=no) authenticated into Client Area`,
+              matchedTenant?.name ?? user.email,
+              "Info",
+            );
+            showToast(`Welcome back, ${user.fullName || user.email}`);
+          }
+        }}
+        tenants={clientTenants}
+      />
+    );
+  }
+
+  const userInitials = currentUser?.fullName
+    ? currentUser.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "SX";
 
   return (
     <SidebarProvider
@@ -991,13 +1178,15 @@ function Dashboard() {
         auditCount={auditLogs.length}
         backendSource={backendSource}
         collapseMode={sidebarCollapseMode}
+        currentUser={currentUser}
         incidentCount={openIncidentCount}
+        isAdminSession={authSession.role === "admin"}
         onCollapseModeChange={setSidebarCollapseMode}
-        onNavigate={setActiveNav}
+        onNavigate={handleNavigate}
+        onSignOut={handleSignOut}
         portalMode={portalMode}
-        primaryOperator={primaryOperator}
         serviceCount={protectedServices.length}
-        tenantCount={clientTenants.length}
+        tenantCount={visibleClientTenants.length}
         vulnCount={openVulnCount}
       />
       <SidebarInset className="min-h-svh bg-background">
@@ -1028,147 +1217,129 @@ function Dashboard() {
               )}
             </Button>
 
-            {/* 3-Portal Mode Switcher */}
-            <div
-              aria-label="Switch dashboard portal"
-              className="flex items-center gap-1 rounded-md border border-border bg-card p-1"
-            >
-              <button
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  portalMode === "client"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => switchPortalMode("client")}
-                type="button"
-              >
-                Client Portal
-              </button>
-              <button
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  portalMode === "soc"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => switchPortalMode("soc")}
-                type="button"
-              >
-                SOC Triage
-              </button>
-              <button
-                className={`rounded px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  portalMode === "admin"
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => switchPortalMode("admin")}
-                type="button"
-              >
-                Admin & Subscriptions
-              </button>
-            </div>
-
-            <span className="hidden text-muted-foreground/60 xl:block">/</span>
-            <span className="hidden truncate text-sm font-semibold text-foreground xl:block">
+            <span className="hidden text-muted-foreground/60 sm:block">/</span>
+            <span className="truncate text-sm font-semibold text-foreground">
               {activeNav}
             </span>
-            <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground 2xl:inline-flex">
+            <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex">
               <Database className="size-3 text-primary" />
               {backendSource === "supabase" ? "Supabase Live" : "Offline"}
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground lg:flex">
-              <Search className="size-4" />
-              <input
-                aria-label="Search incidents"
-                className="w-40 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search incidents, IOCs..."
-                value={search}
-              />
-              {search ? (
-                <button
-                  aria-label="Clear search"
-                  className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setSearch("")}
-                  type="button"
-                >
-                  <X className="size-3.5" />
-                </button>
-              ) : (
-                <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                  <Command className="inline size-3" /> K
-                </kbd>
-              )}
-            </div>
+            {authSession.role === "admin" && (
+              <div className="hidden h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground lg:flex">
+                <Search className="size-4" />
+                <input
+                  aria-label="Search incidents"
+                  className="w-40 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search incidents, IOCs..."
+                  value={search}
+                />
+                {search ? (
+                  <button
+                    aria-label="Clear search"
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setSearch("")}
+                    type="button"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                ) : (
+                  <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    <Command className="inline size-3" /> K
+                  </kbd>
+                )}
+              </div>
+            )}
             <Button
-              aria-label="Report new incident"
               className="h-9 px-3 text-xs"
-              onClick={() => setShowCreateModal(true)}
+              onClick={handleSignOut}
               size="sm"
               variant="outline"
             >
-              <Plus className="size-3.5" />
-              <span className="hidden sm:inline">Report incident</span>
-            </Button>
-            <Button
-              aria-label="Notifications"
-              className="relative size-9"
-              onClick={() =>
-                showToast(
-                  openIncidentCount > 0
-                    ? `${openIncidentCount} open incident(s) require attention`
-                    : "No active incident alerts",
-                )
-              }
-              size="icon"
-              variant="outline"
-            >
-              <Bell />
-              {openIncidentCount > 0 && (
-                <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" />
-              )}
+              <LockKeyhole className="size-3.5 text-primary" />
+              <span>Log Out</span>
             </Button>
             <button
-              aria-label="Open workspace menu"
+              aria-label="Open account menu"
               className="flex size-9 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-secondary-foreground"
               onClick={() => setMenuOpen(!menuOpen)}
               type="button"
             >
-              {primaryOperator ? primaryOperator.initials : "SX"}
+              {userInitials}
             </button>
           </div>
         </header>
 
         {menuOpen && (
-          <div className="absolute right-5 top-14 z-30 w-60 border border-border bg-card p-3 shadow-xl">
-            <p className="text-sm font-semibold">SparrowX Production</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {teamMembers.length} registered responder(s) · {protectedServices.length} protected service(s)
+          <div className="absolute right-5 top-14 z-30 w-64 border border-border bg-card p-3.5 shadow-xl">
+            <p className="truncate text-sm font-semibold">
+              {currentUser?.fullName || "Account"}
             </p>
-            <div className="mt-3 flex flex-col gap-1.5">
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {currentUser?.email}
+            </p>
+            <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
+              {authSession.role === "client" ? (
+                <>
+                  <Button
+                    className="w-full justify-start text-xs"
+                    onClick={() => {
+                      handleNavigate("My Services");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Boxes /> My Services (Client Area)
+                  </Button>
+                  <Button
+                    className="w-full justify-start text-xs"
+                    onClick={() => {
+                      handleNavigate("Profile Management");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <Users /> Profile Management
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    className="w-full justify-start text-xs"
+                    onClick={() => {
+                      handleNavigate("Client Subscriptions");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Users /> Client Subscriptions
+                  </Button>
+                  <Button
+                    className="w-full justify-start text-xs"
+                    onClick={() => {
+                      handleNavigate("Integrations");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    <Database /> Supabase connection
+                  </Button>
+                </>
+              )}
               <Button
-                className="w-full justify-start text-xs"
-                onClick={() => {
-                  setActiveNav("Team & access");
-                  setMenuOpen(false);
-                }}
-                size="sm"
-                variant="secondary"
-              >
-                <Users /> Team & responders
-              </Button>
-              <Button
-                className="w-full justify-start text-xs"
-                onClick={() => {
-                  setActiveNav("Integrations");
-                  setMenuOpen(false);
-                }}
+                className="w-full justify-start text-xs text-destructive hover:text-destructive"
+                onClick={handleSignOut}
                 size="sm"
                 variant="ghost"
               >
-                <Database /> Supabase connection
+                <LockKeyhole /> Log Out to Login Page
               </Button>
             </div>
           </div>
@@ -1181,13 +1352,18 @@ function Dashboard() {
             <ClientPortalView
               activeNav={activeNav}
               assets={assets}
+              currentUser={currentUser}
               incidents={incidents}
               onCreateTenant={handleCreateTenant}
+              onDeleteTenant={handleDeleteTenant}
               onGenerateReport={generateNewReport}
-              onNavigate={setActiveNav}
+              onNavigate={handleNavigate}
               onOpenServiceSdk={(id) => setSdkServiceId(id)}
+              onRenameOrUpdateTenant={handleRenameOrUpdateTenant}
               onSelectTenant={setSelectedTenantId}
+              onSignOut={handleSignOut}
               onToggleTenantModule={handleToggleTenantModule}
+              onUpdateUserProfile={handleUpdateUserProfile}
               onVerifyTenantSdk={handleVerifyTenantSdk}
               protectedServices={protectedServices}
               reports={reports}
@@ -1195,7 +1371,7 @@ function Dashboard() {
               showToast={showToast}
               supabaseAnonKey={supabaseAnonKey}
               supabaseUrl={supabaseUrl}
-              tenants={clientTenants}
+              tenants={visibleClientTenants}
               vulnerabilities={vulnerabilities}
             />
           )}
@@ -3414,7 +3590,9 @@ function AppSidebar({
   backendSource,
   collapseMode,
   onCollapseModeChange,
-  primaryOperator,
+  currentUser,
+  isAdminSession,
+  onSignOut,
   portalMode,
   activeClientTenant,
 }: {
@@ -3428,7 +3606,9 @@ function AppSidebar({
   backendSource: "supabase" | "offline";
   collapseMode: "icon" | "offcanvas";
   onCollapseModeChange: (mode: "icon" | "offcanvas") => void;
-  primaryOperator: TeamMember | null;
+  currentUser: AppUser | null;
+  isAdminSession: boolean;
+  onSignOut: () => void;
   portalMode: "client" | "soc" | "admin";
   activeClientTenant: ClientTenant | null;
 }) {
@@ -3457,9 +3637,24 @@ function AppSidebar({
     { label: "Reports", icon: FileSearch },
   ];
 
-  // Dynamic Client Sidebar: Only renders modules enabled on the client's subscription!
+  // Client Area Hub Navigation
+  const clientAreaNavItems: Array<{ label: string; icon: typeof Activity; count?: string }> = [
+    {
+      label: "My Services",
+      icon: Boxes,
+      count: tenantCount > 0 ? String(tenantCount) : undefined,
+    },
+    { label: "Subscriptions & Due Dates", icon: Activity },
+    { label: "Profile Management", icon: Users },
+  ];
+
+  // Service-Specific Dynamic Dashboard Sidebar: Only renders modules enabled on the selected service!
   const clientEnabledModules = activeClientTenant?.enabledModules ?? [];
-  const clientNavItems: Array<{ label: string; icon: typeof Activity; count?: string }> = [
+  const clientServiceDashboardItems: Array<{
+    label: string;
+    icon: typeof Activity;
+    count?: string;
+  }> = [
     { label: "Client Overview", icon: Sparkles },
     ...(clientEnabledModules.includes("web_security")
       ? [{ label: "Web & WAF Security", icon: Globe2 }]
@@ -3491,12 +3686,21 @@ function AppSidebar({
     },
   ];
 
-  const navItems =
-    portalMode === "client"
-      ? clientNavItems
-      : portalMode === "admin"
-        ? adminNavItems
-        : socNavItems;
+  const isInClientArea =
+    !isAdminSession &&
+    (activeNav === "My Services" ||
+      activeNav === "Subscriptions & Due Dates" ||
+      activeNav === "Profile Management" ||
+      !activeClientTenant);
+
+  const initials = currentUser?.fullName
+    ? currentUser.fullName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    : "SX";
 
   return (
     <Sidebar
@@ -3511,13 +3715,7 @@ function AppSidebar({
             onClick={() =>
               isCollapsed
                 ? toggleSidebar()
-                : onNavigate(
-                    portalMode === "client"
-                      ? "Client Overview"
-                      : portalMode === "admin"
-                        ? "Client Subscriptions"
-                        : "Overview",
-                  )
+                : onNavigate(isAdminSession ? "Client Subscriptions" : "My Services")
             }
             title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Home"}
             type="button"
@@ -3529,11 +3727,11 @@ function AppSidebar({
               sparrow<span className="text-primary">x</span>
             </div>
             <div className="text-[10px] uppercase text-muted-foreground">
-              {portalMode === "client"
-                ? "Client Portal"
-                : portalMode === "admin"
-                  ? "Admin Command"
-                  : "SOC Platform"}
+              {isAdminSession
+                ? "Admin & SOC Command"
+                : isInClientArea
+                  ? "Client Area"
+                  : "Service Dashboard"}
             </div>
           </div>
           <Button
@@ -3554,75 +3752,134 @@ function AppSidebar({
             }`}
           />
           <span className="truncate text-xs font-medium">
-            {portalMode === "client"
-              ? activeClientTenant
-                ? activeClientTenant.name
-                : "New Client Setup"
-              : portalMode === "admin"
-                ? "Master Control"
-                : "Production SOC"}
+            {isAdminSession
+              ? "Master Control"
+              : isInClientArea
+                ? currentUser?.fullName || "Client Account"
+                : activeClientTenant?.name || "Service"}
           </span>
           <span className="ml-auto text-[10px] text-muted-foreground">
-            {portalMode === "client" && activeClientTenant
-              ? activeClientTenant.planTier.toUpperCase()
-              : backendSource === "supabase"
-                ? "SUPABASE"
-                : "OFFLINE"}
+            {isAdminSession
+              ? "ADMIN"
+              : !isInClientArea && activeClientTenant
+                ? activeClientTenant.planTier.toUpperCase()
+                : "ACTIVE"}
           </span>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup className="group-data-[collapsible=icon]:items-center">
-          <SidebarGroupLabel>
-            {portalMode === "client"
-              ? "Subscribed Services"
-              : portalMode === "admin"
-                ? "Admin & Governance"
-                : "SOC Workspace"}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-              {navItems.map(({ label, icon: Icon, count }) => (
-                <SidebarMenuItem key={label}>
-                  <SidebarMenuButton
-                    isActive={activeNav === label}
-                    onClick={() => onNavigate(label)}
-                    tooltip={label}
-                  >
-                    <Icon />
-                    <span>{label}</span>
-                    {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        {portalMode === "soc" && (
-          <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
-            <SidebarGroupLabel>Manage</SidebarGroupLabel>
+        {isAdminSession ? (
+          <>
+            <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>Admin & Subscriptions</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {adminNavItems.map(({ label, icon: Icon, count }) => (
+                    <SidebarMenuItem key={label}>
+                      <SidebarMenuButton
+                        isActive={activeNav === label}
+                        onClick={() => onNavigate(label)}
+                        tooltip={label}
+                      >
+                        <Icon />
+                        <span>{label}</span>
+                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socNavItems.map(({ label, icon: Icon, count }) => (
+                    <SidebarMenuItem key={label}>
+                      <SidebarMenuButton
+                        isActive={activeNav === label}
+                        onClick={() => onNavigate(label)}
+                        tooltip={label}
+                      >
+                        <Icon />
+                        <span>{label}</span>
+                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeNav === "Team & access"}
+                      onClick={() => onNavigate("Team & access")}
+                      tooltip="Team & access"
+                    >
+                      <Users />
+                      <span>Team & access</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeNav === "Integrations"}
+                      onClick={() => onNavigate("Integrations")}
+                      tooltip="Integrations"
+                    >
+                      <Boxes />
+                      <span>Integrations</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : isInClientArea ? (
+          <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+            <SidebarGroupLabel>Client Area</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                {clientAreaNavItems.map(({ label, icon: Icon, count }) => (
+                  <SidebarMenuItem key={label}>
+                    <SidebarMenuButton
+                      isActive={activeNav === label}
+                      onClick={() => onNavigate(label)}
+                      tooltip={label}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ) : (
+          <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+            <SidebarGroupLabel>Service Dashboard</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    isActive={activeNav === "Team & access"}
-                    onClick={() => onNavigate("Team & access")}
-                    tooltip="Team & access"
-                  >
-                    <Users />
-                    <span>Team & access</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={activeNav === "Integrations"}
-                    onClick={() => onNavigate("Integrations")}
-                    tooltip="Integrations"
+                    className="border border-sidebar-border bg-sidebar-accent/40 font-medium text-primary"
+                    onClick={() => onNavigate("My Services")}
+                    tooltip="Back to Client Area"
                   >
                     <Boxes />
-                    <span>Integrations</span>
+                    <span>← Back to Client Area</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {clientServiceDashboardItems.map(({ label, icon: Icon, count }) => (
+                  <SidebarMenuItem key={label}>
+                    <SidebarMenuButton
+                      isActive={activeNav === label}
+                      onClick={() => onNavigate(label)}
+                      tooltip={label}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -3697,24 +3954,25 @@ function AppSidebar({
         </SidebarMenu>
         <div className="mt-2 flex items-center gap-2 border-t border-sidebar-border px-1 pt-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <div className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-[10px] font-semibold">
-            {primaryOperator ? primaryOperator.initials : "SX"}
+            {initials}
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="truncate text-xs font-medium">
-              {primaryOperator ? primaryOperator.name : "Security Operator"}
+              {currentUser?.fullName || "Account"}
             </div>
-            <div className="text-[10px] text-muted-foreground">
-              {primaryOperator ? primaryOperator.role : "Configure in Team & access"}
+            <div className="truncate text-[10px] text-muted-foreground">
+              {currentUser?.email || "Authenticated"}
             </div>
           </div>
           <Button
-            aria-label="Account menu"
-            className="ml-auto size-7 group-data-[collapsible=icon]:hidden"
-            onClick={() => onNavigate("Team & access")}
-            size="icon"
+            aria-label="Log out to login page"
+            className="ml-auto h-7 px-2 text-[11px] text-destructive hover:text-destructive group-data-[collapsible=icon]:hidden"
+            onClick={onSignOut}
+            size="sm"
+            title="Log Out to Login Page"
             variant="ghost"
           >
-            <Ellipsis />
+            Log Out
           </Button>
         </div>
       </SidebarFooter>

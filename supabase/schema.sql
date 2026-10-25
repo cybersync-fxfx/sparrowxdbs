@@ -186,3 +186,19 @@ alter table public.audit_logs enable row level security;
 drop policy if exists "Allow access on audit_logs" on public.audit_logs;
 create policy "Allow access on audit_logs"
   on public.audit_logs for all using (true) with check (true);
+
+-- 11. Platform Users (Unified Login -> Set admin = 'yes' for Admin Portal, 'no' for Client Portal)
+create table if not exists public.app_users (
+  id text primary key,
+  email text unique not null,
+  password text not null,
+  full_name text not null,
+  admin text not null default 'no' check (admin in ('yes', 'no')),
+  tenant_id text,
+  created_at timestamptz not null default now()
+);
+alter table public.app_users enable row level security;
+drop policy if exists "Allow access on app_users" on public.app_users;
+create policy "Allow access on app_users"
+  on public.app_users for all using (true) with check (true);
+

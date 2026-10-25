@@ -26,8 +26,10 @@ import {
 
 import { Button } from "@/components/ui/button";
 import {
+  type AppUser,
   type Asset,
   type AuditLogEntry,
+  authenticateAppUserFromBackend,
   type ClientTenant,
   type Incident,
   type PlanTier,
@@ -106,9 +108,14 @@ export function ClientPortalView({
   selectedTenantId,
   onSelectTenant,
   onCreateTenant,
+  onRenameOrUpdateTenant,
+  onDeleteTenant,
   onToggleTenantModule,
   onVerifyTenantSdk,
   onOpenServiceSdk,
+  currentUser,
+  onUpdateUserProfile,
+  onSignOut,
   protectedServices,
   assets,
   vulnerabilities,
@@ -131,9 +138,21 @@ export function ClientPortalView({
     planTier: PlanTier;
     enabledModules: ServiceModuleId[];
   }) => Promise<void>;
+  onRenameOrUpdateTenant: (
+    tenantId: string,
+    updates: Partial<Pick<ClientTenant, "name" | "primaryDomain" | "planTier">>,
+  ) => Promise<void>;
+  onDeleteTenant: (tenantId: string) => Promise<void>;
   onToggleTenantModule: (tenantId: string, moduleId: ServiceModuleId) => Promise<void>;
   onVerifyTenantSdk: (tenant: ClientTenant) => Promise<void>;
   onOpenServiceSdk: (serviceId: string) => void;
+  currentUser: { fullName: string; email: string } | null;
+  onUpdateUserProfile: (updates: {
+    fullName: string;
+    email: string;
+    newPassword?: string;
+  }) => Promise<void>;
+  onSignOut: () => void;
   protectedServices: ProtectedService[];
   assets: Asset[];
   vulnerabilities: Vulnerability[];
@@ -144,13 +163,25 @@ export function ClientPortalView({
   supabaseAnonKey: string;
   showToast: (msg: string) => void;
 }) {
-  const [showOnboardingWizard, setShowOnboardingWizard] = useState(false);
-  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
-  const [orgName, setOrgName] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
+  // Add Service Modal / Form state in Client Area
+  const [showAddServiceForm, setShowAddServiceForm] = useState(false);
+  const [serviceName, setServiceName] = useState("");
   const [primaryDomain, setPrimaryDomain] = useState("");
   const [planTier, setPlanTier] = useState<PlanTier>("Growth");
   const [selectedModules, setSelectedModules] = useState<ServiceModuleId[]>(["web_security"]);
+
+  // Clicked Service 2-Option Modal ("Go to Dashboard" vs "Manage Service: Rename or Delete")
+  const [clickedServiceId, setClickedServiceId] = useState<string | null>(null);
+  const [manageSubView, setManageSubView] = useState<"choose" | "manage">("choose");
+  const [renameValue, setRenameValue] = useState("");
+  const [domainValue, setDomainValue] = useState("");
+  const [planValue, setPlanValue] = useState<PlanTier>("Growth");
+
+  // Profile Management state
+  const [profileName, setProfileName] = useState(currentUser?.fullName ?? "");
+  const [profileEmail, setProfileEmail] = useState(currentUser?.email ?? "");
+  const [profileNewPassword, setProfileNewPassword] = useState("");
+  const [autoRenewBilling, setAutoRenewBilling] = useState(true);
 
   // Local interactive rules for Web & AI modules
   const [wafSqliBlock, setWafSqliBlock] = useState(true);
@@ -163,6 +194,21 @@ export function ClientPortalView({
   const activeTenant =
     tenants.find((t) => t.id === selectedTenantId) ?? tenants[0] ?? null;
 
+  const clickedService = tenants.find((t) => t.id === clickedServiceId) ?? null;
+
+  const getPlanPrice = (tier: PlanTier) =>
+    tier === "Enterprise" ? 699 : tier === "Growth" ? 199 : 49;
+
+  const getDueDateLabel = (index = 0) => {
+    const due = new Date();
+    due.setDate(due.getDate() + 30 - (index % 7));
+    return due.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
   const toggleWizardModule = (id: ServiceModuleId) => {
     setSelectedModules((prev) =>
       prev.includes(id)
@@ -173,277 +219,670 @@ export function ClientPortalView({
     );
   };
 
-  const handleFinishWizard = async (e: React.FormEvent) => {
+  const handleAddServiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orgName.trim() || !contactEmail.trim() || !primaryDomain.trim()) return;
+    if (!serviceName.trim() || !primaryDomain.trim()) return;
     await onCreateTenant({
-      name: orgName.trim(),
-      contactEmail: contactEmail.trim(),
+      name: serviceName.trim(),
+      contactEmail: currentUser?.email ?? "client@company.com",
       primaryDomain: primaryDomain.trim(),
       planTier,
       enabledModules: selectedModules,
     });
-    setOrgName("");
-    setContactEmail("");
+    setServiceName("");
     setPrimaryDomain("");
-    setWizardStep(1);
-    setShowOnboardingWizard(false);
+    setShowAddServiceForm(false);
   };
 
-  // If no tenant exists yet or user clicked "+ Self-Onboard New Client", show the Automated Onboarding Wizard
-  if (!activeTenant || showOnboardingWizard) {
+  // ============================================================================
+  // CLIENT AREA HUB: 1) My Services  2) Subscriptions & Due Dates  3) Profile
+  // ============================================================================
+  const isClientAreaView =
+    activeNav === "My Services" ||
+    activeNav === "Subscriptions & Due Dates" ||
+    activeNav === "Profile Management" ||
+    !activeTenant;
+
+  if (isClientAreaView) {
+    const currentAreaTab =
+      activeNav === "Subscriptions & Due Dates" || activeNav === "Profile Management"
+        ? activeNav
+        : "My Services";
+
     return (
       <div className="flex flex-col gap-6">
-        <section className="flex flex-col justify-between gap-4 border border-primary/30 bg-card p-5 sm:flex-row sm:items-center">
+        {/* Client Area Top Banner */}
+        <section className="flex flex-col justify-between gap-4 border border-border bg-card p-5 sm:flex-row sm:items-center">
           <div>
-            <div className="mb-1.5 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
+            <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
               <Sparkles className="size-3.5" />
-              Automated Self-Serve Client Onboarding
+              SparrowX Client Area
             </div>
             <h1 className="text-2xl font-semibold text-foreground">
-              Configure your custom SparrowX workspace
+              Welcome, {currentUser?.fullName || "Client Account"}
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Select only the security modules your organization needs. Your dashboard and sidebar will automatically adapt with zero clutter.
+            <p className="mt-1 text-xs text-muted-foreground">
+              Manage your security services, subscription plans, billing due dates, and account profile. Click any service below to launch its dedicated dashboard or manage it.
             </p>
           </div>
-          {activeTenant && (
+          <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={() => setShowOnboardingWizard(false)}
+              onClick={() => {
+                onNavigate("My Services");
+                setShowAddServiceForm(true);
+              }}
               size="sm"
-              variant="outline"
             >
-              Back to {activeTenant.name}
+              <Plus className="size-4" /> Add New Service
             </Button>
-          )}
+            <Button onClick={onSignOut} size="sm" variant="outline">
+              <LockKeyhole className="size-3.5" /> Log Out
+            </Button>
+          </div>
         </section>
 
-        {/* Stepper Indicator */}
-        <div className="grid gap-3 sm:grid-cols-3">
+        {/* Client Area Sub-Navigation Tabs */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border pb-3">
           {[
-            { step: 1, title: "1. Organization & Target", desc: "Company profile, domain & tier" },
-            {
-              step: 2,
-              title: "2. Choose Security Modules",
-              desc: "Build your custom, clutter-free dashboard",
-            },
-            {
-              step: 3,
-              title: "3. Auto-Provision & Connect",
-              desc: "Instant API key & guided SDK setup",
-            },
-          ].map((item) => (
-            <button
-              className={`border p-4 text-left transition-colors ${
-                wizardStep === item.step
-                  ? "border-primary bg-primary/10"
-                  : wizardStep > item.step
-                    ? "border-success/40 bg-card"
-                    : "border-border bg-card opacity-75"
-              }`}
-              key={item.step}
-              onClick={() => {
-                if (item.step === 1 || (orgName && contactEmail && primaryDomain)) {
-                  setWizardStep(item.step as 1 | 2 | 3);
-                }
-              }}
-              type="button"
-            >
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span>{item.title}</span>
-                {wizardStep > item.step && <Check className="size-4 text-success" />}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{item.desc}</p>
-            </button>
-          ))}
+            { label: "My Services", icon: Boxes, count: tenants.length },
+            { label: "Subscriptions & Due Dates", icon: Activity },
+            { label: "Profile Management", icon: Users },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = currentAreaTab === tab.label;
+            return (
+              <button
+                className={`flex items-center gap-2 rounded-md border px-3.5 py-2 text-xs font-semibold transition-colors ${
+                  active
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                }`}
+                key={tab.label}
+                onClick={() => onNavigate(tab.label)}
+                type="button"
+              >
+                <Icon className="size-3.5" />
+                <span>{tab.label}</span>
+                {typeof tab.count === "number" && (
+                  <span className="rounded-full bg-background/20 px-1.5 py-0.5 text-[10px]">
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <form className="border border-border bg-card p-6" onSubmit={handleFinishWizard}>
-          {wizardStep === 1 && (
-            <div className="flex flex-col gap-4">
-              <h2 className="text-base font-semibold">Step 1 · Organization & Primary Endpoint</h2>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="wiz-org">
-                    Organization / Client Name
-                  </label>
-                  <input
-                    className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-                    id="wiz-org"
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="e.g. Acme FinTech Corp"
-                    required
-                    value={orgName}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="wiz-email">
-                    Security Contact Email
-                  </label>
-                  <input
-                    className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-                    id="wiz-email"
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="security@acme.com"
-                    required
-                    type="email"
-                    value={contactEmail}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="wiz-domain">
-                    Primary Production Domain or Agent URI
-                  </label>
-                  <input
-                    className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-                    id="wiz-domain"
-                    onChange={(e) => setPrimaryDomain(e.target.value)}
-                    placeholder="https://app.acme.com or agent://acme-copilot"
-                    required
-                    value={primaryDomain}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="wiz-tier">
-                    Subscription Plan Tier
-                  </label>
-                  <select
-                    className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
-                    id="wiz-tier"
-                    onChange={(e) => setPlanTier(e.target.value as PlanTier)}
-                    value={planTier}
+        {/* TAB 1: MY SERVICES (Add Service + Click Service -> Go to Dashboard OR Manage/Rename/Delete) */}
+        {currentAreaTab === "My Services" && (
+          <>
+            {showAddServiceForm && (
+              <form
+                className="border border-primary/40 bg-card p-5 shadow-lg"
+                onSubmit={handleAddServiceSubmit}
+              >
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div>
+                    <h2 className="text-base font-semibold">Add New Security Service</h2>
+                    <p className="text-xs text-muted-foreground">
+                      Choose the security module(s) for this service. Its dashboard will only display the options you select here.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => setShowAddServiceForm(false)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
                   >
-                    <option value="Starter">Starter (Up to 100k req/mo)</option>
-                    <option value="Growth">Growth (Up to 2M req/mo + Autonomous Block)</option>
-                    <option value="Enterprise">Enterprise (Unlimited + 24/7 SOC SLA)</option>
-                  </select>
+                    Cancel
+                  </Button>
                 </div>
-              </div>
-              <div className="mt-2 flex justify-end">
-                <Button
-                  onClick={() => {
-                    if (!orgName.trim() || !contactEmail.trim() || !primaryDomain.trim()) {
-                      showToast("Please complete organization name, email, and domain");
-                      return;
-                    }
-                    setWizardStep(2);
-                  }}
-                  type="button"
-                >
-                  Next: Choose Security Modules <ArrowRight className="size-4" />
-                </Button>
-              </div>
-            </div>
-          )}
 
-          {wizardStep === 2 && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-base font-semibold">
-                  Step 2 · Select Only the Protection Modules You Need
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your client dashboard will dynamically show only the modules selected below—no extra clutter or unused menus.
-                </p>
-              </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground" htmlFor="add-srv-name">
+                      Service Name
+                    </label>
+                    <input
+                      className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                      id="add-srv-name"
+                      onChange={(e) => setServiceName(e.target.value)}
+                      placeholder="e.g. Main Storefront Web WAF"
+                      required
+                      value={serviceName}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground" htmlFor="add-srv-domain">
+                      Target Domain / Endpoint URI
+                    </label>
+                    <input
+                      className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                      id="add-srv-domain"
+                      onChange={(e) => setPrimaryDomain(e.target.value)}
+                      placeholder="https://app.yourdomain.com"
+                      required
+                      value={primaryDomain}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground" htmlFor="add-srv-plan">
+                      Service Plan Tier
+                    </label>
+                    <select
+                      className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
+                      id="add-srv-plan"
+                      onChange={(e) => setPlanTier(e.target.value as PlanTier)}
+                      value={planTier}
+                    >
+                      <option value="Starter">Starter ($49/mo · 100k req/mo)</option>
+                      <option value="Growth">Growth ($199/mo · 2.5M req/mo)</option>
+                      <option value="Enterprise">Enterprise ($699/mo · Unlimited)</option>
+                    </select>
+                  </div>
+                </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {SERVICE_MODULES.map((mod) => {
-                  const isSelected = selectedModules.includes(mod.id);
+                <div className="mt-4">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    Select Service Type / Protection Modules
+                  </span>
+                  <div className="mt-2 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                    {SERVICE_MODULES.map((mod) => {
+                      const isSelected = selectedModules.includes(mod.id);
+                      return (
+                        <button
+                          className={`flex flex-col justify-between border p-3.5 text-left transition-all ${
+                            isSelected
+                              ? "border-primary bg-primary/10"
+                              : "border-border bg-background hover:border-primary/40"
+                          }`}
+                          key={mod.id}
+                          onClick={() => toggleWizardModule(mod.id)}
+                          type="button"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-primary">
+                                {mod.shortLabel}
+                              </span>
+                              {isSelected && <Check className="size-3.5 text-primary" />}
+                            </div>
+                            <div className="mt-1 text-xs font-semibold">{mod.title}</div>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              {mod.description}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2 border-t border-border pt-3">
+                  <Button
+                    onClick={() => setShowAddServiceForm(false)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" type="submit">
+                    <Sparkles className="size-3.5" /> Provision Service
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {tenants.length > 0 ? (
+              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {tenants.map((srv, idx) => {
+                  const srvModules = SERVICE_MODULES.filter((m) =>
+                    srv.enabledModules.includes(m.id),
+                  );
                   return (
-                    <button
-                      className={`flex flex-col justify-between border p-4 text-left transition-all ${
-                        isSelected
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border bg-background/60 hover:border-border/80"
-                      }`}
-                      key={mod.id}
-                      onClick={() => toggleWizardModule(mod.id)}
-                      type="button"
+                    <article
+                      className="group flex cursor-pointer flex-col justify-between border border-border bg-card p-5 transition-all hover:border-primary hover:shadow-md"
+                      key={srv.id}
+                      onClick={() => {
+                        setClickedServiceId(srv.id);
+                        setManageSubView("choose");
+                        setRenameValue(srv.name);
+                        setDomainValue(srv.primaryDomain);
+                        setPlanValue(srv.planTier);
+                      }}
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold text-foreground">{mod.title}</span>
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {srv.id}
+                          </span>
                           <span
-                            className={`grid size-5 place-items-center rounded-sm border text-[10px] ${
-                              isSelected
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border bg-card"
+                            className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold ${
+                              srv.status === "Active"
+                                ? "border-success/30 bg-success/10 text-success"
+                                : "border-destructive/30 bg-destructive/10 text-destructive"
                             }`}
                           >
-                            {isSelected && <Check className="size-3.5" />}
+                            {srv.status}
                           </span>
                         </div>
-                        <p className="mt-1.5 text-xs text-muted-foreground">{mod.description}</p>
+
+                        <h3 className="mt-2.5 text-base font-semibold group-hover:text-primary">
+                          {srv.name}
+                        </h3>
+                        <p className="mt-0.5 font-mono text-xs text-muted-foreground">
+                          {srv.primaryDomain}
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {srvModules.map((m) => (
+                            <span
+                              className="rounded-sm border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary"
+                              key={m.id}
+                            >
+                              {m.shortLabel}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                      <ul className="mt-3 space-y-1 border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground">
-                        {mod.features.map((feat) => (
-                          <li className="flex items-center gap-1.5" key={feat}>
-                            <Check className="size-3 text-success" /> {feat}
-                          </li>
-                        ))}
-                      </ul>
-                    </button>
+
+                      <div className="mt-5 border-t border-border pt-3 text-xs">
+                        <div className="flex items-center justify-between text-muted-foreground">
+                          <span>
+                            Plan: <strong className="text-foreground">{srv.planTier}</strong> ($
+                            {getPlanPrice(srv.planTier)}/mo)
+                          </span>
+                          <span>Due: {getDueDateLabel(idx)}</span>
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-between font-semibold text-primary">
+                          <span>Click to Open Dashboard or Manage</span>
+                          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
+                        </div>
+                      </div>
+                    </article>
                   );
                 })}
-              </div>
-
-              <div className="mt-2 flex items-center justify-between">
-                <Button onClick={() => setWizardStep(1)} type="button" variant="ghost">
-                  Back
-                </Button>
-                <Button onClick={() => setWizardStep(3)} type="button">
-                  Next: Review & Auto-Provision <ArrowRight className="size-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {wizardStep === 3 && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <h2 className="text-base font-semibold">
-                  Step 3 · Automated Provisioning Summary
-                </h2>
+              </section>
+            ) : (
+              <section className="border border-border bg-card px-6 py-12 text-center">
+                <Boxes className="mx-auto size-7 text-primary" />
+                <h2 className="mt-3 text-base font-semibold">No active security services yet</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  SparrowX will automatically provision your tenant in Supabase, issue your live ingestion key, and configure your custom sidebar.
+                  Add your first service (Web Security, AI Shield, Cloud & Endpoints, or Compliance) to launch your custom security dashboard.
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => setShowAddServiceForm(true)}
+                  size="sm"
+                >
+                  <Plus className="size-4" /> Add Your First Service
+                </Button>
+              </section>
+            )}
+
+            {/* 2-OPTION SERVICE ACTION MODAL: 1) Go to Dashboard  2) Manage Service (Rename / Delete) */}
+            {clickedService && (
+              <div
+                aria-label="Service options"
+                className="fixed inset-0 z-50 grid place-items-center bg-background/75 p-4 backdrop-blur-xs"
+                role="dialog"
+              >
+                <div className="w-full max-w-md border border-border bg-card p-6 shadow-2xl">
+                  <div className="flex items-start justify-between border-b border-border pb-3">
+                    <div>
+                      <span className="text-[10px] font-semibold uppercase text-primary">
+                        {clickedService.id} · {clickedService.planTier} Plan
+                      </span>
+                      <h2 className="mt-0.5 text-lg font-semibold">{clickedService.name}</h2>
+                      <p className="font-mono text-xs text-muted-foreground">
+                        {clickedService.primaryDomain}
+                      </p>
+                    </div>
+                    <Button
+                      className="size-8"
+                      onClick={() => setClickedServiceId(null)}
+                      size="icon"
+                      variant="ghost"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+
+                  {manageSubView === "choose" ? (
+                    <div className="mt-5 space-y-3">
+                      <p className="text-xs text-muted-foreground">
+                        What would you like to do with <strong>{clickedService.name}</strong>?
+                      </p>
+
+                      {/* OPTION 1: GO TO DASHBOARD */}
+                      <button
+                        className="flex w-full items-center justify-between rounded-md border border-primary bg-primary/10 p-4 text-left transition-colors hover:bg-primary/20"
+                        onClick={() => {
+                          onSelectTenant(clickedService.id);
+                          setClickedServiceId(null);
+                          onNavigate("Client Overview");
+                        }}
+                        type="button"
+                      >
+                        <div>
+                          <div className="text-sm font-semibold text-primary">
+                            1. Go to Service Dashboard
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            Open the dedicated security dashboard showing only{" "}
+                            {clickedService.enabledModules
+                              .map((id) => SERVICE_MODULES.find((m) => m.id === id)?.shortLabel)
+                              .join(", ")}{" "}
+                            controls.
+                          </div>
+                        </div>
+                        <ArrowRight className="size-4 shrink-0 text-primary" />
+                      </button>
+
+                      {/* OPTION 2: MANAGE SERVICE (RENAME OR DELETE) */}
+                      <button
+                        className="flex w-full items-center justify-between rounded-md border border-border bg-background p-4 text-left transition-colors hover:border-primary/40"
+                        onClick={() => setManageSubView("manage")}
+                        type="button"
+                      >
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            2. Manage Service (Rename or Delete)
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            Rename this service, update its target domain/plan, or delete it from your account.
+                          </div>
+                        </div>
+                        <Wrench className="size-4 shrink-0 text-muted-foreground" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-4">
+                      <div>
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor="rename-srv-input"
+                        >
+                          Rename Service
+                        </label>
+                        <input
+                          className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                          id="rename-srv-input"
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          value={renameValue}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor="domain-srv-input"
+                        >
+                          Target Domain / Endpoint
+                        </label>
+                        <input
+                          className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                          id="domain-srv-input"
+                          onChange={(e) => setDomainValue(e.target.value)}
+                          value={domainValue}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          className="text-xs font-medium text-muted-foreground"
+                          htmlFor="plan-srv-input"
+                        >
+                          Subscription Plan
+                        </label>
+                        <select
+                          className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
+                          id="plan-srv-input"
+                          onChange={(e) => setPlanValue(e.target.value as PlanTier)}
+                          value={planValue}
+                        >
+                          <option value="Starter">Starter ($49/mo)</option>
+                          <option value="Growth">Growth ($199/mo)</option>
+                          <option value="Enterprise">Enterprise ($699/mo)</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-border pt-4">
+                        <Button
+                          className="text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            await onDeleteTenant(clickedService.id);
+                            setClickedServiceId(null);
+                          }}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 className="size-3.5" /> Delete Service
+                        </Button>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => setManageSubView("choose")}
+                            size="sm"
+                            type="button"
+                            variant="outline"
+                          >
+                            Back
+                          </Button>
+                          <Button
+                            onClick={async () => {
+                              await onRenameOrUpdateTenant(clickedService.id, {
+                                name: renameValue.trim() || clickedService.name,
+                                primaryDomain: domainValue.trim() || clickedService.primaryDomain,
+                                planTier: planValue,
+                              });
+                              setClickedServiceId(null);
+                            }}
+                            size="sm"
+                            type="button"
+                          >
+                            <Check className="size-3.5" /> Save Changes
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* TAB 2: SUBSCRIPTIONS, PLANS & DUE DATES */}
+        {currentAreaTab === "Subscriptions & Due Dates" && (
+          <section className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="border border-border bg-card p-4">
+                <span className="text-xs text-muted-foreground">Active Services</span>
+                <div className="mt-2 font-display text-2xl font-semibold">{tenants.length}</div>
+                <span className="mt-1 block text-[11px] text-success">
+                  All subscriptions in good standing
+                </span>
+              </div>
+              <div className="border border-border bg-card p-4">
+                <span className="text-xs text-muted-foreground">Monthly Commitment</span>
+                <div className="mt-2 font-display text-2xl font-semibold">
+                  ${tenants.reduce((sum, t) => sum + getPlanPrice(t.planTier), 0)}/mo
+                </div>
+                <span className="mt-1 block text-[11px] text-muted-foreground">
+                  Next Consolidated Due Date: {getDueDateLabel(0)}
+                </span>
+              </div>
+              <div className="border border-border bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Auto-Renew Protection</span>
+                  <Button
+                    className="h-7 px-2.5 text-xs"
+                    onClick={() => {
+                      setAutoRenewBilling(!autoRenewBilling);
+                      showToast(
+                        `Auto-renewal ${!autoRenewBilling ? "enabled" : "disabled"}`,
+                      );
+                    }}
+                    size="sm"
+                    variant={autoRenewBilling ? "default" : "outline"}
+                  >
+                    {autoRenewBilling ? "Enabled" : "Disabled"}
+                  </Button>
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Ensures uninterrupted WAF & AI Guardrail protection on your renewal due dates.
                 </p>
               </div>
+            </div>
 
-              <div className="grid gap-3 border border-border bg-background p-4 text-xs sm:grid-cols-2">
-                <div>
-                  <span className="text-muted-foreground">Organization:</span>{" "}
-                  <strong className="text-foreground">{orgName}</strong>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Primary Target:</span>{" "}
-                  <code className="text-foreground">{primaryDomain}</code>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Plan Tier:</span>{" "}
-                  <strong className="text-primary">{planTier}</strong>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Dynamic Sidebar Modules:</span>{" "}
-                  <strong className="text-success">
-                    {selectedModules
-                      .map((id) => SERVICE_MODULES.find((m) => m.id === id)?.shortLabel)
-                      .join(", ")}
-                  </strong>
-                </div>
+            <div className="border border-border bg-card">
+              <div className="border-b border-border px-5 py-4">
+                <h2 className="text-base font-semibold">
+                  Service Subscriptions, Plans & Renewal Due Dates
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Upgrade or change plans, customize subscribed modules, and track upcoming due dates per service.
+                </p>
               </div>
-
-              <div className="mt-2 flex items-center justify-between">
-                <Button onClick={() => setWizardStep(2)} type="button" variant="ghost">
-                  Back
-                </Button>
-                <Button type="submit">
-                  <Sparkles className="size-4" /> Launch Custom Client Dashboard
-                </Button>
+              <div className="divide-y divide-border">
+                {tenants.length > 0 ? (
+                  tenants.map((srv, idx) => (
+                    <div
+                      className="flex flex-col justify-between gap-3 px-5 py-4 sm:flex-row sm:items-center"
+                      key={srv.id}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold">{srv.name}</span>
+                          <span className="rounded-sm bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            {srv.planTier} (${getPlanPrice(srv.planTier)}/mo)
+                          </span>
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Domain: <code className="text-foreground">{srv.primaryDomain}</code> · Next Due Date:{" "}
+                          <strong className="text-foreground">{getDueDateLabel(idx)}</strong>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label={`Change plan for ${srv.name}`}
+                          className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground outline-none"
+                          onChange={(e) =>
+                            onRenameOrUpdateTenant(srv.id, {
+                              planTier: e.target.value as PlanTier,
+                            })
+                          }
+                          value={srv.planTier}
+                        >
+                          <option value="Starter">Starter ($49/mo)</option>
+                          <option value="Growth">Growth ($199/mo)</option>
+                          <option value="Enterprise">Enterprise ($699/mo)</option>
+                        </select>
+                        <Button
+                          className="h-8 px-3 text-xs"
+                          onClick={() => {
+                            onSelectTenant(srv.id);
+                            onNavigate("Client Overview");
+                          }}
+                          size="sm"
+                          variant="outline"
+                        >
+                          Go to Dashboard <ArrowRight className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-5 py-8 text-center text-xs text-muted-foreground">
+                    No active subscriptions yet. Add a service in My Services to begin.
+                  </div>
+                )}
               </div>
             </div>
-          )}
-        </form>
+          </section>
+        )}
+
+        {/* TAB 3: PROFILE MANAGEMENT */}
+        {currentAreaTab === "Profile Management" && (
+          <section className="max-w-2xl border border-border bg-card p-6">
+            <h2 className="text-base font-semibold">Profile & Account Security</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Update your account holder name, email address, and password stored in Supabase.
+            </p>
+            <form
+              className="mt-5 space-y-4"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                await onUpdateUserProfile({
+                  fullName: profileName.trim() || "Client User",
+                  email: profileEmail.trim(),
+                  newPassword: profileNewPassword.trim() || undefined,
+                });
+                setProfileNewPassword("");
+              }}
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="prof-name">
+                    Full Name
+                  </label>
+                  <input
+                    className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                    id="prof-name"
+                    onChange={(e) => setProfileName(e.target.value)}
+                    required
+                    value={profileName}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="prof-email">
+                    Email Address
+                  </label>
+                  <input
+                    className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                    id="prof-email"
+                    onChange={(e) => setProfileEmail(e.target.value)}
+                    required
+                    type="email"
+                    value={profileEmail}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="prof-pass">
+                  New Password (leave blank to keep current password)
+                </label>
+                <input
+                  className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                  id="prof-pass"
+                  onChange={(e) => setProfileNewPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  type="password"
+                  value={profileNewPassword}
+                />
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <Button
+                  className="text-destructive hover:text-destructive"
+                  onClick={onSignOut}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <LockKeyhole className="size-3.5" /> Log Out of Account
+                </Button>
+                <Button size="sm" type="submit">
+                  <Check className="size-3.5" /> Save Profile Changes
+                </Button>
+              </div>
+            </form>
+          </section>
+        )}
       </div>
     );
   }
@@ -453,7 +892,7 @@ export function ClientPortalView({
   );
 
   const clientSdkSnippet = `// SparrowX Automated Client Guardrail SDK
-// Tenant: ${activeTenant.name} (${activeTenant.id})
+// Service: ${activeTenant.name} (${activeTenant.id})
 // Subscribed Modules: ${activeTenant.enabledModules.join(", ")}
 const SPARROWX_URL = "${supabaseUrl}";
 const SPARROWX_KEY = "${supabaseAnonKey}";
@@ -488,12 +927,17 @@ export async function emitSecurityTelemetry(event: {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Top Tenant Bar */}
+      {/* Top Service Dashboard Bar with "← Back to Client Area" */}
       <section className="flex flex-col justify-between gap-4 border border-border bg-card p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="grid size-10 place-items-center rounded-md bg-primary/15 text-primary">
-            <ShieldCheck className="size-5" />
-          </div>
+          <Button
+            className="h-8 px-2.5 text-xs"
+            onClick={() => onNavigate("My Services")}
+            size="sm"
+            variant="outline"
+          >
+            ← Back to Client Area
+          </Button>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg font-semibold text-foreground">{activeTenant.name}</h1>
@@ -512,43 +956,26 @@ export async function emitSecurityTelemetry(event: {
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Target: <code className="text-foreground">{activeTenant.primaryDomain}</code> ·
-              Showing <strong>{enabledModuleObjects.length}</strong> subscribed module(s) in sidebar
+              Showing <strong>{enabledModuleObjects.length}</strong> subscribed module(s) for this service
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {tenants.length > 1 && (
-            <select
-              aria-label="Switch active client tenant"
-              className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground outline-none"
-              onChange={(e) => onSelectTenant(e.target.value)}
-              value={activeTenant.id}
-            >
-              {tenants.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} ({t.planTier})
-                </option>
-              ))}
-            </select>
-          )}
           <Button
             className="h-8 px-3 text-xs"
             onClick={() => onNavigate("Subscription & Modules")}
             size="sm"
             variant="outline"
           >
-            <Wrench className="size-3.5" /> Customize Modules
+            <Wrench className="size-3.5" /> Manage Service Modules
           </Button>
           <Button
             className="h-8 px-3 text-xs"
-            onClick={() => {
-              setWizardStep(1);
-              setShowOnboardingWizard(true);
-            }}
+            onClick={() => onNavigate("My Services")}
             size="sm"
           >
-            <Plus className="size-3.5" /> Self-Onboard Client
+            <Boxes className="size-3.5" /> All My Services
           </Button>
         </div>
       </section>
@@ -1582,3 +2009,445 @@ export function AdminPortalView({
     </div>
   );
 }
+
+export function PortalLoginScreen({
+  tenants,
+  backendSource,
+  onUserAuthenticated,
+  onRegisterAndLoginUser,
+}: {
+  tenants: ClientTenant[];
+  backendSource: "supabase" | "offline";
+  onUserAuthenticated: (user: AppUser) => void;
+  onRegisterAndLoginUser: (input: {
+    fullName: string;
+    email: string;
+    password: string;
+    orgName: string;
+    primaryDomain: string;
+    planTier: PlanTier;
+    enabledModules: ServiceModuleId[];
+  }) => Promise<{ error?: string }>;
+}) {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+
+  // Sign-In fields
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [loginError, setLoginError] = useState("");
+
+  // Sign-Up / Client Self-Onboarding fields
+  const [fullName, setFullName] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const [primaryDomain, setPrimaryDomain] = useState("");
+  const [planTier, setPlanTier] = useState<PlanTier>("Growth");
+  const [selectedModules, setSelectedModules] = useState<ServiceModuleId[]>(["web_security"]);
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [signupError, setSignupError] = useState("");
+
+  const toggleModule = (id: ServiceModuleId) => {
+    setSelectedModules((prev) =>
+      prev.includes(id)
+        ? prev.length > 1
+          ? prev.filter((item) => item !== id)
+          : prev
+        : [...prev, id],
+    );
+  };
+
+  const handleSignIn = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoginError("");
+    setIsSigningIn(true);
+
+    const result = await authenticateAppUserFromBackend(
+      loginEmail.trim(),
+      loginPassword,
+    );
+    setIsSigningIn(false);
+
+    if (!result.user) {
+      setLoginError(
+        result.error ??
+          "Invalid email or password. Please verify your credentials or create an account.",
+      );
+      return;
+    }
+
+    // If user is a client (admin = 'no'), check if their tenant is under Emergency Lockdown
+    if (result.user.admin !== "yes" && result.user.tenantId) {
+      const linkedTenant = tenants.find((t) => t.id === result.user?.tenantId);
+      if (linkedTenant && linkedTenant.status === "Lockdown") {
+        setLoginError(
+          `Access Denied: Workspace ${linkedTenant.name} is currently under Emergency Lockdown by SparrowX Security Operations.`,
+        );
+        return;
+      }
+    }
+
+    onUserAuthenticated(result.user);
+  };
+
+  const handleSignUp = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSignupError("");
+    if (!fullName.trim() || !signupEmail.trim() || !signupPassword) {
+      setSignupError("Please enter your full name, email address, and password.");
+      return;
+    }
+
+    setIsSigningUp(true);
+    const result = await onRegisterAndLoginUser({
+      fullName: fullName.trim(),
+      email: signupEmail.trim().toLowerCase(),
+      password: signupPassword,
+      orgName: orgName.trim(),
+      primaryDomain: primaryDomain.trim(),
+      planTier,
+      enabledModules: selectedModules,
+    });
+    setIsSigningUp(false);
+
+    if (result.error) {
+      setSignupError(result.error);
+    }
+  };
+
+  return (
+    <div className="min-h-svh w-full bg-background text-foreground">
+      {/* Clean Header — Zero Admin UI Exposed */}
+      <header className="border-b border-border bg-card/60 px-6 py-4 backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm">
+              <ShieldCheck className="size-5" />
+            </span>
+            <div>
+              <div className="font-display text-base font-semibold">
+                sparrow<span className="text-primary">x</span>
+              </div>
+              <div className="text-[10px] uppercase text-muted-foreground">
+                Autonomous Security Platform
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span
+              className={`size-2 rounded-full ${
+                backendSource === "supabase" ? "bg-success" : "bg-warning"
+              }`}
+            />
+            {backendSource === "supabase" ? "Supabase Auth & Telemetry Live" : "Offline"}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="mx-auto grid max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[1.05fr_1.15fr] lg:items-start">
+        {/* Left Column: Value Proposition */}
+        <section className="space-y-6">
+          <div>
+            <span className="inline-flex items-center gap-1.5 rounded-sm border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase text-primary">
+              <Sparkles className="size-3.5" /> Zero-Bloat Dynamic Security
+            </span>
+            <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">
+              Sign in to your SparrowX Security Workspace
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              Every organization gets a custom-tailored dashboard showing only the security modules they subscribe to—with automated SDK onboarding and real-time threat containment.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SERVICE_MODULES.map((mod) => (
+              <div className="border border-border bg-card p-4" key={mod.id}>
+                <div className="text-xs font-semibold text-primary">{mod.shortLabel}</div>
+                <div className="mt-1 text-sm font-semibold">{mod.title}</div>
+                <p className="mt-1 text-xs text-muted-foreground">{mod.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Right Column: Unified Login & Self-Onboarding Card */}
+        <section className="border border-border bg-card p-6 shadow-xl">
+          <div className="flex items-center justify-between border-b border-border pb-4">
+            <div>
+              <h2 className="text-lg font-semibold">
+                {mode === "signin" ? "Sign In" : "Create Account & Onboard"}
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                {mode === "signin"
+                  ? "Enter your email and password to access your workspace"
+                  : "Onboard your organization and choose your security modules"}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 rounded-md border border-border bg-background p-1">
+              <button
+                className={`rounded px-3 py-1 text-xs font-semibold ${
+                  mode === "signin"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => {
+                  setMode("signin");
+                  setLoginError("");
+                }}
+                type="button"
+              >
+                Sign In
+              </button>
+              <button
+                className={`rounded px-3 py-1 text-xs font-semibold ${
+                  mode === "signup"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+                onClick={() => {
+                  setMode("signup");
+                  setSignupError("");
+                }}
+                type="button"
+              >
+                Create Account
+              </button>
+            </div>
+          </div>
+
+          {mode === "signin" ? (
+            <form className="mt-5 space-y-4" onSubmit={handleSignIn}>
+              <div>
+                <label
+                  className="text-xs font-medium text-muted-foreground"
+                  htmlFor="login-email"
+                >
+                  Work Email Address
+                </label>
+                <input
+                  className="mt-1.5 h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+                  id="login-email"
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  required
+                  type="email"
+                  value={loginEmail}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="text-xs font-medium text-muted-foreground"
+                  htmlFor="login-password"
+                >
+                  Password
+                </label>
+                <input
+                  className="mt-1.5 h-10 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-primary"
+                  id="login-password"
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  type="password"
+                  value={loginPassword}
+                />
+              </div>
+
+              {loginError && (
+                <div className="border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                  {loginError}
+                </div>
+              )}
+
+              <Button className="w-full" disabled={isSigningIn} type="submit">
+                <ShieldCheck className="size-4" />
+                {isSigningIn ? "Verifying account..." : "Sign In"}
+              </Button>
+
+              <div className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
+                New to SparrowX?{" "}
+                <button
+                  className="font-semibold text-primary hover:underline"
+                  onClick={() => setMode("signup")}
+                  type="button"
+                >
+                  Create an account & onboard your organization
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form className="mt-5 space-y-4" onSubmit={handleSignUp}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="signup-name"
+                  >
+                    Your Full Name
+                  </label>
+                  <input
+                    className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                    id="signup-name"
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Alex Rivera"
+                    required
+                    value={fullName}
+                  />
+                </div>
+                <div>
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="signup-email"
+                  >
+                    Work Email Address
+                  </label>
+                  <input
+                    className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                    id="signup-email"
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    placeholder="alex@acme.io"
+                    required
+                    type="email"
+                    value={signupEmail}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="text-xs font-medium text-muted-foreground"
+                  htmlFor="signup-password"
+                >
+                  Password
+                </label>
+                <input
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                  id="signup-password"
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  placeholder="Create a strong password"
+                  required
+                  type="password"
+                  value={signupPassword}
+                />
+              </div>
+
+              <div className="border-t border-border pt-3">
+                <span className="text-[11px] font-semibold uppercase text-muted-foreground">
+                  Optional: Provision First Service Now (Or Add Later in Client Area)
+                </span>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="signup-org"
+                    >
+                      First Service Name (Optional)
+                    </label>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                      id="signup-org"
+                      onChange={(e) => setOrgName(e.target.value)}
+                      placeholder="e.g. Main Website WAF"
+                      value={orgName}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="signup-domain"
+                    >
+                      Primary Web / API Domain (Optional)
+                    </label>
+                    <input
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
+                      id="signup-domain"
+                      onChange={(e) => setPrimaryDomain(e.target.value)}
+                      placeholder="https://app.acme.io"
+                      value={primaryDomain}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  className="text-xs font-medium text-muted-foreground"
+                  htmlFor="signup-plan"
+                >
+                  Subscription Plan
+                </label>
+                <select
+                  className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
+                  id="signup-plan"
+                  onChange={(e) => setPlanTier(e.target.value as PlanTier)}
+                  value={planTier}
+                >
+                  <option value="Starter">Starter (Up to 100k req/mo)</option>
+                  <option value="Growth">Growth (Up to 2.5M req/mo)</option>
+                  <option value="Enterprise">Enterprise (Unlimited + Dedicated SOC)</option>
+                </select>
+              </div>
+
+              <div>
+                <div className="text-xs font-medium text-muted-foreground">
+                  Select Protection Modules (Only selected modules will appear in your dashboard)
+                </div>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {SERVICE_MODULES.map((mod) => {
+                    const checked = selectedModules.includes(mod.id);
+                    return (
+                      <button
+                        className={`flex items-start gap-2.5 rounded-md border p-3 text-left transition-colors ${
+                          checked
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-background hover:border-primary/40"
+                        }`}
+                        key={mod.id}
+                        onClick={() => toggleModule(mod.id)}
+                        type="button"
+                      >
+                        <span
+                          className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded-xs border text-[10px] ${
+                            checked
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border"
+                          }`}
+                        >
+                          {checked && <Check className="size-3" />}
+                        </span>
+                        <div>
+                          <div className="text-xs font-semibold">{mod.shortLabel}</div>
+                          <div className="mt-0.5 text-[11px] text-muted-foreground">
+                            {mod.title}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {signupError && (
+                <div className="border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                  {signupError}
+                </div>
+              )}
+
+              <Button className="w-full" disabled={isSigningUp} type="submit">
+                <Sparkles className="size-4" />
+                {isSigningUp
+                  ? "Creating Account & Provisioning Dashboard..."
+                  : "Create Account & Launch Dashboard"}
+              </Button>
+            </form>
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+

@@ -139,6 +139,15 @@ export type AuditLogEntry = {
   timestamp: string;
 };
 
+export type AppUser = {
+  id: string;
+  email: string;
+  password: string;
+  fullName: string;
+  admin: "yes" | "no";
+  tenantId: string | null;
+};
+
 export type RangeSnapshot = {
   securityScore: string;
   scoreChange: string;
@@ -195,6 +204,7 @@ const STORAGE_KEYS = {
   integrations: "spx_prod_integrations_v1",
   tenants: "spx_prod_tenants_v1",
   auditLogs: "spx_prod_audit_logs_v1",
+  users: "spx_prod_app_users_v1",
   demoPurged: "spx_legacy_demo_purged_v1",
 } as const;
 
@@ -660,6 +670,35 @@ export async function fetchAuditLogsFromBackend(): Promise<AuditLogEntry[]> {
   }
 }
 
+export async function fetchAppUsersFromBackend(): Promise<AppUser[]> {
+  const cached = readLocalCache<AppUser>(STORAGE_KEYS.users);
+  if (!isSupabaseConfigured || !supabaseUrl) return cached;
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/app_users?select=*&order=created_at.desc`,
+      {
+        headers: getSupabaseHeaders(),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return cached;
+    const data = (await response.json()) as Array<Record<string, unknown>>;
+    if (!Array.isArray(data)) return cached;
+    const mapped: AppUser[] = data.map((row) => ({
+      id: String(row.id ?? ""),
+      email: String(row.email ?? "").toLowerCase(),
+      password: String(row.password ?? ""),
+      fullName: String(row.full_name ?? ""),
+      admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+      tenantId: row.tenant_id ? String(row.tenant_id) : null,
+    }));
+    writeLocalCache(STORAGE_KEYS.users, mapped);
+    return mapped;
+  } catch {
+    return cached;
+  }
+}
+
 export async function fetchAllWorkspaceData() {
   const [
     incidentsResult,
@@ -672,6 +711,7 @@ export async function fetchAllWorkspaceData() {
     integrations,
     clientTenants,
     auditLogs,
+    appUsers,
   ] = await Promise.all([
     fetchIncidentsFromBackend(),
     fetchThreatIndicatorsFromBackend(),
@@ -683,6 +723,7 @@ export async function fetchAllWorkspaceData() {
     fetchIntegrationsFromBackend(),
     fetchClientTenantsFromBackend(),
     fetchAuditLogsFromBackend(),
+    fetchAppUsersFromBackend(),
   ]);
 
   return {
@@ -697,6 +738,7 @@ export async function fetchAllWorkspaceData() {
     integrations,
     clientTenants,
     auditLogs,
+    appUsers,
   };
 }
 
@@ -1043,3 +1085,59 @@ export async function persistAuditLogToBackend(entry: AuditLogEntry): Promise<bo
     return false;
   }
 }
+
+export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
+  const existing = readLocalCache<AppUser>(STORAGE_KEYS.users);
+  const updated = [
+    user,
+    ...existing.filter(
+      (item) => item.id !== user.id && item.email.toLowerCase() !== user.email.toLowerCase(),
+    ),
+  ];
+  writeLocalCache(STORAGE_KEYS.users, updated);
+
+  if (!isSupabaseConfigured || !supabaseUrl) return false;
+  try {
+    const response = await fetch(`${supabaseUrl}/rest/v1/app_users`, {
+      method: "POST",
+      headers: getSupabaseHeaders({
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      }),
+      body: JSON.stringify({
+        id: user.id,
+        email: user.email.toLowerCase(),
+        password: user.password,
+        full_name: user.fullName,
+        admin: user.admin,
+        tenant_id: user.tenantId,
+      }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function authenticateAppUserFromBackend(
+  email: string,
+  password: string,
+): Promise<{ user: AppUser | null; error?: string }> {
+  const normalizedEmail = email.trim().toLowerCase();
+  // Always fetch fresh from Supabase first so changes to `admin = 'yes' / 'no'` in Supabase Table Editor take effect immediately
+  const users = await fetchAppUsersFromBackend();
+  const matched = users.find((u) => u.email.toLowerCase() === normalizedEmail);
+  if (!matched) {
+    return {
+      user: null,
+      error: "No account found with this email. Please create an account to onboard your organization.",
+    };
+  }
+  if (matched.password !== password) {
+    return {
+      user: null,
+      error: "Invalid password. Please check your credentials and try again.",
+    };
+  }
+  return { user: matched };
+}
+
