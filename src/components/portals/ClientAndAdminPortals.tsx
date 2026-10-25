@@ -191,8 +191,7 @@ export function ClientPortalView({
   const [aiMcpFirewall, setAiMcpFirewall] = useState(true);
   const [aiPiiRedaction, setAiPiiRedaction] = useState(true);
 
-  const activeTenant =
-    tenants.find((t) => t.id === selectedTenantId) ?? tenants[0] ?? null;
+  const activeTenant = tenants.find((t) => t.id === selectedTenantId) ?? tenants[0] ?? null;
 
   const clickedService = tenants.find((t) => t.id === clickedServiceId) ?? null;
 
@@ -262,7 +261,8 @@ export function ClientPortalView({
               Welcome, {currentUser?.fullName || "Client Account"}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Manage your security services, subscription plans, billing due dates, and account profile. Click any service below to launch its dedicated dashboard or manage it.
+              Manage your security services, subscription plans, billing due dates, and account
+              profile. Click any service below to launch its dedicated dashboard or manage it.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -325,7 +325,8 @@ export function ClientPortalView({
                   <div>
                     <h2 className="text-base font-semibold">Add New Security Service</h2>
                     <p className="text-xs text-muted-foreground">
-                      Choose the security module(s) for this service. Its dashboard will only display the options you select here.
+                      Choose the security module(s) for this service. Its dashboard will only
+                      display the options you select here.
                     </p>
                   </div>
                   <Button
@@ -340,7 +341,10 @@ export function ClientPortalView({
 
                 <div className="mt-4 grid gap-4 sm:grid-cols-3">
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="add-srv-name">
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="add-srv-name"
+                    >
                       Service Name
                     </label>
                     <input
@@ -353,7 +357,10 @@ export function ClientPortalView({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="add-srv-domain">
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="add-srv-domain"
+                    >
                       Target Domain / Endpoint URI
                     </label>
                     <input
@@ -366,7 +373,10 @@ export function ClientPortalView({
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="add-srv-plan">
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="add-srv-plan"
+                    >
                       Service Plan Tier
                     </label>
                     <select
@@ -509,13 +519,10 @@ export function ClientPortalView({
                 <Boxes className="mx-auto size-7 text-primary" />
                 <h2 className="mt-3 text-base font-semibold">No active security services yet</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Add your first service (Web Security, AI Shield, Cloud & Endpoints, or Compliance) to launch your custom security dashboard.
+                  Add your first service (Web Security, AI Shield, Cloud & Endpoints, or Compliance)
+                  to launch your custom security dashboard.
                 </p>
-                <Button
-                  className="mt-4"
-                  onClick={() => setShowAddServiceForm(true)}
-                  size="sm"
-                >
+                <Button className="mt-4" onClick={() => setShowAddServiceForm(true)} size="sm">
                   <Plus className="size-4" /> Add Your First Service
                 </Button>
               </section>
@@ -591,7 +598,8 @@ export function ClientPortalView({
                             2. Manage Service (Rename or Delete)
                           </div>
                           <div className="mt-0.5 text-xs text-muted-foreground">
-                            Rename this service, update its target domain/plan, or delete it from your account.
+                            Rename this service, update its target domain/plan, or delete it from
+                            your account.
                           </div>
                         </div>
                         <Wrench className="size-4 shrink-0 text-muted-foreground" />
@@ -722,9 +730,7 @@ export function ClientPortalView({
                     className="h-7 px-2.5 text-xs"
                     onClick={() => {
                       setAutoRenewBilling(!autoRenewBilling);
-                      showToast(
-                        `Auto-renewal ${!autoRenewBilling ? "enabled" : "disabled"}`,
-                      );
+                      showToast(`Auto-renewal ${!autoRenewBilling ? "enabled" : "disabled"}`);
                     }}
                     size="sm"
                     variant={autoRenewBilling ? "default" : "outline"}
@@ -744,7 +750,8 @@ export function ClientPortalView({
                   Service Subscriptions, Plans & Renewal Due Dates
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Upgrade or change plans, customize subscribed modules, and track upcoming due dates per service.
+                  Upgrade or change plans, customize subscribed modules, and track upcoming due
+                  dates per service.
                 </p>
               </div>
               <div className="divide-y divide-border">
@@ -762,7 +769,8 @@ export function ClientPortalView({
                           </span>
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          Domain: <code className="text-foreground">{srv.primaryDomain}</code> · Next Due Date:{" "}
+                          Domain: <code className="text-foreground">{srv.primaryDomain}</code> ·
+                          Next Due Date:{" "}
                           <strong className="text-foreground">{getDueDateLabel(idx)}</strong>
                         </div>
                       </div>
@@ -819,7 +827,7 @@ export function ClientPortalView({
                 await onUpdateUserProfile({
                   fullName: profileName.trim() || "Client User",
                   email: profileEmail.trim(),
-                  newPassword: profileNewPassword.trim() || undefined,
+                  ...(profileNewPassword.trim() ? { newPassword: profileNewPassword.trim() } : {}),
                 });
                 setProfileNewPassword("");
               }}
@@ -956,7 +964,8 @@ export async function emitSecurityTelemetry(event: {
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Target: <code className="text-foreground">{activeTenant.primaryDomain}</code> ·
-              Showing <strong>{enabledModuleObjects.length}</strong> subscribed module(s) for this service
+              Showing <strong>{enabledModuleObjects.length}</strong> subscribed module(s) for this
+              service
             </p>
           </div>
         </div>
@@ -970,11 +979,7 @@ export async function emitSecurityTelemetry(event: {
           >
             <Wrench className="size-3.5" /> Manage Service Modules
           </Button>
-          <Button
-            className="h-8 px-3 text-xs"
-            onClick={() => onNavigate("My Services")}
-            size="sm"
-          >
+          <Button className="h-8 px-3 text-xs" onClick={() => onNavigate("My Services")} size="sm">
             <Boxes className="size-3.5" /> All My Services
           </Button>
         </div>
@@ -1032,7 +1037,8 @@ export async function emitSecurityTelemetry(event: {
                   )}
                 </div>
                 <p className="mt-1.5 text-xs text-muted-foreground">
-                  Send an automated verification ping to confirm your endpoint streams to SparrowX Cloud.
+                  Send an automated verification ping to confirm your endpoint streams to SparrowX
+                  Cloud.
                 </p>
                 {!activeTenant.sdkVerified && (
                   <Button
@@ -1105,7 +1111,8 @@ export async function emitSecurityTelemetry(event: {
                   Automated Integration Snippet ({activeTenant.name})
                 </h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Drop this snippet into your application or AI agent runner to stream events directly into your workspace.
+                  Drop this snippet into your application or AI agent runner to stream events
+                  directly into your workspace.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -1274,7 +1281,8 @@ export async function emitSecurityTelemetry(event: {
                   Autonomous AI Agent, Prompt & MCP Tool-Call Guardrails
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Real-time inspection of LLM prompts, completions, and Model Context Protocol (MCP) tool executions.
+                  Real-time inspection of LLM prompts, completions, and Model Context Protocol (MCP)
+                  tool executions.
                 </p>
               </div>
               <span className="rounded-sm border border-success/30 bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
@@ -1321,7 +1329,8 @@ export async function emitSecurityTelemetry(event: {
                   </Button>
                 </div>
                 <p className="mt-2 text-xs text-muted-foreground">
-                  Halts unauthorized destructive SQL queries, shell commands, or data exports by AI agents.
+                  Halts unauthorized destructive SQL queries, shell commands, or data exports by AI
+                  agents.
                 </p>
               </div>
 
@@ -1454,7 +1463,8 @@ export async function emitSecurityTelemetry(event: {
               Manage Subscribed Security Modules ({activeTenant.name})
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Enable or disable modules below. Notice how the left sidebar immediately updates to show only the options you need—no junk menus.
+              Enable or disable modules below. Notice how the left sidebar immediately updates to
+              show only the options you need—no junk menus.
             </p>
           </div>
 
@@ -1542,7 +1552,11 @@ export function AdminPortalView({
   setJitTenantApproval: (v: boolean) => void;
   ipAllowlistStrict: boolean;
   setIpAllowlistStrict: (v: boolean) => void;
-  onRecordAudit: (action: string, target: string, severity?: AuditLogEntry["severity"]) => Promise<void>;
+  onRecordAudit: (
+    action: string,
+    target: string,
+    severity?: AuditLogEntry["severity"],
+  ) => Promise<void>;
 }) {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -1552,11 +1566,7 @@ export function AdminPortalView({
 
   const toggleNewMod = (id: ServiceModuleId) => {
     setNewModules((prev) =>
-      prev.includes(id)
-        ? prev.length > 1
-          ? prev.filter((m) => m !== id)
-          : prev
-        : [...prev, id],
+      prev.includes(id) ? (prev.length > 1 ? prev.filter((m) => m !== id) : prev) : [...prev, id],
     );
   };
 
@@ -1590,7 +1600,8 @@ export function AdminPortalView({
                 Client subscriptions & service modules
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Provision client tenants, manage subscription tiers, and control which service modules appear in each client’s dynamic dashboard.
+                Provision client tenants, manage subscription tiers, and control which service
+                modules appear in each client’s dynamic dashboard.
               </p>
             </div>
           </section>
@@ -1670,10 +1681,7 @@ export function AdminPortalView({
           {tenants.length > 0 ? (
             <section className="grid gap-4">
               {tenants.map((tenant) => (
-                <article
-                  className="border border-border bg-card p-5"
-                  key={tenant.id}
-                >
+                <article className="border border-border bg-card p-5" key={tenant.id}>
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -1723,7 +1731,8 @@ export function AdminPortalView({
 
                   <div className="mt-4 border-t border-border pt-4">
                     <div className="text-xs font-medium text-muted-foreground">
-                      Active Dashboard Modules for {tenant.name} (Click to enable/disable in client portal):
+                      Active Dashboard Modules for {tenant.name} (Click to enable/disable in client
+                      portal):
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-2">
                       {SERVICE_MODULES.map((mod) => {
@@ -1771,7 +1780,8 @@ export function AdminPortalView({
                 Tenant performance & emergency lockdown
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Monitor per-client ingestion volume, edge inspection latency, quota consumption, and API key kill-switches.
+                Monitor per-client ingestion volume, edge inspection latency, quota consumption, and
+                API key kill-switches.
               </p>
             </div>
           </section>
@@ -1823,7 +1833,9 @@ export function AdminPortalView({
 
                     <div className="mt-4">
                       <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">Plan Quota Usage ({tenant.planTier})</span>
+                        <span className="text-muted-foreground">
+                          Plan Quota Usage ({tenant.planTier})
+                        </span>
                         <span className="font-semibold">{tenant.quotaUsedPct}%</span>
                       </div>
                       <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
@@ -1879,7 +1891,8 @@ export function AdminPortalView({
                 Access control & immutable audit log
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Protect our own operations side first—enforce strict staff access controls and audit every action across client tenants.
+                Protect our own operations side first—enforce strict staff access controls and audit
+                every action across client tenants.
               </p>
             </div>
           </section>
@@ -1906,7 +1919,8 @@ export function AdminPortalView({
                 </Button>
               </div>
               <p className="mt-2 text-xs text-muted-foreground">
-                Requires hardware security keys before any staff member can view or modify client subscriptions.
+                Requires hardware security keys before any staff member can view or modify client
+                subscriptions.
               </p>
             </div>
 
@@ -1963,11 +1977,10 @@ export function AdminPortalView({
 
           <section className="border border-border bg-card">
             <div className="border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold">
-                Immutable Staff & Automation Audit Trail
-              </h2>
+              <h2 className="text-base font-semibold">Immutable Staff & Automation Audit Trail</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Every onboarding event, module change, API key rotation, and kill-switch action is recorded below.
+                Every onboarding event, module change, API key rotation, and kill-switch action is
+                recorded below.
               </p>
             </div>
             <div className="divide-y divide-border">
@@ -1999,7 +2012,8 @@ export function AdminPortalView({
                 ))
               ) : (
                 <div className="px-5 py-10 text-center text-xs text-muted-foreground">
-                  No audit events recorded yet. Provision a client or toggle a security control to see live audit logging.
+                  No audit events recorded yet. Provision a client or toggle a security control to
+                  see live audit logging.
                 </div>
               )}
             </div>
@@ -2063,10 +2077,7 @@ export function PortalLoginScreen({
     setLoginError("");
     setIsSigningIn(true);
 
-    const result = await authenticateAppUserFromBackend(
-      loginEmail.trim(),
-      loginPassword,
-    );
+    const result = await authenticateAppUserFromBackend(loginEmail.trim(), loginPassword);
     setIsSigningIn(false);
 
     if (!result.user) {
@@ -2158,7 +2169,8 @@ export function PortalLoginScreen({
               Sign in to your SparrowX Security Workspace
             </h1>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              Every organization gets a custom-tailored dashboard showing only the security modules they subscribe to—with automated SDK onboarding and real-time threat containment.
+              Every organization gets a custom-tailored dashboard showing only the security modules
+              they subscribe to—with automated SDK onboarding and real-time threat containment.
             </p>
           </div>
 
@@ -2221,10 +2233,7 @@ export function PortalLoginScreen({
           {mode === "signin" ? (
             <form className="mt-5 space-y-4" onSubmit={handleSignIn}>
               <div>
-                <label
-                  className="text-xs font-medium text-muted-foreground"
-                  htmlFor="login-email"
-                >
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="login-email">
                   Work Email Address
                 </label>
                 <input
@@ -2373,10 +2382,7 @@ export function PortalLoginScreen({
               </div>
 
               <div>
-                <label
-                  className="text-xs font-medium text-muted-foreground"
-                  htmlFor="signup-plan"
-                >
+                <label className="text-xs font-medium text-muted-foreground" htmlFor="signup-plan">
                   Subscription Plan
                 </label>
                 <select
@@ -2449,5 +2455,3 @@ export function PortalLoginScreen({
     </div>
   );
 }
-
-

@@ -82,9 +82,7 @@ export type IntegrationItem = {
 };
 
 export type ServiceCategory =
-  | "Web App & Website"
-  | "AI Agent (LLM / MCP)"
-  | "Cloud API & Microservice";
+  "Web App & Website" | "AI Agent (LLM / MCP)" | "Cloud API & Microservice";
 
 export type ProtectionMode = "Active Shield" | "Monitor Only" | "Lockdown";
 
@@ -103,11 +101,7 @@ export type ProtectedService = {
   lastHeartbeat: string;
 };
 
-export type ServiceModuleId =
-  | "web_security"
-  | "ai_shield"
-  | "cloud_security"
-  | "compliance";
+export type ServiceModuleId = "web_security" | "ai_shield" | "cloud_security" | "compliance";
 
 export type PlanTier = "Starter" | "Growth" | "Enterprise";
 export type TenantStatus = "Active" | "Trial" | "Lockdown";
@@ -288,8 +282,7 @@ export function computeLiveSnapshot(
 
   return {
     securityScore: String(score),
-    scoreChange:
-      criticalCount === 0 ? "Optimal posture" : `${criticalCount} critical open`,
+    scoreChange: criticalCount === 0 ? "Optimal posture" : `${criticalCount} critical open`,
     protectedAssets: String(totalProtected),
     assetsChange: `${assets.length} hosts · ${protectedServices.length} services`,
     meanResponse: incidents.length === 0 ? "0" : `${containmentRatio}%`,
@@ -321,9 +314,9 @@ export const supabaseAnonKey =
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
-    supabaseAnonKey &&
-    supabaseUrl.startsWith("http") &&
-    !supabaseUrl.includes("your-project-id"),
+  supabaseAnonKey &&
+  supabaseUrl.startsWith("http") &&
+  !supabaseUrl.includes("your-project-id"),
 );
 
 function getSupabaseHeaders(extra?: Record<string, string>): HeadersInit {
@@ -613,9 +606,12 @@ export async function fetchClientTenantsFromBackend(): Promise<ClientTenant[]> {
   const cached = readLocalCache<ClientTenant>(STORAGE_KEYS.tenants);
   if (!isSupabaseConfigured || !supabaseUrl) return cached;
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/client_tenants?select=*&order=created_at.desc`, {
-      headers: getSupabaseHeaders(),
-    });
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/client_tenants?select=*&order=created_at.desc`,
+      {
+        headers: getSupabaseHeaders(),
+      },
+    );
     if (!response.ok) return cached;
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return cached;
@@ -648,9 +644,12 @@ export async function fetchAuditLogsFromBackend(): Promise<AuditLogEntry[]> {
   const cached = readLocalCache<AuditLogEntry>(STORAGE_KEYS.auditLogs);
   if (!isSupabaseConfigured || !supabaseUrl) return cached;
   try {
-    const response = await fetch(`${supabaseUrl}/rest/v1/audit_logs?select=*&order=created_at.desc`, {
-      headers: getSupabaseHeaders(),
-    });
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/audit_logs?select=*&order=created_at.desc`,
+      {
+        headers: getSupabaseHeaders(),
+      },
+    );
     if (!response.ok) return cached;
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return cached;
@@ -1129,7 +1128,8 @@ export async function authenticateAppUserFromBackend(
   if (!matched) {
     return {
       user: null,
-      error: "No account found with this email. Please create an account to onboard your organization.",
+      error:
+        "No account found with this email. Please create an account to onboard your organization.",
     };
   }
   if (matched.password !== password) {
@@ -1140,4 +1140,3 @@ export async function authenticateAppUserFromBackend(
   }
   return { user: matched };
 }
-

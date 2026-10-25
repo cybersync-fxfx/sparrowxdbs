@@ -1,6 +1,6 @@
 # SparrowX Security Dashboard
 
-can u desing a cyber security started dashbord wich neede for a startup cyber security compnay 
+can u desing a cyber security started dashbord wich neede for a startup cyber security compnay
 company name : sparrowx
 
 This project was built with [Lovable](https://lovable.dev).

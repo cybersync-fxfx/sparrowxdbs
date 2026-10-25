@@ -1,3 +1,7 @@
+import { AiGuardrailSandbox } from "@/components/AiGuardrailSandbox";
+import { FirewallRuleExporter } from "@/components/FirewallRuleExporter";
+import { IncidentTimelineView } from "@/components/IncidentTimelineView";
+import { LiveWebhookDispatcherManager } from "@/components/LiveWebhookDispatcherManager";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -68,6 +72,20 @@ import {
 } from "@/components/portals/ClientAndAdminPortals";
 import supabaseSchemaSql from "../../supabase/schema.sql?raw";
 import {
+  analyzePromptInSandbox,
+  dispatchIncidentWebhook,
+  exportFirewallBlocklist,
+  getIncidentTimeline,
+  appendIncidentTimelineEvent,
+  getSavedWebhooks,
+  saveWebhooks,
+  issueSignedSessionToken,
+  verifySessionToken,
+  type WebhookConfig,
+  type AiGuardrailTestResult,
+  type FirewallFormat,
+} from "@/lib/advanced-features";
+import {
   type AppUser,
   type Asset,
   type AuditLogEntry,
@@ -112,12 +130,14 @@ export const Route = createFileRoute("/")({
       { title: "SparrowX | Security operations" },
       {
         name: "description",
-        content: "Production security operations, live incident response, and Web & AI Agent guardrails.",
+        content:
+          "Production security operations, live incident response, and Web & AI Agent guardrails.",
       },
       { property: "og:title", content: "SparrowX | Security operations" },
       {
         property: "og:description",
-        content: "Production security operations, live incident response, and Web & AI Agent guardrails.",
+        content:
+          "Production security operations, live incident response, and Web & AI Agent guardrails.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -239,7 +259,7 @@ function Dashboard() {
       setIntegrations(data.integrations);
       setClientTenants(data.clientTenants);
       if (data.clientTenants.length > 0) {
-        setSelectedTenantId((prev) => prev ?? data.clientTenants[0].id);
+        setSelectedTenantId((prev) => prev ?? data.clientTenants[0]?.id ?? null);
       }
       setAuditLogs(data.auditLogs);
       setIsLoadingWorkspace(false);
@@ -364,6 +384,13 @@ function Dashboard() {
     };
     setIncidents((current) => [created, ...current]);
     await persistIncidentToBackend(created);
+    // Auto-dispatch High & Critical security alerts to Slack/Discord/PagerDuty
+    void dispatchIncidentWebhook(created).then((res) => {
+      if (res.dispatched > 0) {
+        showToast(`Alert broadcast to ${res.dispatched} webhook channel(s)`);
+      }
+    });
+
     showToast(`Verification event ${created.id} persisted to SparrowX Cloud`);
   };
 
@@ -443,6 +470,11 @@ function Dashboard() {
     if (updatedItem) {
       await persistIncidentToBackend(updatedItem);
     }
+    appendIncidentTimelineEvent(id, {
+      stage: "Contained",
+      actor: primaryOperator?.name ?? "SecOps Responder",
+      summary: "Containment executed. Perimeter firewall updated and target isolated.",
+    });
     showToast(`${id} marked as contained`);
   };
 
@@ -707,8 +739,8 @@ function Dashboard() {
     if (!newMemberName.trim() || !newMemberEmail.trim()) return;
     const parts = newMemberName.trim().split(/\s+/);
     const initials =
-      parts.length >= 2
-        ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+      parts.length >= 2 && Boolean(parts[0]) && Boolean(parts[parts.length - 1])
+        ? `${(parts[0] || "").charAt(0)}${(parts[parts.length - 1] || "").charAt(0)}`.toUpperCase()
         : newMemberName.trim().slice(0, 2).toUpperCase();
     const created: TeamMember = {
       id: `USR-${Date.now().toString().slice(-4)}`,
@@ -757,8 +789,7 @@ function Dashboard() {
       id: `INT-${Date.now().toString().slice(-4)}`,
       name: newIntegrationName.trim(),
       category: newIntegrationCategory.trim() || "Telemetry",
-      description:
-        newIntegrationDesc.trim() || "Production security telemetry & webhook pipeline.",
+      description: newIntegrationDesc.trim() || "Production security telemetry & webhook pipeline.",
       connected: true,
       eventsPerMin: "Live",
       lastSync: "Connected",
@@ -960,7 +991,11 @@ function Dashboard() {
     );
     if (updated) {
       await persistClientTenantToBackend(updated);
-      await recordAudit("Rotated production tenant API key", (updated as ClientTenant).name, "Warning");
+      await recordAudit(
+        "Rotated production tenant API key",
+        (updated as ClientTenant).name,
+        "Warning",
+      );
       showToast(`Rotated API key for ${(updated as ClientTenant).name}`);
     }
   };
@@ -1035,9 +1070,7 @@ function Dashboard() {
       : clientTenants;
 
   const activeClientTenant =
-    visibleClientTenants.find((t) => t.id === selectedTenantId) ??
-    visibleClientTenants[0] ??
-    null;
+    visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
 
   const handleNavigate = (navLabel: string) => {
     if (authSession.role === "admin") {
@@ -1100,6 +1133,14 @@ function Dashboard() {
             "Info",
           );
 
+          // Issue signed cryptographic session token
+          issueSignedSessionToken({
+            id: createdUser.id,
+            email: createdUser.email,
+            fullName: createdUser.fullName,
+            role: "client",
+            tenantId: createdTenant?.id ?? null,
+          });
           setCurrentUser(createdUser);
           setAuthSession({
             role: "client",
@@ -1112,6 +1153,13 @@ function Dashboard() {
           return {};
         }}
         onUserAuthenticated={(user) => {
+          issueSignedSessionToken({
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            role: user.admin === "yes" ? "admin" : "client",
+            tenantId: user.tenantId,
+          });
           setCurrentUser(user);
           if (user.admin === "yes") {
             setAuthSession({
@@ -1167,11 +1215,7 @@ function Dashboard() {
     : "SX";
 
   return (
-    <SidebarProvider
-      className="bg-background"
-      onOpenChange={setSidebarOpen}
-      open={sidebarOpen}
-    >
+    <SidebarProvider className="bg-background" onOpenChange={setSidebarOpen} open={sidebarOpen}>
       <AppSidebar
         activeClientTenant={activeClientTenant}
         activeNav={activeNav}
@@ -1218,9 +1262,7 @@ function Dashboard() {
             </Button>
 
             <span className="hidden text-muted-foreground/60 sm:block">/</span>
-            <span className="truncate text-sm font-semibold text-foreground">
-              {activeNav}
-            </span>
+            <span className="truncate text-sm font-semibold text-foreground">{activeNav}</span>
             <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex">
               <Database className="size-3 text-primary" />
               {backendSource === "supabase" ? "SparrowX Cloud Live" : "Offline"}
@@ -1275,12 +1317,8 @@ function Dashboard() {
 
         {menuOpen && (
           <div className="absolute right-5 top-14 z-30 w-64 border border-border bg-card p-3.5 shadow-xl">
-            <p className="truncate text-sm font-semibold">
-              {currentUser?.fullName || "Account"}
-            </p>
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {currentUser?.email}
-            </p>
+            <p className="truncate text-sm font-semibold">{currentUser?.fullName || "Account"}</p>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{currentUser?.email}</p>
             <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
               {authSession.role === "client" ? (
                 <>
@@ -1346,9 +1384,7 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
-          {portalMode === "client" &&
-            activeNav !== "Help center" &&
-            activeNav !== "Settings" && (
+          {portalMode === "client" && activeNav !== "Help center" && activeNav !== "Settings" && (
             <ClientPortalView
               activeNav={activeNav}
               assets={assets}
@@ -1376,9 +1412,7 @@ function Dashboard() {
             />
           )}
 
-          {portalMode === "admin" &&
-            activeNav !== "Help center" &&
-            activeNav !== "Settings" && (
+          {portalMode === "admin" && activeNav !== "Help center" && activeNav !== "Settings" && (
             <AdminPortalView
               activeNav={activeNav}
               auditLogs={auditLogs}
@@ -1461,15 +1495,16 @@ function Dashboard() {
                       Production Guardrails
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {protectedServices.length} onboarded service(s) · {assets.length} monitored host(s) ·{" "}
-                      {incidents.length} incident(s) in SparrowX Cloud
+                      {protectedServices.length} onboarded service(s) · {assets.length} monitored
+                      host(s) · {incidents.length} incident(s) in SparrowX Cloud
                     </span>
                   </div>
                   <h2 className="mt-1.5 text-sm font-semibold">
                     Onboard your Web Apps, Cloud APIs, and AI Agents (LLM / MCP)
                   </h2>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Register production endpoints to generate live SDK keys and stream security events directly into SparrowX Cloud.
+                    Register production endpoints to generate live SDK keys and stream security
+                    events directly into SparrowX Cloud.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1729,7 +1764,8 @@ function Dashboard() {
                     Web & AI Agent Shield
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Register production websites, web apps, and autonomous AI agents (LLM / MCP) to issue ingestion keys and enforce guardrails.
+                    Register production websites, web apps, and autonomous AI agents (LLM / MCP) to
+                    issue ingestion keys and enforce guardrails.
                   </p>
                 </div>
               </section>
@@ -1750,9 +1786,7 @@ function Dashboard() {
                 <select
                   aria-label="Service category"
                   className="h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
-                  onChange={(event) =>
-                    setNewServiceCategory(event.target.value as ServiceCategory)
-                  }
+                  onChange={(event) => setNewServiceCategory(event.target.value as ServiceCategory)}
                   value={newServiceCategory}
                 >
                   <option value="AI Agent (LLM / MCP)">AI Agent (LLM / MCP)</option>
@@ -1771,6 +1805,9 @@ function Dashboard() {
                   <Plus /> Onboard service
                 </Button>
               </form>
+
+              {/* Interactive AI Guardrail Sandbox */}
+              <AiGuardrailSandbox />
 
               {/* Protected Services & AI Agents List */}
               {protectedServices.length > 0 ? (
@@ -1817,9 +1854,7 @@ function Dashboard() {
                         <div className="mt-4 grid grid-cols-3 gap-2 border-y border-border py-3 text-xs">
                           <div>
                             <div className="text-[10px] text-muted-foreground">Service ID</div>
-                            <div className="mt-0.5 font-mono text-xs font-semibold">
-                              {srv.id}
-                            </div>
+                            <div className="mt-0.5 font-mono text-xs font-semibold">{srv.id}</div>
                           </div>
                           <div>
                             <div className="text-[10px] text-muted-foreground">Threats Blocked</div>
@@ -1905,9 +1940,12 @@ function Dashboard() {
               ) : (
                 <section className="border border-border bg-card px-6 py-12 text-center">
                   <ShieldCheck className="mx-auto size-6 text-primary" />
-                  <h2 className="mt-3 text-sm font-semibold">No production services onboarded yet</h2>
+                  <h2 className="mt-3 text-sm font-semibold">
+                    No production services onboarded yet
+                  </h2>
                   <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">
-                    Use the form above to register your first Web App, Cloud API, or AI Agent and generate its live SparrowX Cloud ingestion SDK snippet.
+                    Use the form above to register your first Web App, Cloud API, or AI Agent and
+                    generate its live SparrowX Cloud ingestion SDK snippet.
                   </p>
                 </section>
               )}
@@ -1926,7 +1964,8 @@ function Dashboard() {
                     Incidents & triage
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Investigate live detections, assign responders, and execute containment playbooks.
+                    Investigate live detections, assign responders, and execute containment
+                    playbooks.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -1975,7 +2014,8 @@ function Dashboard() {
                     Threat intel & IOCs
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Correlate indicators of compromise and enforce perimeter firewall blocklists in SparrowX Cloud.
+                    Correlate indicators of compromise and enforce perimeter firewall blocklists in
+                    SparrowX Cloud.
                   </p>
                 </div>
               </section>
@@ -2020,6 +2060,9 @@ function Dashboard() {
                   <Plus /> Block indicator
                 </Button>
               </form>
+
+              {/* Perimeter WAF & Firewall Exporter */}
+              <FirewallRuleExporter indicators={threatIndicators} showToast={showToast} />
 
               <section className="border border-border bg-card">
                 <div className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-5">
@@ -2093,7 +2136,8 @@ function Dashboard() {
                       <Globe2 className="mx-auto size-5 text-muted-foreground" />
                       <p className="mt-3 text-sm font-medium">No threat indicators logged</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Add an IPv4, domain, SHA-256 hash, or ASN above to enforce perimeter blocking.
+                        Add an IPv4, domain, SHA-256 hash, or ASN above to enforce perimeter
+                        blocking.
                       </p>
                     </div>
                   )}
@@ -2114,7 +2158,8 @@ function Dashboard() {
                     Monitored assets
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Register production cloud nodes, API gateways, databases, and endpoints with host isolation controls.
+                    Register production cloud nodes, API gateways, databases, and endpoints with
+                    host isolation controls.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border bg-card p-1">
@@ -2167,9 +2212,7 @@ function Dashboard() {
                 <select
                   aria-label="Asset environment"
                   className="h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
-                  onChange={(event) =>
-                    setNewAssetEnv(event.target.value as Asset["environment"])
-                  }
+                  onChange={(event) => setNewAssetEnv(event.target.value as Asset["environment"])}
                   value={newAssetEnv}
                 >
                   <option value="Production">Production</option>
@@ -2191,13 +2234,11 @@ function Dashboard() {
               <section className="border border-border bg-card">
                 <div className="divide-y divide-border">
                   {assets.filter(
-                    (asset) =>
-                      assetEnvFilter === "All" || asset.environment === assetEnvFilter,
+                    (asset) => assetEnvFilter === "All" || asset.environment === assetEnvFilter,
                   ).length > 0 ? (
                     assets
                       .filter(
-                        (asset) =>
-                          assetEnvFilter === "All" || asset.environment === assetEnvFilter,
+                        (asset) => assetEnvFilter === "All" || asset.environment === assetEnvFilter,
                       )
                       .map((asset) => (
                         <article
@@ -2260,7 +2301,8 @@ function Dashboard() {
                       <Server className="mx-auto size-5 text-muted-foreground" />
                       <p className="mt-3 text-sm font-medium">No monitored assets registered</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Register your production hosts, Kubernetes nodes, and databases above to track posture.
+                        Register your production hosts, Kubernetes nodes, and databases above to
+                        track posture.
                       </p>
                     </div>
                   )}
@@ -2281,7 +2323,8 @@ function Dashboard() {
                     Vulnerabilities
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Track production CVEs by CVSS score and record package remediation rollouts in SparrowX Cloud.
+                    Track production CVEs by CVSS score and record package remediation rollouts in
+                    SparrowX Cloud.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 rounded-md border border-border bg-card p-1">
@@ -2354,9 +2397,8 @@ function Dashboard() {
 
               <section className="border border-border bg-card">
                 <div className="divide-y divide-border">
-                  {vulnerabilities.filter(
-                    (v) => vulnFilter === "All" || v.severity === vulnFilter,
-                  ).length > 0 ? (
+                  {vulnerabilities.filter((v) => vulnFilter === "All" || v.severity === vulnFilter)
+                    .length > 0 ? (
                     vulnerabilities
                       .filter((v) => vulnFilter === "All" || v.severity === vulnFilter)
                       .map((vuln) => (
@@ -2426,7 +2468,8 @@ function Dashboard() {
                       <ShieldAlert className="mx-auto size-5 text-muted-foreground" />
                       <p className="mt-3 text-sm font-medium">No open vulnerabilities recorded</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Log CVEs discovered by your scanner above to track remediation across production hosts.
+                        Log CVEs discovered by your scanner above to track remediation across
+                        production hosts.
                       </p>
                     </div>
                   )}
@@ -2447,7 +2490,8 @@ function Dashboard() {
                     Security reports
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Generate audit-ready posture snapshots for SOC 2, ISO 27001, NIST CSF, and executive briefings.
+                    Generate audit-ready posture snapshots for SOC 2, ISO 27001, NIST CSF, and
+                    executive briefings.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2465,10 +2509,7 @@ function Dashboard() {
                   >
                     <Plus /> ISO 27001
                   </Button>
-                  <Button
-                    onClick={() => generateNewReport("Executive Summary")}
-                    size="sm"
-                  >
+                  <Button onClick={() => generateNewReport("Executive Summary")} size="sm">
                     <Sparkles /> Generate executive digest
                   </Button>
                 </div>
@@ -2526,9 +2567,12 @@ function Dashboard() {
                   ) : (
                     <div className="px-5 py-12 text-center">
                       <FileSearch className="mx-auto size-5 text-muted-foreground" />
-                      <p className="mt-3 text-sm font-medium">No compliance reports generated yet</p>
+                      <p className="mt-3 text-sm font-medium">
+                        No compliance reports generated yet
+                      </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Click one of the report generators above to capture a live posture attestation snapshot.
+                        Click one of the report generators above to capture a live posture
+                        attestation snapshot.
                       </p>
                     </div>
                   )}
@@ -2578,9 +2622,7 @@ function Dashboard() {
                 <select
                   aria-label="Responder role"
                   className="h-9 rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
-                  onChange={(event) =>
-                    setNewMemberRole(event.target.value as TeamMember["role"])
-                  }
+                  onChange={(event) => setNewMemberRole(event.target.value as TeamMember["role"])}
                   value={newMemberRole}
                 >
                   <option value="Security Admin">Security Admin</option>
@@ -2658,7 +2700,8 @@ function Dashboard() {
                       <Users className="mx-auto size-5 text-muted-foreground" />
                       <p className="mt-3 text-sm font-medium">No team responders registered</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Add your security engineers and admins above to assign incidents and on-call shifts.
+                        Add your security engineers and admins above to assign incidents and on-call
+                        shifts.
                       </p>
                     </div>
                   )}
@@ -2679,7 +2722,8 @@ function Dashboard() {
                     Integrations & Cloud Backend
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Manage your live SparrowX Cloud database connection and external telemetry pipelines.
+                    Manage your live SparrowX Cloud database connection and external telemetry
+                    pipelines.
                   </p>
                 </div>
                 <Button disabled={isSyncing} onClick={syncWithBackend}>
@@ -2704,7 +2748,8 @@ function Dashboard() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Provision your production database schema to ensure all security tables (<code className="text-foreground">incidents</code>,{" "}
+                      Provision your production database schema to ensure all security tables (
+                      <code className="text-foreground">incidents</code>,{" "}
                       <code className="text-foreground">threat_feeds</code>,{" "}
                       <code className="text-foreground">assets</code>,{" "}
                       <code className="text-foreground">vulnerabilities</code>,{" "}
@@ -2818,7 +2863,8 @@ function Dashboard() {
                   <Boxes className="mx-auto size-5 text-muted-foreground" />
                   <p className="mt-3 text-sm font-medium">No external connectors registered</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Add your SIEM, EDR, or cloud log connectors above to track external ingestion pipelines alongside SparrowX Cloud.
+                    Add your SIEM, EDR, or cloud log connectors above to track external ingestion
+                    pipelines alongside SparrowX Cloud.
                   </p>
                 </section>
               )}
@@ -2837,7 +2883,8 @@ function Dashboard() {
                     Help center & playbooks
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Production operating procedures for onboarding services, cloud database schema setup, and incident containment.
+                    Production operating procedures for onboarding services, cloud database schema
+                    setup, and incident containment.
                   </p>
                 </div>
               </section>
@@ -2847,7 +2894,8 @@ function Dashboard() {
                   <Terminal className="size-5 text-primary" />
                   <h2 className="mt-3 text-base font-semibold">Web & AI Agent SDK Integration</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Onboard any web application or LLM/MCP agent to generate a live ingestion snippet that streams incidents directly into SparrowX Cloud.
+                    Onboard any web application or LLM/MCP agent to generate a live ingestion
+                    snippet that streams incidents directly into SparrowX Cloud.
                   </p>
                   <Button
                     className="mt-4 h-8 px-3 text-xs"
@@ -2862,7 +2910,8 @@ function Dashboard() {
                   <Database className="size-5 text-success" />
                   <h2 className="mt-3 text-base font-semibold">Database Schema Provisioning</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Provision all production security tables with Row-Level Security in your cloud database engine.
+                    Provision all production security tables with Row-Level Security in your cloud
+                    database engine.
                   </p>
                   <Button
                     className="mt-4 h-8 px-3 text-xs"
@@ -2877,7 +2926,8 @@ function Dashboard() {
                   <Siren className="size-5 text-warning" />
                   <h2 className="mt-3 text-base font-semibold">On-Call Roster & Escalation</h2>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Register your security responders in Team & Access to assign incidents and manage on-call rotations.
+                    Register your security responders in Team & Access to assign incidents and
+                    manage on-call rotations.
                   </p>
                   <Button
                     className="mt-4 h-8 px-3 text-xs"
@@ -2903,7 +2953,8 @@ function Dashboard() {
                     Security & automation settings
                   </h1>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Control autonomous containment rules, alerting thresholds, and layout preferences.
+                    Control autonomous containment rules, alerting thresholds, and layout
+                    preferences.
                   </p>
                 </div>
               </section>
@@ -2915,7 +2966,8 @@ function Dashboard() {
                       Autonomous containment for Critical EDR detections
                     </h2>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Automatically isolate endpoints when high-confidence ransomware or unauthorized shell activity is detected.
+                      Automatically isolate endpoints when high-confidence ransomware or
+                      unauthorized shell activity is detected.
                     </p>
                   </div>
                   <Button
@@ -2938,7 +2990,8 @@ function Dashboard() {
                       Realtime PagerDuty escalation on Critical incidents
                     </h2>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Immediately notify the primary on-call engineer when an incident is triaged as Critical.
+                      Immediately notify the primary on-call engineer when an incident is triaged as
+                      Critical.
                     </p>
                   </div>
                   <Button
@@ -2957,11 +3010,10 @@ function Dashboard() {
 
                 <div className="flex items-center justify-between gap-4 p-4 sm:p-5">
                   <div>
-                    <h2 className="text-sm font-semibold">
-                      Hardware WebAuthn MFA enforcement
-                    </h2>
+                    <h2 className="text-sm font-semibold">Hardware WebAuthn MFA enforcement</h2>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Require FIDO2 security keys for all Security Admin and Incident Responder actions.
+                      Require FIDO2 security keys for all Security Admin and Incident Responder
+                      actions.
                     </p>
                   </div>
                   <Button
@@ -3014,9 +3066,7 @@ function Dashboard() {
                 </p>
 
                 <div className="mt-4 border border-border bg-background p-3.5 text-xs leading-relaxed text-foreground">
-                  <div className="mb-1 font-semibold text-muted-foreground">
-                    Telemetry summary
-                  </div>
+                  <div className="mb-1 font-semibold text-muted-foreground">Telemetry summary</div>
                   {selectedIncident.summary}
                 </div>
 
@@ -3098,6 +3148,13 @@ function Dashboard() {
                 </div>
               </div>
 
+              {/* Forensic Incident Timeline & Remediation Log */}
+              <IncidentTimelineView
+                incident={selectedIncident}
+                currentOperator={primaryOperator?.name ?? "SecOps Responder"}
+                showToast={showToast}
+              />
+
               <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
                 <Button
                   className="text-destructive hover:text-destructive"
@@ -3108,18 +3165,11 @@ function Dashboard() {
                   <Trash2 className="size-3.5" /> Delete incident
                 </Button>
                 <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => setSelectedIncidentId(null)}
-                    size="sm"
-                    variant="ghost"
-                  >
+                  <Button onClick={() => setSelectedIncidentId(null)} size="sm" variant="ghost">
                     Close
                   </Button>
                   {selectedIncident.status !== "Contained" ? (
-                    <Button
-                      onClick={() => resolveIncident(selectedIncident.id)}
-                      size="sm"
-                    >
+                    <Button onClick={() => resolveIncident(selectedIncident.id)} size="sm">
                       <Check /> Execute containment
                     </Button>
                   ) : (
@@ -3204,7 +3254,10 @@ function Dashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-muted-foreground" htmlFor="inc-assign">
+                    <label
+                      className="text-xs font-medium text-muted-foreground"
+                      htmlFor="inc-assign"
+                    >
                       Assignee
                     </label>
                     <input
@@ -3218,7 +3271,10 @@ function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="inc-playbook">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="inc-playbook"
+                  >
                     Response playbook
                   </label>
                   <input
@@ -3230,7 +3286,10 @@ function Dashboard() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-medium text-muted-foreground" htmlFor="inc-summary">
+                  <label
+                    className="text-xs font-medium text-muted-foreground"
+                    htmlFor="inc-summary"
+                  >
                     Initial findings
                   </label>
                   <textarea
@@ -3309,7 +3368,8 @@ export async function reportThreatToSparrowX(event: {
                         Connect {targetSrv.name} to SparrowX
                       </h2>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        Add this guardrail helper to your production Web App middleware or AI Agent tool-runner to stream security incidents directly into SparrowX Cloud.
+                        Add this guardrail helper to your production Web App middleware or AI Agent
+                        tool-runner to stream security incidents directly into SparrowX Cloud.
                       </p>
                     </div>
                     <Button
@@ -3543,7 +3603,8 @@ function IncidentsSection({
             <ShieldCheck className="mx-auto size-6 text-success" />
             <p className="mt-3 text-sm font-medium">No active incidents in queue</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Your production incident queue is clean. Connect a service SDK or report an incident manually.
+              Your production incident queue is clean. Connect a service SDK or report an incident
+              manually.
             </p>
             <Button className="mt-4" onClick={onOpenCreate} size="sm" variant="outline">
               <Plus /> Report incident
@@ -3601,7 +3662,7 @@ function AppSidebar({
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const socNavItems = [
+  const socNavItems: Array<{ label: string; icon: typeof Activity; count?: string | undefined }> = [
     { label: "Overview", icon: Activity },
     {
       label: "Web & AI Shield",
@@ -3624,7 +3685,11 @@ function AppSidebar({
   ];
 
   // Client Area Hub Navigation
-  const clientAreaNavItems: Array<{ label: string; icon: typeof Activity; count?: string }> = [
+  const clientAreaNavItems: Array<{
+    label: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
     {
       label: "My Services",
       icon: Boxes,
@@ -3639,7 +3704,7 @@ function AppSidebar({
   const clientServiceDashboardItems: Array<{
     label: string;
     icon: typeof Activity;
-    count?: string;
+    count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
     ...(clientEnabledModules.includes("web_security")
@@ -3658,19 +3723,20 @@ function AppSidebar({
   ];
 
   // SparrowX Admin & Subscription Command Center Sidebar
-  const adminNavItems: Array<{ label: string; icon: typeof Activity; count?: string }> = [
-    {
-      label: "Client Subscriptions",
-      icon: Users,
-      count: tenantCount > 0 ? String(tenantCount) : undefined,
-    },
-    { label: "Performance & Kill-Switch", icon: Activity },
-    {
-      label: "Access Control & Audit",
-      icon: LockKeyhole,
-      count: auditCount > 0 ? String(auditCount) : undefined,
-    },
-  ];
+  const adminNavItems: Array<{ label: string; icon: typeof Activity; count?: string | undefined }> =
+    [
+      {
+        label: "Client Subscriptions",
+        icon: Users,
+        count: tenantCount > 0 ? String(tenantCount) : undefined,
+      },
+      { label: "Performance & Kill-Switch", icon: Activity },
+      {
+        label: "Access Control & Audit",
+        icon: LockKeyhole,
+        count: auditCount > 0 ? String(auditCount) : undefined,
+      },
+    ];
 
   const isInClientArea =
     !isAdminSession &&
@@ -3728,7 +3794,11 @@ function AppSidebar({
             title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Minimize sidebar (Ctrl+B)"}
             variant="ghost"
           >
-            {isCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
+            {isCollapsed ? (
+              <PanelLeftOpen className="size-4" />
+            ) : (
+              <PanelLeftClose className="size-4" />
+            )}
           </Button>
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 group-data-[collapsible=icon]:hidden">
@@ -3879,7 +3949,11 @@ function AppSidebar({
               onClick={toggleSidebar}
               tooltip={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Minimize sidebar (Ctrl+B)"}
             >
-              {isCollapsed ? <PanelLeftOpen className="text-primary" /> : <PanelLeftClose className="text-primary" />}
+              {isCollapsed ? (
+                <PanelLeftOpen className="text-primary" />
+              ) : (
+                <PanelLeftClose className="text-primary" />
+              )}
               <span>{isCollapsed ? "Expand sidebar" : "Minimize sidebar"}</span>
               <kbd className="ml-auto rounded border border-sidebar-border bg-sidebar px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
                 ^B
@@ -3943,9 +4017,7 @@ function AppSidebar({
             {initials}
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="truncate text-xs font-medium">
-              {currentUser?.fullName || "Account"}
-            </div>
+            <div className="truncate text-xs font-medium">{currentUser?.fullName || "Account"}</div>
             <div className="truncate text-[10px] text-muted-foreground">
               {currentUser?.email || "Authenticated"}
             </div>
@@ -3997,7 +4069,9 @@ function MetricCard({
         {suffix && <span className="text-sm text-muted-foreground">{suffix}</span>}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-        <span className={`font-semibold ${trend === "alert" ? "text-destructive" : "text-success"}`}>
+        <span
+          className={`font-semibold ${trend === "alert" ? "text-destructive" : "text-success"}`}
+        >
           {change}
         </span>
         <span className="text-muted-foreground">{footnote}</span>
@@ -4038,7 +4112,9 @@ function StatusTag({ status }: { status: IncidentStatus }) {
         ? "border-info/30 bg-info/10 text-info"
         : "border-border bg-secondary text-muted-foreground";
   return (
-    <span className={`min-w-[91px] rounded-sm border px-2 py-1 text-center text-[10px] font-medium ${style}`}>
+    <span
+      className={`min-w-[91px] rounded-sm border px-2 py-1 text-center text-[10px] font-medium ${style}`}
+    >
       {status}
     </span>
   );

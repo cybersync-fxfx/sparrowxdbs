@@ -78,14 +78,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "SparrowX | Security Operations" },
+      {
+        name: "description",
+        content:
+          "Production security operations, live incident response, and Web & AI Agent guardrails.",
+      },
+      { name: "author", content: "SparrowX" },
+      { property: "og:title", content: "SparrowX | Security Operations" },
+      {
+        property: "og:description",
+        content:
+          "Production security operations, live incident response, and Web & AI Agent guardrails.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@sparrowx" },
     ],
     links: [
       {
