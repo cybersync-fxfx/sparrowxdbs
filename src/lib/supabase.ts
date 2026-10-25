@@ -122,13 +122,35 @@ export type RangeSnapshot = {
   };
 };
 
-const LEGACY_DEMO_INCIDENT_IDS = new Set([
+const LEGACY_DEMO_IDS = new Set([
   "INC-2847",
   "INC-2846",
   "INC-2845",
   "INC-2844",
   "INC-2843",
   "INC-2842",
+  "AST-101",
+  "AST-102",
+  "AST-103",
+  "AST-104",
+  "AST-105",
+  "VUL-401",
+  "VUL-402",
+  "VUL-403",
+  "VUL-404",
+  "IOC-901",
+  "IOC-902",
+  "IOC-903",
+  "IOC-904",
+  "IOC-905",
+  "RPT-701",
+  "RPT-702",
+  "RPT-703",
+  "RPT-704",
+  "SRV-01",
+  "SRV-02",
+  "SRV-03",
+  "SRV-04",
 ]);
 
 const STORAGE_KEYS = {
@@ -271,13 +293,31 @@ async function purgeLegacyDemoIncidentsOnce(): Promise<void> {
     return;
   }
   try {
-    const ids = Array.from(LEGACY_DEMO_INCIDENT_IDS).join(",");
-    const res = await fetch(`${supabaseUrl}/rest/v1/incidents?id=in.(${ids})`, {
-      method: "DELETE",
-      headers: getSupabaseHeaders(),
-    });
-    if (res.ok && typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEYS.demoPurged, "1");
+    const ids = Array.from(LEGACY_DEMO_IDS).join(",");
+    await Promise.all([
+      fetch(`${supabaseUrl}/rest/v1/incidents?id=in.(${ids})`, {
+        method: "DELETE",
+        headers: getSupabaseHeaders(),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/assets?id=in.(${ids})`, {
+        method: "DELETE",
+        headers: getSupabaseHeaders(),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/vulnerabilities?id=in.(${ids})`, {
+        method: "DELETE",
+        headers: getSupabaseHeaders(),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/threat_feeds?id=in.(${ids})`, {
+        method: "DELETE",
+        headers: getSupabaseHeaders(),
+      }),
+      fetch(`${supabaseUrl}/rest/v1/reports?id=in.(${ids})`, {
+        method: "DELETE",
+        headers: getSupabaseHeaders(),
+      }),
+    ]);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEYS.demoPurged, "2");
     }
   } catch {
     // Ignore network error during cleanup
@@ -312,7 +352,7 @@ export async function fetchIncidentsFromBackend(): Promise<{
     }
 
     const mapped: Incident[] = data
-      .filter((row) => !LEGACY_DEMO_INCIDENT_IDS.has(String(row.id ?? "")))
+      .filter((row) => !LEGACY_DEMO_IDS.has(String(row.id ?? "")))
       .map((row) => ({
         id: String(row.id ?? ""),
         title: String(row.title ?? ""),
@@ -341,17 +381,19 @@ export async function fetchThreatIndicatorsFromBackend(): Promise<ThreatIndicato
     if (!response.ok) return [];
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return [];
-    return data.map((row) => ({
-      id: String(row.id ?? ""),
-      indicator: String(row.indicator ?? ""),
-      type: (row.type as ThreatIndicator["type"]) ?? "IPv4",
-      actor: String(row.actor ?? "Unknown"),
-      confidence: Number(row.confidence ?? 85),
-      severity: (row.severity as Severity) ?? "High",
-      region: String(row.region ?? "Global"),
-      blocked: Boolean(row.blocked ?? false),
-      lastSeen: String(row.last_seen ?? "Just now"),
-    }));
+    return data
+      .filter((row) => !LEGACY_DEMO_IDS.has(String(row.id ?? "")))
+      .map((row) => ({
+        id: String(row.id ?? ""),
+        indicator: String(row.indicator ?? ""),
+        type: (row.type as ThreatIndicator["type"]) ?? "IPv4",
+        actor: String(row.actor ?? "Unknown"),
+        confidence: Number(row.confidence ?? 85),
+        severity: (row.severity as Severity) ?? "High",
+        region: String(row.region ?? "Global"),
+        blocked: Boolean(row.blocked ?? false),
+        lastSeen: String(row.last_seen ?? "Just now"),
+      }));
   } catch {
     return [];
   }
@@ -366,17 +408,19 @@ export async function fetchAssetsFromBackend(): Promise<Asset[]> {
     if (!response.ok) return [];
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return [];
-    return data.map((row) => ({
-      id: String(row.id ?? ""),
-      hostname: String(row.hostname ?? ""),
-      type: (row.type as Asset["type"]) ?? "API Gateway",
-      ip: String(row.ip ?? ""),
-      environment: (row.environment as Asset["environment"]) ?? "Production",
-      owner: String(row.owner ?? ""),
-      riskScore: Number(row.risk_score ?? 10),
-      status: (row.status as Asset["status"]) ?? "Protected",
-      lastCheckin: String(row.last_checkin ?? "Just now"),
-    }));
+    return data
+      .filter((row) => !LEGACY_DEMO_IDS.has(String(row.id ?? "")))
+      .map((row) => ({
+        id: String(row.id ?? ""),
+        hostname: String(row.hostname ?? ""),
+        type: (row.type as Asset["type"]) ?? "API Gateway",
+        ip: String(row.ip ?? ""),
+        environment: (row.environment as Asset["environment"]) ?? "Production",
+        owner: String(row.owner ?? ""),
+        riskScore: Number(row.risk_score ?? 10),
+        status: (row.status as Asset["status"]) ?? "Protected",
+        lastCheckin: String(row.last_checkin ?? "Just now"),
+      }));
   } catch {
     return [];
   }
@@ -391,16 +435,18 @@ export async function fetchVulnerabilitiesFromBackend(): Promise<Vulnerability[]
     if (!response.ok) return [];
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return [];
-    return data.map((row) => ({
-      id: String(row.id ?? ""),
-      cve: String(row.cve ?? ""),
-      packageName: String(row.package_name ?? ""),
-      cvss: Number(row.cvss ?? 5.0),
-      severity: (row.severity as Severity) ?? "Medium",
-      affectedHosts: Number(row.affected_hosts ?? 1),
-      status: (row.status as Vulnerability["status"]) ?? "Open",
-      fixVersion: String(row.fix_version ?? ""),
-    }));
+    return data
+      .filter((row) => !LEGACY_DEMO_IDS.has(String(row.id ?? "")))
+      .map((row) => ({
+        id: String(row.id ?? ""),
+        cve: String(row.cve ?? ""),
+        packageName: String(row.package_name ?? ""),
+        cvss: Number(row.cvss ?? 5.0),
+        severity: (row.severity as Severity) ?? "Medium",
+        affectedHosts: Number(row.affected_hosts ?? 1),
+        status: (row.status as Vulnerability["status"]) ?? "Open",
+        fixVersion: String(row.fix_version ?? ""),
+      }));
   } catch {
     return [];
   }
@@ -415,15 +461,17 @@ export async function fetchReportsFromBackend(): Promise<ReportItem[]> {
     if (!response.ok) return [];
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return [];
-    return data.map((row) => ({
-      id: String(row.id ?? ""),
-      title: String(row.title ?? ""),
-      framework: (row.framework as ReportItem["framework"]) ?? "SOC 2 Type II",
-      period: String(row.period ?? ""),
-      generatedAt: String(row.generated_at ?? "Just now"),
-      author: String(row.author ?? ""),
-      status: (row.status as ReportItem["status"]) ?? "Ready",
-    }));
+    return data
+      .filter((row) => !LEGACY_DEMO_IDS.has(String(row.id ?? "")))
+      .map((row) => ({
+        id: String(row.id ?? ""),
+        title: String(row.title ?? ""),
+        framework: (row.framework as ReportItem["framework"]) ?? "SOC 2 Type II",
+        period: String(row.period ?? ""),
+        generatedAt: String(row.generated_at ?? "Just now"),
+        author: String(row.author ?? ""),
+        status: (row.status as ReportItem["status"]) ?? "Ready",
+      }));
   } catch {
     return [];
   }

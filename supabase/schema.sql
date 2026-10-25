@@ -1,6 +1,7 @@
 -- SparrowX Security Operations Platform - Production Supabase Schema
--- Run this full script in your Supabase SQL Editor.
+-- Copy this ENTIRE file into your Supabase SQL Editor (make sure no text is highlighted) and click Run.
 
+-- 1. Incidents
 create table if not exists public.incidents (
   id text primary key,
   title text not null,
@@ -14,7 +15,13 @@ create table if not exists public.incidents (
   affected_assets integer not null default 1,
   created_at timestamptz not null default now()
 );
+alter table public.incidents enable row level security;
+drop policy if exists "Allow public read/write on incidents for demo" on public.incidents;
+drop policy if exists "Allow access on incidents" on public.incidents;
+create policy "Allow access on incidents"
+  on public.incidents for all using (true) with check (true);
 
+-- 2. Threat Feeds (IOCs)
 create table if not exists public.threat_feeds (
   id text primary key,
   indicator text not null,
@@ -27,7 +34,13 @@ create table if not exists public.threat_feeds (
   last_seen text not null default 'Just now',
   created_at timestamptz not null default now()
 );
+alter table public.threat_feeds enable row level security;
+drop policy if exists "Allow public read/write on threat_feeds for demo" on public.threat_feeds;
+drop policy if exists "Allow access on threat_feeds" on public.threat_feeds;
+create policy "Allow access on threat_feeds"
+  on public.threat_feeds for all using (true) with check (true);
 
+-- 3. Monitored Assets
 create table if not exists public.assets (
   id text primary key,
   hostname text not null,
@@ -40,7 +53,13 @@ create table if not exists public.assets (
   last_checkin text not null default 'Just now',
   created_at timestamptz not null default now()
 );
+alter table public.assets enable row level security;
+drop policy if exists "Allow public read/write on assets for demo" on public.assets;
+drop policy if exists "Allow access on assets" on public.assets;
+create policy "Allow access on assets"
+  on public.assets for all using (true) with check (true);
 
+-- 4. Vulnerabilities (CVEs)
 create table if not exists public.vulnerabilities (
   id text primary key,
   cve text not null,
@@ -52,7 +71,13 @@ create table if not exists public.vulnerabilities (
   fix_version text not null,
   created_at timestamptz not null default now()
 );
+alter table public.vulnerabilities enable row level security;
+drop policy if exists "Allow public read/write on vulnerabilities for demo" on public.vulnerabilities;
+drop policy if exists "Allow access on vulnerabilities" on public.vulnerabilities;
+create policy "Allow access on vulnerabilities"
+  on public.vulnerabilities for all using (true) with check (true);
 
+-- 5. Compliance Reports
 create table if not exists public.reports (
   id text primary key,
   title text not null,
@@ -63,7 +88,13 @@ create table if not exists public.reports (
   status text not null check (status in ('Ready', 'Scheduled')),
   created_at timestamptz not null default now()
 );
+alter table public.reports enable row level security;
+drop policy if exists "Allow public read/write on reports for demo" on public.reports;
+drop policy if exists "Allow access on reports" on public.reports;
+create policy "Allow access on reports"
+  on public.reports for all using (true) with check (true);
 
+-- 6. Protected Web Apps, APIs & AI Agents
 create table if not exists public.protected_services (
   id text primary key,
   name text not null,
@@ -79,7 +110,12 @@ create table if not exists public.protected_services (
   last_heartbeat text not null default 'Connected',
   created_at timestamptz not null default now()
 );
+alter table public.protected_services enable row level security;
+drop policy if exists "Allow access on protected_services" on public.protected_services;
+create policy "Allow access on protected_services"
+  on public.protected_services for all using (true) with check (true);
 
+-- 7. Security Team Members
 create table if not exists public.team_members (
   id text primary key,
   name text not null,
@@ -91,7 +127,12 @@ create table if not exists public.team_members (
   shift text not null default 'Primary Shift',
   created_at timestamptz not null default now()
 );
+alter table public.team_members enable row level security;
+drop policy if exists "Allow access on team_members" on public.team_members;
+create policy "Allow access on team_members"
+  on public.team_members for all using (true) with check (true);
 
+-- 8. External Telemetry Integrations
 create table if not exists public.integrations (
   id text primary key,
   name text not null,
@@ -102,52 +143,7 @@ create table if not exists public.integrations (
   last_sync text not null default 'Live',
   created_at timestamptz not null default now()
 );
-
-alter table public.incidents enable row level security;
-alter table public.threat_feeds enable row level security;
-alter table public.assets enable row level security;
-alter table public.vulnerabilities enable row level security;
-alter table public.reports enable row level security;
-alter table public.protected_services enable row level security;
-alter table public.team_members enable row level security;
 alter table public.integrations enable row level security;
-
-drop policy if exists "Allow public read/write on incidents for demo" on public.incidents;
-drop policy if exists "Allow access on incidents" on public.incidents;
-create policy "Allow access on incidents"
-  on public.incidents for all using (true) with check (true);
-
-drop policy if exists "Allow public read/write on threat_feeds for demo" on public.threat_feeds;
-drop policy if exists "Allow access on threat_feeds" on public.threat_feeds;
-create policy "Allow access on threat_feeds"
-  on public.threat_feeds for all using (true) with check (true);
-
-drop policy if exists "Allow public read/write on assets for demo" on public.assets;
-drop policy if exists "Allow access on assets" on public.assets;
-create policy "Allow access on assets"
-  on public.assets for all using (true) with check (true);
-
-drop policy if exists "Allow public read/write on vulnerabilities for demo" on public.vulnerabilities;
-drop policy if exists "Allow access on vulnerabilities" on public.vulnerabilities;
-create policy "Allow access on vulnerabilities"
-  on public.vulnerabilities for all using (true) with check (true);
-
-drop policy if exists "Allow public read/write on reports for demo" on public.reports;
-drop policy if exists "Allow access on reports" on public.reports;
-create policy "Allow access on reports"
-  on public.reports for all using (true) with check (true);
-
-drop policy if exists "Allow access on protected_services" on public.protected_services;
-create policy "Allow access on protected_services"
-  on public.protected_services for all using (true) with check (true);
-
-drop policy if exists "Allow access on team_members" on public.team_members;
-create policy "Allow access on team_members"
-  on public.team_members for all using (true) with check (true);
-
 drop policy if exists "Allow access on integrations" on public.integrations;
 create policy "Allow access on integrations"
   on public.integrations for all using (true) with check (true);
-
--- Remove any legacy seeded demo incidents if present
-delete from public.incidents where id in ('INC-2847', 'INC-2846', 'INC-2845', 'INC-2844', 'INC-2843', 'INC-2842');
