@@ -63,18 +63,24 @@ const STORAGE_KEYS = {
 };
 
 // Initial welcome credits for new workspaces
-const DEFAULT_INITIAL_CREDITS = 150;
+const DEFAULT_INITIAL_CREDITS = 0;
 
 export function getStoredCreditBalance(tenantId?: string): number {
-  if (typeof window === "undefined") return DEFAULT_INITIAL_CREDITS;
+  if (typeof window === "undefined") return 0;
   const key = tenantId ? `${STORAGE_KEYS.credits}_${tenantId}` : STORAGE_KEYS.credits;
   const raw = window.localStorage.getItem(key);
   if (raw === null) {
-    window.localStorage.setItem(key, String(DEFAULT_INITIAL_CREDITS));
-    return DEFAULT_INITIAL_CREDITS;
+    window.localStorage.setItem(key, "0");
+    return 0;
   }
+  // Clear legacy mock 150 seed if no real transactions exist
+  const txs = getStoredBillingTransactions(tenantId);
   const val = Number.parseInt(raw, 10);
-  return Number.isNaN(val) ? DEFAULT_INITIAL_CREDITS : val;
+  if (val === 150 && txs.length === 0) {
+    window.localStorage.setItem(key, "0");
+    return 0;
+  }
+  return Number.isNaN(val) ? 0 : val;
 }
 
 export function saveStoredCreditBalance(
@@ -154,29 +160,13 @@ export function getStoredBillingTransactions(tenantId?: string): BillingTransact
   const key = tenantId ? `${STORAGE_KEYS.transactions}_${tenantId}` : STORAGE_KEYS.transactions;
   const raw = window.localStorage.getItem(key);
   if (!raw) {
-    const initialSeed: BillingTransaction[] = [
-      {
-        id: "TXN-INIT-01",
-        type: "topup",
-        credits: 150,
-        costUsd: 0,
-        title: "Workspace Onboarding Credit Grant",
-        description: "Welcome credits awarded upon workspace initialization",
-        paymentMethod: "SparrowX Founder Grant",
-        timestamp: new Date().toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        }),
-        receiptNumber: "REC-FREE-001",
-      },
-    ];
-    window.localStorage.setItem(key, JSON.stringify(initialSeed));
-    return initialSeed;
+    return [];
   }
   try {
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as BillingTransaction[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Purge any legacy mock seed
+    return (parsed as BillingTransaction[]).filter((tx) => tx.id !== "TXN-INIT-01");
   } catch {
     return [];
   }

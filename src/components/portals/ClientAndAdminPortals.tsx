@@ -1,3 +1,4 @@
+import { emitEngineActivity, emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { useState, useEffect } from "react";
 import {
   Activity,
@@ -995,10 +996,10 @@ export function ClientPortalView({
                 <div>
                   <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
                     <Coins className="size-4" />
-                    <span>Security Credit Vault & Balance</span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-mono text-emerald-400 lowercase">
-                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      supabase postgresql live
+                    <span>Security Credits Balance</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
+                      <span className="size-1.5 rounded-full bg-emerald-400" />
+                      Live PostgreSQL Ledger
                     </span>
                   </div>
                   <div className="mt-2 flex items-baseline gap-3">
@@ -2723,26 +2724,9 @@ export function PortalLoginScreen({
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="hidden md:flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-xs text-muted-foreground backdrop-blur-sm">
-              <span className="relative flex size-2">
-                <span
-                  className={`absolute inline-flex h-full w-full animate-ping rounded-full ${
-                    backendSource === "supabase" ? "bg-emerald-400" : "bg-amber-400"
-                  } opacity-75`}
-                />
-                <span
-                  className={`relative inline-flex size-2 rounded-full ${
-                    backendSource === "supabase" ? "bg-emerald-500" : "bg-amber-500"
-                  }`}
-                />
-              </span>
-              <span>
-                {backendSource === "supabase" ? "Supabase Live Connected" : "Local Offline Mode"}
-              </span>
-              <span className="text-white/20">·</span>
-              <span className="font-mono text-emerald-400/90 font-medium">
-                {backendSource === "supabase" ? "PostgreSQL Active" : "Cache Active"}
-              </span>
+            <div className="hidden md:flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-xs text-muted-foreground">
+              <span className="size-2 rounded-full bg-emerald-400" />
+              <span>{backendSource === "supabase" ? "Supabase Live Connected" : "Local Mode"}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -2833,20 +2817,6 @@ export function PortalLoginScreen({
                 </div>
               );
             })}
-          </div>
-
-          {/* Live Trust & Human Metrics Footer */}
-          <div className="pt-3 border-t border-white/[0.07] flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span className="inline-block size-2 rounded-full bg-emerald-400" />
-              <span className="font-medium text-foreground/90">100% sovereign & self-hostable</span>
-            </div>
-
-            <div className="flex items-center gap-3 font-mono text-[11px]">
-              <span className="text-muted-foreground">Zero hidden tracking</span>
-              <span>·</span>
-              <span className="text-primary font-medium">Own your data</span>
-            </div>
           </div>
         </section>
 

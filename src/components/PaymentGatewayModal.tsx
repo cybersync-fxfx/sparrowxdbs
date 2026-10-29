@@ -17,6 +17,7 @@ import {
   Coins,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { emitEngineActivity, emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { Button } from "@/components/ui/button";
 import {
   CREDIT_PACKAGES,
@@ -134,6 +135,11 @@ export function PaymentGatewayModal({
 
   const handleExecutePayment = async () => {
     setProcessStage("verifying");
+    emitEngineActivity(
+      "Payment Gateway",
+      `Verifying ${paymentMethod.toUpperCase()} transaction intent...`,
+      "cooking",
+    );
 
     // Stage 1: Verification
     await new Promise((r) => setTimeout(r, 900));
@@ -181,6 +187,16 @@ export function PaymentGatewayModal({
     setCompletedTx(tx);
     setProcessStage("success");
     onCreditsAdded(newBalance, activeCredits);
+    emitEngineActivity(
+      "Cloud Ledger",
+      `Minted +${activeCredits} credits to Supabase billing_credits (Bal: ${newBalance})`,
+      "success",
+    );
+    emitEngineToast(
+      `Payment verified! Added +${activeCredits} credits to workspace`,
+      "success",
+      "Payment Succeeded",
+    );
     showToast(`Successfully added ${activeCredits} credits! New balance: ${newBalance} credits`);
   };
 

@@ -1,4 +1,9 @@
 import { AiGuardrailSandbox } from "@/components/AiGuardrailSandbox";
+import {
+  BackgroundEngineToaster,
+  emitEngineActivity,
+  emitEngineToast,
+} from "@/components/BackgroundEngineToaster";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
 import { generateComplianceReportDocument } from "@/lib/client-sdk-generator";
 import { FirewallRuleExporter } from "@/components/FirewallRuleExporter";
@@ -241,9 +246,14 @@ function Dashboard() {
   const [realtimePagerDuty, setRealtimePagerDuty] = useState(true);
   const [enforceStrictMfa, setEnforceStrictMfa] = useState(true);
 
-  const showToast = (message: string) => {
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "info" | "cooking" = "success",
+  ) => {
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 3200);
+    emitEngineToast(message, type);
+    emitEngineActivity("Dashboard", message, type);
+    window.setTimeout(() => setNotice(""), 3500);
   };
 
   useEffect(() => {
@@ -1125,117 +1135,143 @@ function Dashboard() {
 
   if (authSession.role === "unauthenticated") {
     return (
-      <PortalLoginScreen
-        backendSource={backendSource}
-        onRegisterAndLoginUser={async (input) => {
-          let createdTenant: ClientTenant | null = null;
-          if (input.orgName && input.primaryDomain) {
-            createdTenant = {
-              id: `TNT-${Date.now().toString().slice(-4)}`,
-              name: input.orgName,
-              contactEmail: input.email,
-              primaryDomain: input.primaryDomain,
-              planTier: input.planTier,
-              status: "Active",
-              enabledModules: input.enabledModules,
-              apiKey: `spx_tenant_live_${Math.random().toString(16).slice(2, 12)}`,
-              sdkVerified: false,
-              guardrailsActive: true,
-              requestsPerMin: 0,
-              blockedThreats: 0,
-              avgLatencyMs: 11,
-              quotaUsedPct: 1,
+      <>
+        <PortalLoginScreen
+          backendSource={backendSource}
+          onRegisterAndLoginUser={async (input) => {
+            emitEngineActivity(
+              "Auth Register",
+              `Provisioning workspace for ${input.email}...`,
+              "cooking",
+            );
+            let createdTenant: ClientTenant | null = null;
+            if (input.orgName && input.primaryDomain) {
+              createdTenant = {
+                id: `TNT-${Date.now().toString().slice(-4)}`,
+                name: input.orgName,
+                contactEmail: input.email,
+                primaryDomain: input.primaryDomain,
+                planTier: input.planTier,
+                status: "Active",
+                enabledModules: input.enabledModules,
+                apiKey: `spx_tenant_live_${Math.random().toString(16).slice(2, 12)}`,
+                sdkVerified: false,
+                guardrailsActive: true,
+                requestsPerMin: 0,
+                blockedThreats: 0,
+                avgLatencyMs: 11,
+                quotaUsedPct: 1,
+              };
+              setClientTenants((prev) => [createdTenant as ClientTenant, ...prev]);
+              setSelectedTenantId(createdTenant.id);
+              await persistClientTenantToBackend(createdTenant);
+            }
+
+            const createdUser: AppUser = {
+              id: `USR-${Date.now().toString().slice(-4)}`,
+              email: input.email.toLowerCase(),
+              password: input.password,
+              fullName: input.fullName,
+              admin: "no",
+              tenantId: createdTenant?.id ?? null,
             };
-            setClientTenants((prev) => [createdTenant as ClientTenant, ...prev]);
-            setSelectedTenantId(createdTenant.id);
-            await persistClientTenantToBackend(createdTenant);
-          }
 
-          const createdUser: AppUser = {
-            id: `USR-${Date.now().toString().slice(-4)}`,
-            email: input.email.toLowerCase(),
-            password: input.password,
-            fullName: input.fullName,
-            admin: "no",
-            tenantId: createdTenant?.id ?? null,
-          };
-
-          await persistAppUserToBackend(createdUser);
-          await recordAudit(
-            `Registered user ${createdUser.email} (admin=no)`,
-            createdTenant?.name ?? createdUser.email,
-            "Info",
-          );
-
-          // Issue signed cryptographic session token
-          issueSignedSessionToken({
-            id: createdUser.id,
-            email: createdUser.email,
-            fullName: createdUser.fullName,
-            role: "client",
-            tenantId: createdTenant?.id ?? null,
-          });
-          setCurrentUser(createdUser);
-          setAuthSession({
-            role: "client",
-            tenantId: createdTenant?.id ?? null,
-            userEmail: createdUser.email,
-          });
-          setPortalMode("client");
-          setActiveNav("My Services");
-          showToast(`Welcome ${createdUser.fullName} — Client Area ready`);
-          return {};
-        }}
-        onUserAuthenticated={(user) => {
-          issueSignedSessionToken({
-            id: user.id,
-            email: user.email,
-            fullName: user.fullName,
-            role: user.admin === "yes" ? "admin" : "client",
-            tenantId: user.tenantId,
-          });
-          setCurrentUser(user);
-          if (user.admin === "yes") {
-            setAuthSession({
-              role: "admin",
-              operatorName: user.fullName || "SparrowX Admin",
-              operatorEmail: user.email,
-            });
-            setPortalMode("soc");
-            setActiveNav("Overview");
-            void recordAudit(
-              `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
-              "Admin & Subscriptions Portal",
+            await persistAppUserToBackend(createdUser);
+            await recordAudit(
+              `Registered user ${createdUser.email} (admin=no)`,
+              createdTenant?.name ?? createdUser.email,
               "Info",
             );
-            showToast(`Admin session active (${user.email})`);
-          } else {
-            const matchedTenant =
-              clientTenants.find(
-                (t) =>
-                  t.id === user.tenantId ||
-                  t.contactEmail.toLowerCase() === user.email.toLowerCase(),
-              ) ?? null;
-            if (matchedTenant) {
-              setSelectedTenantId(matchedTenant.id);
-            }
+
+            // Issue signed cryptographic session token
+            issueSignedSessionToken({
+              id: createdUser.id,
+              email: createdUser.email,
+              fullName: createdUser.fullName,
+              role: "client",
+              tenantId: createdTenant?.id ?? null,
+            });
+            setCurrentUser(createdUser);
             setAuthSession({
               role: "client",
-              tenantId: matchedTenant?.id ?? user.tenantId,
-              userEmail: user.email,
+              tenantId: createdTenant?.id ?? null,
+              userEmail: createdUser.email,
             });
             setPortalMode("client");
             setActiveNav("My Services");
-            void recordAudit(
-              `Client user ${user.email} (admin=no) authenticated into Client Area`,
-              matchedTenant?.name ?? user.email,
-              "Info",
+            emitEngineToast(
+              `Welcome ${createdUser.fullName} — Workspace ready`,
+              "success",
+              "Account Created",
             );
-            showToast(`Welcome back, ${user.fullName || user.email}`);
-          }
-        }}
-        tenants={clientTenants}
-      />
+            emitEngineActivity("Auth", `Session created for ${createdUser.email}`, "success");
+            showToast(`Welcome ${createdUser.fullName} — Client Area ready`);
+            return {};
+          }}
+          onUserAuthenticated={(user) => {
+            issueSignedSessionToken({
+              id: user.id,
+              email: user.email,
+              fullName: user.fullName,
+              role: user.admin === "yes" ? "admin" : "client",
+              tenantId: user.tenantId,
+            });
+            setCurrentUser(user);
+            if (user.admin === "yes") {
+              setAuthSession({
+                role: "admin",
+                operatorName: user.fullName || "SparrowX Admin",
+                operatorEmail: user.email,
+              });
+              setPortalMode("soc");
+              setActiveNav("Overview");
+              void recordAudit(
+                `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
+                "Admin & Subscriptions Portal",
+                "Info",
+              );
+              emitEngineToast(
+                `Admin session active (${user.email})`,
+                "success",
+                "Admin Authenticated",
+              );
+              emitEngineActivity("Auth", `Admin ${user.email} logged into SOC command`, "success");
+              showToast(`Admin session active (${user.email})`);
+            } else {
+              const matchedTenant =
+                clientTenants.find(
+                  (t) =>
+                    t.id === user.tenantId ||
+                    t.contactEmail.toLowerCase() === user.email.toLowerCase(),
+                ) ?? null;
+              if (matchedTenant) {
+                setSelectedTenantId(matchedTenant.id);
+              }
+              setAuthSession({
+                role: "client",
+                tenantId: matchedTenant?.id ?? user.tenantId,
+                userEmail: user.email,
+              });
+              setPortalMode("client");
+              setActiveNav("My Services");
+              void recordAudit(
+                `Client user ${user.email} (admin=no) authenticated into Client Area`,
+                matchedTenant?.name ?? user.email,
+                "Info",
+              );
+              emitEngineToast(
+                `Welcome back, ${user.fullName || user.email}`,
+                "success",
+                "Authenticated",
+              );
+              emitEngineActivity("Auth", `Client user ${user.email} session restored`, "success");
+              showToast(`Welcome back, ${user.fullName || user.email}`);
+            }
+          }}
+          tenants={clientTenants}
+        />
+        <BackgroundEngineToaster />
+      </>
     );
   }
 
@@ -3457,24 +3493,7 @@ create policy "Allow access on app_users"
             );
           })()}
 
-        {notice && (
-          <div
-            className="fixed bottom-5 right-5 z-50 flex max-w-[calc(100vw-2.5rem)] items-center gap-3 border border-border bg-popover px-4 py-3 text-sm text-popover-foreground shadow-lg"
-            role="status"
-          >
-            <Check className="size-4 shrink-0 text-success" />
-            <span>{notice}</span>
-            <Button
-              aria-label="Dismiss notification"
-              className="ml-1 size-7"
-              onClick={() => setNotice("")}
-              size="icon"
-              variant="ghost"
-            >
-              <X />
-            </Button>
-          </div>
-        )}
+        <BackgroundEngineToaster />
       </SidebarInset>
     </SidebarProvider>
   );
