@@ -319,7 +319,7 @@ export const isSupabaseConfigured = Boolean(
   !supabaseUrl.includes("your-project-id"),
 );
 
-function getSupabaseHeaders(extra?: Record<string, string>): HeadersInit {
+export function getSupabaseHeaders(extra?: Record<string, string>): HeadersInit {
   return {
     apikey: supabaseAnonKey ?? "",
     Authorization: `Bearer ${supabaseAnonKey ?? ""}`,

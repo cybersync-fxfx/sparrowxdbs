@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Activity,
   ArrowRight,
@@ -6,6 +6,8 @@ import {
   Boxes,
   Check,
   CheckCircle2,
+  Coins,
+  CreditCard,
   Copy,
   Database,
   Download,
@@ -34,6 +36,19 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
+import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
+import {
+  calculateServiceCost,
+  downloadTransactionReceipt,
+  fetchBillingTransactions,
+  fetchCreditBalance,
+  getStoredBillingTransactions,
+  getStoredCreditBalance,
+  recordBillingTransaction,
+  saveStoredCreditBalance,
+  CREDIT_PACKAGES,
+  type BillingTransaction,
+} from "@/lib/billing-credits";
 import { generateComplianceReportDocument } from "@/lib/client-sdk-generator";
 import {
   type AppUser,
@@ -42,6 +57,8 @@ import {
   authenticateAppUserFromBackend,
   type ClientTenant,
   type Incident,
+  persistAuditLogToBackend,
+  persistClientTenantToBackend,
   type PlanTier,
   type ProtectedService,
   type ReportItem,
@@ -192,7 +209,28 @@ export function ClientPortalView({
   const [profileEmail, setProfileEmail] = useState(currentUser?.email ?? "");
   const [profileNewPassword, setProfileNewPassword] = useState("");
   const [autoRenewBilling, setAutoRenewBilling] = useState(true);
+  const activeTenant = tenants.find((t) => t.id === selectedTenantId) ?? tenants[0] ?? null;
   const [integrationTenant, setIntegrationTenant] = useState<ClientTenant | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number>(() =>
+    getStoredCreditBalance(activeTenant?.id),
+  );
+  const [billingTransactions, setBillingTransactions] = useState<BillingTransaction[]>(() =>
+    getStoredBillingTransactions(activeTenant?.id),
+  );
+
+  // Synchronize live credit balance & transactions from Supabase Cloud Ledger
+  useEffect(() => {
+    void fetchCreditBalance(activeTenant?.id, currentUser?.email).then((cloudBal) => {
+      setCreditBalance(cloudBal);
+    });
+    void fetchBillingTransactions(activeTenant?.id, currentUser?.email).then((cloudTxs) => {
+      setBillingTransactions(cloudTxs);
+    });
+  }, [activeTenant?.id, currentUser?.email]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [neededCreditsForService, setNeededCreditsForService] = useState<number | undefined>(
+    undefined,
+  );
 
   // Local interactive rules for Web & AI modules
   const [wafSqliBlock, setWafSqliBlock] = useState(true);
@@ -201,8 +239,6 @@ export function ClientPortalView({
   const [aiPromptShield, setAiPromptShield] = useState(true);
   const [aiMcpFirewall, setAiMcpFirewall] = useState(true);
   const [aiPiiRedaction, setAiPiiRedaction] = useState(true);
-
-  const activeTenant = tenants.find((t) => t.id === selectedTenantId) ?? tenants[0] ?? null;
 
   const clickedService = tenants.find((t) => t.id === clickedServiceId) ?? null;
 
@@ -232,6 +268,30 @@ export function ClientPortalView({
   const handleAddServiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!serviceName.trim() || !primaryDomain.trim()) return;
+    const serviceCost = calculateServiceCost(selectedModules, planTier);
+    if (creditBalance < serviceCost) {
+      setNeededCreditsForService(serviceCost);
+      setShowPaymentModal(true);
+      return;
+    }
+
+    const nextBal = creditBalance - serviceCost;
+    saveStoredCreditBalance(nextBal, activeTenant?.id, currentUser?.email);
+    setCreditBalance(nextBal);
+
+    const newTx = recordBillingTransaction(
+      {
+        type: "service_purchase",
+        credits: -serviceCost,
+        title: `Service Provisioned: ${serviceName.trim()}`,
+        description: `Activated ${serviceName.trim()} (${planTier}) with modules: ${selectedModules.join(", ")}`,
+        paymentMethod: "Security Credit Balance",
+      },
+      activeTenant?.id,
+      currentUser?.email,
+    );
+    setBillingTransactions((prev) => [newTx, ...prev]);
+
     await onCreateTenant({
       name: serviceName.trim(),
       contactEmail: currentUser?.email ?? "client@company.com",
@@ -239,6 +299,10 @@ export function ClientPortalView({
       planTier,
       enabledModules: selectedModules,
     });
+
+    showToast(
+      `Purchased & provisioned ${serviceName.trim()} for ${serviceCost} credits! Remaining: ${nextBal} credits`,
+    );
     setServiceName("");
     setPrimaryDomain("");
     setShowAddServiceForm(false);
@@ -250,12 +314,15 @@ export function ClientPortalView({
   const isClientAreaView =
     activeNav === "My Services" ||
     activeNav === "Subscriptions & Due Dates" ||
+    activeNav === "Billing & Credits" ||
     activeNav === "Profile Management" ||
     !activeTenant;
 
   if (isClientAreaView) {
     const currentAreaTab =
-      activeNav === "Subscriptions & Due Dates" || activeNav === "Profile Management"
+      activeNav === "Subscriptions & Due Dates" ||
+      activeNav === "Billing & Credits" ||
+      activeNav === "Profile Management"
         ? activeNav
         : "My Services";
 
@@ -265,7 +332,11 @@ export function ClientPortalView({
         <section className="flex flex-col justify-between gap-4 border border-border bg-card p-5 sm:flex-row sm:items-center">
           <div>
             <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
-              <Sparkles className="size-3.5" />
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX Logo"
+                className="size-4 object-contain inline-block"
+              />
               SparrowX Client Area
             </div>
             <h1 className="text-2xl font-semibold text-foreground">
@@ -277,6 +348,20 @@ export function ClientPortalView({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                setNeededCreditsForService(undefined);
+                setShowPaymentModal(true);
+              }}
+              className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-all shadow-sm"
+              type="button"
+            >
+              <Coins className="size-3.5" />
+              <span>{creditBalance} Credits</span>
+              <span className="rounded bg-primary/20 px-1 text-[10px] text-primary font-mono">
+                + Top Up
+              </span>
+            </button>
             <Button
               onClick={() => {
                 onNavigate("My Services");
@@ -297,6 +382,7 @@ export function ClientPortalView({
           {[
             { label: "My Services", icon: Boxes, count: tenants.length },
             { label: "Subscriptions & Due Dates", icon: Activity },
+            { label: "Billing & Credits", icon: Coins, count: creditBalance },
             { label: "Profile Management", icon: Users },
           ].map((tab) => {
             const Icon = tab.icon;
@@ -439,19 +525,60 @@ export function ClientPortalView({
                   </div>
                 </div>
 
-                <div className="mt-4 flex justify-end gap-2 border-t border-border pt-3">
-                  <Button
-                    onClick={() => setShowAddServiceForm(false)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                  <Button size="sm" type="submit">
-                    <Sparkles className="size-3.5" /> Provision Service
-                  </Button>
-                </div>
+                {(() => {
+                  const srvCost = calculateServiceCost(selectedModules, planTier);
+                  const hasFunds = creditBalance >= srvCost;
+                  return (
+                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border pt-4">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-muted-foreground">Provisioning Cost:</span>
+                        <span className="font-mono font-bold text-primary">
+                          {srvCost} Credits/mo
+                        </span>
+                        <span className="text-muted-foreground">· Available Balance:</span>
+                        <span
+                          className={`font-mono font-bold ${hasFunds ? "text-success" : "text-destructive"}`}
+                        >
+                          {creditBalance} Credits
+                        </span>
+                        {!hasFunds && (
+                          <span className="rounded bg-destructive/15 px-1.5 py-0.5 text-[11px] font-semibold text-destructive">
+                            Need {srvCost - creditBalance} more credits
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => setShowAddServiceForm(false)}
+                          size="sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          Cancel
+                        </Button>
+                        {!hasFunds ? (
+                          <Button
+                            onClick={() => {
+                              setNeededCreditsForService(srvCost);
+                              setShowPaymentModal(true);
+                            }}
+                            size="sm"
+                            type="button"
+                            className="bg-amber-500 hover:bg-amber-600 text-black font-semibold shadow-md"
+                          >
+                            <Coins className="size-3.5 mr-1" /> Top Up Credits to Buy ({srvCost} Cr)
+                          </Button>
+                        ) : (
+                          <Button size="sm" type="submit">
+                            <Sparkles className="size-3.5 mr-1" /> Buy & Launch Service ({srvCost}{" "}
+                            Cr)
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </form>
             )}
 
@@ -858,6 +985,188 @@ export function ClientPortalView({
           </section>
         )}
 
+        {/* TAB: BILLING & SECURITY CREDITS */}
+        {currentAreaTab === "Billing & Credits" && (
+          <section className="space-y-6">
+            {/* Hero Balance & Top-Up Card */}
+            <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-card via-primary/[0.04] to-card p-6 shadow-xl">
+              <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-primary/10 blur-3xl" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
+                    <Coins className="size-4" />
+                    <span>Security Credit Vault & Balance</span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-mono text-emerald-400 lowercase">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      supabase postgresql live
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-3">
+                    <span className="font-display text-4xl font-extrabold tracking-tight text-foreground">
+                      {creditBalance}
+                    </span>
+                    <span className="text-sm font-semibold text-primary">Security Credits</span>
+                  </div>
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    Active monthly consumption:{" "}
+                    <strong className="text-foreground">
+                      {tenants.reduce(
+                        (sum, t) => sum + calculateServiceCost(t.enabledModules, t.planTier),
+                        0,
+                      )}{" "}
+                      Credits/mo
+                    </strong>{" "}
+                    across {tenants.length} active service(s).
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={() => {
+                      setNeededCreditsForService(undefined);
+                      setShowPaymentModal(true);
+                    }}
+                    size="sm"
+                    className="h-10 px-5 bg-gradient-to-r from-primary to-orange-500 font-semibold text-white shadow-lg shadow-primary/25 hover:shadow-primary/40"
+                  >
+                    <CreditCard className="size-4 mr-1.5" /> Top Up Credits Now
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Credit Packs */}
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Instant Credit Packs</h3>
+                  <p className="text-xs text-muted-foreground">
+                    One-click checkout with automated receipt generation
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {CREDIT_PACKAGES.map((pack) => (
+                  <div
+                    key={pack.id}
+                    className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-md"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-primary">{pack.name}</span>
+                        {pack.popular && (
+                          <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[9px] font-bold uppercase text-primary">
+                            Popular
+                          </span>
+                        )}
+                        {pack.savings && !pack.popular && (
+                          <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-bold text-emerald-400">
+                            {pack.savings}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-baseline gap-1">
+                        <span className="font-display text-2xl font-bold">{pack.credits}</span>
+                        <span className="text-xs text-muted-foreground">Credits</span>
+                      </div>
+                      <div className="mt-1 font-mono text-sm font-semibold text-foreground">
+                        ${pack.priceUsd} USD
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{pack.description}</p>
+                    </div>
+
+                    <Button
+                      onClick={() => {
+                        setNeededCreditsForService(undefined);
+                        setShowPaymentModal(true);
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="mt-4 w-full h-8 text-xs font-semibold"
+                    >
+                      <Coins className="size-3.5 mr-1" /> Buy {pack.credits} Credits
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Transaction Ledger */}
+            <div className="rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-5 py-4 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold">Credit Transaction Ledger & Invoices</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Real-time ledger of credit purchases and service deductions
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-muted-foreground">
+                  {billingTransactions.length} Recorded Transactions
+                </span>
+              </div>
+
+              <div className="divide-y divide-border">
+                {billingTransactions.length > 0 ? (
+                  billingTransactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3.5 text-xs hover:bg-muted/10 transition-colors"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">{tx.title}</span>
+                          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                            {tx.receiptNumber}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-muted-foreground flex flex-wrap items-center gap-2 text-[11px]">
+                          <span>{tx.timestamp}</span>
+                          <span>·</span>
+                          <span>Via {tx.paymentMethod}</span>
+                          <span>·</span>
+                          <span className="font-mono">{tx.id}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div
+                            className={`font-mono font-bold text-sm ${
+                              tx.credits >= 0 ? "text-emerald-400" : "text-orange-400"
+                            }`}
+                          >
+                            {tx.credits >= 0 ? `+${tx.credits}` : tx.credits} Credits
+                          </div>
+                          {tx.costUsd !== undefined && (
+                            <div className="text-[10px] text-muted-foreground">
+                              ${tx.costUsd.toFixed(2)} USD
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          onClick={() => downloadTransactionReceipt(tx)}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs"
+                          title="Download Official Receipt (.txt)"
+                        >
+                          <Download className="size-3 mr-1" /> Receipt
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-8 text-center text-xs text-muted-foreground">
+                    No billing transactions recorded yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* TAB 3: PROFILE MANAGEMENT */}
         {currentAreaTab === "Profile Management" && (
           <section className="max-w-2xl border border-border bg-card p-6">
@@ -1230,8 +1539,20 @@ export async function emitSecurityTelemetry(event: {
                   <Button
                     className="h-7 px-2.5 text-xs"
                     onClick={() => {
-                      setWafSqliBlock(!wafSqliBlock);
-                      showToast(`SQLi/XSS Edge Block ${!wafSqliBlock ? "enabled" : "disabled"}`);
+                      const next = !wafSqliBlock;
+                      setWafSqliBlock(next);
+                      void persistAuditLogToBackend({
+                        id: `AUD-${Date.now().toString().slice(-4)}`,
+                        actor: currentUser?.fullName || "Client Operator",
+                        role: "Client",
+                        action: `Edge WAF: SQLi & XSS Inspection ${next ? "Enforced" : "Paused"}`,
+                        target: activeTenant.name,
+                        severity: "Info",
+                        timestamp: "Just now",
+                      });
+                      showToast(
+                        `SQLi/XSS Edge Block ${next ? "enabled & logged to Supabase" : "disabled & logged"}`,
+                      );
                     }}
                     size="sm"
                     variant={wafSqliBlock ? "default" : "outline"}
@@ -1355,9 +1676,19 @@ export async function emitSecurityTelemetry(event: {
                   <Button
                     className="h-7 px-2.5 text-xs"
                     onClick={() => {
-                      setAiPromptShield(!aiPromptShield);
+                      const next = !aiPromptShield;
+                      setAiPromptShield(next);
+                      void persistAuditLogToBackend({
+                        id: `AUD-${Date.now().toString().slice(-4)}`,
+                        actor: currentUser?.fullName || "Client Operator",
+                        role: "Client",
+                        action: `AI Shield: Prompt Injection Guardrail ${next ? "Activated" : "Paused"}`,
+                        target: activeTenant.name,
+                        severity: "Info",
+                        timestamp: "Just now",
+                      });
                       showToast(
-                        `Prompt Injection Shield ${!aiPromptShield ? "enabled" : "disabled"}`,
+                        `Prompt Shield ${next ? "enabled & logged to Supabase" : "disabled & logged"}`,
                       );
                     }}
                     size="sm"
@@ -1608,6 +1939,29 @@ export async function emitSecurityTelemetry(event: {
           </div>
         </section>
       )}
+      {/* Payment Gateway Modal for Buying Security Credits */}
+      {showPaymentModal && (
+        <PaymentGatewayModal
+          currentBalance={creditBalance}
+          neededCredits={neededCreditsForService}
+          tenantId={activeTenant?.id}
+          tenantName={activeTenant?.name}
+          userEmail={currentUser?.email}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setNeededCreditsForService(undefined);
+          }}
+          onCreditsAdded={(newBal) => {
+            setCreditBalance(newBal);
+            saveStoredCreditBalance(newBal, activeTenant?.id, currentUser?.email);
+            void fetchBillingTransactions(activeTenant?.id, currentUser?.email).then((cloudTxs) => {
+              setBillingTransactions(cloudTxs);
+            });
+          }}
+          showToast={showToast}
+        />
+      )}
+
       {/* Client Integration & Diagnostic Modal */}
       {integrationTenant && (
         <ClientIntegrationModal
@@ -1709,7 +2063,11 @@ export function AdminPortalView({
           <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
-                <Users className="size-3.5" />
+                <img
+                  src="/sparrowx-logo.png"
+                  alt="SparrowX Logo"
+                  className="size-4 object-contain inline-block"
+                />
                 SparrowX Master Subscription & Tenant Control
               </div>
               <h1 className="text-2xl font-semibold text-foreground sm:text-[28px]">
@@ -2327,8 +2685,12 @@ export function PortalLoginScreen({
       <header className="relative z-10 border-b border-white/[0.07] bg-[#0c0c0e]/85 backdrop-blur-xl px-4 sm:px-8 py-3.5">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="relative grid size-9 place-items-center rounded-xl bg-gradient-to-br from-primary to-orange-600 text-white shadow-lg shadow-primary/25">
-              <ShieldCheck className="size-5" />
+            <div className="relative grid size-10 place-items-center rounded-xl bg-black/60 border border-white/15 p-1 text-white shadow-lg shadow-primary/25 overflow-hidden shrink-0">
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX Logo"
+                className="size-full object-contain"
+              />
               <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 border-2 border-[#09090b]" />
             </div>
             <div>
@@ -2364,25 +2726,25 @@ export function PortalLoginScreen({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleQuickDemoAccess}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary hover:text-white shadow-sm whitespace-nowrap"
-                title="Instant 1-Click Access as Demo Client"
+                onClick={handleQuickAdminDemoAccess}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary hover:text-white shadow-sm whitespace-nowrap"
+                title="Open SOC Command Center as Elena Rostova (SOC Lead)"
               >
-                <Zap className="size-3.5" />
-                <span className="hidden sm:inline">1-Click</span> Demo Drive
+                <ShieldCheck className="size-3.5" />
+                <span>SOC Command Demo</span>
               </button>
 
               <button
                 type="button"
-                onClick={handleQuickAdminDemoAccess}
+                onClick={handleQuickDemoAccess}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:text-foreground hover:bg-white/[0.08] whitespace-nowrap"
-                title="Instant Access as Security Operator / Admin"
+                title="Instant Access as Client Tenant (Alex Rivera)"
               >
-                <LockKeyhole className="size-3.5 text-amber-400" />
-                <span className="hidden md:inline">SOC Lead</span>
+                <Boxes className="size-3.5" />
+                <span className="hidden sm:inline">Client</span> Area
               </button>
             </div>
           </div>
@@ -2395,8 +2757,12 @@ export function PortalLoginScreen({
         <section className="space-y-5">
           <div className="space-y-3.5">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3.5 py-1 text-xs font-semibold text-primary shadow-[0_0_20px_rgba(240,90,40,0.15)]">
-              <Sparkles className="size-3.5 text-primary" />
-              <span>Honest Security For Builders · Under Active Development</span>
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX"
+                className="size-4 object-contain inline-block"
+              />
+              <span>SparrowX Autonomous Security · Under Active Development</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight leading-tight">
@@ -2524,20 +2890,50 @@ export function PortalLoginScreen({
             </div>
 
             {/* Quick Demo Helper Prompt */}
-            <div className="mt-3.5 rounded-xl border border-primary/20 bg-primary/[0.07] px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <Zap className="size-4 shrink-0 text-primary" />
-                <span className="text-foreground/90 font-medium">
-                  Want to explore? Jump in with preloaded demo data.
+            <div className="mt-3.5 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/[0.06]">
+                <div className="flex items-center gap-2">
+                  <Zap className="size-4 shrink-0 text-primary" />
+                  <span className="font-semibold text-foreground/95">Fast Track Demo Drives:</span>
+                </div>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  1-click instant login
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={handleQuickDemoAccess}
-                className="shrink-0 font-semibold text-primary hover:underline hover:text-orange-400 inline-flex items-center gap-1 whitespace-nowrap"
-              >
-                Launch Demo <ArrowRight className="size-3" />
-              </button>
+              <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleQuickAdminDemoAccess}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-left font-medium text-primary hover:bg-primary/20 transition-all shadow-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="size-4 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-xs leading-none">SOC Operations</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        Elena (SOC Lead)
+                      </div>
+                    </div>
+                  </div>
+                  <ArrowRight className="size-3.5 shrink-0 opacity-70" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickDemoAccess}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left font-medium text-foreground hover:bg-white/[0.08] transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Boxes className="size-4 shrink-0 text-muted-foreground" />
+                    <div>
+                      <div className="font-semibold text-xs leading-none">Client Area</div>
+                      <div className="text-[10px] text-muted-foreground mt-0.5">
+                        Alex (Acme Corp)
+                      </div>
+                    </div>
+                  </div>
+                  <ArrowRight className="size-3.5 shrink-0 opacity-70" />
+                </button>
+              </div>
             </div>
 
             {/* SIGN IN FORM */}
@@ -2574,16 +2970,30 @@ export function PortalLoginScreen({
                     >
                       Password
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginEmail("alex.rivera@acme.io");
-                        setLoginPassword("demo");
-                      }}
-                      className="text-[11px] text-primary hover:underline"
-                    >
-                      Fill Demo Credentials
-                    </button>
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="text-muted-foreground">Demo:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginEmail("security.lead@sparrowx.dev");
+                          setLoginPassword("admin");
+                        }}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        SOC Lead
+                      </button>
+                      <span className="text-muted-foreground/40">·</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLoginEmail("alex.rivera@acme.io");
+                          setLoginPassword("demo");
+                        }}
+                        className="text-muted-foreground hover:text-foreground hover:underline"
+                      >
+                        Client
+                      </button>
+                    </div>
                   </div>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">

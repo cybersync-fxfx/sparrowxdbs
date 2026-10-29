@@ -17,6 +17,7 @@ import {
   Check,
   CircleHelp,
   Clock3,
+  Coins,
   Command,
   Copy,
   Database,
@@ -1075,18 +1076,29 @@ function Dashboard() {
     visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
 
   const handleNavigate = (navLabel: string) => {
-    if (authSession.role === "admin") {
-      if (
-        navLabel === "Client Subscriptions" ||
-        navLabel === "Performance & Kill-Switch" ||
-        navLabel === "Access Control & Audit"
-      ) {
-        setPortalMode("admin");
-      } else {
-        setPortalMode("soc");
-      }
-    } else {
+    if (
+      navLabel === "Client Subscriptions" ||
+      navLabel === "Performance & Kill-Switch" ||
+      navLabel === "Access Control & Audit"
+    ) {
+      setPortalMode("admin");
+    } else if (
+      navLabel === "My Services" ||
+      navLabel === "Subscriptions & Due Dates" ||
+      navLabel === "Billing & Credits" ||
+      navLabel === "Profile Management" ||
+      navLabel === "Client Overview" ||
+      navLabel === "Web & WAF Security" ||
+      navLabel === "AI Agent & LLM Shield" ||
+      navLabel === "Cloud & Endpoint Security" ||
+      navLabel === "Compliance & Evidence" ||
+      navLabel === "Subscription & Modules"
+    ) {
       setPortalMode("client");
+    } else if (navLabel === "Help center" || navLabel === "Settings") {
+      // Retain current active portalMode
+    } else {
+      setPortalMode("soc");
     }
     setActiveNav(navLabel);
   };
@@ -1169,8 +1181,8 @@ function Dashboard() {
               operatorName: user.fullName || "SparrowX Admin",
               operatorEmail: user.email,
             });
-            setPortalMode("admin");
-            setActiveNav("Client Subscriptions");
+            setPortalMode("soc");
+            setActiveNav("Overview");
             void recordAudit(
               `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
               "Admin & Subscriptions Portal",
@@ -1263,6 +1275,9 @@ function Dashboard() {
               )}
             </Button>
 
+            <div className="hidden sm:flex items-center gap-2 pr-1">
+              <img src="/sparrowx-logo.png" alt="SparrowX" className="size-5 object-contain" />
+            </div>
             <span className="hidden text-muted-foreground/60 sm:block">/</span>
             <span className="truncate text-sm font-semibold text-foreground">{activeNav}</span>
             <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex">
@@ -1271,6 +1286,50 @@ function Dashboard() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Direct Mode / Dashboard Switcher Pill */}
+            <div className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
+              <button
+                type="button"
+                onClick={() => handleNavigate("Overview")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  portalMode === "soc"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+                title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
+              >
+                <ShieldAlert className="size-3.5" />
+                <span>SOC Command</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavigate("My Services")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  portalMode === "client"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+                title="Client Portal (Protected Services, Credits, SDKs)"
+              >
+                <Boxes className="size-3.5" />
+                <span>Client Area</span>
+              </button>
+              {authSession.role === "admin" && (
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("Client Subscriptions")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    portalMode === "admin"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  }`}
+                  title="Multi-Tenant Subscription Master & Kill-Switch"
+                >
+                  <Users className="size-3.5" />
+                  <span>Admin Control</span>
+                </button>
+              )}
+            </div>
             {authSession.role === "admin" && (
               <div className="hidden h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground lg:flex">
                 <Search className="size-4" />
@@ -1322,56 +1381,40 @@ function Dashboard() {
             <p className="truncate text-sm font-semibold">{currentUser?.fullName || "Account"}</p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{currentUser?.email}</p>
             <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
-              {authSession.role === "client" ? (
-                <>
-                  <Button
-                    className="w-full justify-start text-xs"
-                    onClick={() => {
-                      handleNavigate("My Services");
-                      setMenuOpen(false);
-                    }}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    <Boxes /> My Services (Client Area)
-                  </Button>
-                  <Button
-                    className="w-full justify-start text-xs"
-                    onClick={() => {
-                      handleNavigate("Profile Management");
-                      setMenuOpen(false);
-                    }}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    <Users /> Profile Management
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button
-                    className="w-full justify-start text-xs"
-                    onClick={() => {
-                      handleNavigate("Client Subscriptions");
-                      setMenuOpen(false);
-                    }}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    <Users /> Client Subscriptions
-                  </Button>
-                  <Button
-                    className="w-full justify-start text-xs"
-                    onClick={() => {
-                      handleNavigate("Integrations");
-                      setMenuOpen(false);
-                    }}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    <Database /> Cloud & telemetry pipelines
-                  </Button>
-                </>
+              <Button
+                className="w-full justify-start text-xs font-medium"
+                onClick={() => {
+                  handleNavigate("Overview");
+                  setMenuOpen(false);
+                }}
+                size="sm"
+                variant={portalMode === "soc" ? "secondary" : "ghost"}
+              >
+                <ShieldAlert className="size-3.5 text-primary" /> SOC Operations Command
+              </Button>
+              <Button
+                className="w-full justify-start text-xs font-medium"
+                onClick={() => {
+                  handleNavigate("My Services");
+                  setMenuOpen(false);
+                }}
+                size="sm"
+                variant={portalMode === "client" ? "secondary" : "ghost"}
+              >
+                <Boxes className="size-3.5" /> Client Area & Services
+              </Button>
+              {authSession.role === "admin" && (
+                <Button
+                  className="w-full justify-start text-xs font-medium"
+                  onClick={() => {
+                    handleNavigate("Client Subscriptions");
+                    setMenuOpen(false);
+                  }}
+                  size="sm"
+                  variant={portalMode === "admin" ? "secondary" : "ghost"}
+                >
+                  <Users className="size-3.5" /> Multi-Tenant Admin Control
+                </Button>
               )}
               <Button
                 className="w-full justify-start text-xs text-destructive hover:text-destructive"
@@ -1809,7 +1852,10 @@ function Dashboard() {
               </form>
 
               {/* Interactive AI Guardrail Sandbox */}
-              <AiGuardrailSandbox />
+              <AiGuardrailSandbox
+                onIncidentLogged={(newInc) => setIncidents((prev) => [newInc, ...prev])}
+                showToast={showToast}
+              />
 
               {/* Protected Services & AI Agents List */}
               {protectedServices.length > 0 ? (
@@ -3684,6 +3730,7 @@ function AppSidebar({
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
     { label: "Subscriptions & Due Dates", icon: Activity },
+    { label: "Billing & Credits", icon: Coins },
     { label: "Profile Management", icon: Users },
   ];
 
@@ -3730,6 +3777,7 @@ function AppSidebar({
     !isAdminSession &&
     (activeNav === "My Services" ||
       activeNav === "Subscriptions & Due Dates" ||
+      activeNav === "Billing & Credits" ||
       activeNav === "Profile Management" ||
       !activeClientTenant);
 
@@ -3751,27 +3799,39 @@ function AppSidebar({
         <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-0">
           <button
             aria-label={isCollapsed ? "Expand sidebar" : "SparrowX Home"}
-            className="grid size-9 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground shadow-sm transition-transform hover:scale-105"
+            className="relative grid size-9 shrink-0 place-items-center rounded-lg bg-black/60 border border-white/10 p-1 shadow-sm transition-transform hover:scale-105 overflow-hidden"
             onClick={() =>
               isCollapsed
                 ? toggleSidebar()
-                : onNavigate(isAdminSession ? "Client Subscriptions" : "My Services")
+                : onNavigate(
+                    portalMode === "soc"
+                      ? "Overview"
+                      : isAdminSession
+                        ? "Client Subscriptions"
+                        : "My Services",
+                  )
             }
-            title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Home"}
+            title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "SparrowX Home"}
             type="button"
           >
-            <ShieldCheck className="size-5" />
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX Logo"
+              className="size-full object-contain"
+            />
           </button>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="font-display text-base font-semibold">
               sparrow<span className="text-primary">x</span>
             </div>
-            <div className="text-[10px] uppercase text-muted-foreground">
-              {isAdminSession
-                ? "Admin & SOC Command"
-                : isInClientArea
-                  ? "Client Area"
-                  : "Service Dashboard"}
+            <div className="text-[10px] uppercase text-muted-foreground font-semibold">
+              {portalMode === "soc"
+                ? "SOC Incident Command"
+                : portalMode === "admin"
+                  ? "Admin Control"
+                  : isInClientArea
+                    ? "Client Area"
+                    : "Service Dashboard"}
             </div>
           </div>
           <Button
@@ -3796,23 +3856,99 @@ function AppSidebar({
             }`}
           />
           <span className="truncate text-xs font-medium">
-            {isAdminSession
-              ? "Master Control"
-              : isInClientArea
-                ? currentUser?.fullName || "Client Account"
-                : activeClientTenant?.name || "Service"}
+            {portalMode === "soc"
+              ? "Security Operations Center"
+              : portalMode === "admin"
+                ? "Admin Master"
+                : isInClientArea
+                  ? currentUser?.fullName || "Client Account"
+                  : activeClientTenant?.name || "Service"}
           </span>
-          <span className="ml-auto text-[10px] text-muted-foreground">
-            {isAdminSession
-              ? "ADMIN"
-              : !isInClientArea && activeClientTenant
-                ? activeClientTenant.planTier.toUpperCase()
-                : "ACTIVE"}
+          <span className="ml-auto text-[10px] font-mono text-muted-foreground">
+            {portalMode === "soc"
+              ? "SOC LIVE"
+              : portalMode === "admin"
+                ? "ADMIN"
+                : !isInClientArea && activeClientTenant
+                  ? activeClientTenant.planTier.toUpperCase()
+                  : "ACTIVE"}
           </span>
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {isAdminSession ? (
+        {portalMode === "soc" ? (
+          <>
+            <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socNavItems.map(({ label, icon: Icon, count }) => (
+                    <SidebarMenuItem key={label}>
+                      <SidebarMenuButton
+                        isActive={activeNav === label}
+                        onClick={() => onNavigate(label)}
+                        tooltip={label}
+                      >
+                        <Icon />
+                        <span>{label}</span>
+                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeNav === "Team & access"}
+                      onClick={() => onNavigate("Team & access")}
+                      tooltip="Team & access"
+                    >
+                      <Users />
+                      <span>Team & access</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={activeNav === "Integrations"}
+                      onClick={() => onNavigate("Integrations")}
+                      tooltip="Integrations"
+                    >
+                      <Boxes />
+                      <span>Integrations</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>Switch Workspace</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="font-medium text-primary hover:text-primary"
+                      onClick={() => onNavigate("My Services")}
+                      tooltip="Client Portal & Services"
+                    >
+                      <Boxes className="size-4" />
+                      <span>Client Portal & Services</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  {isAdminSession && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => onNavigate("Client Subscriptions")}
+                        tooltip="Admin Subscriptions"
+                      >
+                        <Users className="size-4" />
+                        <span>Admin Subscriptions</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : portalMode === "admin" ? (
           <>
             <SidebarGroup className="group-data-[collapsible=icon]:items-center">
               <SidebarGroupLabel>Admin & Subscriptions</SidebarGroupLabel>
@@ -3876,57 +4012,103 @@ function AppSidebar({
             </SidebarGroup>
           </>
         ) : isInClientArea ? (
-          <SidebarGroup className="group-data-[collapsible=icon]:items-center">
-            <SidebarGroupLabel>Client Area</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                {clientAreaNavItems.map(({ label, icon: Icon, count }) => (
-                  <SidebarMenuItem key={label}>
+          <>
+            <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>Client Area</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {clientAreaNavItems.map(({ label, icon: Icon, count }) => (
+                    <SidebarMenuItem key={label}>
+                      <SidebarMenuButton
+                        isActive={activeNav === label}
+                        onClick={() => onNavigate(label)}
+                        tooltip={label}
+                      >
+                        <Icon />
+                        <span>{label}</span>
+                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  <SidebarMenuItem>
                     <SidebarMenuButton
-                      isActive={activeNav === label}
-                      onClick={() => onNavigate(label)}
-                      tooltip={label}
+                      className="font-medium text-primary hover:text-primary"
+                      onClick={() => onNavigate("Overview")}
+                      tooltip="SOC Incident Operations"
                     >
-                      <Icon />
-                      <span>{label}</span>
-                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      <ShieldAlert className="size-4 text-primary" />
+                      <span>SOC Incident Command</span>
+                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
+                        Live
+                      </SidebarMenuBadge>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
         ) : (
-          <SidebarGroup className="group-data-[collapsible=icon]:items-center">
-            <SidebarGroupLabel>Service Dashboard</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    className="border border-sidebar-border bg-sidebar-accent/40 font-medium text-primary"
-                    onClick={() => onNavigate("My Services")}
-                    tooltip="Back to Client Area"
-                  >
-                    <Boxes />
-                    <span>← Back to Client Area</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                {clientServiceDashboardItems.map(({ label, icon: Icon, count }) => (
-                  <SidebarMenuItem key={label}>
+          <>
+            <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>Service Dashboard</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  <SidebarMenuItem>
                     <SidebarMenuButton
-                      isActive={activeNav === label}
-                      onClick={() => onNavigate(label)}
-                      tooltip={label}
+                      className="border border-sidebar-border bg-sidebar-accent/40 font-medium text-primary"
+                      onClick={() => onNavigate("My Services")}
+                      tooltip="Back to Client Area"
                     >
-                      <Icon />
-                      <span>{label}</span>
-                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      <Boxes />
+                      <span>← Back to Client Area</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+                  {clientServiceDashboardItems.map(({ label, icon: Icon, count }) => (
+                    <SidebarMenuItem key={label}>
+                      <SidebarMenuButton
+                        isActive={activeNav === label}
+                        onClick={() => onNavigate(label)}
+                        tooltip={label}
+                      >
+                        <Icon />
+                        <span>{label}</span>
+                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="font-medium text-primary hover:text-primary"
+                      onClick={() => onNavigate("Overview")}
+                      tooltip="SOC Incident Operations"
+                    >
+                      <ShieldAlert className="size-4 text-primary" />
+                      <span>SOC Incident Command</span>
+                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
+                        Live
+                      </SidebarMenuBadge>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
         )}
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">

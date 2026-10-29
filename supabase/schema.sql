@@ -202,3 +202,39 @@ drop policy if exists "Allow access on app_users" on public.app_users;
 create policy "Allow access on app_users"
   on public.app_users for all using (true) with check (true);
 
+-- 12. Billing Transactions & Payment Gateway Ledger
+create table if not exists public.billing_transactions (
+  id text primary key,
+  tenant_id text,
+  user_email text,
+  type text not null check (type in ('topup', 'service_purchase', 'module_upgrade')),
+  credits integer not null,
+  cost_usd numeric(10,2) default 0.00,
+  payment_method text not null,
+  title text not null,
+  description text not null,
+  receipt_number text not null,
+  status text not null default 'completed',
+  created_at timestamptz not null default now()
+);
+alter table public.billing_transactions enable row level security;
+drop policy if exists "Allow access on billing_transactions" on public.billing_transactions;
+create policy "Allow access on billing_transactions"
+  on public.billing_transactions for all using (true) with check (true);
+
+-- 13. Tenant & Client Billing Credits
+create table if not exists public.billing_credits (
+  id text primary key,
+  tenant_id text unique,
+  user_email text,
+  balance integer not null default 150,
+  total_purchased integer not null default 0,
+  total_spent integer not null default 0,
+  last_topup_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.billing_credits enable row level security;
+drop policy if exists "Allow access on billing_credits" on public.billing_credits;
+create policy "Allow access on billing_credits"
+  on public.billing_credits for all using (true) with check (true);
