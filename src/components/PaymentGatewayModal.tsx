@@ -12,12 +12,14 @@ import {
   QrCode,
   Building2,
   CheckCircle2,
+  Copy,
+  ExternalLink,
   Coins,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import {
   CREDIT_PACKAGES,
-  type CreditPackage,
   type BillingTransaction,
   recordBillingTransaction,
   downloadTransactionReceipt,
@@ -33,6 +35,9 @@ interface PaymentGatewayModalProps {
   onCreditsAdded: (newBalance: number, creditsAdded: number) => void;
   showToast: (msg: string) => void;
 }
+
+const TARGET_UPI_ID = "bm.atchuthakrishna@okhdfcbank";
+const TARGET_PAYEE_NAME = "SparrowX Security";
 
 export function PaymentGatewayModal({
   currentBalance,
@@ -52,8 +57,13 @@ export function PaymentGatewayModal({
     neededCredits ? Math.max(100, neededCredits) : 300,
   );
 
-  // Payment method tab
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "crypto" | "bank">("card");
+  // Payment method tab - Default to UPI as requested
+  const [paymentMethod, setPaymentMethod] = useState<"upi" | "card" | "crypto" | "bank">("upi");
+
+  // UPI fields
+  const [upiUtr, setUpiUtr] = useState("");
+  const [upiCopied, setUpiCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // Card fields
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
@@ -70,8 +80,26 @@ export function PaymentGatewayModal({
   const selectedPack = CREDIT_PACKAGES.find((p) => p.id === selectedPackId);
   const activeCredits =
     selectedPackId === "custom" ? customCredits : (selectedPack?.credits ?? 500);
-  const activePrice =
+
+  const activePriceUsd =
     selectedPackId === "custom" ? Math.round(customCredits * 0.18) : (selectedPack?.priceUsd ?? 79);
+
+  // INR equivalent calculation
+  const inrPrice =
+    selectedPackId === "starter"
+      ? 1599
+      : selectedPackId === "builder"
+        ? 6499
+        : selectedPackId === "scale"
+          ? 19999
+          : Math.round(customCredits * 15);
+
+  // Official NPCI UPI payment intent URI
+  const upiUri = `upi://pay?pa=${TARGET_UPI_ID}&pn=${encodeURIComponent(
+    TARGET_PAYEE_NAME,
+  )}&am=${inrPrice}&cu=INR&tn=${encodeURIComponent(
+    `SparrowX Security - ${activeCredits} Credits Topup`,
+  )}`;
 
   // Detect card brand
   const getCardBrand = (num: string) => {
@@ -90,6 +118,20 @@ export function PaymentGatewayModal({
     showToast("Filled verified sandbox test card credentials");
   };
 
+  const handleCopyUpiId = () => {
+    void navigator.clipboard.writeText(TARGET_UPI_ID);
+    setUpiCopied(true);
+    showToast(`Copied UPI ID: ${TARGET_UPI_ID}`);
+    setTimeout(() => setUpiCopied(false), 2500);
+  };
+
+  const handleCopyPaymentLink = () => {
+    void navigator.clipboard.writeText(upiUri);
+    setLinkCopied(true);
+    showToast("Copied UPI Payment Link to clipboard");
+    setTimeout(() => setLinkCopied(false), 2500);
+  };
+
   const handleExecutePayment = async () => {
     setProcessStage("verifying");
 
@@ -106,25 +148,31 @@ export function PaymentGatewayModal({
 
     // Complete transaction
     const newBalance = currentBalance + activeCredits;
+    const utrRef = upiUtr.trim() || `UPI-TXN-${Date.now().toString().slice(-6)}`;
+
     const tx = recordBillingTransaction(
       {
         type: "topup",
         credits: activeCredits,
-        costUsd: activePrice,
-        title: `Purchased ${activeCredits} Security Credits`,
+        costUsd: activePriceUsd,
+        title: `Purchased ${activeCredits} Security Credits${paymentMethod === "upi" ? " (UPI Pay)" : ""}`,
         description: `Top-up of ${activeCredits} credits via ${
-          paymentMethod === "card"
-            ? `${getCardBrand(cardNumber)} ending in ${cardNumber.slice(-4)}`
-            : paymentMethod === "crypto"
-              ? "USDC Sovereign Web3"
-              : "Dev Bank Wire"
+          paymentMethod === "upi"
+            ? `UPI to ${TARGET_UPI_ID} (Ref/UTR: ${utrRef})`
+            : paymentMethod === "card"
+              ? `${getCardBrand(cardNumber)} ending in ${cardNumber.slice(-4)}`
+              : paymentMethod === "crypto"
+                ? "USDC Sovereign Web3"
+                : "Dev Bank Wire"
         }`,
         paymentMethod:
-          paymentMethod === "card"
-            ? `${getCardBrand(cardNumber)} •••• ${cardNumber.slice(-4)}`
-            : paymentMethod === "crypto"
-              ? "USDC on Base (Sovereign Pay)"
-              : "Direct ACH Wire",
+          paymentMethod === "upi"
+            ? `UPI QR (${TARGET_UPI_ID})`
+            : paymentMethod === "card"
+              ? `${getCardBrand(cardNumber)} •••• ${cardNumber.slice(-4)}`
+              : paymentMethod === "crypto"
+                ? "USDC on Base (Sovereign Pay)"
+                : "Direct ACH Wire",
       },
       tenantId,
       userEmail,
@@ -139,7 +187,7 @@ export function PaymentGatewayModal({
   return (
     <div
       aria-label="Payment Gateway Modal"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-3 sm:p-4 backdrop-blur-md overflow-y-auto"
       role="dialog"
     >
       <div className="relative w-full max-w-2xl rounded-2xl border border-white/10 bg-[#0f0f13] p-5 sm:p-7 shadow-2xl my-6 text-foreground font-sans">
@@ -204,6 +252,8 @@ export function PaymentGatewayModal({
               <div className="grid gap-2.5 sm:grid-cols-3">
                 {CREDIT_PACKAGES.map((pack) => {
                   const isSelected = selectedPackId === pack.id;
+                  const packInr =
+                    pack.id === "starter" ? 1599 : pack.id === "builder" ? 6499 : 19999;
                   return (
                     <div
                       key={pack.id}
@@ -233,7 +283,10 @@ export function PaymentGatewayModal({
                         <span className="text-xs text-primary font-semibold">Credits</span>
                       </div>
                       <div className="mt-2 text-sm font-bold text-foreground/90">
-                        ${pack.priceUsd} USD
+                        ₹{packInr.toLocaleString()} INR{" "}
+                        <span className="text-xs font-normal text-muted-foreground">
+                          (${pack.priceUsd})
+                        </span>
                       </div>
                       <p className="mt-1 text-[10px] text-muted-foreground line-clamp-2">
                         {pack.description}
@@ -258,7 +311,8 @@ export function PaymentGatewayModal({
                 </button>
                 {selectedPackId === "custom" && (
                   <span className="font-mono text-primary text-xs font-bold">
-                    {customCredits} Credits = ${Math.round(customCredits * 0.18)} USD
+                    {customCredits} Credits = ₹{(customCredits * 15).toLocaleString()} INR ($
+                    {Math.round(customCredits * 0.18)})
                   </span>
                 )}
               </div>
@@ -281,21 +335,36 @@ export function PaymentGatewayModal({
                     className="w-full accent-primary cursor-pointer"
                   />
                   <div className="flex justify-between text-[10px] text-muted-foreground font-mono">
-                    <span>50 credits ($9)</span>
-                    <span>2,500 credits ($450)</span>
-                    <span>5,000 credits ($900)</span>
+                    <span>50 credits (₹750)</span>
+                    <span>2,500 credits (₹37,500)</span>
+                    <span>5,000 credits (₹75,000)</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* STEP 2: PAYMENT METHOD & CARD PREVIEW */}
+            {/* STEP 2: PAYMENT METHOD & INTERACTIVE GATEWAY */}
             <div>
-              <div className="flex items-center justify-between mb-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2.5">
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   2. Payment Method
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("upi")}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                      paymentMethod === "upi"
+                        ? "bg-primary text-white shadow-sm ring-1 ring-primary/50"
+                        : "text-muted-foreground hover:text-white bg-white/[0.03]"
+                    }`}
+                  >
+                    <span className="relative flex size-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                    </span>
+                    <span>UPI Instant QR</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => setPaymentMethod("card")}
@@ -331,6 +400,147 @@ export function PaymentGatewayModal({
                   </button>
                 </div>
               </div>
+
+              {/* UPI QR PAYMENT TAB */}
+              {paymentMethod === "upi" && (
+                <div className="rounded-2xl border border-primary/30 bg-gradient-to-b from-primary/[0.08] via-black/40 to-black/60 p-4 sm:p-5 shadow-inner space-y-4">
+                  {/* Top amount & payee badge */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3.5">
+                    <div>
+                      <div className="text-[11px] font-medium text-muted-foreground">
+                        Payable via NPCI Unified Payments Interface:
+                      </div>
+                      <div className="flex items-baseline gap-2 mt-0.5">
+                        <span className="font-display text-2xl font-black text-foreground">
+                          ₹{inrPrice.toLocaleString()} INR
+                        </span>
+                        <span className="text-xs font-mono text-muted-foreground">
+                          (~${activePriceUsd} USD)
+                        </span>
+                        <span className="rounded-full bg-primary/20 border border-primary/30 px-2 py-0.5 text-[10px] font-bold text-primary font-mono">
+                          +{activeCredits} Credits
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/60 px-3 py-1.5 text-xs">
+                      <span className="size-2 rounded-full bg-emerald-400" />
+                      <span className="text-muted-foreground text-[11px]">Payee:</span>
+                      <span className="font-mono text-xs font-bold text-primary">
+                        {TARGET_UPI_ID}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* QR Code and Quick Pay Section */}
+                  <div className="grid gap-5 sm:grid-cols-[190px_1fr] items-center">
+                    {/* Real Dynamic SVG QR Code */}
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="relative rounded-2xl bg-white p-3 shadow-2xl border-4 border-emerald-500/30">
+                        <QRCodeSVG
+                          value={upiUri}
+                          size={160}
+                          level="H"
+                          bgColor="#FFFFFF"
+                          fgColor="#0c0c0e"
+                          includeMargin={false}
+                        />
+                        <div className="mt-2 text-center">
+                          <span className="rounded bg-black/80 px-2 py-0.5 font-mono text-[9px] font-bold tracking-widest text-emerald-400 uppercase">
+                            Scan with Any UPI App
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 text-center text-[10px] text-muted-foreground font-mono">
+                        Instant auto-detection
+                      </div>
+                    </div>
+
+                    {/* Instructions & Interactive Copy Tools */}
+                    <div className="space-y-3">
+                      <div>
+                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <Sparkles className="size-3.5 text-primary" /> Supported UPI Apps:
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground leading-relaxed">
+                          Google Pay, PhonePe, Paytm, BHIM, Cred, Amazon Pay, or any Mobile Banking
+                          App.
+                        </p>
+                      </div>
+
+                      {/* Direct UPI ID Pill with 1-Click Copy */}
+                      <div className="rounded-xl border border-white/10 bg-black/40 p-2.5 space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-muted-foreground">Target VPA / UPI ID:</span>
+                          <span className="text-[10px] text-emerald-400 font-mono">
+                            Verified Merchant
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <code className="font-mono text-xs font-bold text-primary truncate">
+                            {TARGET_UPI_ID}
+                          </code>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={handleCopyUpiId}
+                            className="h-7 px-2.5 text-[11px] font-medium border-primary/40 bg-primary/10 hover:bg-primary/20 text-primary shrink-0"
+                          >
+                            {upiCopied ? (
+                              <>
+                                <Check className="size-3 mr-1 text-emerald-400" /> Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="size-3 mr-1" /> Copy ID
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Mobile Intent & Link tools */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={upiUri}
+                          className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1 text-[11px] font-medium text-foreground hover:bg-white/[0.09] transition-all"
+                        >
+                          <ExternalLink className="size-3 text-primary" />
+                          <span>Open in Mobile UPI App</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={handleCopyPaymentLink}
+                          className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-all"
+                        >
+                          <Copy className="size-3" />
+                          <span>{linkCopied ? "Link Copied!" : "Copy Payment URI"}</span>
+                        </button>
+                      </div>
+
+                      {/* UTR / Reference Number Field */}
+                      <div className="pt-1">
+                        <label
+                          htmlFor="upi-utr-input"
+                          className="block text-[11px] font-medium text-muted-foreground mb-1"
+                        >
+                          12-Digit UPI Reference / UTR No (from SMS or receipt):
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            id="upi-utr-input"
+                            value={upiUtr}
+                            onChange={(e) => setUpiUtr(e.target.value)}
+                            placeholder="e.g. 429182901234 (Optional / Instant Verification)"
+                            className="h-8.5 w-full rounded-lg border border-white/10 bg-black/50 px-2.5 font-mono text-xs text-foreground outline-none focus:border-primary placeholder:text-muted-foreground/40"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* CARD PAYMENT TAB */}
               {paymentMethod === "card" && (
@@ -488,9 +698,13 @@ export function PaymentGatewayModal({
                   <Sparkles className="size-4 animate-spin" />
                   <span>
                     {processStage === "verifying" &&
-                      "1/3 Encrypting & Verifying Payment Authorization..."}
+                      (paymentMethod === "upi"
+                        ? `1/3 Verifying UPI payment to ${TARGET_UPI_ID}...`
+                        : "1/3 Encrypting & Verifying Payment Authorization...")}
                     {processStage === "charging" &&
-                      `2/3 Processing $${activePrice}.00 USD Settlement...`}
+                      (paymentMethod === "upi"
+                        ? `2/3 Confirming ₹${inrPrice.toLocaleString()} INR via NPCI UPI network...`
+                        : `2/3 Processing $${activePriceUsd}.00 USD Settlement...`)}
                     {processStage === "minting" &&
                       `3/3 Minting ${activeCredits} Security Credits to Workspace...`}
                   </span>
@@ -515,8 +729,11 @@ export function PaymentGatewayModal({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/[0.08] pt-4">
               <div className="text-xs text-muted-foreground">
                 Total Due:{" "}
-                <strong className="text-base text-foreground font-bold">${activePrice} USD</strong>{" "}
-                for <strong className="text-primary font-bold">+{activeCredits} Credits</strong>
+                <strong className="text-base text-foreground font-bold">
+                  ₹{inrPrice.toLocaleString()} INR
+                </strong>{" "}
+                <span className="text-xs text-muted-foreground">(${activePriceUsd} USD)</span> for{" "}
+                <strong className="text-primary font-bold">+{activeCredits} Credits</strong>
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -536,7 +753,9 @@ export function PaymentGatewayModal({
                   className="w-full sm:w-auto px-5 bg-gradient-to-r from-primary to-orange-500 font-semibold text-white shadow-lg shadow-primary/25 hover:shadow-primary/40"
                 >
                   <Lock className="size-3.5 mr-1" />
-                  Authorize & Top Up {activeCredits} Credits
+                  {paymentMethod === "upi"
+                    ? `Confirm UPI Payment & Add +${activeCredits} Credits`
+                    : `Authorize & Top Up ${activeCredits} Credits`}
                 </Button>
               </div>
             </div>
@@ -559,11 +778,25 @@ export function PaymentGatewayModal({
               </p>
             </div>
 
-            <div className="mx-auto max-w-sm rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs flex items-center justify-between">
-              <span className="text-muted-foreground">New Total Balance:</span>
-              <span className="font-mono text-base font-bold text-primary">
-                {currentBalance + activeCredits} Credits
-              </span>
+            <div className="mx-auto max-w-sm rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">New Total Balance:</span>
+                <span className="font-mono text-base font-bold text-primary">
+                  {currentBalance + activeCredits} Credits
+                </span>
+              </div>
+              <div className="flex items-center justify-between border-t border-white/[0.06] pt-1.5 text-[11px]">
+                <span className="text-muted-foreground">Settlement Method:</span>
+                <span className="font-mono font-medium text-foreground">
+                  {paymentMethod === "upi" ? `UPI (${TARGET_UPI_ID})` : "Card / Web3"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">Amount Paid:</span>
+                <span className="font-mono font-bold text-emerald-400">
+                  ₹{inrPrice.toLocaleString()} INR (${activePriceUsd} USD)
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-400 font-mono">

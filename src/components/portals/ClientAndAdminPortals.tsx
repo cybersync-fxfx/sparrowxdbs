@@ -1245,6 +1245,49 @@ export function ClientPortalView({
             </form>
           </section>
         )}
+
+        {/* Payment Gateway Modal for Buying Security Credits */}
+        {showPaymentModal && (
+          <PaymentGatewayModal
+            currentBalance={creditBalance}
+            neededCredits={neededCreditsForService}
+            tenantId={activeTenant?.id}
+            tenantName={activeTenant?.name}
+            userEmail={currentUser?.email}
+            onClose={() => {
+              setShowPaymentModal(false);
+              setNeededCreditsForService(undefined);
+            }}
+            onCreditsAdded={(newBal) => {
+              setCreditBalance(newBal);
+              saveStoredCreditBalance(newBal, activeTenant?.id, currentUser?.email);
+              void fetchBillingTransactions(activeTenant?.id, currentUser?.email).then(
+                (cloudTxs) => {
+                  setBillingTransactions(cloudTxs);
+                },
+              );
+            }}
+            showToast={showToast}
+          />
+        )}
+
+        {/* Client Integration & Diagnostic Modal */}
+        {integrationTenant && (
+          <ClientIntegrationModal
+            onClose={() => setIntegrationTenant(null)}
+            onVerificationComplete={async () => {
+              await onVerifyTenantSdk(integrationTenant);
+            }}
+            service={{
+              id: integrationTenant.id,
+              name: integrationTenant.name,
+              endpoint: integrationTenant.primaryDomain,
+              apiKey: integrationTenant.apiKey,
+              category: integrationTenant.enabledModules.join(", "),
+            }}
+            showToast={showToast}
+          />
+        )}
       </div>
     );
   }
