@@ -2775,7 +2775,9 @@ function Dashboard() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h2 className="text-base font-semibold">SparrowX Production Database</h2>
+                      <h2 className="text-base font-semibold">
+                        SparrowX Production Database (Supabase)
+                      </h2>
                       <span
                         className={`rounded-sm border px-2 py-0.5 text-[10px] font-semibold ${
                           backendSource === "supabase"
@@ -2783,22 +2785,46 @@ function Dashboard() {
                             : "border-warning/30 bg-warning/10 text-warning"
                         }`}
                       >
-                        {backendSource === "supabase" ? "Connected & Live" : "Offline"}
+                        {backendSource === "supabase"
+                          ? "PostgreSQL Connected & Live"
+                          : "Offline Cache"}
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Provision your production database schema to ensure all security tables (
-                      <code className="text-foreground">incidents</code>,{" "}
-                      <code className="text-foreground">threat_feeds</code>,{" "}
-                      <code className="text-foreground">assets</code>,{" "}
-                      <code className="text-foreground">vulnerabilities</code>,{" "}
-                      <code className="text-foreground">reports</code>,{" "}
-                      <code className="text-foreground">protected_services</code>,{" "}
-                      <code className="text-foreground">team_members</code>,{" "}
-                      <code className="text-foreground">integrations</code>) are active.
+                      Target URL: <code className="text-foreground font-mono">{supabaseUrl}</code>
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Active database tables:{" "}
+                      <span className="text-success font-mono font-medium">
+                        incidents, assets, vulnerabilities, threat_feeds, reports,
+                        protected_services, team_members, integrations, client_tenants, audit_logs
+                      </span>
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      onClick={() => {
+                        navigator.clipboard?.writeText(`-- 11. Platform Users Table
+create table if not exists public.app_users (
+  id text primary key,
+  email text unique not null,
+  password text not null,
+  full_name text not null,
+  admin text not null default 'no' check (admin in ('yes', 'no')),
+  tenant_id text,
+  created_at timestamptz not null default now()
+);
+alter table public.app_users enable row level security;
+drop policy if exists "Allow access on app_users" on public.app_users;
+create policy "Allow access on app_users"
+  on public.app_users for all using (true) with check (true);`);
+                        showToast("Copied app_users table SQL snippet");
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Copy className="size-3.5" /> Copy app_users SQL
+                    </Button>
                     <Button
                       onClick={() => {
                         navigator.clipboard?.writeText(supabaseSchemaSql);
