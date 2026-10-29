@@ -2189,7 +2189,7 @@ export function AdminPortalView({
                         size="sm"
                         variant="secondary"
                       >
-                        <Eye className="size-3.5" /> Open Client’s Dynamic View
+                        <Eye className="size-3.5" /> Inspect Tenant Console & SDK
                       </Button>
                       <Button
                         aria-label={`Delete ${tenant.name}`}
@@ -2565,7 +2565,7 @@ export function PortalLoginScreen({
     if (!result.user) {
       setLoginError(
         result.error ??
-          "Invalid email or password. Please verify your credentials or use 1-Click Demo Access below.",
+          "Invalid email or password. Please verify your credentials or create a new account.",
       );
       return;
     }
@@ -2582,30 +2582,6 @@ export function PortalLoginScreen({
     }
 
     onUserAuthenticated(result.user);
-  };
-
-  const handleQuickDemoAccess = () => {
-    const demoUser: AppUser = {
-      id: "USR-DEMO-01",
-      email: "alex.rivera@acme.io",
-      fullName: "Alex Rivera",
-      password: "demo",
-      admin: "no",
-      tenantId: tenants[0]?.id ?? null,
-    };
-    onUserAuthenticated(demoUser);
-  };
-
-  const handleQuickAdminDemoAccess = () => {
-    const adminUser: AppUser = {
-      id: "USR-ADMIN-01",
-      email: "security.lead@sparrowx.dev",
-      fullName: "Elena Rostova (SOC Lead)",
-      password: "admin",
-      admin: "yes",
-      tenantId: null,
-    };
-    onUserAuthenticated(adminUser);
   };
 
   const handleSignUp = async (event: React.FormEvent) => {
@@ -2729,22 +2705,24 @@ export function PortalLoginScreen({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleQuickAdminDemoAccess}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary hover:text-white shadow-sm whitespace-nowrap"
-                title="Open SOC Command Center as Elena Rostova (SOC Lead)"
+                onClick={() => {
+                  setMode(mode === "signin" ? "signup" : "signin");
+                  setLoginError("");
+                  setSignupError("");
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-white/10 shadow-sm whitespace-nowrap"
               >
-                <ShieldCheck className="size-3.5" />
-                <span>SOC Command Demo</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleQuickDemoAccess}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.05] px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:text-foreground hover:bg-white/[0.08] whitespace-nowrap"
-                title="Instant Access as Client Tenant (Alex Rivera)"
-              >
-                <Boxes className="size-3.5" />
-                <span className="hidden sm:inline">Client</span> Area
+                {mode === "signin" ? (
+                  <>
+                    <Sparkles className="size-3.5 text-primary" />
+                    <span>Create Account</span>
+                  </>
+                ) : (
+                  <>
+                    <LockKeyhole className="size-3.5 text-primary" />
+                    <span>Sign In</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -2889,53 +2867,6 @@ export function PortalLoginScreen({
               </div>
             </div>
 
-            {/* Quick Demo Helper Prompt */}
-            <div className="mt-3.5 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs">
-              <div className="flex items-center justify-between gap-2 pb-2 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2">
-                  <Zap className="size-4 shrink-0 text-primary" />
-                  <span className="font-semibold text-foreground/95">Fast Track Demo Drives:</span>
-                </div>
-                <span className="text-[10px] text-muted-foreground font-mono">
-                  1-click instant login
-                </span>
-              </div>
-              <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleQuickAdminDemoAccess}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-left font-medium text-primary hover:bg-primary/20 transition-all shadow-sm"
-                >
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="size-4 shrink-0" />
-                    <div>
-                      <div className="font-semibold text-xs leading-none">SOC Operations</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">
-                        Elena (SOC Lead)
-                      </div>
-                    </div>
-                  </div>
-                  <ArrowRight className="size-3.5 shrink-0 opacity-70" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleQuickDemoAccess}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-left font-medium text-foreground hover:bg-white/[0.08] transition-all"
-                >
-                  <div className="flex items-center gap-2">
-                    <Boxes className="size-4 shrink-0 text-muted-foreground" />
-                    <div>
-                      <div className="font-semibold text-xs leading-none">Client Area</div>
-                      <div className="text-[10px] text-muted-foreground mt-0.5">
-                        Alex (Acme Corp)
-                      </div>
-                    </div>
-                  </div>
-                  <ArrowRight className="size-3.5 shrink-0 opacity-70" />
-                </button>
-              </div>
-            </div>
-
             {/* SIGN IN FORM */}
             {mode === "signin" ? (
               <form className="mt-4 space-y-3.5" onSubmit={handleSignIn}>
@@ -2970,30 +2901,6 @@ export function PortalLoginScreen({
                     >
                       Password
                     </label>
-                    <div className="flex items-center gap-2 text-[11px]">
-                      <span className="text-muted-foreground">Demo:</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginEmail("security.lead@sparrowx.dev");
-                          setLoginPassword("admin");
-                        }}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        SOC Lead
-                      </button>
-                      <span className="text-muted-foreground/40">·</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setLoginEmail("alex.rivera@acme.io");
-                          setLoginPassword("demo");
-                        }}
-                        className="text-muted-foreground hover:text-foreground hover:underline"
-                      >
-                        Client
-                      </button>
-                    </div>
                   </div>
                   <div className="relative">
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-muted-foreground">

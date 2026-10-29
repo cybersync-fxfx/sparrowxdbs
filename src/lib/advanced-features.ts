@@ -105,7 +105,7 @@ export async function dispatchIncidentWebhook(
   for (const wh of targetWebhooks) {
     notifiedChannels.push(wh.name);
     try {
-      // In browser demo environment, simulate payload formulation
+      // Client-side fallback if offline, formulate payload
       const payload = {
         source: "SparrowX Unified SecOps",
         event: "security_incident_alert",

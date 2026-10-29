@@ -1076,6 +1076,26 @@ function Dashboard() {
     visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
 
   const handleNavigate = (navLabel: string) => {
+    if (authSession.role === "client") {
+      const allowedClientPages = [
+        "My Services",
+        "Subscriptions & Due Dates",
+        "Billing & Credits",
+        "Profile Management",
+        "Client Overview",
+        "Web & WAF Security",
+        "AI Agent & LLM Shield",
+        "Cloud & Endpoint Security",
+        "Compliance & Evidence",
+        "Subscription & Modules",
+        "Help center",
+        "Settings",
+      ];
+      setPortalMode("client");
+      setActiveNav(allowedClientPages.includes(navLabel) ? navLabel : "My Services");
+      return;
+    }
+
     if (
       navLabel === "Client Subscriptions" ||
       navLabel === "Performance & Kill-Switch" ||
@@ -1286,50 +1306,6 @@ function Dashboard() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Direct Mode / Dashboard Switcher Pill */}
-            <div className="hidden sm:inline-flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
-              <button
-                type="button"
-                onClick={() => handleNavigate("Overview")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                  portalMode === "soc"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                }`}
-                title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
-              >
-                <ShieldAlert className="size-3.5" />
-                <span>SOC Command</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleNavigate("My Services")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                  portalMode === "client"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                }`}
-                title="Client Portal (Protected Services, Credits, SDKs)"
-              >
-                <Boxes className="size-3.5" />
-                <span>Client Area</span>
-              </button>
-              {authSession.role === "admin" && (
-                <button
-                  type="button"
-                  onClick={() => handleNavigate("Client Subscriptions")}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                    portalMode === "admin"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                  title="Multi-Tenant Subscription Master & Kill-Switch"
-                >
-                  <Users className="size-3.5" />
-                  <span>Admin Control</span>
-                </button>
-              )}
-            </div>
             {authSession.role === "admin" && (
               <div className="hidden h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground lg:flex">
                 <Search className="size-4" />
@@ -1338,6 +1314,7 @@ function Dashboard() {
                   className="w-40 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Search incidents, IOCs..."
+                  type="text"
                   value={search}
                 />
                 {search ? (
@@ -1381,40 +1358,67 @@ function Dashboard() {
             <p className="truncate text-sm font-semibold">{currentUser?.fullName || "Account"}</p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{currentUser?.email}</p>
             <div className="mt-3 flex flex-col gap-1.5 border-t border-border pt-2.5">
-              <Button
-                className="w-full justify-start text-xs font-medium"
-                onClick={() => {
-                  handleNavigate("Overview");
-                  setMenuOpen(false);
-                }}
-                size="sm"
-                variant={portalMode === "soc" ? "secondary" : "ghost"}
-              >
-                <ShieldAlert className="size-3.5 text-primary" /> SOC Operations Command
-              </Button>
-              <Button
-                className="w-full justify-start text-xs font-medium"
-                onClick={() => {
-                  handleNavigate("My Services");
-                  setMenuOpen(false);
-                }}
-                size="sm"
-                variant={portalMode === "client" ? "secondary" : "ghost"}
-              >
-                <Boxes className="size-3.5" /> Client Area & Services
-              </Button>
-              {authSession.role === "admin" && (
-                <Button
-                  className="w-full justify-start text-xs font-medium"
-                  onClick={() => {
-                    handleNavigate("Client Subscriptions");
-                    setMenuOpen(false);
-                  }}
-                  size="sm"
-                  variant={portalMode === "admin" ? "secondary" : "ghost"}
-                >
-                  <Users className="size-3.5" /> Multi-Tenant Admin Control
-                </Button>
+              {authSession.role === "admin" ? (
+                <>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("Overview");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={portalMode === "soc" ? "secondary" : "ghost"}
+                  >
+                    <ShieldAlert className="size-3.5 text-primary" /> SOC Operations Command
+                  </Button>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("Client Subscriptions");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={portalMode === "admin" ? "secondary" : "ghost"}
+                  >
+                    <Users className="size-3.5 text-primary" /> Tenant Subscriptions (Admin)
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("My Services");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={activeNav === "My Services" ? "secondary" : "ghost"}
+                  >
+                    <Boxes className="size-3.5 text-primary" /> My Services & Security
+                  </Button>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("Billing & Credits");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={activeNav === "Billing & Credits" ? "secondary" : "ghost"}
+                  >
+                    <Coins className="size-3.5 text-primary" /> Billing & Credits
+                  </Button>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("Profile Management");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={activeNav === "Profile Management" ? "secondary" : "ghost"}
+                  >
+                    <Users className="size-3.5" /> Profile & Credentials
+                  </Button>
+                </>
               )}
               <Button
                 className="w-full justify-start text-xs text-destructive hover:text-destructive"
@@ -1422,7 +1426,7 @@ function Dashboard() {
                 size="sm"
                 variant="ghost"
               >
-                <LockKeyhole /> Log Out to Login Page
+                <LockKeyhole className="size-3.5" /> Log Out
               </Button>
             </div>
           </div>
@@ -3919,34 +3923,25 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
 
-            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>Switch Workspace</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="font-medium text-primary hover:text-primary"
-                      onClick={() => onNavigate("My Services")}
-                      tooltip="Client Portal & Services"
-                    >
-                      <Boxes className="size-4" />
-                      <span>Client Portal & Services</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  {isAdminSession && (
+            {isAdminSession && (
+              <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+                <SidebarGroupLabel>Administration</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                     <SidebarMenuItem>
                       <SidebarMenuButton
+                        isActive={activeNav === "Client Subscriptions"}
                         onClick={() => onNavigate("Client Subscriptions")}
-                        tooltip="Admin Subscriptions"
+                        tooltip="Client Subscriptions"
                       >
                         <Users className="size-4" />
-                        <span>Admin Subscriptions</span>
+                        <span>Client Subscriptions</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                  )}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </>
         ) : portalMode === "admin" ? (
           <>
@@ -4033,27 +4028,6 @@ function AppSidebar({
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-
-            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="font-medium text-primary hover:text-primary"
-                      onClick={() => onNavigate("Overview")}
-                      tooltip="SOC Incident Operations"
-                    >
-                      <ShieldAlert className="size-4 text-primary" />
-                      <span>SOC Incident Command</span>
-                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
-                        Live
-                      </SidebarMenuBadge>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
           </>
         ) : (
           <>
@@ -4084,27 +4058,6 @@ function AppSidebar({
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="font-medium text-primary hover:text-primary"
-                      onClick={() => onNavigate("Overview")}
-                      tooltip="SOC Incident Operations"
-                    >
-                      <ShieldAlert className="size-4 text-primary" />
-                      <span>SOC Incident Command</span>
-                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
-                        Live
-                      </SidebarMenuBadge>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
