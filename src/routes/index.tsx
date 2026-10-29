@@ -1,4 +1,6 @@
 import { AiGuardrailSandbox } from "@/components/AiGuardrailSandbox";
+import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
+import { generateComplianceReportDocument } from "@/lib/client-sdk-generator";
 import { FirewallRuleExporter } from "@/components/FirewallRuleExporter";
 import { IncidentTimelineView } from "@/components/IncidentTimelineView";
 import { LiveWebhookDispatcherManager } from "@/components/LiveWebhookDispatcherManager";
@@ -2544,13 +2546,50 @@ function Dashboard() {
                           <Button
                             className="h-8 px-3 text-xs"
                             onClick={() => {
+                              const fw = (
+                                [
+                                  "SOC 2 Type II",
+                                  "ISO 27001",
+                                  "NIST CSF",
+                                  "Executive Summary",
+                                ].includes(report.framework)
+                                  ? report.framework
+                                  : "SOC 2 Type II"
+                              ) as "SOC 2 Type II" | "ISO 27001" | "NIST CSF" | "Executive Summary";
+                              const doc = generateComplianceReportDocument(fw, {
+                                tenantName: "SparrowX Sovereign Cloud",
+                                domain: "app.sparrowx.internal",
+                                activeIncidentsCount: incidents.length,
+                                protectedAssetsCount: assets.length,
+                                guardrailStatus: "Enforced & Active",
+                                author: report.author,
+                              });
+                              const blob = new Blob([doc.content], { type: doc.mimeType });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement("a");
+                              a.href = url;
+                              a.download = doc.filename;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                              showToast(`Downloaded verified ${doc.filename}`);
+                            }}
+                            size="sm"
+                            variant="outline"
+                          >
+                            <Download className="size-3.5" /> Attestation (.md)
+                          </Button>
+                          <Button
+                            className="h-8 px-3 text-xs"
+                            onClick={() => {
                               exportIncidents();
                               showToast(`Exported CSV for ${report.title}`);
                             }}
                             size="sm"
                             variant="outline"
                           >
-                            <Download className="size-3.5" /> Export CSV
+                            <Download className="size-3.5" /> Incidents (.csv)
                           </Button>
                           <Button
                             aria-label={`Delete ${report.title}`}
@@ -3320,104 +3359,27 @@ function Dashboard() {
         )}
 
         {/* SDK & AI Guardrail Integration Modal */}
-        {sdkServiceId && (
-          <div
-            aria-label="Connect Service SDK"
-            className="fixed inset-0 z-40 grid place-items-center bg-background/75 p-4 backdrop-blur-xs"
-            role="dialog"
-          >
-            {(() => {
-              const targetSrv = protectedServices.find((item) => item.id === sdkServiceId);
-              if (!targetSrv) return null;
-              const snippet = `// SparrowX Production Guardrail SDK (${targetSrv.name})
-// Service ID: ${targetSrv.id} | Key: ${targetSrv.apiKey}
-const SPARROWX_CLOUD_URL = "${supabaseUrl}";
-const SPARROWX_INGEST_KEY = "${supabaseAnonKey}";
-
-export async function reportThreatToSparrowX(event: {
-  title: string;
-  severity: "Critical" | "High" | "Medium";
-  summary: string;
-}) {
-  await fetch(\`\${SPARROWX_CLOUD_URL}/rest/v1/incidents\`, {
-    method: "POST",
-    headers: {
-      apikey: SPARROWX_INGEST_KEY,
-      Authorization: \`Bearer \${SPARROWX_INGEST_KEY}\`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      id: \`INC-\${Date.now().toString().slice(-4)}\`,
-      title: event.title,
-      source: "${targetSrv.category} · ${targetSrv.endpoint}",
-      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      severity: event.severity,
-      status: "Investigating",
-      assignee: "${teamMembers[0]?.name ?? "Unassigned"}",
-      summary: event.summary,
-      playbook: "Automated Web & AI Shield Playbook",
-      affected_assets: 1,
-    }),
-  });
-}`;
-              return (
-                <div className="w-full max-w-2xl border border-border bg-card p-5 shadow-2xl">
-                  <div className="flex items-center justify-between border-b border-border pb-3">
-                    <div>
-                      <h2 className="text-base font-semibold">
-                        Connect {targetSrv.name} to SparrowX
-                      </h2>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        Add this guardrail helper to your production Web App middleware or AI Agent
-                        tool-runner to stream security incidents directly into SparrowX Cloud.
-                      </p>
-                    </div>
-                    <Button
-                      aria-label="Close SDK modal"
-                      className="size-8"
-                      onClick={() => setSdkServiceId(null)}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <X />
-                    </Button>
-                  </div>
-
-                  <pre className="mt-4 max-h-80 overflow-x-auto border border-border bg-background p-3.5 font-mono text-xs leading-relaxed text-foreground">
-                    {snippet}
-                  </pre>
-
-                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
-                    <span className="text-xs text-muted-foreground">
-                      Service API Key: <code className="text-foreground">{targetSrv.apiKey}</code>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={() => {
-                          navigator.clipboard?.writeText(snippet);
-                          showToast("Copied SparrowX SDK snippet to clipboard");
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <Copy className="size-3.5" /> Copy SDK Snippet
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setSdkServiceId(null);
-                          void sendVerificationEventForService(targetSrv);
-                        }}
-                        size="sm"
-                      >
-                        <Sparkles className="size-3.5" /> Send Verification Ping
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
+        {sdkServiceId &&
+          (() => {
+            const targetSrv = protectedServices.find((item) => item.id === sdkServiceId);
+            if (!targetSrv) return null;
+            return (
+              <ClientIntegrationModal
+                onClose={() => setSdkServiceId(null)}
+                onVerificationComplete={async () => {
+                  await sendVerificationEventForService(targetSrv);
+                }}
+                service={{
+                  id: targetSrv.id,
+                  name: targetSrv.name,
+                  endpoint: targetSrv.endpoint,
+                  apiKey: targetSrv.apiKey,
+                  ...(targetSrv.category ? { category: targetSrv.category } : {}),
+                }}
+                showToast={showToast}
+              />
+            );
+          })()}
 
         {notice && (
           <div

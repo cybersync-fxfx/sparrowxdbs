@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Copy,
   Database,
+  Download,
   Eye,
   EyeOff,
   FileSearch,
@@ -32,6 +33,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
+import { generateComplianceReportDocument } from "@/lib/client-sdk-generator";
 import {
   type AppUser,
   type Asset,
@@ -189,6 +192,7 @@ export function ClientPortalView({
   const [profileEmail, setProfileEmail] = useState(currentUser?.email ?? "");
   const [profileNewPassword, setProfileNewPassword] = useState("");
   const [autoRenewBilling, setAutoRenewBilling] = useState(true);
+  const [integrationTenant, setIntegrationTenant] = useState<ClientTenant | null>(null);
 
   // Local interactive rules for Web & AI modules
   const [wafSqliBlock, setWafSqliBlock] = useState(true);
@@ -514,7 +518,20 @@ export function ClientPortalView({
                         </div>
                         <div className="mt-2.5 flex items-center justify-between font-semibold text-primary">
                           <span>Click to Open Dashboard or Manage</span>
-                          <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              className="h-6 px-2 text-[10px]"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIntegrationTenant(srv);
+                              }}
+                              size="sm"
+                              variant="outline"
+                            >
+                              <Terminal className="mr-1 size-2.5" /> Connect SDK
+                            </Button>
+                            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
+                          </div>
                         </div>
                       </div>
                     </article>
@@ -594,7 +611,28 @@ export function ClientPortalView({
                         <ArrowRight className="size-4 shrink-0 text-primary" />
                       </button>
 
-                      {/* OPTION 2: MANAGE SERVICE (RENAME OR DELETE) */}
+                      {/* OPTION 2: AUTOMATED CONNECTION & SDK */}
+                      <button
+                        className="flex w-full items-center justify-between rounded-md border border-primary/40 bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
+                        onClick={() => {
+                          setIntegrationTenant(clickedService);
+                          setClickedServiceId(null);
+                        }}
+                        type="button"
+                      >
+                        <div>
+                          <div className="text-sm font-semibold text-primary">
+                            2. Automated Connection & Diagnostics (SDK)
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted-foreground">
+                            Open multi-framework integration guide (Next.js, Python, Express, MCP),
+                            run automated 4-step probes, and transmit live telemetry beacons.
+                          </div>
+                        </div>
+                        <Terminal className="size-4 shrink-0 text-primary" />
+                      </button>
+
+                      {/* OPTION 3: MANAGE SERVICE (RENAME OR DELETE) */}
                       <button
                         className="flex w-full items-center justify-between rounded-md border border-border bg-background p-4 text-left transition-colors hover:border-primary/40"
                         onClick={() => setManageSubView("manage")}
@@ -602,7 +640,7 @@ export function ClientPortalView({
                       >
                         <div>
                           <div className="text-sm font-semibold text-foreground">
-                            2. Manage Service (Rename or Delete)
+                            3. Manage Service (Rename or Delete)
                           </div>
                           <div className="mt-0.5 text-xs text-muted-foreground">
                             Rename this service, update its target domain/plan, or delete it from
@@ -1047,15 +1085,28 @@ export async function emitSecurityTelemetry(event: {
                   Send an automated verification ping to confirm your endpoint streams to SparrowX
                   Cloud.
                 </p>
-                {!activeTenant.sdkVerified && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Button
-                    className="mt-3 h-7 px-2.5 text-[11px]"
-                    onClick={() => onVerifyTenantSdk(activeTenant)}
+                    className="h-7 px-2.5 text-[11px]"
+                    onClick={() => setIntegrationTenant(activeTenant)}
                     size="sm"
                   >
-                    Run Automated Verification
+                    <Terminal className="size-3 mr-1" />
+                    {activeTenant.sdkVerified
+                      ? "Re-Test & View SDK Code"
+                      : "Open Connect & Diagnostic Tool"}
                   </Button>
-                )}
+                  {!activeTenant.sdkVerified && (
+                    <Button
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => onVerifyTenantSdk(activeTenant)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      Quick Ping
+                    </Button>
+                  )}
+                </div>
               </article>
 
               <article className="border border-success/30 bg-background p-4">
@@ -1440,14 +1491,55 @@ export async function emitSecurityTelemetry(event: {
           <div className="mt-4 divide-y divide-border border-t border-border">
             {reports.length > 0 ? (
               reports.map((r) => (
-                <div className="flex items-center justify-between py-3 text-xs" key={r.id}>
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 py-3 text-xs"
+                  key={r.id}
+                >
                   <div>
                     <span className="font-semibold">{r.title}</span> ·{" "}
                     <span className="text-muted-foreground">{r.generatedAt}</span>
                   </div>
-                  <span className="rounded-sm bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
-                    {r.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-sm bg-success/15 px-2 py-0.5 text-[10px] font-semibold text-success">
+                      {r.status}
+                    </span>
+                    <Button
+                      className="h-7 px-2.5 text-xs"
+                      onClick={() => {
+                        const fw = (
+                          ["SOC 2 Type II", "ISO 27001", "NIST CSF", "Executive Summary"].includes(
+                            r.framework,
+                          )
+                            ? r.framework
+                            : "SOC 2 Type II"
+                        ) as "SOC 2 Type II" | "ISO 27001" | "NIST CSF" | "Executive Summary";
+                        const doc = generateComplianceReportDocument(fw, {
+                          tenantName: activeTenant.name,
+                          domain: activeTenant.primaryDomain,
+                          activeIncidentsCount: incidents.length,
+                          protectedAssetsCount: assets.length,
+                          guardrailStatus: activeTenant.sdkVerified
+                            ? "Enforced & Active"
+                            : "Pending Ingestion Probe",
+                          author: currentUser?.fullName ?? "SparrowX Security Officer",
+                        });
+                        const blob = new Blob([doc.content], { type: doc.mimeType });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = doc.filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        showToast(`Downloaded verified ${doc.filename}`);
+                      }}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Download className="size-3 mr-1" /> Attestation (.md)
+                    </Button>
+                  </div>
                 </div>
               ))
             ) : (
@@ -1515,6 +1607,23 @@ export async function emitSecurityTelemetry(event: {
             })}
           </div>
         </section>
+      )}
+      {/* Client Integration & Diagnostic Modal */}
+      {integrationTenant && (
+        <ClientIntegrationModal
+          onClose={() => setIntegrationTenant(null)}
+          onVerificationComplete={async () => {
+            await onVerifyTenantSdk(integrationTenant);
+          }}
+          service={{
+            id: integrationTenant.id,
+            name: integrationTenant.name,
+            endpoint: integrationTenant.primaryDomain,
+            apiKey: integrationTenant.apiKey,
+            category: integrationTenant.enabledModules.join(", "),
+          }}
+          showToast={showToast}
+        />
       )}
     </div>
   );
