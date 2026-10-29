@@ -1086,26 +1086,6 @@ function Dashboard() {
     visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
 
   const handleNavigate = (navLabel: string) => {
-    if (authSession.role === "client") {
-      const allowedClientPages = [
-        "My Services",
-        "Subscriptions & Due Dates",
-        "Billing & Credits",
-        "Profile Management",
-        "Client Overview",
-        "Web & WAF Security",
-        "AI Agent & LLM Shield",
-        "Cloud & Endpoint Security",
-        "Compliance & Evidence",
-        "Subscription & Modules",
-        "Help center",
-        "Settings",
-      ];
-      setPortalMode("client");
-      setActiveNav(allowedClientPages.includes(navLabel) ? navLabel : "My Services");
-      return;
-    }
-
     if (
       navLabel === "Client Subscriptions" ||
       navLabel === "Performance & Kill-Switch" ||
@@ -1128,6 +1108,7 @@ function Dashboard() {
     } else if (navLabel === "Help center" || navLabel === "Settings") {
       // Retain current active portalMode
     } else {
+      // All SOC Operations (Overview, Incidents, Threat indicators, CVEs, Assets, Team, Integrations)
       setPortalMode("soc");
     }
     setActiveNav(navLabel);
@@ -1342,6 +1323,50 @@ function Dashboard() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Top Workspace Switcher (SOC Dashboard vs Client Area) */}
+            <div className="flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
+              <button
+                type="button"
+                onClick={() => handleNavigate("Overview")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  portalMode === "soc"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+                title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
+              >
+                <ShieldAlert className="size-3.5" />
+                <span>SOC Dashboard</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavigate("My Services")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  portalMode === "client"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+                title="Client Portal (Protected Services, Credits, SDKs)"
+              >
+                <Boxes className="size-3.5" />
+                <span>Client Area</span>
+              </button>
+              {authSession.role === "admin" && (
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("Client Subscriptions")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    portalMode === "admin"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  }`}
+                  title="Multi-Tenant Subscription Master"
+                >
+                  <Users className="size-3.5" />
+                  <span>Admin Master</span>
+                </button>
+              )}
+            </div>
             {authSession.role === "admin" && (
               <div className="hidden h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground lg:flex">
                 <Search className="size-4" />
@@ -1421,6 +1446,17 @@ function Dashboard() {
                 </>
               ) : (
                 <>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("Overview");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={portalMode === "soc" ? "secondary" : "ghost"}
+                  >
+                    <ShieldAlert className="size-3.5 text-primary" /> SOC Dashboard & Incidents
+                  </Button>
                   <Button
                     className="w-full justify-start text-xs font-medium"
                     onClick={() => {
@@ -3942,6 +3978,24 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
 
+            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>Client Area</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="font-medium text-primary hover:text-primary"
+                      onClick={() => onNavigate("My Services")}
+                      tooltip="Client Portal & Services"
+                    >
+                      <Boxes className="size-4" />
+                      <span>Client Area & Services</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
             {isAdminSession && (
               <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
                 <SidebarGroupLabel>Administration</SidebarGroupLabel>
@@ -4044,6 +4098,27 @@ function AppSidebar({
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel>Security Operations</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      className="font-medium text-primary hover:text-primary"
+                      onClick={() => onNavigate("Overview")}
+                      tooltip="SOC Operations & Live Telemetry"
+                    >
+                      <ShieldAlert className="size-4 text-primary" />
+                      <span>SOC Dashboard</span>
+                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
+                        Live
+                      </SidebarMenuBadge>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
