@@ -148,6 +148,18 @@ export async function fetchCreditBalance(tenantId?: string, userEmail?: string):
         }
         return cloudBal;
       }
+    } else {
+      // Fallback: If billing_credits table is missing (404), compute balance from audit_logs
+      const txs = await fetchBillingTransactions(tenantId, userEmail);
+      if (txs.length > 0) {
+        const computed = txs.reduce((acc, t) => acc + t.credits, 0);
+        const safeComputed = Math.max(0, computed);
+        if (typeof window !== "undefined") {
+          const key = tenantId ? `${STORAGE_KEYS.credits}_${tenantId}` : STORAGE_KEYS.credits;
+          window.localStorage.setItem(key, String(safeComputed));
+        }
+        return safeComputed;
+      }
     }
   } catch {
     // Return cached balance on error
@@ -218,6 +230,65 @@ export async function fetchBillingTransactions(
           window.localStorage.setItem(key, JSON.stringify(mapped));
         }
         return mapped;
+      }
+    } else {
+      // Fallback: Read transaction ledger entries from audit_logs table (200 OK)
+      const auditUrl = `${supabaseUrl}/rest/v1/audit_logs?target=eq.Billing%20%26%20Credits%20Ledger&order=created_at.desc&limit=100`;
+      const auditRes = await fetch(auditUrl, { headers: getSupabaseHeaders() });
+      if (auditRes.ok) {
+        const auditRows = (await auditRes.json()) as Array<{
+          id?: string;
+          action?: string;
+          actor?: string;
+          severity?: string;
+          created_at?: string;
+        }>;
+        if (Array.isArray(auditRows) && auditRows.length > 0) {
+          const fallbackTx: BillingTransaction[] = auditRows.map((row, idx) => {
+            const act = String(row.action || "");
+            const isTopup = act.toLowerCase().includes("added");
+            const creditsMatch = act.match(/(?:Added|Deducted)\s+(\d+)\s+credits/i);
+            const numCredits = creditsMatch ? Number.parseInt(creditsMatch[1] ?? "0", 10) : 0;
+            const costMatch = act.match(/\(\$(\d+(?:\.\d+)?)\)/);
+            const costUsd = costMatch ? Number.parseFloat(costMatch[1] ?? "0") : undefined;
+            const recMatch = act.match(/\[(REC-[^\]]+)\]/);
+            const receipt = recMatch ? (recMatch[1] ?? `REC-AUTO-${idx}`) : `REC-AUTO-${idx}`;
+            const viaMatch = act.match(/via\s+([^[]+)/i);
+            const method = viaMatch ? (viaMatch[1] ?? "Payment Gateway").trim() : "Payment Gateway";
+
+            return {
+              id: String(row.id || `TXN-AUD-${idx}`),
+              type: isTopup ? "topup" : "service_purchase",
+              credits: isTopup ? numCredits : -numCredits,
+              costUsd,
+              title: isTopup ? "Credit Top-Up" : "Protected Service Allocation",
+              description: act,
+              paymentMethod: method,
+              receiptNumber: receipt,
+              timestamp: row.created_at
+                ? new Date(row.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "Recent",
+              tenantId,
+              userEmail: row.actor,
+            };
+          });
+
+          if (fallbackTx.length > 0) {
+            if (typeof window !== "undefined") {
+              const key = tenantId
+                ? `${STORAGE_KEYS.transactions}_${tenantId}`
+                : STORAGE_KEYS.transactions;
+              window.localStorage.setItem(key, JSON.stringify(fallbackTx));
+            }
+            return fallbackTx;
+          }
+        }
       }
     }
   } catch {
