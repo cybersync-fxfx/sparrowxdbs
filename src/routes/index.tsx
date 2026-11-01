@@ -354,6 +354,14 @@ function Dashboard() {
   };
 
   const handlePurgeAllIncidents = async () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "CAUTION: Are you sure you want to purge all security incident records from the backend? This action cannot be undone.",
+      )
+    ) {
+      return;
+    }
     setIsSyncing(true);
     await clearAllIncidentsFromBackend();
     setIncidents([]);
@@ -426,6 +434,12 @@ function Dashboard() {
   };
 
   const handleDeleteProtectedService = async (id: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Are you sure you want to delete this protected service configuration?")
+    ) {
+      return;
+    }
     setProtectedServices((current) => current.filter((srv) => srv.id !== id));
     await deleteRecordFromBackend("protected_services", id);
     showToast("Service removed");
@@ -558,6 +572,12 @@ function Dashboard() {
   };
 
   const deleteIncident = async (id: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Are you sure you want to permanently delete incident ${id}?`)
+    ) {
+      return;
+    }
     setIncidents((current) => current.filter((incident) => incident.id !== id));
     if (selectedIncidentId === id) {
       setSelectedIncidentId(null);
@@ -686,6 +706,12 @@ function Dashboard() {
   };
 
   const deleteIndicator = async (id: string) => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Remove this indicator from active firewall IOC blocking?")
+    ) {
+      return;
+    }
     setThreatIndicators((current) => current.filter((item) => item.id !== id));
     await deleteRecordFromBackend("threat_feeds", id);
     showToast("Indicator removed");
@@ -1081,6 +1107,14 @@ function Dashboard() {
 
   const handleDeleteTenant = async (tenantId: string) => {
     const target = clientTenants.find((t) => t.id === tenantId);
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Are you sure you want to permanently remove "${target?.name ?? "this client service"}"? All associated keys and protection rules will be terminated.`,
+      )
+    ) {
+      return;
+    }
     setClientTenants((prev) => prev.filter((t) => t.id !== tenantId));
     if (selectedTenantId === tenantId) {
       setSelectedTenantId(null);
