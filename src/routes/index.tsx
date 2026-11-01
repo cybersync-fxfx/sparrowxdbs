@@ -1282,6 +1282,14 @@ function Dashboard() {
       return;
     }
     if (
+      navLabel === "Installation & Integration Docs" ||
+      navLabel === "How-To Install Docs"
+    ) {
+      setActiveDocSection("sdk_install");
+      setActiveNav("Troubleshooting & Docs");
+      return;
+    }
+    if (
       navLabel === "Troubleshooting & Docs" ||
       navLabel === "Troubleshooting & Error Center" ||
       navLabel === "docs_errors"

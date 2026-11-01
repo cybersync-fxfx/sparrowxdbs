@@ -3,6 +3,7 @@ import {
   Activity,
   ArrowRight,
   ArrowUpRight,
+  BookOpen,
   CheckCircle2,
   Copy,
   Crosshair,
@@ -1201,6 +1202,17 @@ export default sparrowxShield;
             type="button"
             size="sm"
             variant="outline"
+            onClick={() => onNavigate?.("Installation & Integration Docs")}
+            className="h-9 gap-1.5 text-xs font-semibold border-primary/40 text-primary hover:bg-primary/10"
+          >
+            <BookOpen className="size-3.5" />
+            Install Docs & How-To →
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
             onClick={() => setShowIntegrationGuide(true)}
             className="h-9 gap-1.5 text-xs font-semibold"
           >
@@ -1856,6 +1868,27 @@ export default sparrowxShield;
                 </Button>
               </div>
 
+              {/* Direct Redirect to Full Documentation Center */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-primary/40 bg-primary/15 p-3.5">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="size-4 text-primary shrink-0" />
+                  <div className="text-xs font-bold text-foreground">
+                    Looking for full multi-framework integration (Next.js, Python FastAPI, Cloudflare, Nginx)?
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => {
+                    setShowIntegrationGuide(false);
+                    onNavigate?.("Installation & Integration Docs");
+                  }}
+                  className="h-8 gap-1.5 bg-primary text-xs font-semibold text-primary-foreground shrink-0 shadow-sm"
+                >
+                  Open Full Installation Docs →
+                </Button>
+              </div>
+
               {/* Step 1: Save or drop-in sparrowx-shield.js */}
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
@@ -1959,8 +1992,24 @@ export function middleware(request: NextRequest) {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end">
-              <Button type="button" onClick={() => setShowIntegrationGuide(false)}>
+            <div className="mt-6 flex flex-col-reverse sm:flex-row items-center justify-between gap-3 border-t border-border/60 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setShowIntegrationGuide(false);
+                  onNavigate?.("Installation & Integration Docs");
+                }}
+                className="w-full sm:w-auto gap-1.5 text-xs font-semibold text-primary border-primary/40 hover:bg-primary/10"
+              >
+                <BookOpen className="size-3.5" />
+                Open Full Installation & Integration Documentation →
+              </Button>
+              <Button
+                type="button"
+                onClick={() => setShowIntegrationGuide(false)}
+                className="w-full sm:w-auto"
+              >
                 Done & Close
               </Button>
             </div>
