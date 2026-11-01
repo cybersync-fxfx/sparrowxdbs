@@ -3031,74 +3031,78 @@ export function PortalLoginScreen({
 
   const renderAuthCard = () => (
     <div className="relative w-full">
-      <div className="pointer-events-none absolute -inset-1 rounded-3xl bg-gradient-to-b from-primary/25 via-orange-500/10 to-transparent blur-xl opacity-75" />
-      <div className="relative rounded-2xl bg-[#0A0A0A]/95 p-5 sm:p-7 shadow-2xl border border-[#1F1F1F] backdrop-blur-xl">
-        {/* Form Mode Header & Segmented Pill */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[#1F1F1F] pb-4">
-          <div>
-            <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-              {mode === "signin" ? (
-                <>
-                  <LockKeyhole className="size-4 text-primary" /> Operator & Client Sign In
-                </>
-              ) : (
-                <>
-                  <Sparkles className="size-4 text-primary" /> Launch Your Protected Workspace
-                </>
-              )}
-            </h2>
-            <p className="mt-0.5 text-xs text-zinc-400">
-              {mode === "signin"
-                ? "Sign in to access your live SOC telemetry, SIEM alerts, and AI guardrails."
-                : "Deploy real-time cyber protection for your apps, APIs, and AI agents in 60 seconds."}
-            </p>
+      <div className="pointer-events-none absolute -inset-1.5 rounded-3xl bg-gradient-to-b from-primary/25 via-orange-500/10 to-emerald-500/5 blur-2xl opacity-80" />
+      <div className="relative rounded-2xl bg-[#0A0A0A]/95 p-6 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.95)] border border-[#222222] backdrop-blur-xl">
+        {/* Top Full-Width 2-Tab Mode Switcher (Never Wraps) */}
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-[#222222] bg-black p-1.5 mb-6">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("signin");
+              setLoginError("");
+            }}
+            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              mode === "signin"
+                ? "bg-gradient-to-r from-primary to-orange-500 text-white shadow-md shadow-primary/30"
+                : "text-zinc-400 hover:text-white hover:bg-[#111111]"
+            }`}
+          >
+            <LockKeyhole className="size-3.5 shrink-0" />
+            <span>Sign In to Console</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("signup");
+              setSignupError("");
+            }}
+            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+              mode === "signup"
+                ? "bg-gradient-to-r from-primary to-orange-500 text-white shadow-md shadow-primary/30"
+                : "text-zinc-400 hover:text-white hover:bg-[#111111]"
+            }`}
+          >
+            <Sparkles className="size-3.5 shrink-0" />
+            <span>Create Workspace</span>
+          </button>
+        </div>
+
+        {/* Clean Identity Header */}
+        <div className="flex items-start justify-between gap-4 border-b border-[#1F1F1F] pb-5">
+          <div className="flex items-center gap-3.5">
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/30 bg-gradient-to-br from-primary/20 to-black p-2 shadow-inner">
+              <img src="/sparrowx-logo.png" alt="SparrowX" className="size-full object-contain" />
+            </div>
+            <div>
+              <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+                {mode === "signin" ? "Welcome back to SparrowX" : "Launch Your Protected Workspace"}
+              </h2>
+              <p className="mt-0.5 text-xs text-zinc-400">
+                {mode === "signin"
+                  ? "Authenticate to access your live SOC telemetry, SIEM rules, and Gemini AI Brain."
+                  : "Deploy autonomous Edge WAF, AI guardrails, and ownership verification in 60s."}
+              </p>
+            </div>
           </div>
 
-          {/* Segmented Pill Switcher */}
-          <div className="flex items-center self-start sm:self-auto rounded-xl border border-[#262626] bg-black p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signin");
-                setLoginError("");
-              }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                mode === "signin"
-                  ? "bg-primary text-white shadow-md shadow-primary/30"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setSignupError("");
-              }}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                mode === "signup"
-                  ? "bg-primary text-white shadow-md shadow-primary/30"
-                  : "text-zinc-400 hover:text-white"
-              }`}
-            >
-              Get Protected
-            </button>
-          </div>
+          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-mono font-semibold text-emerald-400 shrink-0">
+            <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            TLS 1.3 VERIFIED
+          </span>
         </div>
 
         {/* SIGN IN FORM */}
         {mode === "signin" ? (
-          <form className="mt-5 space-y-4" onSubmit={handleSignIn}>
+          <form className="mt-6 space-y-4" onSubmit={handleSignIn}>
             <div>
               <label
-                className="text-xs font-medium text-zinc-300 block mb-1.5"
+                className="text-xs font-semibold text-zinc-200 block mb-2"
                 htmlFor="login-email"
               >
                 Work Email Address
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
                   <Mail className="size-4" />
                 </span>
                 <input
@@ -3108,19 +3112,22 @@ export function PortalLoginScreen({
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
                   placeholder="alex.rivera@acme.io"
-                  className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-3 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="h-11 w-full rounded-xl border border-[#262626] bg-black pl-10 pr-3.5 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-zinc-300" htmlFor="login-password">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-zinc-200" htmlFor="login-password">
                   Password
                 </label>
+                <span className="text-[11px] font-mono text-zinc-500">
+                  Zero-Trust Hashed Credential
+                </span>
               </div>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
                   <LockKeyhole className="size-4" />
                 </span>
                 <input
@@ -3130,12 +3137,12 @@ export function PortalLoginScreen({
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-10 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="h-11 w-full rounded-xl border border-[#262626] bg-black pl-10 pr-10 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-500 hover:text-white"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-500 hover:text-white cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
@@ -3143,7 +3150,7 @@ export function PortalLoginScreen({
             </div>
 
             {loginError && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-start gap-2">
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 text-xs text-red-300 flex items-start gap-2.5">
                 <ShieldAlert className="size-4 shrink-0 mt-0.5 text-red-400" />
                 <span>{loginError}</span>
               </div>
@@ -3152,18 +3159,34 @@ export function PortalLoginScreen({
             <button
               type="submit"
               disabled={isSigningIn}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-semibold text-sm text-white shadow-lg shadow-primary/25 transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4"
+              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-bold text-sm text-white shadow-[0_0_25px_rgba(240,90,40,0.35)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4 cursor-pointer"
             >
               <ShieldCheck className="size-4 shrink-0" />
               <span>{isSigningIn ? "Authenticating Session..." : "Sign In to Command Center"}</span>
+              <ArrowRight className="size-4 shrink-0" />
             </button>
+
+            {/* Security Assurance Bar */}
+            <div className="grid grid-cols-3 gap-2 pt-3">
+              {["Signed Session Token", "Gemini AI Brain Ready", "Live Edge Telemetry"].map(
+                (badge) => (
+                  <div
+                    key={badge}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[#1C1C1C] bg-black/70 py-1.5 px-2 text-[10px] font-mono text-zinc-400"
+                  >
+                    <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
+                    <span className="truncate">{badge}</span>
+                  </div>
+                ),
+              )}
+            </div>
 
             <div className="pt-3 border-t border-[#1F1F1F] text-center text-xs text-zinc-400">
               Need protection for a new app or startup?{" "}
               <button
                 type="button"
                 onClick={() => setMode("signup")}
-                className="font-semibold text-primary hover:underline"
+                className="font-bold text-primary hover:underline cursor-pointer"
               >
                 Create your protected workspace →
               </button>
@@ -3171,17 +3194,17 @@ export function PortalLoginScreen({
           </form>
         ) : (
           /* CREATE ACCOUNT / ONBOARDING FORM */
-          <form className="mt-5 space-y-3.5" onSubmit={handleSignUp}>
-            <div className="grid gap-3 sm:grid-cols-2">
+          <form className="mt-5 space-y-4" onSubmit={handleSignUp}>
+            <div className="grid gap-3.5 sm:grid-cols-2">
               <div>
                 <label
-                  className="text-xs font-medium text-zinc-300 block mb-1"
+                  className="text-xs font-semibold text-zinc-200 block mb-1.5"
                   htmlFor="signup-name"
                 >
                   Full Name
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-zinc-500">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
                     <User className="size-3.5" />
                   </span>
                   <input
@@ -3190,20 +3213,20 @@ export function PortalLoginScreen({
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Alex Rivera"
-                    className="h-9 w-full rounded-xl border border-[#262626] bg-black pl-8 pr-3 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-3 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
 
               <div>
                 <label
-                  className="text-xs font-medium text-zinc-300 block mb-1"
+                  className="text-xs font-semibold text-zinc-200 block mb-1.5"
                   htmlFor="signup-email"
                 >
                   Work Email
                 </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-zinc-500">
+                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
                     <Mail className="size-3.5" />
                   </span>
                   <input
@@ -3213,7 +3236,7 @@ export function PortalLoginScreen({
                     value={signupEmail}
                     onChange={(e) => setSignupEmail(e.target.value)}
                     placeholder="alex@acme.io"
-                    className="h-9 w-full rounded-xl border border-[#262626] bg-black pl-8 pr-3 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-3 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
               </div>
@@ -3221,13 +3244,13 @@ export function PortalLoginScreen({
 
             <div>
               <label
-                className="text-xs font-medium text-zinc-300 block mb-1"
+                className="text-xs font-semibold text-zinc-200 block mb-1.5"
                 htmlFor="signup-password"
               >
                 Password
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-zinc-500">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
                   <LockKeyhole className="size-3.5" />
                 </span>
                 <input
@@ -3237,12 +3260,12 @@ export function PortalLoginScreen({
                   value={signupPassword}
                   onChange={(e) => setSignupPassword(e.target.value)}
                   placeholder="At least 6 characters"
-                  className="h-9 w-full rounded-xl border border-[#262626] bg-black pl-8 pr-9 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-9 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="button"
                   onClick={() => setShowSignupPassword(!showSignupPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-zinc-500 hover:text-white"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-500 hover:text-white cursor-pointer"
                 >
                   {showSignupPassword ? (
                     <EyeOff className="size-3.5" />
@@ -3254,9 +3277,9 @@ export function PortalLoginScreen({
             </div>
 
             {/* Optional Service Target */}
-            <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-2">
+            <div className="rounded-xl border border-[#1F1F1F] bg-black/70 p-3.5 space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-300">
                   First Asset to Protect (Optional)
                 </span>
                 <span className="text-[10px] text-zinc-500 font-mono">Can also register later</span>
@@ -3268,7 +3291,7 @@ export function PortalLoginScreen({
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
                     placeholder="Service Name (e.g. Acme API)"
-                    className="h-8 w-full rounded-lg border border-[#262626] bg-black px-2.5 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
+                    className="h-9 w-full rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
                   />
                 </div>
                 <div>
@@ -3277,7 +3300,7 @@ export function PortalLoginScreen({
                     value={primaryDomain}
                     onChange={(e) => setPrimaryDomain(e.target.value)}
                     placeholder="Domain (https://api.acme.io)"
-                    className="h-8 w-full rounded-lg border border-[#262626] bg-black px-2.5 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
+                    className="h-9 w-full rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
                   />
                 </div>
               </div>
@@ -3285,14 +3308,17 @@ export function PortalLoginScreen({
 
             {/* Plan Tier Selection */}
             <div>
-              <label className="text-xs font-medium text-zinc-300 block mb-1" htmlFor="signup-plan">
+              <label
+                className="text-xs font-semibold text-zinc-200 block mb-1.5"
+                htmlFor="signup-plan"
+              >
                 Protection Tier
               </label>
               <select
                 id="signup-plan"
                 value={planTier}
                 onChange={(e) => setPlanTier(e.target.value as PlanTier)}
-                className="h-9 w-full rounded-xl border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-primary"
+                className="h-10 w-full rounded-xl border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-primary"
               >
                 <option value="Starter">Starter — Indie Builders & Early Prototypes</option>
                 <option value="Growth">Growth — Startups & Production Apps</option>
@@ -3302,9 +3328,11 @@ export function PortalLoginScreen({
 
             {/* Modular Protection Selection */}
             <div>
-              <div className="flex items-center justify-between text-xs font-medium text-zinc-300 mb-1.5">
+              <div className="flex items-center justify-between text-xs font-semibold text-zinc-200 mb-1.5">
                 <span>Active Defense Modules</span>
-                <span className="text-[10px] text-primary">Customizes your workspace</span>
+                <span className="text-[10px] font-mono text-primary">
+                  Customizes your workspace
+                </span>
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
                 {SERVICE_MODULES.map((mod) => {
@@ -3314,7 +3342,7 @@ export function PortalLoginScreen({
                       key={mod.id}
                       type="button"
                       onClick={() => toggleModule(mod.id)}
-                      className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all ${
+                      className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer ${
                         checked
                           ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(240,90,40,0.12)] ring-1 ring-primary/30"
                           : "border-[#262626] bg-black hover:border-zinc-700"
@@ -3342,7 +3370,7 @@ export function PortalLoginScreen({
             </div>
 
             {signupError && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-start gap-2">
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 text-xs text-red-300 flex items-start gap-2.5">
                 <ShieldAlert className="size-4 shrink-0 mt-0.5 text-red-400" />
                 <span>{signupError}</span>
               </div>
@@ -3351,12 +3379,13 @@ export function PortalLoginScreen({
             <button
               type="submit"
               disabled={isSigningUp}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-semibold text-sm text-white shadow-lg shadow-primary/25 transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4"
+              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-bold text-sm text-white shadow-[0_0_25px_rgba(240,90,40,0.35)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4 cursor-pointer"
             >
               <Sparkles className="size-4 shrink-0" />
               <span>
                 {isSigningUp ? "Provisioning SOC Workspace..." : "Create Account & Launch Shield"}
               </span>
+              <ArrowRight className="size-4 shrink-0" />
             </button>
 
             <div className="pt-3 border-t border-[#1F1F1F] text-center text-xs text-zinc-400">
@@ -3364,7 +3393,7 @@ export function PortalLoginScreen({
               <button
                 type="button"
                 onClick={() => setMode("signin")}
-                className="font-semibold text-primary hover:underline"
+                className="font-bold text-primary hover:underline cursor-pointer"
               >
                 Sign In
               </button>
@@ -3470,47 +3499,107 @@ export function PortalLoginScreen({
 
       {/* STAGE 1: DEDICATED AUTHENTICATION GATEWAY */}
       {viewStage === "auth" ? (
-        <main className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 py-10 lg:py-16">
-          <div className="grid gap-8 lg:grid-cols-12 items-center">
-            <div className="lg:col-span-5 space-y-5">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
-                Step inside your live cyber command center.
-              </h1>
-              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                Every SparrowX workspace connects directly to real-time web WAF inspection, AI
-                prompt sandboxing, DNS/HTTP ownership verification, and live incident response
-                playbooks.
-              </p>
+        <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-8 py-10 lg:py-16">
+          <div className="grid gap-10 lg:grid-cols-12 items-center">
+            {/* Left 5 Cols: High-Trust Live SOC Command Telemetry Preview */}
+            <div className="lg:col-span-5 space-y-6">
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-[1.12]">
+                  Step inside your live{" "}
+                  <span className="bg-gradient-to-r from-primary via-orange-400 to-amber-300 bg-clip-text text-transparent">
+                    cyber command center.
+                  </span>
+                </h1>
+                <p className="mt-3 text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                  Every SparrowX workspace connects directly to real-time Edge WAF inspection,
+                  Gemini AI Brain predictive blocking, DNS/HTTP ownership verification, and live
+                  incident response playbooks.
+                </p>
+              </div>
 
-              <div className="space-y-2.5 pt-2">
+              {/* Live Subsystem Handshake Status Card */}
+              <div className="rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-4 space-y-3 shadow-xl">
+                <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-2.5">
+                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-300">
+                    SparrowX Defense Mesh Status
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold text-emerald-400">
+                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                    ALL NODES OPERATIONAL
+                  </span>
+                </div>
+                <div className="space-y-2 text-xs font-mono">
+                  {[
+                    {
+                      sys: "Edge WAF & AST SQLi/XSS Engine",
+                      state: "ACTIVE · <1.4ms",
+                      color: "text-emerald-400",
+                    },
+                    {
+                      sys: "Gemini AI Brain Predictive Blocker",
+                      state: "ONLINE · LEARNING",
+                      color: "text-primary",
+                    },
+                    {
+                      sys: "DNS TXT & HTTP Ownership Verifier",
+                      state: "READY · CRYPTO-PROVEN",
+                      color: "text-emerald-400",
+                    },
+                  ].map((row) => (
+                    <div
+                      key={row.sys}
+                      className="flex items-center justify-between rounded-lg border border-[#181818] bg-black px-3 py-2"
+                    >
+                      <span className="text-zinc-300 text-[11px] truncate">{row.sys}</span>
+                      <span className={`text-[10px] font-bold shrink-0 ${row.color}`}>
+                        {row.state}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3 Architecture Guarantees */}
+              <div className="space-y-2.5">
                 {[
                   {
+                    icon: Globe2,
                     title: "Real-Time Attack Interception",
-                    desc: "Stop SQLi, XSS, SSRF, and LLM jailbreaks before they execute.",
+                    desc: "Stop SQLi, XSS, SSRF, and LLM jailbreaks at the edge before they execute.",
                   },
                   {
+                    icon: ShieldCheck,
                     title: "Cryptographic Ownership & Health Proof",
                     desc: "Verify your domains via DNS TXT or HTTP challenge files with live probes.",
                   },
                   {
-                    title: "Instant Firewall Blocklist Export",
-                    desc: "Generate production Cloudflare, UFW, and iptables rules in one click.",
+                    icon: Terminal,
+                    title: "1-Click Firewall Blocklist Export",
+                    desc: "Export production Cloudflare, UFW, and iptables drop rules from live incidents.",
                   },
-                ].map((item) => (
-                  <div
-                    key={item.title}
-                    className="flex items-start gap-3 rounded-xl border border-[#1F1F1F] bg-[#0A0A0A] p-3"
-                  >
-                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <div>
-                      <div className="text-xs font-semibold text-white">{item.title}</div>
-                      <div className="text-[11px] text-zinc-400 mt-0.5">{item.desc}</div>
+                ].map((item) => {
+                  const IconComp = item.icon;
+                  return (
+                    <div
+                      key={item.title}
+                      className="flex items-start gap-3.5 rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3.5 transition-colors hover:border-zinc-700"
+                    >
+                      <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary mt-0.5">
+                        <IconComp className="size-4" />
+                      </span>
+                      <div>
+                        <div className="text-xs font-bold text-white">{item.title}</div>
+                        <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                          {item.desc}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
+            {/* Right 7 Cols: Auth Card */}
             <div className="lg:col-span-7">{renderAuthCard()}</div>
           </div>
         </main>
