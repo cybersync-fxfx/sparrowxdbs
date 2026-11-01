@@ -75,8 +75,21 @@ import {
   type ProtectedService,
   type ReportItem,
   type ServiceModuleId,
+  type ThreatIndicator,
   type Vulnerability,
 } from "@/lib/supabase";
+import {
+  type AiBrainChatTurn,
+  collectUnifiedPlatformContext,
+  getAiBrainConfig,
+  getLearnedThreatPatterns,
+  getStoredBrainChat,
+  harvestTelemetryIntoAiMemory,
+  querySparrowxGeminiBrain,
+  saveAiBrainConfig,
+  saveStoredBrainChat,
+  type SparrowxBrainModel,
+} from "@/lib/sparrowx-ai-brain";
 
 export const SERVICE_MODULES: Array<{
   id: ServiceModuleId;
@@ -2094,10 +2107,518 @@ export async function emitSecurityTelemetry(event: {
   );
 }
 
+function AdminMasterAiBrainConsole({
+  activeNav,
+  tenants,
+  reports = [],
+  incidents = [],
+  vulnerabilities = [],
+  assets = [],
+  protectedServices = [],
+  threatIndicators = [],
+  auditLogs,
+  onPreviewClientPortal,
+  onEnforceGlobalAutoBlock,
+  onRecordAudit,
+}: {
+  activeNav: string;
+  tenants: ClientTenant[];
+  reports?: ReportItem[] | undefined;
+  incidents?: Incident[] | undefined;
+  vulnerabilities?: Vulnerability[] | undefined;
+  assets?: Asset[] | undefined;
+  protectedServices?: ProtectedService[] | undefined;
+  threatIndicators?: ThreatIndicator[] | undefined;
+  auditLogs: AuditLogEntry[];
+  onPreviewClientPortal: (tenantId: string) => void;
+  onEnforceGlobalAutoBlock?: ((learnedCount: number) => Promise<void> | void) | undefined;
+  onRecordAudit: (
+    action: string,
+    target: string,
+    severity?: AuditLogEntry["severity"],
+  ) => Promise<void>;
+}) {
+  const [selectedTenantId, setSelectedTenantId] = useState<string>("ALL");
+  const [brainModel, setBrainModel] = useState<SparrowxBrainModel>(
+    () => getAiBrainConfig().model ?? "gemini-3.8-flash",
+  );
+  const [chatHistory, setChatHistory] = useState<AiBrainChatTurn[]>(() => getStoredBrainChat());
+  const [promptInput, setPromptInput] = useState("");
+  const [isThinking, setIsThinking] = useState(false);
+
+  const focusedTenant =
+    selectedTenantId !== "ALL" ? tenants.find((t) => t.id === selectedTenantId) : undefined;
+
+  const verifiedCount = tenants.filter((t) => t.sdkVerified).length;
+  const totalBlockedAcrossUsers = tenants.reduce((acc, t) => acc + t.blockedThreats, 0);
+
+  const handleModelChange = (model: SparrowxBrainModel) => {
+    setBrainModel(model);
+    saveAiBrainConfig({ model });
+    emitEngineToast(`Admin AI Brain switched to ${model}`);
+  };
+
+  const askAdminBrain = async (rawPrompt: string, overrideTenantId?: string) => {
+    const trimmed = rawPrompt.trim();
+    if (!trimmed || isThinking) return;
+    const targetTenantId = overrideTenantId ?? selectedTenantId;
+    setPromptInput("");
+    setIsThinking(true);
+
+    const userTurn: AiBrainChatTurn = {
+      id: `admin-turn-u-${Date.now()}`,
+      role: "user",
+      content: trimmed,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    const updatedWithUser = [...chatHistory, userTurn];
+    setChatHistory(updatedWithUser);
+    saveStoredBrainChat(updatedWithUser);
+
+    const digest = collectUnifiedPlatformContext({
+      activeNav: `Admin Master Console · ${activeNav}`,
+      portalMode: "admin",
+      incidents,
+      threatIndicators,
+      assets,
+      vulnerabilities,
+      protectedServices,
+      clientTenants: tenants,
+      auditLogs,
+      reports,
+      focusedTenantId: targetTenantId === "ALL" ? null : targetTenantId,
+    });
+
+    const harvested = harvestTelemetryIntoAiMemory({
+      incidents,
+      threatIndicators,
+      vulnerabilities,
+      protectedServices,
+    });
+
+    const cfg = getAiBrainConfig();
+    const res = await querySparrowxGeminiBrain({
+      prompt: trimmed,
+      digest,
+      model: brainModel,
+      previousInteractionId: cfg.lastInteractionId,
+    });
+
+    const aiTurn: AiBrainChatTurn = {
+      id: `admin-turn-a-${Date.now()}`,
+      role: "assistant",
+      content: res.text,
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      modelUsed: res.modelUsed,
+      interactionId: res.interactionId,
+      learnedPatternsCount: harvested.allPatterns.length,
+    };
+    const finalTurns = [...updatedWithUser, aiTurn];
+    setChatHistory(finalTurns);
+    saveStoredBrainChat(finalTurns);
+    setIsThinking(false);
+
+    await onRecordAudit(
+      `Admin AI Brain queried (${res.modelUsed})`,
+      targetTenantId === "ALL"
+        ? `All ${tenants.length} User Dashboards & ${reports.length} Reports`
+        : `User Dashboard ${targetTenantId}`,
+      "Info",
+    );
+  };
+
+  const handleExportMultiUserReport = () => {
+    const content = [
+      `SPARROWX MASTER ADMIN AI BRAIN — MULTI-USER DASHBOARD & COMPLIANCE REPORT`,
+      `Generated At: ${new Date().toISOString()}`,
+      `AI Brain Engine: Google Gemini (${brainModel})`,
+      `Total User Workspaces: ${tenants.length} (${verifiedCount} SDK Verified)`,
+      `Total Blocked Threats Across Users: ${totalBlockedAcrossUsers}`,
+      `Total Compliance & Security Reports: ${reports.length}`,
+      ``,
+      `=== 1. ALL USER / CLIENT DASHBOARDS ===`,
+      ...tenants.map(
+        (t, idx) =>
+          `${idx + 1}. ${t.name} (${t.contactEmail}) | Domain: ${t.primaryDomain} | Tier: ${t.planTier} | Status: ${t.status} | SDK Verified: ${t.sdkVerified ? "YES" : "NO"} | Guardrails: ${t.guardrailsActive ? "ACTIVE" : "PAUSED"} | Blocked Threats: ${t.blockedThreats} | Traffic: ${t.requestsPerMin} req/min | Latency: ${t.avgLatencyMs}ms | Quota: ${t.quotaUsedPct}% | Modules: ${t.enabledModules.join(", ")}`,
+      ),
+      ``,
+      `=== 2. GENERATED SECURITY & COMPLIANCE REPORTS ===`,
+      ...reports.map(
+        (r, idx) =>
+          `${idx + 1}. [${r.id}] ${r.title} (${r.framework}) | Period: ${r.period} | Status: ${r.status} | Generated: ${r.generatedAt} | Author: ${r.author}`,
+      ),
+      ``,
+      `=== 3. LATEST AI BRAIN EXECUTIVE SYNTHESIS ===`,
+      chatHistory.filter((t) => t.role === "assistant").slice(-1)[0]?.content ??
+        "Run an AI Brain query to include live conversational analysis.",
+    ].join("\n");
+
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `sparrowx-admin-ai-brain-all-users-report-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+    emitEngineToast("Downloaded Admin AI Brain Multi-User & Compliance Report.");
+  };
+
+  const latestAssistantTurns = chatHistory.slice(-6);
+
+  return (
+    <section className="overflow-hidden rounded-xl border border-primary/40 bg-gradient-to-br from-primary/10 via-card to-card p-5 shadow-lg">
+      {/* Header Bar */}
+      <div className="flex flex-col justify-between gap-4 border-b border-border/80 pb-4 lg:flex-row lg:items-center">
+        <div>
+          <div className="mb-1.5 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-primary">
+              <Sparkles className="size-3.5" />
+              Master Admin Gemini AI Brain · Full User & Report Access
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] text-emerald-400">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {tenants.length} User Dashboards · {reports.length} Reports Connected
+            </span>
+          </div>
+          <h2 className="text-lg font-bold text-foreground sm:text-xl">
+            Ask SparrowX AI Brain About Any User Dashboard, Tenant Posture, or Compliance Report
+          </h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Your Gemini AI Brain has live read/analyze access to all{" "}
+            <strong className="text-foreground">{tenants.length} client user dashboards</strong>,{" "}
+            <strong className="text-foreground">
+              {reports.length} security & compliance reports
+            </strong>
+            , <strong className="text-foreground">{incidents.length} SOC incidents</strong>, and{" "}
+            <strong className="text-foreground">{auditLogs.length} audit events</strong>.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Select Gemini AI Brain Model"
+            value={brainModel}
+            onChange={(e) => handleModelChange(e.target.value as SparrowxBrainModel)}
+            className="h-9 rounded-lg border border-border bg-background px-3 font-mono text-xs text-foreground outline-none focus:border-primary"
+          >
+            <option value="gemini-3.8-flash">gemini-3.8-flash (Pro Speed)</option>
+            <option value="gemini-4-argon">gemini-4-argon (Deep Reasoning)</option>
+          </select>
+
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleExportMultiUserReport}
+            className="h-9 gap-1.5 text-xs"
+          >
+            <Download className="size-3.5 text-primary" />
+            Export All-Users AI Report
+          </Button>
+
+          {onEnforceGlobalAutoBlock && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={async () => {
+                await onEnforceGlobalAutoBlock(getLearnedThreatPatterns().length);
+                emitEngineToast(
+                  "Admin AI Brain enforced learned threat signatures across all user dashboards.",
+                );
+              }}
+              className="h-9 gap-1.5 bg-primary text-xs font-semibold text-primary-foreground"
+            >
+              <ShieldCheck className="size-3.5" />
+              Auto-Shield All Users
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* User / Tenant Scope Selector + Live User Dashboards Strip */}
+      <div className="mt-4 grid gap-4 lg:grid-cols-12">
+        <div className="flex flex-col gap-3 lg:col-span-5">
+          <div className="flex items-center justify-between">
+            <label
+              htmlFor="admin-brain-user-select"
+              className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+            >
+              1. Inspect User Dashboard Scope
+            </label>
+            <span className="font-mono text-[11px] text-primary">
+              {verifiedCount}/{tenants.length} Verified
+            </span>
+          </div>
+
+          <select
+            id="admin-brain-user-select"
+            value={selectedTenantId}
+            onChange={(e) => setSelectedTenantId(e.target.value)}
+            className="h-10 rounded-lg border border-border bg-background px-3 text-xs font-medium text-foreground outline-none focus:border-primary"
+          >
+            <option value="ALL">
+              🌐 All Users & Client Dashboards ({tenants.length} Workspaces + {reports.length}{" "}
+              Reports)
+            </option>
+            {tenants.map((t) => (
+              <option key={t.id} value={t.id}>
+                👤 {t.name} ({t.contactEmail}) · {t.primaryDomain} [{t.planTier} ·{" "}
+                {t.sdkVerified ? "SDK Verified" : "Unverified"}]
+              </option>
+            ))}
+          </select>
+
+          {/* Focused User or All-Users Quick Cards */}
+          <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+            {(focusedTenant ? [focusedTenant] : tenants).map((t) => (
+              <div
+                key={t.id}
+                className={`flex flex-col gap-2 rounded-lg border p-3 transition-colors ${
+                  selectedTenantId === t.id
+                    ? "border-primary/60 bg-primary/10"
+                    : "border-border/80 bg-background/60 hover:border-primary/40"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-xs font-semibold text-foreground">
+                        {t.name}
+                      </span>
+                      <span
+                        className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
+                          t.sdkVerified
+                            ? "bg-emerald-500/15 text-emerald-400"
+                            : "bg-amber-500/15 text-amber-400"
+                        }`}
+                      >
+                        {t.sdkVerified ? "Verified" : "Unverified"}
+                      </span>
+                      <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        {t.planTier}
+                      </span>
+                    </div>
+                    <div className="truncate font-mono text-[11px] text-muted-foreground">
+                      {t.contactEmail} · {t.primaryDomain}
+                    </div>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTenantId(t.id);
+                        void askAdminBrain(
+                          `Analyze ${t.name}'s user dashboard (${t.primaryDomain}, contact: ${t.contactEmail}). Report their SDK verification status, blocked threats (${t.blockedThreats}), quota usage (${t.quotaUsedPct}%), active security modules, and what actions we should take to protect them.`,
+                          t.id,
+                        );
+                      }}
+                      className="rounded border border-primary/40 bg-primary/15 px-2 py-1 text-[10px] font-semibold text-primary hover:bg-primary/25"
+                    >
+                      Ask AI
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onPreviewClientPortal(t.id)}
+                      className="rounded border border-border bg-card px-2 py-1 text-[10px] font-medium text-foreground hover:border-primary/40"
+                      title="Open this user's live dashboard"
+                    >
+                      Open Portal
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 border-t border-border/60 pt-1.5 font-mono text-[10px] text-muted-foreground">
+                  <span>
+                    Blocked: <strong className="text-foreground">{t.blockedThreats}</strong>
+                  </span>
+                  <span>
+                    Traffic: <strong className="text-foreground">{t.requestsPerMin}/m</strong>
+                  </span>
+                  <span>
+                    Quota: <strong className="text-foreground">{t.quotaUsedPct}%</strong>
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Connected Compliance & Executive Reports List */}
+          {reports.length > 0 && (
+            <div className="rounded-lg border border-border/80 bg-background/60 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  2. Connected Security & Compliance Reports ({reports.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void askAdminBrain(
+                      `Review all ${reports.length} compliance and executive security reports (${reports.map((r) => r.title).join(", ")}) alongside all ${tenants.length} user dashboards. Summarize key compliance findings, readiness gaps, and executive recommendations.`,
+                    )
+                  }
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                >
+                  Audit All Reports →
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {reports.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() =>
+                      void askAdminBrain(
+                        `Analyze report "${r.title}" [${r.framework}, Period: ${r.period}, Status: ${r.status}] generated by ${r.author} and cross-reference it with our ${tenants.length} client user dashboards and open incidents.`,
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-left text-[11px] text-foreground transition-colors hover:border-primary/50 hover:bg-primary/10"
+                  >
+                    <FileSearch className="size-3 text-primary" />
+                    <span className="truncate max-w-[180px] font-medium">{r.title}</span>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      ({r.framework})
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column: Live Admin AI Brain Chat Thread & Prompt Bar */}
+        <div className="flex flex-col justify-between rounded-xl border border-border bg-background/80 p-4 lg:col-span-7">
+          <div>
+            {/* Quick Admin Prompt Presets */}
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {[
+                {
+                  label: "📊 Summarize All Users' Dashboards",
+                  prompt:
+                    "Give me a complete executive briefing of all user dashboards, including each user's domain, plan tier, SDK verification status, blocked threats, quota usage, and any workspaces that need immediate attention.",
+                },
+                {
+                  label: "📋 Audit All Compliance Reports",
+                  prompt:
+                    "Inspect all generated compliance and executive reports (SOC 2 Type II, ISO 27001, NIST CSF, Executive Summary) and cross-reference them with live user dashboard telemetry and open vulnerabilities.",
+                },
+                {
+                  label: "⚠️ Find Unverified or At-Risk Users",
+                  prompt:
+                    "Which user dashboards currently have unverified SDKs, paused AI guardrails, lockdown state, or high quota utilization? Tell me how to remediate each one.",
+                },
+                {
+                  label: "🛡️ Predict & Block Threats Across All Users",
+                  prompt:
+                    "Correlate all open SOC incidents, unblocked threat indicators, and CVEs across all client user dashboards and generate zero-trust WAF & AI guardrail rules to block future problems.",
+                },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  disabled={isThinking}
+                  onClick={() => void askAdminBrain(preset.prompt)}
+                  className="rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-medium text-foreground transition-colors hover:border-primary hover:bg-primary/20 disabled:opacity-50"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Conversation Stream */}
+            <div className="max-h-80 min-h-[220px] space-y-3 overflow-y-auto rounded-lg border border-border/70 bg-card/60 p-3">
+              {latestAssistantTurns.length === 0 ? (
+                <div className="flex h-48 flex-col items-center justify-center text-center">
+                  <Sparkles className="mb-2 size-7 text-primary" />
+                  <div className="text-sm font-semibold text-foreground">
+                    Admin Master AI Brain Ready
+                  </div>
+                  <p className="mt-1 max-w-md text-xs text-muted-foreground">
+                    Select any user workspace on the left or click a preset above to talk with
+                    Gemini AI about all user dashboards, SDK verification states, blocked threats,
+                    and compliance reports.
+                  </p>
+                </div>
+              ) : (
+                latestAssistantTurns.map((turn) => (
+                  <div
+                    key={turn.id}
+                    className={`rounded-lg border p-3 text-xs leading-relaxed ${
+                      turn.role === "user"
+                        ? "ml-6 border-primary/40 bg-primary/10 text-foreground"
+                        : "mr-2 border-border bg-background/90 text-foreground"
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center justify-between text-[10px] text-muted-foreground">
+                      <span className="font-semibold uppercase text-primary">
+                        {turn.role === "user"
+                          ? `Admin Operator ${focusedTenant ? `(Scope: ${focusedTenant.name})` : "(Global Scope)"}`
+                          : `SparrowX Gemini AI Brain (${turn.modelUsed ?? brainModel})`}
+                      </span>
+                      <span className="font-mono">{turn.timestamp}</span>
+                    </div>
+                    <div className="whitespace-pre-wrap font-sans text-xs">{turn.content}</div>
+                  </div>
+                ))
+              )}
+
+              {isThinking && (
+                <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs text-primary">
+                  <RefreshCw className="size-3.5 animate-spin" />
+                  <span>
+                    Gemini AI Brain ({brainModel}) is inspecting all {tenants.length} user
+                    dashboards and {reports.length} compliance reports...
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Chat Input Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void askAdminBrain(promptInput);
+            }}
+            className="mt-3 flex gap-2"
+          >
+            <input
+              type="text"
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              placeholder={
+                focusedTenant
+                  ? `Ask AI Brain about ${focusedTenant.name}'s dashboard (${focusedTenant.primaryDomain}) or reports...`
+                  : `Ask AI Brain about any user's dashboard, blocked threats, SDK status, or compliance report...`
+              }
+              className="h-10 flex-1 rounded-lg border border-border bg-card px-3.5 text-xs text-foreground outline-none focus:border-primary"
+            />
+            <Button
+              type="submit"
+              disabled={isThinking || !promptInput.trim()}
+              className="h-10 gap-1.5 bg-primary px-4 text-xs font-semibold text-primary-foreground"
+            >
+              <Sparkles className="size-3.5" />
+              {isThinking ? "Analyzing..." : "Ask AI Brain"}
+            </Button>
+          </form>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function AdminPortalView({
   activeNav,
   tenants,
   auditLogs,
+  reports = [],
+  incidents = [],
+  vulnerabilities = [],
+  assets = [],
+  protectedServices = [],
+  threatIndicators = [],
+  onEnforceGlobalAutoBlock,
   onCreateTenant,
   onToggleTenantModule,
   onToggleTenantLockdown,
@@ -2115,6 +2636,13 @@ export function AdminPortalView({
   activeNav: string;
   tenants: ClientTenant[];
   auditLogs: AuditLogEntry[];
+  reports?: ReportItem[] | undefined;
+  incidents?: Incident[] | undefined;
+  vulnerabilities?: Vulnerability[] | undefined;
+  assets?: Asset[] | undefined;
+  protectedServices?: ProtectedService[] | undefined;
+  threatIndicators?: ThreatIndicator[] | undefined;
+  onEnforceGlobalAutoBlock?: ((learnedCount: number) => Promise<void> | void) | undefined;
   onCreateTenant: (input: {
     name: string;
     contactEmail: string;
@@ -2173,6 +2701,21 @@ export function AdminPortalView({
 
   return (
     <div className="flex flex-col gap-6">
+      <AdminMasterAiBrainConsole
+        activeNav={activeNav}
+        tenants={tenants}
+        reports={reports}
+        incidents={incidents}
+        vulnerabilities={vulnerabilities}
+        assets={assets}
+        protectedServices={protectedServices}
+        threatIndicators={threatIndicators}
+        auditLogs={auditLogs}
+        onPreviewClientPortal={onPreviewClientPortal}
+        onEnforceGlobalAutoBlock={onEnforceGlobalAutoBlock}
+        onRecordAudit={onRecordAudit}
+      />
+
       {/* 1. CLIENT SUBSCRIPTIONS & DYNAMIC MODULE CONTROL */}
       {activeNav === "Client Subscriptions" && (
         <>

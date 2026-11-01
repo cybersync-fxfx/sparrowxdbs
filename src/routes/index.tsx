@@ -1778,11 +1778,14 @@ function Dashboard() {
             (portalMode === "soc" && activeNav === "Access Control & Audit")) && (
             <AdminPortalView
               activeNav={activeNav}
+              assets={assets}
               auditLogs={auditLogs}
+              incidents={incidents}
               ipAllowlistStrict={ipAllowlistStrict}
               jitTenantApproval={jitTenantApproval}
               onCreateTenant={handleCreateTenant}
               onDeleteTenant={handleDeleteTenant}
+              onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
               onPreviewClientPortal={(tenantId) => {
                 setSelectedTenantId(tenantId);
                 setPortalMode("client");
@@ -1792,11 +1795,15 @@ function Dashboard() {
               onRotateTenantKey={handleRotateTenantKey}
               onToggleTenantLockdown={handleToggleTenantLockdown}
               onToggleTenantModule={handleToggleTenantModule}
+              protectedServices={protectedServices}
+              reports={reports}
               setIpAllowlistStrict={setIpAllowlistStrict}
               setJitTenantApproval={setJitTenantApproval}
               setStaffMfaEnforced={setStaffMfaEnforced}
               staffMfaEnforced={staffMfaEnforced}
               tenants={clientTenants}
+              threatIndicators={threatIndicators}
+              vulnerabilities={vulnerabilities}
             />
           )}
 

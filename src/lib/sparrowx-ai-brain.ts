@@ -5,6 +5,7 @@ import {
   type ClientTenant,
   type Incident,
   type ProtectedService,
+  type ReportItem,
   type ThreatIndicator,
   type Vulnerability,
   maskSecretKey,
@@ -61,6 +62,8 @@ export interface PlatformTelemetryDigest {
   protectedServicesCount: number;
   verifiedTenantsCount: number;
   totalTenantsCount: number;
+  totalReportsCount?: number | undefined;
+  focusedTenantName?: string | undefined;
   summaryText: string;
 }
 
@@ -256,6 +259,8 @@ export function getStoredBrainChat(): AiBrainChatTurn[] {
   }
 }
 
+export const getBrainChatHistory = getStoredBrainChat;
+
 export function saveStoredBrainChat(turns: AiBrainChatTurn[]): void {
   if (typeof window === "undefined") return;
   try {
@@ -264,6 +269,8 @@ export function saveStoredBrainChat(turns: AiBrainChatTurn[]): void {
     // ignore
   }
 }
+
+export const saveBrainChatHistory = saveStoredBrainChat;
 
 /**
  * Collects live telemetry across all SparrowX dashboards so the Gemini AI Brain
@@ -279,6 +286,8 @@ export function collectUnifiedPlatformContext(input: {
   protectedServices: ProtectedService[];
   clientTenants: ClientTenant[];
   auditLogs: AuditLogEntry[];
+  reports?: ReportItem[] | undefined;
+  focusedTenantId?: string | null | undefined;
 }): PlatformTelemetryDigest {
   const openIncidents = input.incidents.filter((i) => i.status !== "Contained");
   const openCritical = openIncidents.filter((i) => i.severity === "Critical").length;
@@ -287,7 +296,12 @@ export function collectUnifiedPlatformContext(input: {
   const isolatedAssets = input.assets.filter((a) => a.status === "Isolated").length;
   const openVulns = input.vulnerabilities.filter((v) => v.status !== "Patched");
   const verifiedTenants = input.clientTenants.filter((t) => t.sdkVerified).length;
+  const reportsList = input.reports ?? [];
   const learnedMemory = getLearnedThreatPatterns();
+
+  const focusedTenant = input.focusedTenantId
+    ? input.clientTenants.find((t) => t.id === input.focusedTenantId)
+    : undefined;
 
   const incidentLines = openIncidents
     .slice(0, 6)
@@ -318,15 +332,48 @@ export function collectUnifiedPlatformContext(input: {
     )
     .join("\n");
 
-  const summaryText = `SPARROWX LIVE MULTI-DASHBOARD TELEMETRY DIGEST:
-- Active View: ${input.portalMode.toUpperCase()} Portal -> ${input.activeNav}
+  const tenantDashboardLines = input.clientTenants
+    .map(
+      (t) =>
+        `- [${t.id}] User/Org: ${t.name} (${t.contactEmail}) | Domain: ${t.primaryDomain} | Tier: ${t.planTier} | Status: ${t.status} | SDK Verified: ${t.sdkVerified ? "YES" : "NO (Setup Pending)"} | AI Guardrails: ${t.guardrailsActive ? "ACTIVE" : "PAUSED"} | Blocked Threats: ${t.blockedThreats} | Traffic: ${t.requestsPerMin} req/min | Avg Latency: ${t.avgLatencyMs}ms | Quota Used: ${t.quotaUsedPct}% | Enabled Modules: ${t.enabledModules.join(", ")}`,
+    )
+    .join("\n");
+
+  const reportLines = reportsList
+    .map(
+      (r) =>
+        `- [${r.id}] ${r.title} | Framework: ${r.framework} | Period: ${r.period} | Status: ${r.status} | Generated: ${r.generatedAt} | Author: ${r.author}`,
+    )
+    .join("\n");
+
+  const auditLines = input.auditLogs
+    .slice(0, 8)
+    .map(
+      (log) =>
+        `- [${log.timestamp}] ${log.severity.toUpperCase()} | ${log.actor} (${log.role}) -> ${log.action} on ${log.target}`,
+    )
+    .join("\n");
+
+  const focusedUserBlock = focusedTenant
+    ? `\nFOCUSED USER / CLIENT DASHBOARD SELECTED BY ADMIN:\n- Tenant ID: ${focusedTenant.id}\n- Name: ${focusedTenant.name}\n- Contact Email: ${focusedTenant.contactEmail}\n- Primary Domain: ${focusedTenant.primaryDomain}\n- Plan Tier & Status: ${focusedTenant.planTier} (${focusedTenant.status})\n- SDK Verification: ${focusedTenant.sdkVerified ? "Cryptographically Verified" : "Unverified (Requires DNS/Middleware Handshake)"}\n- AI Guardrails: ${focusedTenant.guardrailsActive ? "Active" : "Paused"}\n- Blocked Threats: ${focusedTenant.blockedThreats}\n- Live Traffic: ${focusedTenant.requestsPerMin} req/min (${focusedTenant.avgLatencyMs}ms latency)\n- Quota Utilization: ${focusedTenant.quotaUsedPct}%\n- Enabled Security Modules: ${focusedTenant.enabledModules.join(", ")}\n`
+    : "";
+
+  const summaryText = `SPARROWX LIVE MULTI-DASHBOARD & MULTI-USER TELEMETRY DIGEST:
+- Active View: ${input.portalMode.toUpperCase()} Portal -> ${input.activeNav}${focusedTenant ? ` (Focused User: ${focusedTenant.name} @ ${focusedTenant.primaryDomain})` : ""}
 - Incidents: ${input.incidents.length} total (${openIncidents.length} open, ${openCritical} critical)
 - Threat Indicators (IOCs): ${blockedIocs} blocked, ${unblockedIocs.length} unblocked/active
 - Infrastructure Assets: ${input.assets.length} total (${isolatedAssets} isolated)
 - Unpatched Vulnerabilities: ${openVulns.length} open CVEs
 - Protected Web & AI Services: ${input.protectedServices.length} endpoints
-- Client Tenants Verified: ${verifiedTenants} / ${input.clientTenants.length}
+- Client Users & Tenant Dashboards Verified: ${verifiedTenants} / ${input.clientTenants.length}
+- Compliance & Executive Reports Available: ${reportsList.length} reports
 - AI Brain Learned Memory Patterns: ${learnedMemory.length} active predictive block signatures
+${focusedUserBlock}
+ALL USER / CLIENT DASHBOARDS TELEMETRY (${input.clientTenants.length} WORKSPACES):
+${tenantDashboardLines || "No client tenants registered"}
+
+GENERATED SECURITY & COMPLIANCE REPORTS (${reportsList.length} REPORTS):
+${reportLines || "No reports generated yet"}
 
 OPEN INCIDENTS:
 ${incidentLines || "None (Queue clear)"}
@@ -338,7 +385,10 @@ OPEN VULNERABILITIES (CVEs):
 ${vulnLines || "No unpatched CVEs"}
 
 PROTECTED WEB & AI SERVICES:
-${serviceLines || "No services registered"}`;
+${serviceLines || "No services registered"}
+
+RECENT ADMIN & OPERATOR AUDIT LOGS:
+${auditLines || "No recent audit logs"}`;
 
   return {
     timestamp: new Date().toISOString(),
@@ -354,6 +404,8 @@ ${serviceLines || "No services registered"}`;
     protectedServicesCount: input.protectedServices.length,
     verifiedTenantsCount: verifiedTenants,
     totalTenantsCount: input.clientTenants.length,
+    totalReportsCount: reportsList.length,
+    focusedTenantName: focusedTenant?.name,
     summaryText,
   };
 }
@@ -567,6 +619,47 @@ function buildDeterministicBrainSynthesis(
 ): string {
   const q = prompt.toLowerCase();
   const topPattern = learnedPatterns[0];
+
+  const extractSection = (header: string): string => {
+    const idx = digest.summaryText.indexOf(header);
+    if (idx === -1) return "";
+    const after = digest.summaryText.slice(idx);
+    const nextBlank = after.indexOf("\n\n");
+    return (nextBlank === -1 ? after : after.slice(0, nextBlank)).trim();
+  };
+
+  if (
+    q.includes("user") ||
+    q.includes("tenant") ||
+    q.includes("client") ||
+    q.includes("report") ||
+    q.includes("compliance") ||
+    q.includes("dashboard") ||
+    digest.focusedTenantName
+  ) {
+    const focusedBlock = extractSection("FOCUSED USER / CLIENT DASHBOARD SELECTED BY ADMIN:");
+    const allUsersBlock = extractSection("ALL USER / CLIENT DASHBOARDS TELEMETRY");
+    const reportsBlock = extractSection("GENERATED SECURITY & COMPLIANCE REPORTS");
+
+    return `### 🧠 SparrowX Master Admin AI Brain — Cross-User Dashboard & Report Intelligence${digest.focusedTenantName ? ` (Focused: ${digest.focusedTenantName})` : ""}
+
+I have inspected all **${digest.totalTenantsCount} user/client workspace dashboards** (\`${digest.verifiedTenantsCount}/${digest.totalTenantsCount}\` SDK verified) and **${digest.totalReportsCount ?? 0} compliance & security reports**:
+
+${focusedBlock ? `#### 🎯 Focused User Dashboard Analysis\n\`\`\`text\n${focusedBlock}\n\`\`\`\n` : ""}#### 👥 All User & Client Workspace Dashboards
+\`\`\`text
+${allUsersBlock || "No client tenants registered."}
+\`\`\`
+
+#### 📋 Compliance & Executive Security Reports
+\`\`\`text
+${reportsBlock || "No reports generated yet."}
+\`\`\`
+
+#### 🛡️ AI Brain Admin Recommendations Across User Dashboards:
+1. **Unverified User Dashboards:** \`${digest.totalTenantsCount - digest.verifiedTenantsCount}\` workspace(s) still require cryptographic DNS/SDK verification handshake—use **Inspect Portal** or **Verify SDK** in the Admin console to complete onboarding.
+2. **Global Perimeter Protection:** \`${learnedPatterns.length}\` learned AI Brain threat signatures are actively shielding all connected user dashboards (${digest.unblockedIocsCount} unblocked IOCs ready for 1-click quarantine).
+3. **Audit & Compliance Readiness:** All ${digest.totalReportsCount ?? 0} reports are synchronized with live SOC telemetry and ready for client or auditor export.`;
+  }
 
   if (q.includes("block") || q.includes("future") || q.includes("prevent") || q.includes("rule")) {
     return `### 🧠 SparrowX AI Brain — Predictive Threat Prevention & Auto-Block Synthesis

@@ -30,6 +30,11 @@ export interface EngineToast {
   title?: string | undefined;
   message: string;
   timestamp: string;
+  code?: string | undefined;
+  referenceId?: string | undefined;
+  nextStep?: string | undefined;
+  onRetry?: (() => Promise<void> | void) | undefined;
+  onTroubleshoot?: (() => void) | undefined;
 }
 
 // Global subscribers for dispatching activity from anywhere in the app
@@ -64,6 +69,13 @@ export function emitEngineToast(
   message: string,
   type: "success" | "error" | "info" | "cooking" = "info",
   title?: string,
+  options?: {
+    code?: string;
+    referenceId?: string;
+    nextStep?: string;
+    onRetry?: () => Promise<void> | void;
+    onTroubleshoot?: () => void;
+  },
 ) {
   const newToast: EngineToast = {
     id: `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -71,6 +83,11 @@ export function emitEngineToast(
     title,
     message,
     timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    code: options?.code,
+    referenceId: options?.referenceId,
+    nextStep: options?.nextStep,
+    onRetry: options?.onRetry,
+    onTroubleshoot: options?.onTroubleshoot,
   };
   toastSubscribers.forEach((fn) => fn(newToast));
 }
@@ -136,10 +153,11 @@ export function BackgroundEngineToaster() {
 
     const handleToast: ToastListener = (newToast) => {
       setActiveToasts((prev) => [...prev, newToast]);
-      // Auto-dismiss after 4.5 seconds
+      // Longer auto-dismiss for errors (8s) so user has time to review and click action; 4.5s for success/info
+      const dismissDelay = newToast.type === "error" ? 8000 : 4500;
       setTimeout(() => {
         setActiveToasts((prev) => prev.filter((t) => t.id !== newToast.id));
-      }, 4500);
+      }, dismissDelay);
     };
 
     logSubscribers.add(handleLog);
@@ -199,11 +217,55 @@ export function BackgroundEngineToaster() {
 
                 <div className="flex-1 min-w-0">
                   {toast.title && (
-                    <div className="text-xs font-bold tracking-tight mb-0.5">{toast.title}</div>
+                    <div className="text-xs font-bold tracking-tight mb-1 flex items-center justify-between gap-1">
+                      <span className="truncate">{toast.title}</span>
+                      {toast.code && (
+                        <span className="shrink-0 font-mono text-[9px] px-1.5 py-0.2 rounded bg-black/40 border border-white/10 text-primary">
+                          {toast.code}
+                        </span>
+                      )}
+                    </div>
                   )}
-                  <div className="text-xs leading-relaxed text-white/90 break-words">
+                  <div className="text-xs leading-relaxed text-white/90 whitespace-pre-line break-words">
                     {toast.message}
                   </div>
+
+                  {(toast.onRetry || toast.onTroubleshoot || toast.referenceId) && (
+                    <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                      {toast.referenceId && (
+                        <span className="font-mono text-[9px] text-muted-foreground/80">
+                          {toast.referenceId}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1.5 ml-auto">
+                        {toast.onRetry && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toast.onRetry?.();
+                              dismissToast(toast.id);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white font-medium transition-colors"
+                          >
+                            <RefreshCw className="size-2.5" />
+                            <span>Retry</span>
+                          </button>
+                        )}
+                        {toast.onTroubleshoot && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              toast.onTroubleshoot?.();
+                              dismissToast(toast.id);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 font-medium transition-colors"
+                          >
+                            <span>Troubleshoot & Fix →</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <button
