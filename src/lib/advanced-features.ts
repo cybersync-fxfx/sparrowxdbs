@@ -412,6 +412,7 @@ export function exportFirewallBlocklist(
 export type SessionTokenPayload = {
   sub: string;
   email: string;
+  fullName?: string;
   role: "admin" | "responder" | "client" | "auditor";
   tenantId: string | null;
   issuedAt: number;
@@ -436,6 +437,7 @@ export function issueSignedSessionToken(user: {
   const payload: SessionTokenPayload = {
     sub: user.id,
     email: user.email,
+    fullName: user.fullName,
     role: user.role,
     tenantId: user.tenantId,
     issuedAt,
@@ -473,4 +475,10 @@ export function verifySessionToken(): SessionTokenPayload | null {
     }
   }
   return null;
+}
+
+export function clearSessionToken(): void {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(JWT_STORAGE_KEY);
+  }
 }

@@ -9,27 +9,38 @@ import { generateComplianceReportDocument } from "@/lib/client-sdk-generator";
 import { FirewallRuleExporter } from "@/components/FirewallRuleExporter";
 import { IncidentTimelineView } from "@/components/IncidentTimelineView";
 import { LiveWebhookDispatcherManager } from "@/components/LiveWebhookDispatcherManager";
+import { NotificationCenterDrawer } from "@/components/NotificationCenterDrawer";
+import { CheckpointsAndProbesView } from "@/components/CheckpointsAndProbesView";
+import { LiveOperationsView } from "@/components/LiveOperationsView";
+import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
+  AlertCircle,
+  AlertTriangle,
   ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
+  BarChart3,
   Bell,
   BookOpen,
   Boxes,
+  Building2,
   Check,
+  CheckCircle2,
   CircleHelp,
   Clock3,
   Coins,
   Command,
   Copy,
+  CreditCard,
   Database,
   Download,
   Ellipsis,
   Eye,
   FileSearch,
+  FileText,
   Filter,
   Globe2,
   KeyRound,
@@ -39,18 +50,21 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
+  Radio,
   RefreshCw,
   Search,
   Server,
   ShieldAlert,
   ShieldCheck,
   Siren,
+  SlidersHorizontal,
   Sparkles,
   Terminal,
   Trash2,
   Users,
   Wrench,
   X,
+  Zap,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -89,6 +103,7 @@ import {
   saveWebhooks,
   issueSignedSessionToken,
   verifySessionToken,
+  clearSessionToken,
   type WebhookConfig,
   type AiGuardrailTestResult,
   type FirewallFormat,
@@ -197,6 +212,8 @@ function Dashboard() {
   const [range, setRange] = useState<RangeOption>("24 hours");
   const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState("Unauthorized Access");
 
   // Backend & Incident Triage / Creation state
   const [backendSource, setBackendSource] = useState<"supabase" | "offline">(
@@ -259,6 +276,38 @@ function Dashboard() {
   useEffect(() => {
     let active = true;
     setIsLoadingWorkspace(true);
+
+    // Restore authenticated session from signed token if present
+    const storedSession = verifySessionToken();
+    if (storedSession) {
+      if (storedSession.role === "admin") {
+        setAuthSession({
+          role: "admin",
+          operatorName: storedSession.fullName || "SparrowX Admin",
+          operatorEmail: storedSession.email,
+        });
+        setPortalMode("soc");
+      } else {
+        setAuthSession({
+          role: "client",
+          tenantId: storedSession.tenantId,
+          userEmail: storedSession.email,
+        });
+        if (storedSession.tenantId) {
+          setSelectedTenantId(storedSession.tenantId);
+        }
+        setPortalMode("client");
+      }
+      setCurrentUser({
+        id: storedSession.sub,
+        email: storedSession.email,
+        password: "",
+        fullName: storedSession.fullName || storedSession.email.split("@")[0] || "Operator",
+        admin: storedSession.role === "admin" ? "yes" : "no",
+        tenantId: storedSession.tenantId,
+      });
+    }
+
     fetchAllWorkspaceData().then((data) => {
       if (!active) return;
       setIncidents(data.incidents);
@@ -453,6 +502,23 @@ function Dashboard() {
     [vulnerabilities],
   );
 
+  const highOpenCount = useMemo(
+    () =>
+      incidents.filter((item) => item.status !== "Contained" && item.severity === "High").length,
+    [incidents],
+  );
+
+  const onDutyCount = useMemo(() => teamMembers.filter((m) => m.onCall).length, [teamMembers]);
+
+  const unreadNotifCount = useMemo(
+    () =>
+      incidents.filter((item) => item.status !== "Contained" && item.severity === "Critical")
+        .length +
+      vulnerabilities.filter((v) => v.status === "Open" && v.severity === "Critical").length +
+      threatIndicators.filter((t) => t.blocked && t.severity === "Critical").length,
+    [incidents, vulnerabilities, threatIndicators],
+  );
+
   const filteredIncidents = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     return incidents.filter((incident) => {
@@ -525,14 +591,14 @@ function Dashboard() {
     if (!newTitle.trim() || !newSource.trim()) return;
     const created: Incident = {
       id: `INC-${Date.now().toString().slice(-4)}`,
-      title: newTitle.trim(),
+      title: `[${newCategory}] ${newTitle.trim()}`,
       source: newSource.trim(),
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       severity: newSeverity,
       status: "Investigating",
       assignee: newAssignee.trim() || teamMembers[0]?.name || "Unassigned",
-      summary: newSummary.trim() || "Incident logged for triage and containment review.",
-      playbook: newPlaybook.trim() || "Standard Triage Playbook",
+      summary: `${newCategory}: ${newSummary.trim() || "Incident logged for triage and containment review."}`,
+      playbook: newPlaybook.trim() || `${newCategory} Response Playbook`,
       affectedAssets: 1,
     };
     setIncidents((current) => [created, ...current]);
@@ -1067,6 +1133,7 @@ function Dashboard() {
   };
 
   const handleSignOut = () => {
+    clearSessionToken();
     setCurrentUser(null);
     setAuthSession({ role: "unauthenticated" });
     setMenuOpen(false);
@@ -1086,17 +1153,27 @@ function Dashboard() {
     visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
 
   const handleNavigate = (navLabel: string) => {
-    if (
-      navLabel === "Client Subscriptions" ||
-      navLabel === "Performance & Kill-Switch" ||
-      navLabel === "Access Control & Audit"
-    ) {
+    if (navLabel === "Notifications") {
+      setNotificationDrawerOpen(true);
+      return;
+    }
+    if (navLabel === "Client Subscriptions" || navLabel === "Performance & Kill-Switch") {
       setPortalMode("admin");
+    } else if (navLabel === "Access Control & Audit") {
+      if (portalMode !== "soc") {
+        setPortalMode("admin");
+      }
     } else if (
       navLabel === "My Services" ||
+      navLabel === "Clients & Services" ||
       navLabel === "Subscriptions & Due Dates" ||
       navLabel === "Billing & Credits" ||
-      navLabel === "Profile Management" ||
+      navLabel === "Profile Management"
+    ) {
+      if (portalMode !== "soc") {
+        setPortalMode("client");
+      }
+    } else if (
       navLabel === "Client Overview" ||
       navLabel === "Web & WAF Security" ||
       navLabel === "AI Agent & LLM Shield" ||
@@ -1317,12 +1394,23 @@ function Dashboard() {
             </div>
             <span className="hidden text-muted-foreground/60 sm:block">/</span>
             <span className="truncate text-sm font-semibold text-foreground">{activeNav}</span>
-            <span className="hidden items-center gap-1.5 rounded-sm border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground lg:inline-flex">
-              <Database className="size-3 text-primary" />
-              {backendSource === "supabase" ? "SparrowX Cloud Live" : "Offline"}
-            </span>
+
+            {/* Operational Status Badge */}
+            {criticalOpenCount > 0 ? (
+              <span className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[10px] font-semibold text-destructive animate-pulse">
+                <AlertTriangle className="size-3" />
+                <span>ALERT: {criticalOpenCount} CRITICAL</span>
+              </span>
+            ) : (
+              <span className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-success">
+                <CheckCircle2 className="size-3" />
+                <span>SYSTEMS NOMINAL</span>
+              </span>
+            )}
+
+            <OperationalClock />
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Top Workspace Switcher (SOC Dashboard vs Client Area) */}
             <div className="flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
               <button
@@ -1336,7 +1424,7 @@ function Dashboard() {
                 title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
               >
                 <ShieldAlert className="size-3.5" />
-                <span>SOC Dashboard</span>
+                <span>SOC Command</span>
               </button>
               <button
                 type="button"
@@ -1367,45 +1455,62 @@ function Dashboard() {
                 </button>
               )}
             </div>
-            {authSession.role === "admin" && (
-              <div className="hidden h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-muted-foreground lg:flex">
-                <Search className="size-4" />
-                <input
-                  aria-label="Search incidents"
-                  className="w-40 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search incidents, IOCs..."
-                  type="text"
-                  value={search}
-                />
-                {search ? (
-                  <button
-                    aria-label="Clear search"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => setSearch("")}
-                    type="button"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                ) : (
-                  <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    <Command className="inline size-3" /> K
-                  </kbd>
-                )}
-              </div>
-            )}
+
+            {/* Global Search Bar */}
+            <div className="hidden h-8.5 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground lg:flex shadow-xs">
+              <Search className="size-3.5" />
+              <input
+                aria-label="Search operational assets, incidents, and threat feeds"
+                className="w-36 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search telemetry..."
+                type="text"
+                value={search}
+              />
+              {search ? (
+                <button
+                  aria-label="Clear search"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setSearch("")}
+                  type="button"
+                >
+                  <X className="size-3" />
+                </button>
+              ) : (
+                <kbd className="rounded border border-border px-1 py-0.2 font-mono text-[9px] text-muted-foreground">
+                  <Command className="inline size-2.5" /> K
+                </kbd>
+              )}
+            </div>
+
+            {/* Notification Center Bell */}
+            <button
+              type="button"
+              onClick={() => setNotificationDrawerOpen(true)}
+              className="relative flex size-8.5 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors shadow-xs"
+              title="Security Operations Alerts"
+              aria-label="Open notifications drawer"
+            >
+              <Bell className="size-4" />
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex size-4 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground shadow-xs ring-2 ring-background">
+                  {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                </span>
+              )}
+            </button>
+
             <Button
-              className="h-9 px-3 text-xs"
+              className="h-8.5 px-2.5 text-xs font-medium"
               onClick={handleSignOut}
               size="sm"
               variant="outline"
             >
               <LockKeyhole className="size-3.5 text-primary" />
-              <span>Log Out</span>
+              <span className="hidden sm:inline">Log Out</span>
             </Button>
             <button
               aria-label="Open account menu"
-              className="flex size-9 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-secondary-foreground"
+              className="flex size-8.5 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-secondary-foreground shadow-xs"
               onClick={() => setMenuOpen(!menuOpen)}
               type="button"
             >
@@ -1413,6 +1518,17 @@ function Dashboard() {
             </button>
           </div>
         </header>
+
+        {/* Global Notification Center Drawer */}
+        <NotificationCenterDrawer
+          isOpen={notificationDrawerOpen}
+          onClose={() => setNotificationDrawerOpen(false)}
+          incidents={incidents}
+          threats={threatIndicators}
+          vulnerabilities={vulnerabilities}
+          auditLogs={auditLogs}
+          onNavigate={handleNavigate}
+        />
 
         {menuOpen && (
           <div className="absolute right-5 top-14 z-30 w-64 border border-border bg-card p-3.5 shadow-xl">
@@ -1505,7 +1621,12 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
-          {portalMode === "client" && activeNav !== "Help center" && activeNav !== "Settings" && (
+          {((portalMode === "client" && activeNav !== "Help center" && activeNav !== "Settings") ||
+            (portalMode === "soc" &&
+              (activeNav === "My Services" ||
+                activeNav === "Subscriptions & Due Dates" ||
+                activeNav === "Billing & Credits" ||
+                activeNav === "Profile Management"))) && (
             <ClientPortalView
               activeNav={activeNav}
               assets={assets}
@@ -1533,7 +1654,8 @@ function Dashboard() {
             />
           )}
 
-          {portalMode === "admin" && activeNav !== "Help center" && activeNav !== "Settings" && (
+          {((portalMode === "admin" && activeNav !== "Help center" && activeNav !== "Settings") ||
+            (portalMode === "soc" && activeNav === "Access Control & Audit")) && (
             <AdminPortalView
               activeNav={activeNav}
               auditLogs={auditLogs}
@@ -1558,322 +1680,397 @@ function Dashboard() {
             />
           )}
 
-          {portalMode === "soc" && activeNav === "Overview" && (
-            <>
-              <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                <div>
-                  <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-success">
-                    <span className="size-2 animate-pulse rounded-full bg-success" />
-                    {isLoadingWorkspace
-                      ? "Loading live telemetry..."
-                      : criticalOpenCount > 0
-                        ? `${criticalOpenCount} critical incident(s) active`
-                        : "Production telemetry active"}
-                  </div>
-                  <h1 className="text-2xl font-semibold text-foreground sm:text-[28px]">
-                    Security overview
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Live security posture computed from your production telemetry records.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                  <label className="sr-only" htmlFor="range-select">
-                    Time range
-                  </label>
-                  <select
-                    className="h-9 rounded-md border border-border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    id="range-select"
-                    onChange={(event) => setRange(event.target.value as RangeOption)}
-                    value={range}
-                  >
-                    <option value="24 hours">24 hours</option>
-                    <option value="7 days">7 days</option>
-                    <option value="30 days">30 days</option>
-                  </select>
-                  <Button
-                    aria-label="Sync backend"
-                    className="size-9"
-                    disabled={isSyncing}
-                    onClick={syncWithBackend}
-                    size="icon"
-                    variant="outline"
-                  >
-                    <RefreshCw className={`size-4 ${isSyncing ? "animate-spin" : ""}`} />
-                  </Button>
-                  <Button onClick={() => setShowCreateModal(true)}>
-                    <Plus />
-                    <span className="hidden sm:inline">Report incident</span>
-                    <span className="sm:hidden">New</span>
-                  </Button>
-                </div>
-              </section>
-
-              <section className="flex flex-col justify-between gap-4 border border-primary/30 bg-card p-4 sm:flex-row sm:items-center sm:p-5">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-sm bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
-                      Production Guardrails
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {protectedServices.length} onboarded service(s) · {assets.length} monitored
-                      host(s) · {incidents.length} incident(s) in SparrowX Cloud
-                    </span>
-                  </div>
-                  <h2 className="mt-1.5 text-sm font-semibold">
-                    Onboard your Web Apps, Cloud APIs, and AI Agents (LLM / MCP)
-                  </h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Register production endpoints to generate live SDK keys and stream security
-                    events directly into SparrowX Cloud.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    className="h-8 px-3 text-xs"
-                    onClick={() => setActiveNav("Assets")}
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Server className="size-3.5" /> Register host asset
-                  </Button>
-                  <Button
-                    className="h-8 px-3 text-xs"
-                    onClick={() => setActiveNav("Web & AI Shield")}
-                    size="sm"
-                  >
-                    Onboard Web / AI service <ArrowRight className="size-3.5" />
-                  </Button>
-                </div>
-              </section>
-
-              <section
-                aria-label="Security metrics"
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
-              >
-                <MetricCard
-                  change={currentSnapshot.scoreChange}
-                  footnote="live posture"
-                  icon={<ShieldCheck />}
-                  label="Security score"
-                  suffix="/ 100"
-                  trend={criticalOpenCount > 0 ? "alert" : "up"}
-                  value={currentSnapshot.securityScore}
-                />
-                <MetricCard
-                  change={`${criticalOpenCount} critical`}
-                  footnote={openIncidentCount === 0 ? "Queue clear" : "Needs attention"}
-                  icon={<Siren />}
-                  label="Open incidents"
-                  trend={openIncidentCount > 0 ? "alert" : "up"}
-                  value={String(openIncidentCount).padStart(2, "0")}
-                />
-                <MetricCard
-                  change={currentSnapshot.assetsChange}
-                  footnote="registered targets"
-                  icon={<LockKeyhole />}
-                  label="Protected targets"
-                  trend="up"
-                  value={currentSnapshot.protectedAssets}
-                />
-                <MetricCard
-                  change={currentSnapshot.responseChange}
-                  footnote="resolution rate"
-                  icon={<Clock3 />}
-                  label="Containment rate"
-                  trend="up"
-                  value={currentSnapshot.meanResponse}
-                />
-              </section>
-
-              <section className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.85fr)]">
-                <div className="min-w-0 border border-border bg-card p-4 sm:p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold">Threat & telemetry activity</h2>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Live security events, IOCs, and blocked threats ({range})
-                      </p>
+          {portalMode === "soc" &&
+            (activeNav === "Overview" ||
+              activeNav === "Dashboard" ||
+              activeNav === "Security Overview") && (
+              <>
+                {/* Enterprise Operations Top Bar */}
+                <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                  <div>
+                    <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
+                      <Radio className="size-3.5 text-primary animate-pulse" />
+                      Operational Security Command Center
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <span className="size-2 rounded-full bg-primary" /> Live telemetry
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[28px]">
+                      Welcome, {currentUser?.fullName || "Security Commander"}
+                    </h1>
+                    <p className="mt-1 text-xs text-muted-foreground max-w-2xl leading-relaxed">
+                      Live operational telemetry, incident command, and autonomous edge guardrails
+                      computed from your Supabase PostgreSQL cloud records.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+                    <label className="sr-only" htmlFor="range-select">
+                      Time range
+                    </label>
+                    <select
+                      className="h-8.5 rounded-md border border-border bg-card px-3 text-xs text-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring shadow-xs"
+                      id="range-select"
+                      onChange={(event) => setRange(event.target.value as RangeOption)}
+                      value={range}
+                    >
+                      <option value="24 hours">Last 24 Hours</option>
+                      <option value="7 days">Last 7 Days</option>
+                      <option value="30 days">Last 30 Days</option>
+                    </select>
+                    <Button
+                      aria-label="Sync backend"
+                      className="size-8.5 shadow-xs"
+                      disabled={isSyncing}
+                      onClick={syncWithBackend}
+                      size="icon"
+                      variant="outline"
+                    >
+                      <RefreshCw className={`size-3.5 ${isSyncing ? "animate-spin" : ""}`} />
+                    </Button>
+                    <Button
+                      onClick={() => setShowCreateModal(true)}
+                      size="sm"
+                      className="h-8.5 gap-1.5 text-xs font-semibold shadow-xs"
+                    >
+                      <Plus className="size-3.5" />
+                      <span>Report Incident</span>
+                    </Button>
+                  </div>
+                </section>
+
+                {/* Quick Actions Operations Toolbar */}
+                <section className="flex flex-wrap items-center gap-2 border border-border bg-card/60 p-2.5 rounded-md shadow-xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2">
+                    Quick Actions:
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => setShowCreateModal(true)}
+                  >
+                    <Siren className="size-3 text-destructive" /> Create Incident
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Alerts & Threats")}
+                  >
+                    <Globe2 className="size-3 text-primary" /> Block Threat IOC
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Sites & Locations")}
+                  >
+                    <Server className="size-3 text-primary" /> Register Host / Site
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Checkpoints & Probes")}
+                  >
+                    <CheckCircle2 className="size-3 text-success" /> Run Checkpoint Probes
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Reports & Compliance")}
+                  >
+                    <FileText className="size-3 text-primary" /> Generate Report
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Live Operations")}
+                  >
+                    <Radio className="size-3 text-cyan-400" /> Live Stream
+                  </Button>
+                </section>
+
+                {/* 6 Enterprise Security Metric Cards */}
+                <section
+                  aria-label="Security metrics"
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+                >
+                  <MetricCard
+                    change={currentSnapshot.scoreChange}
+                    footnote="live posture"
+                    icon={<ShieldCheck />}
+                    label="Security score"
+                    suffix="/ 100"
+                    trend={criticalOpenCount > 0 ? "alert" : "up"}
+                    value={currentSnapshot.securityScore}
+                  />
+                  <MetricCard
+                    change={`${criticalOpenCount} critical · ${highOpenCount} high`}
+                    footnote={openIncidentCount === 0 ? "Queue clear" : "Needs attention"}
+                    icon={<Siren />}
+                    label="Open incidents"
+                    trend={openIncidentCount > 0 ? "alert" : "up"}
+                    value={String(openIncidentCount).padStart(2, "0")}
+                  />
+                  <MetricCard
+                    change={`${onDutyCount} on call`}
+                    footnote={`${teamMembers.length} team total`}
+                    icon={<Users />}
+                    label="Personnel on duty"
+                    trend="up"
+                    value={`${onDutyCount} / ${teamMembers.length}`}
+                  />
+                  <MetricCard
+                    change={currentSnapshot.assetsChange}
+                    footnote="registered targets"
+                    icon={<LockKeyhole />}
+                    label="Protected targets"
+                    trend="up"
+                    value={String(protectedServices.length + assets.length)}
+                  />
+                  <MetricCard
+                    change="Perimeter drops"
+                    footnote="threat blocklist"
+                    icon={<Globe2 />}
+                    label="Blocked threats"
+                    trend="up"
+                    value={String(threatIndicators.filter((i) => i.blocked).length)}
+                  />
+                  <MetricCard
+                    change={`${clientTenants.filter((t) => t.sdkVerified).length} verified`}
+                    footnote="synthetic probes"
+                    icon={<CheckCircle2 />}
+                    label="Checkpoint health"
+                    trend="up"
+                    value={`${clientTenants.filter((t) => t.sdkVerified).length} / ${clientTenants.length || 1}`}
+                  />
+                </section>
+
+                <section className="grid gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.85fr)]">
+                  <div className="min-w-0 border border-border bg-card p-4 sm:p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-semibold">Threat & telemetry activity</h2>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Live security events, IOCs, and blocked threats ({range})
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span className="size-2 rounded-full bg-primary" /> Live telemetry
+                        <Button
+                          aria-label="Threat activity options"
+                          className="ml-1 size-8"
+                          onClick={() => setActiveNav("Threat intel")}
+                          size="icon"
+                          variant="ghost"
+                        >
+                          <Ellipsis />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="font-display text-3xl font-semibold">
+                        {currentSnapshot.totalEvents}
+                      </span>
+                      <span className="inline-flex items-center text-xs font-medium text-primary">
+                        <ArrowUpRight className="size-3.5" /> {currentSnapshot.eventsDelta}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        across onboarded targets
+                      </span>
+                    </div>
+                    <div className="mt-3 w-full overflow-hidden">
+                      <svg
+                        aria-label={`Threat activity trend over the last ${range}`}
+                        className="h-[170px] w-full overflow-visible text-primary"
+                        preserveAspectRatio="none"
+                        role="img"
+                        viewBox="0 0 720 140"
+                      >
+                        {[25, 58, 91, 124].map((y) => (
+                          <line
+                            className="stroke-border"
+                            key={y}
+                            strokeDasharray="3 6"
+                            x1="0"
+                            x2="720"
+                            y1={y}
+                            y2={y}
+                          />
+                        ))}
+                        <path
+                          d={chartPath}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="2.5"
+                          vectorEffect="non-scaling-stroke"
+                        />
+                        <circle
+                          cx="720"
+                          cy={126 - (currentSnapshot.riskPoints.at(-1) ?? 6)}
+                          fill="currentColor"
+                          r="4.5"
+                        />
+                      </svg>
+                    </div>
+                    <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+                      {currentSnapshot.labels.map((label) => (
+                        <span key={label}>{label}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border border-border bg-card p-4 sm:p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h2 className="text-base font-semibold">Risk posture</h2>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Live exposure by severity
+                        </p>
+                      </div>
                       <Button
-                        aria-label="Threat activity options"
-                        className="ml-1 size-8"
-                        onClick={() => setActiveNav("Threat intel")}
+                        aria-label="Risk posture details"
+                        className="size-8"
+                        onClick={() => setActiveNav("Vulnerabilities")}
                         size="icon"
                         variant="ghost"
                       >
-                        <Ellipsis />
+                        <ArrowRight />
                       </Button>
                     </div>
-                  </div>
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="font-display text-3xl font-semibold">
-                      {currentSnapshot.totalEvents}
-                    </span>
-                    <span className="inline-flex items-center text-xs font-medium text-primary">
-                      <ArrowUpRight className="size-3.5" /> {currentSnapshot.eventsDelta}
-                    </span>
-                    <span className="text-xs text-muted-foreground">across onboarded targets</span>
-                  </div>
-                  <div className="mt-3 w-full overflow-hidden">
-                    <svg
-                      aria-label={`Threat activity trend over the last ${range}`}
-                      className="h-[170px] w-full overflow-visible text-primary"
-                      preserveAspectRatio="none"
-                      role="img"
-                      viewBox="0 0 720 140"
-                    >
-                      {[25, 58, 91, 124].map((y) => (
-                        <line
-                          className="stroke-border"
-                          key={y}
-                          strokeDasharray="3 6"
-                          x1="0"
-                          x2="720"
-                          y1={y}
-                          y2={y}
-                        />
-                      ))}
-                      <path
-                        d={chartPath}
-                        fill="none"
-                        stroke="currentColor"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2.5"
-                        vectorEffect="non-scaling-stroke"
-                      />
-                      <circle
-                        cx="720"
-                        cy={126 - (currentSnapshot.riskPoints.at(-1) ?? 6)}
-                        fill="currentColor"
-                        r="4.5"
-                      />
-                    </svg>
-                  </div>
-                  <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-                    {currentSnapshot.labels.map((label) => (
-                      <span key={label}>{label}</span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="border border-border bg-card p-4 sm:p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h2 className="text-base font-semibold">Risk posture</h2>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Live exposure by severity
-                      </p>
-                    </div>
-                    <Button
-                      aria-label="Risk posture details"
-                      className="size-8"
-                      onClick={() => setActiveNav("Vulnerabilities")}
-                      size="icon"
-                      variant="ghost"
-                    >
-                      <ArrowRight />
-                    </Button>
-                  </div>
-                  <div className="my-6 flex items-center gap-5">
-                    <div
-                      className="relative grid size-28 shrink-0 place-items-center rounded-full"
-                      style={{
-                        background:
-                          criticalOpenCount > 0
-                            ? "conic-gradient(var(--color-destructive) 0% 25%, var(--color-primary) 25% 45%, var(--color-warning) 45% 65%, var(--color-success) 65% 100%)"
-                            : "conic-gradient(var(--color-success) 0% 100%)",
-                      }}
-                    >
-                      <div className="grid size-[82px] place-items-center rounded-full bg-card">
-                        <div className="text-center">
-                          <div className="font-display text-2xl font-semibold">
-                            {currentSnapshot.securityScore}
+                    <div className="my-6 flex items-center gap-5">
+                      <div
+                        className="relative grid size-28 shrink-0 place-items-center rounded-full"
+                        style={{
+                          background:
+                            criticalOpenCount > 0
+                              ? "conic-gradient(var(--color-destructive) 0% 25%, var(--color-primary) 25% 45%, var(--color-warning) 45% 65%, var(--color-success) 65% 100%)"
+                              : "conic-gradient(var(--color-success) 0% 100%)",
+                        }}
+                      >
+                        <div className="grid size-[82px] place-items-center rounded-full bg-card">
+                          <div className="text-center">
+                            <div className="font-display text-2xl font-semibold">
+                              {currentSnapshot.securityScore}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">/ 100 score</div>
                           </div>
-                          <div className="text-[10px] text-muted-foreground">/ 100 score</div>
                         </div>
                       </div>
+                      <div className="flex flex-col gap-3 text-xs">
+                        <RiskLegend
+                          color="bg-destructive"
+                          count={String(currentSnapshot.postureBreakdown.critical)}
+                          label="Critical"
+                        />
+                        <RiskLegend
+                          color="bg-primary"
+                          count={String(currentSnapshot.postureBreakdown.high)}
+                          label="High"
+                        />
+                        <RiskLegend
+                          color="bg-warning"
+                          count={String(currentSnapshot.postureBreakdown.medium)}
+                          label="Medium"
+                        />
+                        <RiskLegend
+                          color="bg-success"
+                          count={String(currentSnapshot.postureBreakdown.low)}
+                          label="Protected"
+                        />
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-3 text-xs">
-                      <RiskLegend
-                        color="bg-destructive"
-                        count={String(currentSnapshot.postureBreakdown.critical)}
-                        label="Critical"
-                      />
-                      <RiskLegend
-                        color="bg-primary"
-                        count={String(currentSnapshot.postureBreakdown.high)}
-                        label="High"
-                      />
-                      <RiskLegend
-                        color="bg-warning"
-                        count={String(currentSnapshot.postureBreakdown.medium)}
-                        label="Medium"
-                      />
-                      <RiskLegend
-                        color="bg-success"
-                        count={String(currentSnapshot.postureBreakdown.low)}
-                        label="Protected"
-                      />
+                    <div className="flex items-center justify-between border-t border-border pt-4 text-xs">
+                      <span className="text-muted-foreground">Live posture state</span>
+                      <span className="inline-flex items-center gap-1 font-medium text-success">
+                        <ArrowDownRight className="size-3.5" />{" "}
+                        {criticalOpenCount === 0 ? "Healthy" : "Action required"}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between border-t border-border pt-4 text-xs">
-                    <span className="text-muted-foreground">Live posture state</span>
-                    <span className="inline-flex items-center gap-1 font-medium text-success">
-                      <ArrowDownRight className="size-3.5" />{" "}
-                      {criticalOpenCount === 0 ? "Healthy" : "Action required"}
-                    </span>
-                  </div>
-                </div>
-              </section>
+                </section>
 
-              <IncidentsSection
-                filteredIncidents={filteredIncidents}
-                incidentFilter={incidentFilter}
-                incidents={incidents}
-                onDelete={deleteIncident}
-                onExport={exportIncidents}
-                onFilterChange={setIncidentFilter}
-                onInspect={(id) => setSelectedIncidentId(id)}
-                onOpenCreate={() => setShowCreateModal(true)}
-                onResolve={resolveIncident}
-                onViewAll={() => {
-                  setIncidentFilter("All");
-                  setSearch("");
-                  setActiveNav("Incidents");
-                }}
-              />
+                <IncidentsSection
+                  filteredIncidents={filteredIncidents}
+                  incidentFilter={incidentFilter}
+                  incidents={incidents}
+                  onDelete={deleteIncident}
+                  onExport={exportIncidents}
+                  onFilterChange={setIncidentFilter}
+                  onInspect={(id) => setSelectedIncidentId(id)}
+                  onOpenCreate={() => setShowCreateModal(true)}
+                  onResolve={resolveIncident}
+                  onViewAll={() => {
+                    setIncidentFilter("All");
+                    setSearch("");
+                    setActiveNav("Incidents");
+                  }}
+                />
 
-              <section className="grid gap-3 pb-4 sm:grid-cols-3">
-                <SignalItem
-                  detail={`${threatIndicators.length} indicator(s) tracked`}
-                  icon={<Globe2 />}
-                  label="Threat intelligence"
-                  onClick={() => setActiveNav("Threat intel")}
-                  state="Live"
-                />
-                <SignalItem
-                  detail={`${assets.length} host(s) registered`}
-                  icon={<Layers3 />}
-                  label="Infrastructure assets"
-                  onClick={() => setActiveNav("Assets")}
-                  state="Monitored"
-                />
-                <SignalItem
-                  detail={`${protectedServices.length} Web / AI service(s)`}
-                  icon={<ShieldCheck />}
-                  label="Web & AI Agent Shield"
-                  onClick={() => setActiveNav("Web & AI Shield")}
-                  state="Active"
-                />
-              </section>
-            </>
+                <section className="grid gap-3 pb-4 sm:grid-cols-3">
+                  <SignalItem
+                    detail={`${threatIndicators.length} indicator(s) tracked`}
+                    icon={<Globe2 />}
+                    label="Threat intelligence"
+                    onClick={() => setActiveNav("Threat intel")}
+                    state="Live"
+                  />
+                  <SignalItem
+                    detail={`${assets.length} host(s) registered`}
+                    icon={<Layers3 />}
+                    label="Infrastructure assets"
+                    onClick={() => setActiveNav("Assets")}
+                    state="Monitored"
+                  />
+                  <SignalItem
+                    detail={`${protectedServices.length} Web / AI service(s)`}
+                    icon={<ShieldCheck />}
+                    label="Web & AI Agent Shield"
+                    onClick={() => setActiveNav("Web & AI Shield")}
+                    state="Active"
+                  />
+                </section>
+              </>
+            )}
+
+          {portalMode === "soc" && activeNav === "Live Operations" && (
+            <LiveOperationsView
+              incidents={incidents}
+              threats={threatIndicators}
+              assets={assets}
+              protectedServices={protectedServices}
+              teamMembers={teamMembers}
+              auditLogs={auditLogs}
+              onResolveIncident={resolveIncident}
+              onToggleAssetIsolation={toggleAssetIsolation}
+              onNavigate={handleNavigate}
+              showToast={showToast}
+            />
           )}
 
-          {activeNav === "Web & AI Shield" && (
+          {portalMode === "soc" && activeNav === "Checkpoints & Probes" && (
+            <CheckpointsAndProbesView
+              tenants={clientTenants}
+              protectedServices={protectedServices}
+              onVerifyTenant={handleVerifyTenantSdk}
+              showToast={showToast}
+            />
+          )}
+
+          {portalMode === "soc" &&
+            (activeNav === "Incident Statistics" || activeNav === "Performance Analytics") && (
+              <IncidentStatisticsView
+                incidents={incidents}
+                vulnerabilities={vulnerabilities}
+                threats={threatIndicators}
+                onNavigate={handleNavigate}
+                showToast={showToast}
+              />
+            )}
+
+          {(activeNav === "Web & AI Shield" || activeNav === "Security Devices & Gateways") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2126,7 +2323,7 @@ function Dashboard() {
             </>
           )}
 
-          {activeNav === "Threat intel" && (
+          {(activeNav === "Threat intel" || activeNav === "Alerts & Threats") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2270,7 +2467,7 @@ function Dashboard() {
             </>
           )}
 
-          {activeNav === "Assets" && (
+          {(activeNav === "Assets" || activeNav === "Sites & Locations") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2602,7 +2799,7 @@ function Dashboard() {
             </>
           )}
 
-          {activeNav === "Reports" && (
+          {(activeNav === "Reports" || activeNav === "Reports & Compliance") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2742,7 +2939,7 @@ function Dashboard() {
             </>
           )}
 
-          {activeNav === "Team & access" && (
+          {(activeNav === "Team & access" || activeNav === "Security Personnel") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -2871,7 +3068,7 @@ function Dashboard() {
             </>
           )}
 
-          {activeNav === "Integrations" && (
+          {(activeNav === "Integrations" || activeNav === "Integrations & Webhooks") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
                 <div>
@@ -3426,6 +3623,26 @@ create policy "Allow access on app_users"
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
+                    <label className="text-xs font-medium text-muted-foreground" htmlFor="inc-cat">
+                      Category
+                    </label>
+                    <select
+                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
+                      id="inc-cat"
+                      onChange={(e) => setNewCategory(e.target.value)}
+                      value={newCategory}
+                    >
+                      <option value="Unauthorized Access">Unauthorized Access</option>
+                      <option value="Perimeter & Injection Attack">Perimeter & Injection</option>
+                      <option value="Rogue Tool / Shell Execution">Rogue Tool / Shell</option>
+                      <option value="Data Exfiltration & Privacy">Data Exfiltration</option>
+                      <option value="Infrastructure & Network">Infrastructure & Network</option>
+                      <option value="Intrusion & Breach">Intrusion & Breach</option>
+                      <option value="Prompt Injection">Prompt Injection</option>
+                      <option value="Malware & C2 Activity">Malware & C2 Activity</option>
+                    </select>
+                  </div>
+                  <div>
                     <label className="text-xs font-medium text-muted-foreground" htmlFor="inc-sev">
                       Severity
                     </label>
@@ -3440,21 +3657,19 @@ create policy "Allow access on app_users"
                       <option value="Medium">Medium</option>
                     </select>
                   </div>
-                  <div>
-                    <label
-                      className="text-xs font-medium text-muted-foreground"
-                      htmlFor="inc-assign"
-                    >
-                      Assignee
-                    </label>
-                    <input
-                      className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
-                      id="inc-assign"
-                      onChange={(e) => setNewAssignee(e.target.value)}
-                      placeholder={teamMembers[0]?.name ?? "Responder name"}
-                      value={newAssignee}
-                    />
-                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor="inc-assign">
+                    Assignee
+                  </label>
+                  <input
+                    className="mt-1 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
+                    id="inc-assign"
+                    onChange={(e) => setNewAssignee(e.target.value)}
+                    placeholder={teamMembers[0]?.name ?? "Responder name"}
+                    value={newAssignee}
+                  />
                 </div>
 
                 <div>
@@ -3755,26 +3970,95 @@ function AppSidebar({
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  const socNavItems: Array<{ label: string; icon: typeof Activity; count?: string | undefined }> = [
-    { label: "Overview", icon: Activity },
+  // Enterprise Security Navigation Groups (Mapped to verified functional modules)
+  const socOverviewItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
+    { label: "Dashboard", navKey: "Overview", icon: Activity },
+    { label: "Live Operations", navKey: "Live Operations", icon: Radio },
+  ];
+
+  const socOperationsItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
     {
-      label: "Web & AI Shield",
+      label: "Incidents",
+      navKey: "Incidents",
+      icon: Siren,
+      count: incidentCount > 0 ? String(incidentCount) : undefined,
+    },
+    { label: "Alerts & Threats", navKey: "Threat intel", icon: Globe2 },
+    { label: "Security Personnel", navKey: "Team & access", icon: Users },
+    { label: "Sites & Locations", navKey: "Assets", icon: Server },
+    { label: "Checkpoints & Probes", navKey: "Checkpoints & Probes", icon: CheckCircle2 },
+  ];
+
+  const socMonitoringItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
+    {
+      label: "Security Devices & Gateways",
+      navKey: "Web & AI Shield",
       icon: ShieldCheck,
       count: serviceCount > 0 ? String(serviceCount) : undefined,
     },
     {
-      label: "Incidents",
-      icon: Siren,
-      count: incidentCount > 0 ? String(incidentCount) : undefined,
-    },
-    { label: "Threat intel", icon: Globe2 },
-    { label: "Assets", icon: Boxes },
-    {
-      label: "Vulnerabilities",
+      label: "Vulnerability Scanning",
+      navKey: "Vulnerabilities",
       icon: ShieldAlert,
       count: vulnCount > 0 ? String(vulnCount) : undefined,
     },
-    { label: "Reports", icon: FileSearch },
+    {
+      label: "Activity & Forensic Logs",
+      navKey: "Access Control & Audit",
+      icon: FileSearch,
+      count: auditCount > 0 ? String(auditCount) : undefined,
+    },
+  ];
+
+  const socManagementItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
+    {
+      label: "Clients & Services",
+      navKey: "My Services",
+      icon: Boxes,
+      count: tenantCount > 0 ? String(tenantCount) : undefined,
+    },
+    { label: "Subscriptions & Due Dates", navKey: "Subscriptions & Due Dates", icon: CreditCard },
+    { label: "Billing & Credits", navKey: "Billing & Credits", icon: Coins },
+  ];
+
+  const socAnalyticsItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
+    { label: "Reports & Compliance", navKey: "Reports", icon: FileText },
+    { label: "Incident Statistics", navKey: "Incident Statistics", icon: BarChart3 },
+  ];
+
+  const socSystemItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
+    { label: "Integrations & Webhooks", navKey: "Integrations", icon: Boxes },
+    { label: "Platform Settings", navKey: "Settings", icon: Wrench },
   ];
 
   // Client Area Hub Navigation
@@ -3937,84 +4221,179 @@ function AppSidebar({
       <SidebarContent>
         {portalMode === "soc" ? (
           <>
+            {/* 1. OVERVIEW */}
             <SidebarGroup className="group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                OVERVIEW
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  {socNavItems.map(({ label, icon: Icon, count }) => (
-                    <SidebarMenuItem key={label}>
-                      <SidebarMenuButton
-                        isActive={activeNav === label}
-                        onClick={() => onNavigate(label)}
-                        tooltip={label}
-                      >
-                        <Icon />
-                        <span>{label}</span>
-                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeNav === "Team & access"}
-                      onClick={() => onNavigate("Team & access")}
-                      tooltip="Team & access"
-                    >
-                      <Users />
-                      <span>Team & access</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeNav === "Integrations"}
-                      onClick={() => onNavigate("Integrations")}
-                      tooltip="Integrations"
-                    >
-                      <Boxes />
-                      <span>Integrations</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {socOverviewItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
 
-            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>Client Area</SidebarGroupLabel>
+            {/* 2. OPERATIONS */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                OPERATIONS
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="font-medium text-primary hover:text-primary"
-                      onClick={() => onNavigate("My Services")}
-                      tooltip="Client Portal & Services"
-                    >
-                      <Boxes className="size-4" />
-                      <span>Client Area & Services</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {socOperationsItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
 
-            {isAdminSession && (
-              <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-                <SidebarGroupLabel>Administration</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        isActive={activeNav === "Client Subscriptions"}
-                        onClick={() => onNavigate("Client Subscriptions")}
-                        tooltip="Client Subscriptions"
-                      >
-                        <Users className="size-4" />
-                        <span>Client Subscriptions</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            )}
+            {/* 3. MONITORING */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                MONITORING
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socMonitoringItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 4. MANAGEMENT */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                MANAGEMENT
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socManagementItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 5. ANALYTICS */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                ANALYTICS
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socAnalyticsItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 6. SYSTEM */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                SYSTEM
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socSystemItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
           </>
         ) : portalMode === "admin" ? (
           <>
@@ -4039,40 +4418,17 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
             <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>SOC Operations</SidebarGroupLabel>
+              <SidebarGroupLabel>Operations</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  {socNavItems.map(({ label, icon: Icon, count }) => (
-                    <SidebarMenuItem key={label}>
-                      <SidebarMenuButton
-                        isActive={activeNav === label}
-                        onClick={() => onNavigate(label)}
-                        tooltip={label}
-                      >
-                        <Icon />
-                        <span>{label}</span>
-                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      isActive={activeNav === "Team & access"}
-                      onClick={() => onNavigate("Team & access")}
-                      tooltip="Team & access"
+                      isActive={activeNav === "Overview"}
+                      onClick={() => onNavigate("Overview")}
+                      tooltip="Switch to SOC Command"
                     >
-                      <Users />
-                      <span>Team & access</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={activeNav === "Integrations"}
-                      onClick={() => onNavigate("Integrations")}
-                      tooltip="Integrations"
-                    >
-                      <Boxes />
-                      <span>Integrations</span>
+                      <ShieldAlert className="size-4 text-primary" />
+                      <span>Switch to SOC Command</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -4308,32 +4664,72 @@ function RiskLegend({ label, count, color }: { label: string; count: string; col
 }
 
 function SeverityTag({ severity }: { severity: Severity }) {
-  const style =
-    severity === "Critical"
-      ? "border-destructive/30 bg-destructive/10 text-destructive"
-      : severity === "High"
-        ? "border-primary/30 bg-primary/10 text-primary"
-        : "border-warning/30 bg-warning/10 text-warning";
+  const isCrit = severity === "Critical";
+  const isHigh = severity === "High";
+  const style = isCrit
+    ? "border-destructive/30 bg-destructive/10 text-destructive"
+    : isHigh
+      ? "border-warning/30 bg-warning/10 text-warning"
+      : "border-primary/30 bg-primary/10 text-primary";
+  const Icon = isCrit ? ShieldAlert : isHigh ? AlertTriangle : AlertCircle;
   return (
-    <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold ${style}`}>
-      {severity}
+    <span
+      className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold ${style}`}
+    >
+      <Icon className="size-3 shrink-0" />
+      <span>{severity}</span>
     </span>
   );
 }
 
 function StatusTag({ status }: { status: IncidentStatus }) {
-  const style =
-    status === "Contained"
-      ? "border-success/30 bg-success/10 text-success"
-      : status === "Investigating"
-        ? "border-info/30 bg-info/10 text-info"
-        : "border-border bg-secondary text-muted-foreground";
+  const isContained = status === "Contained";
+  const isInvestigating = status === "Investigating";
+  const style = isContained
+    ? "border-success/30 bg-success/10 text-success"
+    : isInvestigating
+      ? "border-info/30 bg-info/10 text-info"
+      : "border-border bg-secondary text-muted-foreground";
+  const Icon = isContained ? CheckCircle2 : isInvestigating ? Activity : Clock3;
   return (
     <span
-      className={`min-w-[91px] rounded-sm border px-2 py-1 text-center text-[10px] font-medium ${style}`}
+      className={`inline-flex min-w-[95px] items-center justify-center gap-1 rounded-sm border px-2 py-0.5 text-center text-[10px] font-medium ${style}`}
     >
-      {status}
+      <Icon className="size-3 shrink-0" />
+      <span>{status}</span>
     </span>
+  );
+}
+
+function OperationalClock() {
+  const [time, setTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const utcStr = time.toUTCString().slice(17, 25) + " UTC";
+  const localStr = time.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const dateStr = time.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <div className="hidden xl:flex items-center gap-2 rounded-md border border-border bg-card/80 px-2.5 py-1 text-xs font-mono text-muted-foreground shadow-xs">
+      <span className="size-1.5 rounded-full bg-primary animate-pulse" />
+      <span className="font-semibold text-foreground">{localStr}</span>
+      <span className="text-muted-foreground/60">·</span>
+      <span>{utcStr}</span>
+      <span className="text-muted-foreground/60">·</span>
+      <span className="text-[11px] text-muted-foreground">{dateStr}</span>
+    </div>
   );
 }
 
