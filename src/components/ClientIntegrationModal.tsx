@@ -20,7 +20,12 @@ import {
   type SdkTargetLanguage,
   type ServiceDiagnosticResult,
 } from "@/lib/client-sdk-generator";
-import { supabaseUrl, getSupabaseHeaders, persistAuditLogToBackend, maskSecretKey } from "@/lib/supabase";
+import {
+  supabaseUrl,
+  getSupabaseHeaders,
+  persistAuditLogToBackend,
+  maskSecretKey,
+} from "@/lib/supabase";
 
 export function ClientIntegrationModal({
   service,

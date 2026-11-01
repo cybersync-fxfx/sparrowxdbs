@@ -3249,7 +3249,9 @@ export function PortalLoginScreen({
             <div className="hidden md:flex items-center gap-2 rounded-lg border border-[#1F1F1F] bg-[#0A0A0A] px-2.5 py-1.5 text-[11px] text-zinc-400">
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>
-                {backendSource === "supabase" ? "SparrowX Cloud Telemetry" : "SparrowX Local Engine"}
+                {backendSource === "supabase"
+                  ? "SparrowX Cloud Telemetry"
+                  : "SparrowX Local Engine"}
               </span>
             </div>
 
@@ -3692,6 +3694,27 @@ export function PortalLoginScreen({
             </div>
           </section>
 
+          {/* PUBLIC PRICING, PACKAGES & 24-HOUR DONE-FOR-YOU AUDIT */}
+          <LandingPricingSection
+            onSelectPlanAndSignup={(selectedTier, modules) => {
+              setPlanTier(selectedTier);
+              setSelectedModules(modules);
+              openAuthGateway("signup");
+            }}
+            onOpenDirectPaymentModal={(credits, label) => {
+              setLandingNeededCredits(credits);
+              setLandingPaymentLabel(label);
+              setShowLandingPaymentModal(true);
+            }}
+          />
+
+          {/* VIRAL TRUST BADGE GENERATOR & AGENCY RESELLER PITCH */}
+          <ViralTrustBadgeAndOutreachSection
+            defaultDomain={
+              primaryDomain ? primaryDomain.replace(/^https?:\/\//, "") : "your-startup.io"
+            }
+          />
+
           {/* 3-STEP 60-SECOND ONBOARDING + EMBEDDED WORKSPACE LAUNCHPAD */}
           <section id="how-it-works" className="mx-auto max-w-7xl px-4 sm:px-8 py-16 lg:py-20">
             <div className="grid gap-10 lg:grid-cols-12 items-start">
@@ -3778,6 +3801,29 @@ export function PortalLoginScreen({
             </div>
           </footer>
         </main>
+      )}
+
+      {/* Instant Checkout Payment Modal on Landing Page */}
+      {showLandingPaymentModal && (
+        <PaymentGatewayModal
+          currentBalance={landingCreditBalance}
+          neededCredits={landingNeededCredits}
+          tenantName={landingPaymentLabel}
+          userEmail={signupEmail || loginEmail || undefined}
+          onClose={() => {
+            setShowLandingPaymentModal(false);
+          }}
+          onCreditsAdded={(newBal) => {
+            setLandingCreditBalance(newBal);
+            saveStoredCreditBalance(newBal);
+            emitEngineToast({
+              title:
+                "Security Credits Added! Complete your workspace signup to activate protection.",
+              tone: "success",
+            });
+          }}
+          showToast={(msg) => emitEngineToast({ title: msg, tone: "success" })}
+        />
       )}
     </div>
   );

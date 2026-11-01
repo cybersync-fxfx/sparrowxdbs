@@ -1,4 +1,9 @@
-import { type ProtectedService, type ClientTenant, type Incident, maskSecretKey } from "@/lib/supabase";
+import {
+  type ProtectedService,
+  type ClientTenant,
+  type Incident,
+  maskSecretKey,
+} from "@/lib/supabase";
 
 export type SdkTargetLanguage =
   "nextjs" | "express" | "python_fastapi" | "ai_agent_mcp" | "curl" | "cloudflare_worker";

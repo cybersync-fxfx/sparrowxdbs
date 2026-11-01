@@ -30,10 +30,7 @@ import {
   Zap,
 } from "lucide-react";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
-import {
-  getStoredCreditBalance,
-  saveStoredCreditBalance,
-} from "@/lib/billing-credits";
+import { getStoredCreditBalance, saveStoredCreditBalance } from "@/lib/billing-credits";
 import type { PlanTier, ServiceModuleId } from "@/lib/supabase";
 
 export interface LiveDomainAuditFinding {
@@ -270,8 +267,7 @@ export function buildColdOutreachMessage(
   audit: LiveDomainAuditResult,
   channel: "dm" | "email" | "linkedin",
 ): string {
-  const ipNote =
-    audit.resolvedIps.length > 0 ? ` (resolving to ${audit.resolvedIps[0]})` : "";
+  const ipNote = audit.resolvedIps.length > 0 ? ` (resolving to ${audit.resolvedIps[0]})` : "";
 
   if (channel === "dm") {
     return `Hey! Saw ${audit.cleanHost} and ran a quick non-intrusive security header & WAF check${ipNote}. Right now it scores ${audit.score}/100—your API/web routes don't have edge SQLi/XSS filtering or AI token-drain rate limiting active. I already generated the 5-line drop-in middleware fix + full audit report for ${audit.cleanHost} inside SparrowX. Want me to send it over?`;
@@ -884,8 +880,7 @@ export function ViralTrustBadgeAndOutreachSection({
   const [copiedBadge, setCopiedBadge] = useState(false);
 
   const cleanDomain = badgeDomain.trim().replace(/^https?:\/\//, "") || "your-startup.io";
-  const originUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://sparrowx.dev";
+  const originUrl = typeof window !== "undefined" ? window.location.origin : "https://sparrowx.dev";
 
   const embedHtmlSnippet = `<!-- Verified Protected by SparrowX Trust Badge -->
 <a href="${originUrl}?verify=${encodeURIComponent(cleanDomain)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:9999px;background:#0A0A0A;border:1px solid ${
@@ -1062,7 +1057,9 @@ export function AdminRevenueAndOutreachEngine({
     if (!auditResult) return;
     const text = buildColdOutreachMessage(auditResult, selectedChannel);
     void navigator.clipboard.writeText(text);
-    showToast(`Copied ${selectedChannel.toUpperCase()} outreach pitch for ${auditResult.cleanHost}`);
+    showToast(
+      `Copied ${selectedChannel.toUpperCase()} outreach pitch for ${auditResult.cleanHost}`,
+    );
   };
 
   const handleDownloadProspectReport = () => {
@@ -1227,4 +1224,3 @@ export function AdminRevenueAndOutreachEngine({
     </section>
   );
 }
-

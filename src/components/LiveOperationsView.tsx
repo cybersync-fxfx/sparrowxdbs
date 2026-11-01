@@ -61,12 +61,9 @@ export function LiveOperationsView({
     setIsPinging(true);
     const t0 = performance.now();
     try {
-      const res = await fetch(
-        `${supabaseUrl}/rest/v1/incidents?select=id&limit=1`,
-        {
-          headers: getSupabaseHeaders(),
-        },
-      );
+      const res = await fetch(`${supabaseUrl}/rest/v1/incidents?select=id&limit=1`, {
+        headers: getSupabaseHeaders(),
+      });
       if (res.ok) {
         const ms = Math.round(performance.now() - t0);
         setLiveLatency(ms);

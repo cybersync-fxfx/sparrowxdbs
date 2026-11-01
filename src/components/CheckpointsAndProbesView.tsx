@@ -15,7 +15,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { emitEngineActivity, emitEngineToast } from "@/components/BackgroundEngineToaster";
-import { type ClientTenant, type ProtectedService, persistAuditLogToBackend, maskSecretKey } from "@/lib/supabase";
+import {
+  type ClientTenant,
+  type ProtectedService,
+  persistAuditLogToBackend,
+  maskSecretKey,
+} from "@/lib/supabase";
 
 export function CheckpointsAndProbesView({
   tenants,
