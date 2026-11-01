@@ -3268,9 +3268,6 @@ export function PortalLoginScreen({
               <span className="font-display text-base font-bold tracking-tight text-white">
                 sparrow<span className="text-primary">x</span>
               </span>
-              <span className="hidden xl:inline-flex items-center rounded-full border border-[#262626] bg-[#0A0A0A] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
-                Cyber Defense
-              </span>
             </div>
           </button>
 
