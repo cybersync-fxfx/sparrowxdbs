@@ -1816,7 +1816,7 @@ export function ViralTrustBadgeAndOutreachSection({
                 aria-label="Domain or Verification ID to check"
                 value={badgeDomain}
                 onChange={(e) => setBadgeDomain(e.target.value)}
-                placeholder="Enter domain (e.g. novapay.io or your-startup.io)"
+                placeholder="Enter domain (e.g. your-startup.io or yourdomain.com)"
                 className="h-9 flex-1 rounded-xl border border-[#262626] bg-black px-3 text-xs text-white font-mono outline-none focus:border-primary"
               />
               <div className="flex items-center gap-1.5">

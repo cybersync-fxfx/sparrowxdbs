@@ -2350,9 +2350,21 @@ function Dashboard() {
                     </div>
                     <div className="flex items-center justify-between border-t border-border pt-4 text-xs">
                       <span className="text-muted-foreground">Live posture state</span>
-                      <span className="inline-flex items-center gap-1 font-medium text-success">
+                      <span
+                        className={`inline-flex items-center gap-1 font-medium ${
+                          assets.length + protectedServices.length === 0
+                            ? "text-zinc-500 font-mono"
+                            : criticalOpenCount === 0
+                              ? "text-success"
+                              : "text-destructive"
+                        }`}
+                      >
                         <ArrowDownRight className="size-3.5" />{" "}
-                        {criticalOpenCount === 0 ? "Healthy" : "Action required"}
+                        {assets.length + protectedServices.length === 0
+                          ? "Not Configured (0 endpoints)"
+                          : criticalOpenCount === 0
+                            ? "Healthy"
+                            : "Action required"}
                       </span>
                     </div>
                   </div>
@@ -2377,25 +2389,37 @@ function Dashboard() {
 
                 <section className="grid gap-3 pb-4 sm:grid-cols-3">
                   <SignalItem
-                    detail={`${threatIndicators.length} indicator(s) tracked`}
+                    detail={
+                      threatIndicators.length > 0
+                        ? `${threatIndicators.length} indicator(s) tracked`
+                        : "No threat feed connected"
+                    }
                     icon={<Globe2 />}
                     label="Threat intelligence"
                     onClick={() => setActiveNav("Threat intel")}
-                    state="Live"
+                    state={threatIndicators.length > 0 ? "Live" : "Not Configured"}
                   />
                   <SignalItem
-                    detail={`${assets.length} host(s) registered`}
+                    detail={
+                      assets.length > 0
+                        ? `${assets.length} host(s) registered`
+                        : "No host assets registered"
+                    }
                     icon={<Layers3 />}
                     label="Infrastructure assets"
                     onClick={() => setActiveNav("Assets")}
-                    state="Monitored"
+                    state={assets.length > 0 ? "Monitored" : "Not Configured"}
                   />
                   <SignalItem
-                    detail={`${protectedServices.length} Web / AI service(s)`}
+                    detail={
+                      protectedServices.length > 0
+                        ? `${protectedServices.length} Web / AI service(s)`
+                        : "No services onboarded"
+                    }
                     icon={<ShieldCheck />}
                     label="Web & AI Agent Shield"
                     onClick={() => setActiveNav("Web & AI Shield")}
-                    state="Active"
+                    state={protectedServices.length > 0 ? "Active" : "Not Configured"}
                   />
                 </section>
               </>
@@ -5374,6 +5398,12 @@ function SignalItem({
   state: string;
   onClick?: () => void;
 }) {
+  const isOff =
+    state.toLowerCase().includes("not configured") ||
+    state.toLowerCase().includes("inactive") ||
+    state.toLowerCase().includes("off") ||
+    state.toLowerCase().includes("paused");
+
   return (
     <button
       className="flex w-full items-center gap-3 border border-border bg-card p-4 text-left transition-colors hover:border-primary/40"
@@ -5387,8 +5417,14 @@ function SignalItem({
         <div className="truncate text-xs font-medium">{label}</div>
         <div className="mt-1 truncate text-[10px] text-muted-foreground">{detail}</div>
       </div>
-      <span className="hidden items-center gap-1 text-[10px] text-success sm:flex">
-        <span className="size-1.5 rounded-full bg-success" />
+      <span
+        className={`hidden items-center gap-1 text-[10px] sm:flex ${
+          isOff ? "text-zinc-500 font-mono" : "text-success"
+        }`}
+      >
+        <span
+          className={`size-1.5 rounded-full ${isOff ? "bg-zinc-600" : "bg-success"}`}
+        />
         {state}
       </span>
     </button>

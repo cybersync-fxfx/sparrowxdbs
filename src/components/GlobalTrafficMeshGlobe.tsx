@@ -29,6 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { ClientTenant, ProtectedService } from "@/lib/supabase";
 import { getStoredProspects } from "@/components/GrowthAndMonetizationHub";
+import { CyberThreatGlobe, type ThreatCity, DEFAULT_CITIES } from "@/components/CyberThreatGlobe";
 
 // ==========================================
 // Types & Telemetry Models
@@ -112,11 +113,11 @@ export function sanitizeDomainName(raw: string): string {
     .toLowerCase();
 }
 
-// Preset Verified Real Webapps with Verified Authoritative DNS
+// Preset Verified Real Webapps with Verified Authoritative DNS (No dummy or fake mock entries)
 export const PRESET_ORIGINS: OriginHostConfig[] = [
   {
     id: "origin-sparrowx-net",
-    name: "SparrowX Production Network",
+    name: "SparrowX Edge Mesh",
     domain: "sparrowx.net",
     ip: "64.29.17.65",
     allIps: ["64.29.17.65", "216.198.79.65"],
@@ -134,52 +135,6 @@ export const PRESET_ORIGINS: OriginHostConfig[] = [
     wafMode: "Active Shield",
     uptimePct: 99.99,
     baseLatencyMs: 11,
-    dnsVerified: true,
-    dnsResolver: "Google DNS DoH (8.8.8.8)",
-  },
-  {
-    id: "origin-cloudflare-edge",
-    name: "Cloudflare Edge Global Anycast",
-    domain: "cloudflare.com",
-    ip: "104.16.132.229",
-    allIps: ["104.16.132.229", "104.16.133.229"],
-    provider: "Cloudflare, Inc. (AS13335)",
-    region: "San Francisco, California, US",
-    geo: {
-      lat: 37.7749,
-      lng: -122.4194,
-      country: "United States",
-      countryCode: "US",
-      city: "San Francisco, CA",
-      flag: "🇺🇸",
-    },
-    status: "Protected & Active",
-    wafMode: "Active Shield",
-    uptimePct: 99.99,
-    baseLatencyMs: 9,
-    dnsVerified: true,
-    dnsResolver: "Cloudflare DoH (1.1.1.1)",
-  },
-  {
-    id: "origin-github",
-    name: "GitHub Infrastructure Core",
-    domain: "github.com",
-    ip: "140.82.112.3",
-    allIps: ["140.82.112.3", "140.82.112.4"],
-    provider: "GitHub, Inc. (AS36459)",
-    region: "San Jose, California, US",
-    geo: {
-      lat: 37.3382,
-      lng: -121.8863,
-      country: "United States",
-      countryCode: "US",
-      city: "San Jose, CA",
-      flag: "🇺🇸",
-    },
-    status: "Protected & Active",
-    wafMode: "Active Shield",
-    uptimePct: 99.98,
-    baseLatencyMs: 14,
     dnsVerified: true,
     dnsResolver: "Google DNS DoH (8.8.8.8)",
   },
@@ -508,11 +463,15 @@ function createSampleNetworkPacket(origin: OriginHostConfig): LiveConnectionPack
 export function GlobalTrafficMeshGlobe({
   tenants = [],
   protectedServices = [],
+  currentUserRole = "client",
+  activeTenantId,
   onNavigate,
   showToast,
 }: {
   tenants?: ClientTenant[] | undefined;
   protectedServices?: ProtectedService[] | undefined;
+  currentUserRole?: "admin" | "client" | "unauthenticated" | undefined;
+  activeTenantId?: string | null | undefined;
   onNavigate?: ((nav: string) => void) | undefined;
   showToast?: ((msg: string) => void) | undefined;
 }) {
@@ -520,6 +479,7 @@ export function GlobalTrafficMeshGlobe({
 
   // Active Origin Server Host
   const [activeOriginId, setActiveOriginId] = useState<string>("origin-sparrowx-net");
+  const [globeVisualEngine, setGlobeVisualEngine] = useState<"threat_matrix" | "infrastructure">("threat_matrix");
   const [filterMode, setFilterMode] = useState<"ALL" | "ALLOWED" | "BLOCKED" | "AI">("ALL");
   const [isStreaming, setIsStreaming] = useState<boolean>(true);
   const [streamSpeedMs, setStreamSpeedMs] = useState<number>(650);
@@ -534,7 +494,7 @@ export function GlobalTrafficMeshGlobe({
   const [dnsResolutionFeedback, setDnsResolutionFeedback] = useState<string | null>(null);
   const [resolvedTenantOrigins, setResolvedTenantOrigins] = useState<Record<string, OriginHostConfig>>({});
 
-  // Background Automatic DNS Resolution for all tenants (NO FAKE HARDCODED IPs)
+  // Background Automatic DNS Resolution for client's verified domains
   useEffect(() => {
     if (!tenants || tenants.length === 0) return;
 
@@ -550,7 +510,7 @@ export function GlobalTrafficMeshGlobe({
             id: `tenant-${tenant.id}`,
             name: `${tenant.name} (${tenant.planTier})`,
             domain: clean,
-            ip: res.primaryIp, // REAL IP from live Google DoH!
+            ip: res.primaryIp,
             allIps: res.resolvedIps,
             provider: res.provider,
             region: res.region,
@@ -569,11 +529,64 @@ export function GlobalTrafficMeshGlobe({
     });
   }, [tenants]);
 
-  // Combine real origins (presets + auto-resolved tenants)
+  // Combine real origins: Strictly isolated per client session
   const allOrigins: OriginHostConfig[] = useMemo(() => {
+    // If client mode: ONLY show this client's verified tenant/services
+    if (currentUserRole === "client") {
+      const list: OriginHostConfig[] = [];
+
+      tenants.forEach((tenant) => {
+        const clean = sanitizeDomainName(tenant.primaryDomain);
+        const existingResolved = resolvedTenantOrigins[tenant.id];
+
+        if (existingResolved) {
+          list.push(existingResolved);
+        } else {
+          const defaultIp = clean === "sparrowx.net" ? "64.29.17.65" : "104.21.55.19";
+          list.push({
+            id: `tenant-${tenant.id}`,
+            name: `${tenant.name} (${clean || tenant.primaryDomain})`,
+            domain: clean || "sparrowx.net",
+            ip: defaultIp,
+            allIps: [defaultIp],
+            provider: "Authoritative Cloud Edge",
+            region: "Global Cloud Edge",
+            geo: {
+              lat: 34.0119,
+              lng: -117.86,
+              country: "United States",
+              countryCode: "US",
+              city: "Edge Host",
+              flag: "🌐",
+            },
+            status: "Protected & Active",
+            wafMode: tenant.guardrailsActive ? "Active Shield" : "Monitor Only",
+            uptimePct: 99.98,
+            baseLatencyMs: tenant.avgLatencyMs || 11,
+            dnsVerified: false,
+            dnsResolver: "Google DoH Querying...",
+          });
+        }
+      });
+
+      // Include any user-resolved custom hosts added in this session
+      Object.values(resolvedTenantOrigins).forEach((o) => {
+        if (!list.some((existing) => existing.id === o.id)) {
+          list.push(o);
+        }
+      });
+
+      // If the client hasn't added any domain yet, fall back to the core SparrowX edge
+      if (list.length === 0) {
+        list.push(PRESET_ORIGINS[0]);
+      }
+
+      return list;
+    }
+
+    // Admin mode: show all client tenants plus the core platform edge
     const list: OriginHostConfig[] = [...PRESET_ORIGINS];
 
-    // Add tenants with real resolved DNS
     tenants.forEach((tenant) => {
       const clean = sanitizeDomainName(tenant.primaryDomain);
       const existingResolved = resolvedTenantOrigins[tenant.id];
@@ -581,7 +594,6 @@ export function GlobalTrafficMeshGlobe({
       if (existingResolved) {
         list.push(existingResolved);
       } else {
-        // Fallback placeholder while live DNS query executes in background
         const defaultIp = clean === "sparrowx.net" ? "64.29.17.65" : "104.21.55.19";
         list.push({
           id: `tenant-${tenant.id}`,
@@ -610,12 +622,41 @@ export function GlobalTrafficMeshGlobe({
     });
 
     return list;
-  }, [tenants, resolvedTenantOrigins]);
+  }, [tenants, resolvedTenantOrigins, currentUserRole]);
+
+  // Keep activeOriginId synced to active client tenant if available
+  useEffect(() => {
+    if (activeTenantId) {
+      const matching = allOrigins.find((o) => o.id === `tenant-${activeTenantId}`);
+      if (matching) {
+        setActiveOriginId(matching.id);
+        return;
+      }
+    }
+    if (!allOrigins.some((o) => o.id === activeOriginId) && allOrigins.length > 0) {
+      setActiveOriginId(allOrigins[0].id);
+    }
+  }, [allOrigins, activeOriginId, activeTenantId]);
 
   const activeOrigin = useMemo(
     () => allOrigins.find((o) => o.id === activeOriginId) ?? allOrigins[0],
     [allOrigins, activeOriginId],
   );
+
+  const threatCities: ThreatCity[] = useMemo(() => {
+    const list: ThreatCity[] = [...DEFAULT_CITIES];
+    allOrigins.forEach((o) => {
+      if (!list.some((c) => Math.abs(c.lat - o.geo.lat) < 0.2 && Math.abs(c.lon - o.geo.lng) < 0.2)) {
+        list.push({
+          name: o.domain || o.name,
+          lat: o.geo.lat,
+          lon: o.geo.lng,
+          isOrigin: true,
+        });
+      }
+    });
+    return list;
+  }, [allOrigins]);
 
   // Live DNS resolver handler for user's input domain
   const handleResolveUserDomain = useCallback(async (domainToResolve: string) => {
@@ -1271,7 +1312,7 @@ export default sparrowxShield;
                 type="text"
                 value={customDomainInput}
                 onChange={(e) => setCustomDomainInput(e.target.value)}
-                placeholder="Enter domain to resolve its real IP (e.g. sparrowx.net, novapay.io, github.com)..."
+                placeholder="Enter domain to resolve its real IP (e.g. yourdomain.com, sparrowx.net)..."
                 className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-xs text-foreground outline-none focus:border-primary font-mono"
               />
             </div>
@@ -1470,106 +1511,158 @@ export default sparrowxShield;
       </div>
 
       {/* 4. The 3D Interactive Globe Canvas View */}
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-card via-[#020617] to-card shadow-2xl">
-        {/* Globe Overlay HUD: Rotation Tip & Legend */}
-        <div className="pointer-events-none absolute left-4 top-4 z-10 flex flex-col gap-2">
-          <div className="flex items-center gap-2 rounded-lg border border-border/80 bg-background/80 px-3 py-1.5 backdrop-blur-md">
-            <span className="size-2 rounded-full bg-primary animate-ping" />
-            <span className="text-[11px] font-semibold text-foreground">
-              Drag to spin 3D Globe · High-Def Vector Continental Coastlines
-            </span>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-xs">
+            <button
+              type="button"
+              onClick={() => setGlobeVisualEngine("threat_matrix")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                globeVisualEngine === "threat_matrix"
+                  ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/20 font-bold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Zap className="size-3.5" />
+              <span>Cyber Threat Matrix (3D Live)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setGlobeVisualEngine("infrastructure")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                globeVisualEngine === "infrastructure"
+                  ? "bg-primary text-primary-foreground shadow-md"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Globe2 className="size-3.5" />
+              <span>Origin Infrastructure Mesh</span>
+            </button>
           </div>
 
-          {/* Color-Coded Arcs Legend */}
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-1 text-[10px] backdrop-blur-md">
-            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-              <span className="size-2 rounded-full bg-emerald-400" />
-              Allowed (200 OK)
-            </span>
-            <span className="text-muted-foreground/40">|</span>
-            <span className="flex items-center gap-1 text-rose-400 font-semibold">
-              <span className="size-2 rounded-full bg-rose-400" />
-              Blocked Threat (403)
-            </span>
-            <span className="text-muted-foreground/40">|</span>
-            <span className="flex items-center gap-1 text-amber-400 font-semibold">
-              <span className="size-2 rounded-full bg-amber-400" />
-              Rate-Limited (429)
-            </span>
-            <span className="text-muted-foreground/40">|</span>
-            <span className="flex items-center gap-1 text-cyan-400 font-semibold">
-              <span className="size-2 rounded-full bg-cyan-400" />
-              AI Prompt Shield
-            </span>
-          </div>
-        </div>
-
-        {/* Origin Target Pin HUD Overlay */}
-        <div className="pointer-events-none absolute right-4 top-4 z-10 hidden sm:flex flex-col items-end gap-1">
-          <div className="rounded-xl border border-primary/40 bg-card/90 p-3 shadow-xl backdrop-blur-md font-mono">
-            <div className="flex items-center gap-2 text-xs font-bold text-foreground font-sans">
-              <span className="size-2 rounded-full bg-primary animate-pulse" />
-              Host: {activeOrigin.name}
-            </div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              Real IP: <span className="text-primary font-bold">{activeOrigin.ip}</span>
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              Domain: {activeOrigin.domain}
-            </div>
-            <div className="text-[10px] text-muted-foreground">
-              Datacenter: {activeOrigin.region}
-            </div>
-            <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400 font-sans">
-              <CheckCircle2 className="size-3" />
-              <span>Live Inbound Arcs Terminate Here</span>
-            </div>
-          </div>
-        </div>
-
-        {/* HTML5 Canvas Element */}
-        <canvas
-          ref={canvasRef}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerLeave={handlePointerUp}
-          className="h-[460px] w-full cursor-grab active:cursor-grabbing sm:h-[540px]"
-          title="Drag mouse or finger to rotate the 3D globe"
-        />
-
-        {/* Bottom Ticker Strip */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-card/90 px-4 py-2.5 text-xs font-mono">
-          <div className="flex items-center gap-2 font-sans">
-            <Radio className="size-3.5 text-primary animate-pulse" />
-            <span className="font-semibold text-foreground">Latest Inbound Connection:</span>
-            {packets[0] ? (
-              <span className="font-mono text-[11px] text-muted-foreground">
-                {packets[0].clientGeo.flag} {packets[0].clientGeo.country} ({packets[0].clientIp}) ───&gt;{" "}
-                <span className="text-foreground font-semibold">{packets[0].path}</span> [
-                <span
-                  className={
-                    packets[0].status === "ALLOWED"
-                      ? "text-emerald-400 font-bold"
-                      : packets[0].status === "BLOCKED"
-                        ? "text-rose-400 font-bold"
-                        : "text-amber-400 font-bold"
-                  }
-                >
-                  {packets[0].httpCode} {packets[0].status}
-                </span>
-                ] · {packets[0].latencyMs}ms
+          <div className="text-xs text-muted-foreground font-mono">
+            {globeVisualEngine === "threat_matrix" ? (
+              <span className="text-cyan-400 font-semibold flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
+                <span>Active Engine: 3D Spherical Slerp Arcs &amp; Threat HUD</span>
               </span>
             ) : (
-              <span className="text-muted-foreground">Listening for network packets...</span>
+              <span>Active Engine: Multi-Datacenter Routing Mesh</span>
             )}
           </div>
-
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <span>Origin Real IP: <strong className="text-foreground">{activeOrigin.ip}</strong> ({activeOrigin.region.split(",")[0]})</span>
-          </div>
         </div>
-      </section>
+
+        {globeVisualEngine === "threat_matrix" ? (
+          <CyberThreatGlobe
+            customCities={threatCities}
+            height={560}
+            showControls={true}
+            showFeed={true}
+            showStats={true}
+          />
+        ) : (
+          <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-card via-[#020617] to-card shadow-2xl">
+            {/* Globe Overlay HUD: Rotation Tip & Legend */}
+            <div className="pointer-events-none absolute left-4 top-4 z-10 flex flex-col gap-2">
+              <div className="flex items-center gap-2 rounded-lg border border-border/80 bg-background/80 px-3 py-1.5 backdrop-blur-md">
+                <span className="size-2 rounded-full bg-primary animate-ping" />
+                <span className="text-[11px] font-semibold text-foreground">
+                  Drag to spin 3D Globe · High-Def Vector Continental Coastlines
+                </span>
+              </div>
+
+              {/* Color-Coded Arcs Legend */}
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-1 text-[10px] backdrop-blur-md">
+                <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                  <span className="size-2 rounded-full bg-emerald-400" />
+                  Allowed (200 OK)
+                </span>
+                <span className="text-muted-foreground/40">|</span>
+                <span className="flex items-center gap-1 text-rose-400 font-semibold">
+                  <span className="size-2 rounded-full bg-rose-400" />
+                  Blocked Threat (403)
+                </span>
+                <span className="text-muted-foreground/40">|</span>
+                <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                  <span className="size-2 rounded-full bg-amber-400" />
+                  Rate-Limited (429)
+                </span>
+                <span className="text-muted-foreground/40">|</span>
+                <span className="flex items-center gap-1 text-cyan-400 font-semibold">
+                  <span className="size-2 rounded-full bg-cyan-400" />
+                  AI Prompt Shield
+                </span>
+              </div>
+            </div>
+
+            {/* Origin Target Pin HUD Overlay */}
+            <div className="pointer-events-none absolute right-4 top-4 z-10 hidden sm:flex flex-col items-end gap-1">
+              <div className="rounded-xl border border-primary/40 bg-card/90 p-3 shadow-xl backdrop-blur-md font-mono">
+                <div className="flex items-center gap-2 text-xs font-bold text-foreground font-sans">
+                  <span className="size-2 rounded-full bg-primary animate-pulse" />
+                  Host: {activeOrigin.name}
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  Real IP: <span className="text-primary font-bold">{activeOrigin.ip}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  Domain: {activeOrigin.domain}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  Datacenter: {activeOrigin.region}
+                </div>
+                <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400 font-sans">
+                  <CheckCircle2 className="size-3" />
+                  <span>Live Inbound Arcs Terminate Here</span>
+                </div>
+              </div>
+            </div>
+
+            {/* HTML5 Canvas Element */}
+            <canvas
+              ref={canvasRef}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerLeave={handlePointerUp}
+              className="h-[460px] w-full cursor-grab active:cursor-grabbing sm:h-[540px]"
+              title="Drag mouse or finger to rotate the 3D globe"
+            />
+
+            {/* Bottom Ticker Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-card/90 px-4 py-2.5 text-xs font-mono">
+              <div className="flex items-center gap-2 font-sans">
+                <Radio className="size-3.5 text-primary animate-pulse" />
+                <span className="font-semibold text-foreground">Latest Inbound Connection:</span>
+                {packets[0] ? (
+                  <span className="font-mono text-[11px] text-muted-foreground">
+                    {packets[0].clientGeo.flag} {packets[0].clientGeo.country} ({packets[0].clientIp}) ───&gt;{" "}
+                    <span className="text-foreground font-semibold">{packets[0].path}</span> [
+                    <span
+                      className={
+                        packets[0].status === "ALLOWED"
+                          ? "text-emerald-400 font-bold"
+                          : packets[0].status === "BLOCKED"
+                            ? "text-rose-400 font-bold"
+                            : "text-amber-400 font-bold"
+                      }
+                    >
+                      {packets[0].httpCode} {packets[0].status}
+                    </span>
+                    ] · {packets[0].latencyMs}ms
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Listening for network packets...</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <span>Origin Real IP: <strong className="text-foreground">{activeOrigin.ip}</strong> ({activeOrigin.region.split(",")[0]})</span>
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
 
       {/* 5. Live Connection Packet Stream Table & Filter Bar */}
       <section className="rounded-xl border border-border bg-card p-4 shadow-sm">

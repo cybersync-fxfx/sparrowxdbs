@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CyberThreatGlobe } from "@/components/CyberThreatGlobe";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
 import {
   AdminRevenueAndOutreachEngine,
@@ -2760,7 +2761,7 @@ export function AdminPortalView({
                 aria-label="Client organization name"
                 className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Client name (e.g. NovaPay)"
+                placeholder="Client name (e.g. Acme Corp)"
                 required
                 value={newName}
               />
@@ -2768,7 +2769,7 @@ export function AdminPortalView({
                 aria-label="Client contact email"
                 className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
                 onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="secops@novapay.io"
+                placeholder="secops@yourcompany.com"
                 required
                 type="email"
                 value={newEmail}
@@ -2777,7 +2778,7 @@ export function AdminPortalView({
                 aria-label="Primary domain or URI"
                 className="h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
                 onChange={(e) => setNewDomain(e.target.value)}
-                placeholder="https://app.novapay.io"
+                placeholder="https://app.yourcompany.com"
                 required
                 value={newDomain}
               />
@@ -4596,6 +4597,17 @@ export function PortalLoginScreen({
                   <Search className="size-3.5" />
                   <span>Check If Your Site Is Exposed</span>
                 </a>
+              </div>
+
+              {/* Live Interactive 3D Cyber Threat Globe Interception Engine */}
+              <div className="mt-8">
+                <CyberThreatGlobe
+                  height={500}
+                  showControls={true}
+                  showFeed={true}
+                  showStats={true}
+                  className="border-[#1F1F1F] bg-[#02050E]"
+                />
               </div>
 
               <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

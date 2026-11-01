@@ -163,8 +163,12 @@ export function LiveOperationsView({
           <div className="mt-2 font-display text-2xl font-bold text-foreground">
             {onDutyOfficers.length} / {teamMembers.length}
           </div>
-          <span className="mt-1 block text-[11px] text-success font-medium">
-            Shift coverage active
+          <span
+            className={`mt-1 block text-[11px] font-medium ${
+              teamMembers.length > 0 ? "text-success" : "text-muted-foreground font-mono"
+            }`}
+          >
+            {teamMembers.length > 0 ? "Shift coverage active" : "Not Configured · No team roster"}
           </span>
         </div>
 
@@ -177,7 +181,7 @@ export function LiveOperationsView({
             {blockedThreats.length}
           </div>
           <span className="mt-1 block text-[11px] text-muted-foreground font-mono">
-            Edge WAF filter enforced
+            {blockedThreats.length > 0 ? "Edge WAF filter enforced" : "0 threats · Feeds idle"}
           </span>
         </div>
 
@@ -189,9 +193,16 @@ export function LiveOperationsView({
           <div className="mt-2 font-display text-2xl font-bold text-foreground">
             {protectedServices.length + assets.length}
           </div>
-          <span className="mt-1 block text-[11px] text-success font-medium">
-            {assets.filter((a) => a.status === "Protected").length} Protected ·{" "}
-            {assets.filter((a) => a.status === "Isolated").length} Isolated
+          <span
+            className={`mt-1 block text-[11px] font-medium ${
+              protectedServices.length + assets.length > 0
+                ? "text-success"
+                : "text-muted-foreground font-mono"
+            }`}
+          >
+            {protectedServices.length + assets.length > 0
+              ? `${assets.filter((a) => a.status === "Protected").length} Protected · ${assets.filter((a) => a.status === "Isolated").length} Isolated`
+              : "Not Configured · 0 endpoints"}
           </span>
         </div>
       </section>
