@@ -202,3 +202,68 @@ h4 {
   background: #0f0f0f;
   border-color: #333333;
 }
+
+@keyframes spx-marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes spx-float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes spx-scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(400%);
+  }
+}
+
+@keyframes spx-pulse-ring {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.animate-spx-marquee {
+  display: flex;
+  width: max-content;
+  animation: spx-marquee 32s linear infinite;
+}
+
+.animate-spx-marquee:hover {
+  animation-play-state: paused;
+}
+
+.animate-spx-float {
+  animation: spx-float 5s ease-in-out infinite;
+}
+
+.animate-spx-scanline {
+  animation: spx-scanline 3.5s linear infinite;
+}
+
+.animate-spx-pulse-ring {
+  animation: spx-pulse-ring 2.2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+}
