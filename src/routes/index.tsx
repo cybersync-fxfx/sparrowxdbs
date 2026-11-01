@@ -1445,8 +1445,6 @@ function Dashboard() {
                 <span>SYSTEMS NOMINAL</span>
               </span>
             )}
-
-            <OperationalClock />
           </div>
           <div className="flex items-center gap-2 sm:gap-2.5">
             {/* Top Workspace Switcher (SOC Dashboard vs Client Area) */}
@@ -1554,6 +1552,9 @@ function Dashboard() {
             >
               {userInitials}
             </button>
+
+            {/* Operational Clock positioned at the very end of the navbar */}
+            <OperationalClock />
           </div>
         </header>
 
@@ -4866,13 +4867,13 @@ function OperationalClock() {
   });
 
   return (
-    <div className="hidden xl:flex items-center gap-2 rounded-md border border-border bg-card/80 px-2.5 py-1 text-xs font-mono text-muted-foreground shadow-xs">
+    <div className="hidden xl:flex items-center gap-1.5 rounded-md border border-border bg-card/60 px-2 py-1 text-[11px] font-mono text-muted-foreground shadow-xs shrink-0 select-none">
       <span className="size-1.5 rounded-full bg-primary animate-pulse" />
       <span className="font-semibold text-foreground">{localStr}</span>
-      <span className="text-muted-foreground/60">·</span>
+      <span className="text-muted-foreground/40">·</span>
       <span>{utcStr}</span>
-      <span className="text-muted-foreground/60">·</span>
-      <span className="text-[11px] text-muted-foreground">{dateStr}</span>
+      <span className="text-muted-foreground/40">·</span>
+      <span className="text-muted-foreground/80">{dateStr}</span>
     </div>
   );
 }
