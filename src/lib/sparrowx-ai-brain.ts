@@ -488,12 +488,12 @@ export function harvestTelemetryIntoAiMemory(input: {
 export async function querySparrowxGeminiBrain(params: {
   prompt: string;
   digest: PlatformTelemetryDigest;
-  model?: SparrowxBrainModel;
-  previousInteractionId?: string;
+  model?: SparrowxBrainModel | undefined;
+  previousInteractionId?: string | undefined;
 }): Promise<{
   text: string;
   modelUsed: SparrowxBrainModel;
-  interactionId?: string;
+  interactionId?: string | undefined;
   liveApiSucceeded: boolean;
 }> {
   const cfg = getAiBrainConfig();
