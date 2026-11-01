@@ -13,6 +13,8 @@ import { NotificationCenterDrawer } from "@/components/NotificationCenterDrawer"
 import { CheckpointsAndProbesView } from "@/components/CheckpointsAndProbesView";
 import { LiveOperationsView } from "@/components/LiveOperationsView";
 import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
+import { ThreatHuntingView } from "@/components/ThreatHuntingView";
+import { SiemAndDetectionRulesView } from "@/components/SiemAndDetectionRulesView";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -35,6 +37,7 @@ import {
   Command,
   Copy,
   CreditCard,
+  Crosshair,
   Database,
   Download,
   Ellipsis,
@@ -2104,6 +2107,50 @@ function Dashboard() {
               />
             )}
 
+          {portalMode === "soc" && activeNav === "Threat Hunting" && (
+            <ThreatHuntingView
+              assets={assets}
+              auditLogs={auditLogs}
+              incidents={incidents}
+              onCreateIncidentFromHunt={(title, source, severity) => {
+                const created: Incident = {
+                  id: `INC-${Date.now().toString().slice(-4)}`,
+                  title,
+                  source,
+                  time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                  severity,
+                  status: "Investigating",
+                  assignee: teamMembers[0]?.name ?? "Unassigned",
+                  summary:
+                    "Forensic hunting ticket automatically escalated from threat hunting correlation engine.",
+                  playbook: "Threat Hunt Investigation Playbook",
+                  affectedAssets: 1,
+                };
+                setIncidents((current) => [created, ...current]);
+                setSelectedIncidentId(created.id);
+                void persistIncidentToBackend(created);
+                showToast(`Created forensic case ${created.id}`);
+                handleNavigate("Incidents");
+              }}
+              onNavigate={handleNavigate}
+              protectedServices={protectedServices}
+              showToast={showToast}
+              threats={threatIndicators}
+              vulnerabilities={vulnerabilities}
+            />
+          )}
+
+          {portalMode === "soc" &&
+            (activeNav === "SIEM & Detection Rules" ||
+              activeNav === "SIEM" ||
+              activeNav === "Detection Rules") && (
+              <SiemAndDetectionRulesView
+                onNavigate={handleNavigate}
+                onRecordAudit={recordAudit}
+                showToast={showToast}
+              />
+            )}
+
           {(activeNav === "Web & AI Shield" || activeNav === "Security Devices & Gateways") && (
             <>
               <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
@@ -4004,14 +4051,14 @@ function AppSidebar({
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
 
-  // Enterprise Security Navigation Groups (Mapped to verified functional modules)
+  // Enterprise Cybersecurity SOC Navigation Groups (Section 18 Architecture)
   const socOverviewItems: Array<{
     label: string;
     navKey: string;
     icon: typeof Activity;
     count?: string | undefined;
   }> = [
-    { label: "Dashboard", navKey: "Overview", icon: Activity },
+    { label: "SOC Dashboard", navKey: "Overview", icon: Activity },
     { label: "Live Operations", navKey: "Live Operations", icon: Radio },
   ];
 
@@ -4022,35 +4069,23 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     {
-      label: "Incidents",
+      label: "Security Incidents",
       navKey: "Incidents",
       icon: Siren,
       count: incidentCount > 0 ? String(incidentCount) : undefined,
     },
-    { label: "Alerts & Threats", navKey: "Threat intel", icon: Globe2 },
-    { label: "Security Personnel", navKey: "Team & access", icon: Users },
-    { label: "Sites & Locations", navKey: "Assets", icon: Server },
-    { label: "Checkpoints & Probes", navKey: "Checkpoints & Probes", icon: CheckCircle2 },
+    { label: "Threat Hunting", navKey: "Threat Hunting", icon: Crosshair },
+    { label: "Incident Analytics & MTTD", navKey: "Incident Statistics", icon: BarChart3 },
   ];
 
-  const socMonitoringItems: Array<{
+  const socDetectionItems: Array<{
     label: string;
     navKey: string;
     icon: typeof Activity;
     count?: string | undefined;
   }> = [
-    {
-      label: "Security Devices & Gateways",
-      navKey: "Web & AI Shield",
-      icon: ShieldCheck,
-      count: serviceCount > 0 ? String(serviceCount) : undefined,
-    },
-    {
-      label: "Vulnerability Scanning",
-      navKey: "Vulnerabilities",
-      icon: ShieldAlert,
-      count: vulnCount > 0 ? String(vulnCount) : undefined,
-    },
+    { label: "SIEM & Detection Rules", navKey: "SIEM & Detection Rules", icon: Terminal },
+    { label: "Security Boundary Probes", navKey: "Checkpoints & Probes", icon: CheckCircle2 },
     {
       label: "Activity & Forensic Logs",
       navKey: "Access Control & Audit",
@@ -4058,6 +4093,41 @@ function AppSidebar({
       count: auditCount > 0 ? String(auditCount) : undefined,
     },
   ];
+
+  const socThreatIntelItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [{ label: "Threat Feeds & IOCs", navKey: "Threat intel", icon: Globe2 }];
+
+  const socAssetSecurityItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [
+    { label: "Endpoints & Cloud Assets", navKey: "Assets", icon: Server },
+    {
+      label: "Web & AI Agent Shield",
+      navKey: "Web & AI Shield",
+      icon: ShieldCheck,
+      count: serviceCount > 0 ? String(serviceCount) : undefined,
+    },
+    {
+      label: "Vulnerability Management",
+      navKey: "Vulnerabilities",
+      icon: ShieldAlert,
+      count: vulnCount > 0 ? String(vulnCount) : undefined,
+    },
+  ];
+
+  const socAutomationItems: Array<{
+    label: string;
+    navKey: string;
+    icon: typeof Activity;
+    count?: string | undefined;
+  }> = [{ label: "SOAR & Integrations", navKey: "Integrations", icon: Boxes }];
 
   const socManagementItems: Array<{
     label: string;
@@ -4073,26 +4143,9 @@ function AppSidebar({
     },
     { label: "Subscriptions & Due Dates", navKey: "Subscriptions & Due Dates", icon: CreditCard },
     { label: "Billing & Credits", navKey: "Billing & Credits", icon: Coins },
-  ];
-
-  const socAnalyticsItems: Array<{
-    label: string;
-    navKey: string;
-    icon: typeof Activity;
-    count?: string | undefined;
-  }> = [
     { label: "Reports & Compliance", navKey: "Reports", icon: FileText },
-    { label: "Incident Statistics", navKey: "Incident Statistics", icon: BarChart3 },
-  ];
-
-  const socSystemItems: Array<{
-    label: string;
-    navKey: string;
-    icon: typeof Activity;
-    count?: string | undefined;
-  }> = [
-    { label: "Integrations & Webhooks", navKey: "Integrations", icon: Boxes },
-    { label: "Platform Settings", navKey: "Settings", icon: Wrench },
+    { label: "SOC Analysts & Access", navKey: "Team & access", icon: Users },
+    { label: "Platform Settings & MFA", navKey: "Settings", icon: Wrench },
   ];
 
   // Client Area Hub Navigation
@@ -4313,14 +4366,14 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
 
-            {/* 3. MONITORING */}
+            {/* 3. DETECTION & SIEM */}
             <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
               <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
-                MONITORING
+                DETECTION
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  {socMonitoringItems.map((item) => {
+                  {socDetectionItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeNav === item.navKey || activeNav === item.label;
                     return (
@@ -4342,7 +4395,94 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
 
-            {/* 4. MANAGEMENT */}
+            {/* 4. THREAT INTELLIGENCE */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                THREAT INTELLIGENCE
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socThreatIntelItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 5. ASSET SECURITY */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                ASSET SECURITY
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socAssetSecurityItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 6. AUTOMATION */}
+            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
+              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
+                AUTOMATION
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                  {socAutomationItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeNav === item.navKey || activeNav === item.label;
+                    return (
+                      <SidebarMenuItem key={item.label}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => onNavigate(item.navKey)}
+                          tooltip={item.label}
+                          className="font-medium"
+                        >
+                          <Icon className="size-4" />
+                          <span>{item.label}</span>
+                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+
+            {/* 7. MANAGEMENT */}
             <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
               <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
                 MANAGEMENT
@@ -4350,64 +4490,6 @@ function AppSidebar({
               <SidebarGroupContent>
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                   {socManagementItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeNav === item.navKey || activeNav === item.label;
-                    return (
-                      <SidebarMenuItem key={item.label}>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
-                          tooltip={item.label}
-                          className="font-medium"
-                        >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            {/* 5. ANALYTICS */}
-            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
-                ANALYTICS
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  {socAnalyticsItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeNav === item.navKey || activeNav === item.label;
-                    return (
-                      <SidebarMenuItem key={item.label}>
-                        <SidebarMenuButton
-                          isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
-                          tooltip={item.label}
-                          className="font-medium"
-                        >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-
-            {/* 6. SYSTEM */}
-            <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 px-2">
-                SYSTEM
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  {socSystemItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeNav === item.navKey || activeNav === item.label;
                     return (

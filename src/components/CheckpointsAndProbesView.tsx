@@ -83,7 +83,7 @@ export function CheckpointsAndProbesView({
   const checkpointsList = [
     {
       id: "chk-edge-tls",
-      name: "Checkpoint Alpha: Edge TLS & DNS Ingestion",
+      name: "Stage 1: Edge TLS 1.3 & DNSSEC Ingestion",
       desc: "Validates SSL/TLS certificate chain, HTTP/2/3 negotiation, and DNS edge routing.",
       target: "Edge Gateway",
       frequency: "Every 60s",
@@ -91,7 +91,7 @@ export function CheckpointsAndProbesView({
     },
     {
       id: "chk-waf-filter",
-      name: "Checkpoint Bravo: WAF Payload Inspection",
+      name: "Stage 2: WAF & Perimeter Payload Inspection",
       desc: "Simulates test payloads for SQL Injection, XSS, and path traversal rejection.",
       target: "Perimeter Shield",
       frequency: "Every 120s",
@@ -99,7 +99,7 @@ export function CheckpointsAndProbesView({
     },
     {
       id: "chk-ai-guardrail",
-      name: "Checkpoint Charlie: AI Prompt & MCP Firewall",
+      name: "Stage 3: AI Prompt & MCP Firewall Guardrail",
       desc: "Tests system prompt jailbreak evasion and rogue MCP shell command interceptors.",
       target: "LLM / AI Gateway",
       frequency: "Continuous",
@@ -107,7 +107,7 @@ export function CheckpointsAndProbesView({
     },
     {
       id: "chk-webhook-telemetry",
-      name: "Checkpoint Delta: Real-Time Telemetry Dispatch",
+      name: "Stage 4: Real-Time Telemetry & SIEM Dispatch",
       desc: "Verifies high-speed event delivery pipelines to Slack, Discord, and SIEM webhooks.",
       target: "Pipeline Router",
       frequency: "On event",
@@ -122,13 +122,13 @@ export function CheckpointsAndProbesView({
         <div>
           <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary tracking-wider">
             <CheckCircle2 className="size-4" />
-            Automated Operational Checkpoints
+            Automated Security Boundary Probes
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[28px]">
-            Checkpoints & Health Probes
+            Security Health & Ingestion Probes
           </h1>
           <p className="mt-1 text-xs text-muted-foreground max-w-2xl leading-relaxed">
-            Continuous synthetic telemetry probes and health checkpoints running across your
+            Continuous synthetic telemetry probes and health verification running across your
             registered infrastructure, edge gateways, and AI agent endpoints.
           </p>
         </div>
