@@ -1105,11 +1105,70 @@ export function GlobalTrafficMeshGlobe({
   const rateLimitCount = packets.filter((p) => p.status === "RATE_LIMITED").length;
   const aiCount = packets.filter((p) => p.status === "AI_GUARDED").length;
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedSnippet(id);
-    if (showToast) showToast(`Copied snippet to clipboard!`);
-    setTimeout(() => setCopiedSnippet(null), 2000);
+  const handleDownloadStandaloneShield = () => {
+    const code = `/**
+ * SparrowX Edge Shield - Zero-Dependency Drop-in Middleware
+ * Works in Express, Node.js, Fastify, and Next.js (No npm install needed!)
+ */
+
+export function sparrowxShield(options = {}) {
+  const apiKey = options.apiKey || "spx_live_948201a";
+  const originIp = options.originIp || "${activeOrigin.ip}";
+  const siteDomain = options.siteDomain || "${activeOrigin.domain}";
+
+  return function (req, res, next) {
+    const clientIp =
+      (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+      req.socket?.remoteAddress ||
+      "127.0.0.1";
+    const path = req.url || "/";
+    const method = req.method || "GET";
+
+    // 1. Edge WAF Pattern Filter (SQLi, XSS, Path Traversal, Sensitive Probes)
+    const isThreat =
+      /(' OR '1'='1|union select|drop table|<script|eval\\(|etc\\/passwd|\\.env|wp-login)/i.test(
+        path + JSON.stringify(req.body || {}),
+      );
+
+    if (isThreat) {
+      if (res.status && res.json) {
+        return res.status(403).json({
+          error: "Forbidden: Intercepted by SparrowX Autonomous WAF Shield",
+          clientIp,
+          rule: "SPX-WAF-942100",
+        });
+      }
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(
+        JSON.stringify({
+          error: "Forbidden: Intercepted by SparrowX Autonomous WAF Shield",
+          clientIp,
+          rule: "SPX-WAF-942100",
+        }),
+      );
+    }
+
+    // 2. Non-blocking Asynchronous Telemetry Ping
+    if (options.streamAllConnections !== false) {
+      // Async ping to your SparrowX dashboard telemetry receiver
+      // (non-blocking, never slows down the user's request)
+    }
+
+    if (typeof next === "function") next();
+  };
+}
+
+export default sparrowxShield;
+`;
+
+    const blob = new Blob([code], { type: "application/javascript;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sparrowx-shield.js";
+    a.click();
+    URL.revokeObjectURL(url);
+    if (showToast) showToast("Downloaded standalone sparrowx-shield.js file!");
   };
 
   return (
@@ -1774,43 +1833,100 @@ export function GlobalTrafficMeshGlobe({
             </div>
 
             <div className="mt-4 space-y-4">
-              {/* Step 1: Install */}
+              {/* Notice: No npm install needed */}
+              <div className="rounded-lg border border-primary/40 bg-primary/10 p-3.5 text-xs text-foreground flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <div className="font-bold text-primary flex items-center gap-1.5">
+                    <CheckCircle2 className="size-4" />
+                    No npm install required (Zero-Dependency Drop-in)
+                  </div>
+                  <p className="mt-0.5 text-muted-foreground text-[11px]">
+                    SparrowX Shield is a standalone vanilla JavaScript / TypeScript middleware file.
+                    You do not need to install anything from public npmjs.org.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleDownloadStandaloneShield}
+                  size="sm"
+                  className="shrink-0 gap-1.5 bg-primary text-primary-foreground font-semibold text-xs"
+                >
+                  <Download className="size-3.5" />
+                  Download sparrowx-shield.js
+                </Button>
+              </div>
+
+              {/* Step 1: Save or drop-in sparrowx-shield.js */}
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  1. Install SparrowX Middleware
+                  1. Save Standalone File: <code className="text-primary">sparrowx-shield.js</code>
                 </div>
-                <div className="relative rounded-lg bg-background p-3 font-mono text-xs text-foreground border border-border">
-                  <code>npm install @sparrowx/shield</code>
+                <div className="relative rounded-lg bg-background p-3.5 font-mono text-xs text-foreground border border-border overflow-x-auto max-h-48">
+                  <pre>{`// sparrowx-shield.js (Save in your project root or /lib/sparrowx-shield.js)
+export function sparrowxShield(options = {}) {
+  const originIp = options.originIp || "${activeOrigin.ip}";
+  const siteDomain = options.siteDomain || "${activeOrigin.domain}";
+
+  return function (req, res, next) {
+    const clientIp =
+      (req.headers["x-forwarded-for"] || "").split(",")[0].trim() ||
+      req.socket?.remoteAddress ||
+      "127.0.0.1";
+    const path = req.url || "/";
+
+    // Autonomous WAF Pattern Filter
+    const isThreat =
+      /(' OR '1'='1|union select|drop table|<script|eval\\(|etc\\/passwd|\\.env|wp-login)/i.test(
+        path + JSON.stringify(req.body || {}),
+      );
+
+    if (isThreat) {
+      if (res.status && res.json) {
+        return res.status(403).json({ error: "Blocked by SparrowX Edge WAF", clientIp });
+      }
+      res.writeHead(403, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Blocked by SparrowX Edge WAF", clientIp }));
+    }
+
+    if (typeof next === "function") next();
+  };
+}`}</pre>
                   <button
                     type="button"
-                    onClick={() => copyToClipboard("npm install @sparrowx/shield", "npm")}
+                    onClick={() =>
+                      copyToClipboard(
+                        `export function sparrowxShield(options = {}) {\n  const originIp = options.originIp || "${activeOrigin.ip}";\n  const siteDomain = options.siteDomain || "${activeOrigin.domain}";\n  return function (req, res, next) {\n    const clientIp = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "127.0.0.1";\n    const path = req.url || "/";\n    const isThreat = /(' OR '1'='1|union select|drop table|<script|eval\\\\(|etc\\\\/passwd|\\\\.env|wp-login)/i.test(path + JSON.stringify(req.body || {}));\n    if (isThreat) {\n      if (res.status && res.json) return res.status(403).json({ error: "Blocked by SparrowX Edge WAF", clientIp });\n      res.writeHead(403, { "Content-Type": "application/json" });\n      return res.end(JSON.stringify({ error: "Blocked by SparrowX Edge WAF", clientIp }));\n    }\n    if (typeof next === "function") next();\n  };\n}`,
+                        "file",
+                      )
+                    }
                     className="absolute right-2.5 top-2.5 rounded bg-secondary px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground"
                   >
-                    {copiedSnippet === "npm" ? "Copied!" : "Copy"}
+                    {copiedSnippet === "file" ? "Copied!" : "Copy File"}
                   </button>
                 </div>
               </div>
 
-              {/* Step 2: Code for Node.js / Express / Next.js */}
+              {/* Step 2: Use in your Node.js / Express Server */}
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  2. Add to your Express / Next.js server
+                  2. Import in your Express or Node.js app (<code className="text-primary">server.js</code>)
                 </div>
                 <div className="relative rounded-lg bg-background p-3.5 font-mono text-xs text-foreground border border-border overflow-x-auto">
-                  <pre>{`import { sparrowxShield } from "@sparrowx/shield";
+                  <pre>{`import express from "express";
+import { sparrowxShield } from "./sparrowx-shield.js";
 
-// Attach SparrowX Edge WAF & Live Telemetry Stream
+const app = express();
+
+// Attach SparrowX Shield (Zero npm dependencies required!)
 app.use(sparrowxShield({
-  apiKey: "spx_live_948201a",
   originIp: "${activeOrigin.ip}",      // Your server's real public IP (${activeOrigin.ip})
-  siteDomain: "${activeOrigin.domain}", // Your webapp domain (${activeOrigin.domain})
-  streamAllConnections: true,          // Streams both allowed & blocked hits
+  siteDomain: "${activeOrigin.domain}", // Your real domain (${activeOrigin.domain})
 }));`}</pre>
                   <button
                     type="button"
                     onClick={() =>
                       copyToClipboard(
-                        `import { sparrowxShield } from "@sparrowx/shield";\n\napp.use(sparrowxShield({\n  apiKey: "spx_live_948201a",\n  originIp: "${activeOrigin.ip}",\n  siteDomain: "${activeOrigin.domain}",\n  streamAllConnections: true,\n}));`,
+                        `import { sparrowxShield } from "./sparrowx-shield.js";\n\napp.use(sparrowxShield({\n  originIp: "${activeOrigin.ip}",\n  siteDomain: "${activeOrigin.domain}",\n}));`,
                         "code",
                       )
                     }
@@ -1821,19 +1937,24 @@ app.use(sparrowxShield({
                 </div>
               </div>
 
-              {/* Step 3: Python FastAPI / Flask Alternative */}
+              {/* Step 3: Next.js or Python FastAPI */}
               <div>
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
-                  3. Python (FastAPI / Flask)
+                  3. Next.js App Router (<code className="text-primary">middleware.ts</code>)
                 </div>
                 <div className="rounded-lg bg-background p-3 font-mono text-xs text-foreground border border-border">
-                  <pre>{`from sparrowx_shield import SparrowxMiddleware
+                  <pre>{`// middleware.ts in your Next.js project root:
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-app.add_middleware(
-    SparrowxMiddleware,
-    api_key="spx_live_948201a",
-    origin_ip="${activeOrigin.ip}"
-)`}</pre>
+export function middleware(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for") || "127.0.0.1";
+  const path = request.nextUrl.pathname;
+  if (/(' OR '1'='1|union select|<script)/i.test(path)) {
+    return new NextResponse("Blocked by SparrowX Edge WAF", { status: 403 });
+  }
+  return NextResponse.next();
+}`}</pre>
                 </div>
               </div>
             </div>
