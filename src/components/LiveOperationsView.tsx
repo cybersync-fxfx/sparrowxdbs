@@ -51,7 +51,7 @@ export function LiveOperationsView({
   onNavigate: (nav: string) => void;
   showToast: (msg: string) => void;
 }) {
-  const [liveLatency, setLiveLatency] = useState(11);
+  const [liveLatency, setLiveLatency] = useState<number | null>(null);
   const [isPinging, setIsPinging] = useState(false);
 
   // Measure true network roundtrip to Supabase REST endpoint
@@ -59,16 +59,23 @@ export function LiveOperationsView({
     setIsPinging(true);
     const t0 = performance.now();
     try {
-      await fetch("https://yidqdgufjgfyxflgvbqq.supabase.co/rest/v1/incidents?select=id&limit=1", {
-        headers: {
-          apikey: "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-",
-          Authorization: "Bearer sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-",
+      const res = await fetch(
+        "https://yidqdgufjgfyxflgvbqq.supabase.co/rest/v1/incidents?select=id&limit=1",
+        {
+          headers: {
+            apikey: "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-",
+            Authorization: "Bearer sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-",
+          },
         },
-      });
-      const ms = Math.round(performance.now() - t0);
-      setLiveLatency(ms);
+      );
+      if (res.ok) {
+        const ms = Math.round(performance.now() - t0);
+        setLiveLatency(ms);
+      } else {
+        setLiveLatency(null);
+      }
     } catch {
-      setLiveLatency(14);
+      setLiveLatency(null);
     } finally {
       setIsPinging(false);
     }
@@ -106,15 +113,21 @@ export function LiveOperationsView({
           <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-xs font-mono">
             <span
               className={`size-2 rounded-full ${
-                liveLatency < 80
-                  ? "bg-success"
-                  : liveLatency < 200
-                    ? "bg-warning"
-                    : "bg-destructive"
+                liveLatency === null
+                  ? "bg-destructive"
+                  : liveLatency < 80
+                    ? "bg-success"
+                    : liveLatency < 200
+                      ? "bg-warning"
+                      : "bg-destructive"
               }`}
             />
             <span className="text-muted-foreground">Cloud API Ping:</span>
-            <span className="font-bold text-foreground">{liveLatency}ms</span>
+            {liveLatency !== null ? (
+              <span className="font-bold text-foreground">{liveLatency}ms</span>
+            ) : (
+              <span className="font-semibold text-destructive">Offline</span>
+            )}
           </div>
 
           <Button

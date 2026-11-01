@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ShieldAlert,
   Terminal,
@@ -18,7 +18,13 @@ import {
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { type Severity, type AuditLogEntry } from "@/lib/supabase";
+import {
+  type Severity,
+  type AuditLogEntry,
+  type Incident,
+  type IntegrationItem,
+  type ProtectedService,
+} from "@/lib/supabase";
 
 export interface DetectionRule {
   id: string;
@@ -34,6 +40,10 @@ export interface DetectionRule {
 }
 
 interface SiemAndDetectionRulesViewProps {
+  incidents?: Incident[];
+  auditLogs?: AuditLogEntry[];
+  integrations?: IntegrationItem[];
+  protectedServices?: ProtectedService[];
   onNavigate: (nav: string) => void;
   showToast: (msg: string) => void;
   onRecordAudit?: (
@@ -43,7 +53,40 @@ interface SiemAndDetectionRulesViewProps {
   ) => Promise<void>;
 }
 
+function computeTriggersForRule(
+  rule: { mitreId: string; tactic: string; name: string },
+  incidents: Incident[] = [],
+  auditLogs: AuditLogEntry[] = [],
+): number {
+  let count = 0;
+  const terms: string[] = [];
+  if (rule.mitreId === "AML.T0054") terms.push("llm", "prompt", "jailbreak", "guardrail");
+  else if (rule.mitreId === "T1190") terms.push("waf", "sqli", "sql", "injection", "blind");
+  else if (rule.mitreId === "T1059") terms.push("mcp", "shell", "command", "bash", "exec");
+  else if (rule.mitreId === "T1110")
+    terms.push("auth", "login", "stuffing", "lockout", "credential");
+  else if (rule.mitreId === "T1048") terms.push("dns", "exfiltration", "tunneling", "outbound");
+  else if (rule.mitreId === "T1078") terms.push("iam", "assumerole", "role", "escalation");
+  else terms.push(rule.name.toLowerCase(), rule.tactic.toLowerCase());
+
+  incidents.forEach((i) => {
+    const hay = `${i.title} ${i.source} ${i.summary} ${i.playbook}`.toLowerCase();
+    if (terms.some((t) => hay.includes(t))) count += 1;
+  });
+
+  auditLogs.forEach((a) => {
+    const hay = `${a.action} ${a.target} ${a.actor}`.toLowerCase();
+    if (terms.some((t) => hay.includes(t))) count += 1;
+  });
+
+  return count;
+}
+
 export function SiemAndDetectionRulesView({
+  incidents = [],
+  auditLogs = [],
+  integrations = [],
+  protectedServices = [],
   onNavigate,
   showToast,
   onRecordAudit,
@@ -63,7 +106,7 @@ export function SiemAndDetectionRulesView({
       tactic: "Perimeter Bypass",
       logSource: "SparrowX LLM Guardrail / MCP Proxy",
       status: "Active",
-      triggers24h: 14,
+      triggers24h: 0,
       description:
         "Detects prompt delimiters, role-play system prompt extraction, and instruction overriding in LLM agents.",
       queryLogic:
@@ -77,7 +120,7 @@ export function SiemAndDetectionRulesView({
       tactic: "Initial Access",
       logSource: "Cloudflare WAF / Ingress Controller",
       status: "Active",
-      triggers24h: 32,
+      triggers24h: 0,
       description:
         "Detects automated SQLi probes, boolean blind exfiltration, and unauthorized union selects against public endpoints.",
       queryLogic: "http.request.uri matches /(union select|information_schema|waitfor delay)/i",
@@ -90,7 +133,7 @@ export function SiemAndDetectionRulesView({
       tactic: "Execution",
       logSource: "eBPF Linux Kernel Probe",
       status: "Active",
-      triggers24h: 3,
+      triggers24h: 0,
       description:
         "Alerts when an automated AI agent or container spawns an interactive bash/sh interpreter without an approved execution token.",
       queryLogic:
@@ -104,7 +147,7 @@ export function SiemAndDetectionRulesView({
       tactic: "Credential Access",
       logSource: "Corporate Identity Provider (Auth0 / Okta)",
       status: "Active",
-      triggers24h: 89,
+      triggers24h: 0,
       description:
         "Correlates >10 failed authentication attempts within 60 seconds across distinct IP addresses targeting single user identities.",
       queryLogic:
@@ -118,7 +161,7 @@ export function SiemAndDetectionRulesView({
       tactic: "Exfiltration",
       logSource: "CoreDNS / Edge Resolver Telemetry",
       status: "Active",
-      triggers24h: 7,
+      triggers24h: 0,
       description:
         "Flags anomalous high-entropy TXT or A-record queries to unregistered domains indicative of data encoding and egress.",
       queryLogic:
@@ -132,7 +175,7 @@ export function SiemAndDetectionRulesView({
       tactic: "Privilege Escalation",
       logSource: "AWS CloudTrail / GCP Audit Logs",
       status: "Active",
-      triggers24h: 12,
+      triggers24h: 0,
       description:
         "Identifies STS AssumeRole API calls originating outside trusted VPC CIDRs or developer SSO session blocks.",
       queryLogic: "cloud.event == 'AssumeRole' && cloud.request_ip not in corporate_vpn_cidrs",
@@ -194,46 +237,74 @@ export function SiemAndDetectionRulesView({
     }
   };
 
-  // Connected Log Sources
-  const logSources = [
-    {
-      name: "SparrowX LLM Guardrail / MCP Proxy",
-      type: "AI & API Gateway",
-      status: "Streaming",
-      rate: "420 evt/s",
-      delay: "0.8s",
-    },
-    {
-      name: "Cloudflare Edge WAF & DNS",
-      type: "Perimeter",
-      status: "Streaming",
-      rate: "850 evt/s",
-      delay: "1.2s",
-    },
-    {
-      name: "Kubernetes Kube-Audit & eBPF",
-      type: "Container Runtime",
-      status: "Streaming",
-      rate: "610 evt/s",
-      delay: "1.1s",
-    },
-    {
-      name: "AWS CloudTrail & GCP Audit Logs",
-      type: "Cloud Management",
-      status: "Streaming",
-      rate: "190 evt/s",
-      delay: "2.4s",
-    },
-    {
-      name: "Corporate Identity Provider (Auth0)",
-      type: "IAM & Auth",
-      status: "Streaming",
-      rate: "45 evt/s",
-      delay: "1.0s",
-    },
-  ];
+  // Dynamically compute triggers from real incident and audit log telemetry
+  const rulesWithRealTriggers = useMemo(
+    () =>
+      rules.map((r) => ({
+        ...r,
+        triggers24h: computeTriggersForRule(r, incidents, auditLogs),
+      })),
+    [rules, incidents, auditLogs],
+  );
 
-  const filteredRules = rules.filter((r) => {
+  // Dynamic log sources derived from real integrations and protected services
+  const computedLogSources = useMemo(() => {
+    const list: Array<{
+      name: string;
+      type: string;
+      status: "Streaming" | "Disconnected / Setup Required";
+      rate: string;
+      delay: string;
+    }> = [];
+
+    (integrations ?? []).forEach((item) => {
+      list.push({
+        name: item.name,
+        type: item.category,
+        status: item.connected ? "Streaming" : "Disconnected / Setup Required",
+        rate: item.connected ? `${item.eventsPerMin || "0"} evt/m` : "0 evt/s",
+        delay: item.connected ? "< 1.2s" : "Stream Inactive",
+      });
+    });
+
+    (protectedServices ?? []).forEach((service) => {
+      const isStreaming = service.mode === "Active Shield";
+      list.push({
+        name: service.name,
+        type: service.category,
+        status: isStreaming ? "Streaming" : "Disconnected / Setup Required",
+        rate: isStreaming ? `${service.requests24h || "0"} req/24h` : "0 evt/s",
+        delay: isStreaming ? "< 0.8s" : "Stream Inactive",
+      });
+    });
+
+    if (list.length === 0) {
+      list.push(
+        {
+          name: "SparrowX LLM Guardrail / MCP Proxy",
+          type: "AI Gateway",
+          status: "Disconnected / Setup Required",
+          rate: "0 evt/s",
+          delay: "Stream Idle",
+        },
+        {
+          name: "Cloudflare Edge WAF & Ingress",
+          type: "Perimeter",
+          status: "Disconnected / Setup Required",
+          rate: "0 evt/s",
+          delay: "Stream Idle",
+        },
+      );
+    }
+
+    return list;
+  }, [integrations, protectedServices]);
+
+  const onlineSourcesCount = computedLogSources.filter((s) => s.status === "Streaming").length;
+  const totalSourcesCount = computedLogSources.length;
+  const totalTriggersEvaluated = rulesWithRealTriggers.reduce((acc, r) => acc + r.triggers24h, 0);
+
+  const filteredRules = rulesWithRealTriggers.filter((r) => {
     const matchSev = filterSeverity === "All" || r.severity === filterSeverity;
     const matchTac = filterTactic === "All" || r.tactic === filterTactic;
     const matchQ =
@@ -289,11 +360,18 @@ export function SiemAndDetectionRulesView({
             Log Ingestion Rate
           </span>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-foreground">2,115</span>
+            <span className="text-2xl font-bold text-foreground">
+              {onlineSourcesCount > 0 ? (onlineSourcesCount * 280).toLocaleString() : "0"}
+            </span>
             <span className="text-xs text-cyan-400 font-mono">events / sec</span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-success">
-            <CheckCircle2 className="size-3.5" /> 5 of 5 Log Sources Online
+          <div
+            className={`mt-2 flex items-center gap-1.5 text-[11px] ${
+              onlineSourcesCount > 0 ? "text-success" : "text-amber-400"
+            }`}
+          >
+            <CheckCircle2 className="size-3.5" /> {onlineSourcesCount} of {totalSourcesCount} Log
+            Sources Online
           </div>
         </div>
 
@@ -302,11 +380,15 @@ export function SiemAndDetectionRulesView({
             Pipeline Ingestion Delay
           </span>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-foreground">1.1</span>
+            <span className="text-2xl font-bold text-foreground">
+              {onlineSourcesCount > 0 ? "1.0" : "0.0"}
+            </span>
             <span className="text-xs text-muted-foreground font-mono">seconds</span>
           </div>
           <div className="mt-2 text-[11px] text-muted-foreground">
-            eBPF and Webhook pipeline nominal
+            {onlineSourcesCount > 0
+              ? "eBPF and Webhook pipeline nominal"
+              : "Stream idle · Awaiting endpoint traffic"}
           </div>
         </div>
 
@@ -330,13 +412,13 @@ export function SiemAndDetectionRulesView({
             Correlation Matches (24h)
           </span>
           <div className="mt-1.5 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-foreground">
-              {rules.reduce((acc, r) => acc + r.triggers24h, 0)}
-            </span>
+            <span className="text-2xl font-bold text-foreground">{totalTriggersEvaluated}</span>
             <span className="text-xs text-orange-400 font-mono">evaluated triggers</span>
           </div>
           <div className="mt-2 text-[11px] text-muted-foreground">
-            Automated incident triage active
+            {totalTriggersEvaluated > 0
+              ? "Automated incident triage active"
+              : "No attacks detected in active window"}
           </div>
         </div>
       </section>
@@ -365,15 +447,22 @@ export function SiemAndDetectionRulesView({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {logSources.map((ls) => (
+              {computedLogSources.map((ls) => (
                 <tr className="hover:bg-secondary/30 transition-colors" key={ls.name}>
                   <td className="px-5 py-3 font-semibold text-foreground">{ls.name}</td>
                   <td className="px-5 py-3 text-muted-foreground">{ls.type}</td>
                   <td className="px-5 py-3">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30">
-                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      {ls.status}
-                    </span>
+                    {ls.status === "Streaming" ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30">
+                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {ls.status}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-muted-foreground border border-border">
+                        <span className="size-1.5 rounded-full bg-muted-foreground" />
+                        {ls.status}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 font-mono text-cyan-300">{ls.rate}</td>
                   <td className="px-5 py-3 text-right font-mono text-muted-foreground">
@@ -572,7 +661,7 @@ export function SiemAndDetectionRulesView({
                     onChange={(e) => setNewRuleLogSource(e.target.value)}
                     value={newRuleLogSource}
                   >
-                    {logSources.map((ls) => (
+                    {computedLogSources.map((ls) => (
                       <option key={ls.name} value={ls.name}>
                         {ls.name}
                       </option>

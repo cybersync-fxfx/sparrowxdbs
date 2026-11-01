@@ -45,7 +45,7 @@ export function CheckpointsAndProbesView({
     const start = performance.now();
     try {
       await onVerifyTenant(tenant);
-      const elapsed = Math.round(performance.now() - start + 12);
+      const elapsed = Math.round(performance.now() - start);
       setProbeResults((prev) => ({
         ...prev,
         [tenant.id]: {
@@ -66,14 +66,25 @@ export function CheckpointsAndProbesView({
       );
       showToast(`Diagnostic probe passed for ${tenant.name} (${elapsed}ms)`);
     } catch {
+      const elapsed = Math.round(performance.now() - start);
       setProbeResults((prev) => ({
         ...prev,
         [tenant.id]: {
           status: "warn",
-          latency: 45,
+          latency: elapsed,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       }));
+      emitEngineToast(
+        `Checkpoint probe warning: Handshake failed for ${tenant.name}`,
+        "error",
+        "Probe Degraded",
+      );
+      emitEngineActivity(
+        "Probe Warning",
+        `Health probe handshake degraded for ${tenant.primaryDomain}`,
+        "error",
+      );
       showToast(`Probe completed with warnings for ${tenant.name}`);
     } finally {
       setRunningProbeId(null);

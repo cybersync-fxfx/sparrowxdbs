@@ -263,15 +263,47 @@ export function computeLiveSnapshot(
   const containmentRatio =
     incidents.length > 0 ? Math.round((containedCount / incidents.length) * 100) : 100;
 
-  const baseActivity = Math.min(85, Math.max(4, totalEventsCount * 3));
-  const riskPoints = Array.from({ length: 12 }, (_, idx) => {
-    if (totalEventsCount === 0 && openIncidents.length === 0) {
-      return 6;
-    }
-    const factor = (idx + 1) / 12;
-    const wave = idx % 2 === 0 ? 4 : -2;
-    return Math.min(110, Math.max(6, Math.round(baseActivity * factor + criticalCount * 6 + wave)));
-  });
+  // Genuine distribution of telemetry events across 12 temporal intervals (no synthetic waves)
+  const buckets = Array<number>(12).fill(0);
+  if (totalEventsCount > 0) {
+    const now = Date.now();
+    const rangeMs =
+      range === "24 hours"
+        ? 24 * 60 * 60 * 1000
+        : range === "7 days"
+          ? 7 * 24 * 60 * 60 * 1000
+          : 30 * 24 * 60 * 60 * 1000;
+    const bucketInterval = rangeMs / 12;
+
+    const recordTimestamp = (timeStr?: string) => {
+      if (!timeStr) return;
+      const parsed = Date.parse(timeStr);
+      let eventTime: number;
+      if (!Number.isNaN(parsed)) {
+        eventTime = parsed;
+      } else {
+        // Fallback for non-ISO time formats (e.g. "14:20") to recent window
+        eventTime = now;
+      }
+      const age = now - eventTime;
+      if (age >= 0 && age <= rangeMs) {
+        const bucketIdx = Math.min(11, Math.max(0, 11 - Math.floor(age / bucketInterval)));
+        buckets[bucketIdx] = (buckets[bucketIdx] ?? 0) + 1;
+      } else {
+        buckets[11] = (buckets[11] ?? 0) + 1;
+      }
+    };
+
+    incidents.forEach((i) => recordTimestamp(i.time));
+    threatIndicators.forEach((t) => recordTimestamp(t.lastSeen));
+    protectedServices.forEach((s) => {
+      if (s.blockedThreats > 0) {
+        buckets[11] = (buckets[11] ?? 0) + s.blockedThreats;
+      }
+    });
+  }
+
+  const riskPoints = buckets;
 
   const labels: [string, string, string, string, string] =
     range === "24 hours"

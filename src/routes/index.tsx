@@ -491,16 +491,17 @@ function Dashboard() {
     [range, incidents, assets, vulnerabilities, threatIndicators, protectedServices],
   );
 
-  const chartPath = useMemo(
-    () =>
-      currentSnapshot.riskPoints
-        .map(
-          (value, index) =>
-            `${index === 0 ? "M" : "L"} ${(index / Math.max(1, currentSnapshot.riskPoints.length - 1)) * 720} ${126 - value}`,
-        )
-        .join(" "),
-    [currentSnapshot],
-  );
+  const chartPath = useMemo(() => {
+    const pts = currentSnapshot.riskPoints;
+    const maxVal = Math.max(1, ...pts);
+    return pts
+      .map((value, index) => {
+        const x = (index / Math.max(1, pts.length - 1)) * 720;
+        const y = 126 - (value > 0 ? (value / maxVal) * 95 : 0);
+        return `${index === 0 ? "M" : "L"} ${x} ${y}`;
+      })
+      .join(" ");
+  }, [currentSnapshot]);
 
   const openIncidentCount = useMemo(
     () => incidents.filter((item) => item.status !== "Contained").length,
@@ -1925,40 +1926,55 @@ function Dashboard() {
                       </span>
                     </div>
                     <div className="mt-3 w-full overflow-hidden">
-                      <svg
-                        aria-label={`Threat activity trend over the last ${range}`}
-                        className="h-[170px] w-full overflow-visible text-primary"
-                        preserveAspectRatio="none"
-                        role="img"
-                        viewBox="0 0 720 140"
-                      >
-                        {[25, 58, 91, 124].map((y) => (
-                          <line
-                            className="stroke-border"
-                            key={y}
-                            strokeDasharray="3 6"
-                            x1="0"
-                            x2="720"
-                            y1={y}
-                            y2={y}
+                      {currentSnapshot.riskPoints.some((p) => p > 0) ||
+                      (parseInt(currentSnapshot.totalEvents.replace(/,/g, "")) || 0) > 0 ? (
+                        <svg
+                          aria-label={`Threat activity trend over the last ${range}`}
+                          className="h-[170px] w-full overflow-visible text-primary"
+                          preserveAspectRatio="none"
+                          role="img"
+                          viewBox="0 0 720 140"
+                        >
+                          {[25, 58, 91, 124].map((y) => (
+                            <line
+                              className="stroke-border"
+                              key={y}
+                              strokeDasharray="3 6"
+                              x1="0"
+                              x2="720"
+                              y1={y}
+                              y2={y}
+                            />
+                          ))}
+                          <path
+                            d={chartPath}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="2.5"
+                            vectorEffect="non-scaling-stroke"
                           />
-                        ))}
-                        <path
-                          d={chartPath}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2.5"
-                          vectorEffect="non-scaling-stroke"
-                        />
-                        <circle
-                          cx="720"
-                          cy={126 - (currentSnapshot.riskPoints.at(-1) ?? 6)}
-                          fill="currentColor"
-                          r="4.5"
-                        />
-                      </svg>
+                          {(() => {
+                            const pts = currentSnapshot.riskPoints;
+                            const maxVal = Math.max(1, ...pts);
+                            const lastVal = pts.at(-1) ?? 0;
+                            const cy = 126 - (lastVal > 0 ? (lastVal / maxVal) * 95 : 0);
+                            return <circle cx="720" cy={cy} fill="currentColor" r="4.5" />;
+                          })()}
+                        </svg>
+                      ) : (
+                        <div className="flex h-[170px] flex-col items-center justify-center rounded border border-dashed border-border/70 p-4 text-center">
+                          <Activity className="mb-2 size-6 text-muted-foreground" />
+                          <p className="text-xs font-medium text-foreground">
+                            No security events recorded in this time range
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">
+                            Telemetry ingestion active · Connect endpoints or trigger probes to
+                            stream live telemetry.
+                          </p>
+                        </div>
+                      )}
                     </div>
                     <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
                       {currentSnapshot.labels.map((label) => (
@@ -2153,6 +2169,10 @@ function Dashboard() {
               activeNav === "SIEM" ||
               activeNav === "Detection Rules") && (
               <SiemAndDetectionRulesView
+                incidents={incidents}
+                auditLogs={auditLogs}
+                integrations={integrations}
+                protectedServices={protectedServices}
                 onNavigate={handleNavigate}
                 onRecordAudit={recordAudit}
                 showToast={showToast}
