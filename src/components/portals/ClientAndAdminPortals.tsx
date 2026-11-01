@@ -3392,14 +3392,6 @@ export function PortalLoginScreen({
             <div className="grid gap-10 lg:grid-cols-12 items-center">
               {/* Hero Left: Startup Story & High-Impact Value Proposition */}
               <div className="lg:col-span-6 space-y-6">
-                <div className="inline-flex items-center gap-2.5 rounded-full border border-primary/40 bg-primary/10 px-3.5 py-1.5 text-xs font-semibold text-primary shadow-[0_0_25px_rgba(240,90,40,0.2)]">
-                  <span className="relative flex size-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                    <span className="relative inline-flex rounded-full size-2 bg-primary" />
-                  </span>
-                  <span>Born to Defend Builders in an Era of Automated Cyber Warfare</span>
-                </div>
-
                 <h1 className="text-3xl sm:text-5xl lg:text-[52px] font-extrabold tracking-tight text-white leading-[1.08]">
                   The threat world never sleeps.{" "}
                   <span className="bg-gradient-to-r from-primary via-orange-400 to-amber-300 bg-clip-text text-transparent">
