@@ -227,6 +227,7 @@ function Dashboard() {
   const [activeNav, setActiveNav] = useState("Overview");
   const [activeDocCode, setActiveDocCode] = useState<string | null>(null);
   const [activeDocRef, setActiveDocRef] = useState<string | null>(null);
+  const [activeDocSection, setActiveDocSection] = useState<"sdk_install" | "errors" | "dns_verification">("sdk_install");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapseMode, setSidebarCollapseMode] = useState<"icon" | "offcanvas">("icon");
   const [incidentFilter, setIncidentFilter] = useState("All");
@@ -1832,11 +1833,15 @@ function Dashboard() {
 
           {(activeNav === "Troubleshooting & Docs" ||
             activeNav === "Troubleshooting & Error Center" ||
-            activeNav === "docs_errors") && (
+            activeNav === "docs_errors" ||
+            activeNav === "Installation & Integration Docs" ||
+            activeNav === "How-To Install Docs") && (
             <ErrorDocumentationCenter
               initialCode={activeDocCode}
               initialReferenceId={activeDocRef}
+              initialSection={activeDocSection}
               onNavigateBack={() => handleNavigate(portalMode === "soc" ? "Overview" : "My Services")}
+              onNavigateToGlobe={() => handleNavigate("Global Traffic Mesh")}
               showToast={showToast}
             />
           )}
@@ -4449,7 +4454,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "SOC Dashboard", navKey: "Overview", icon: Activity },
-    { label: "Global Traffic Mesh (Live 3D)", navKey: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
+    { label: "Global Traffic Mesh", navKey: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
     ...(isAdminSession
       ? [{ label: "Gemini AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" }]
       : []),
@@ -4769,10 +4774,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4798,10 +4803,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4827,10 +4832,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4856,10 +4861,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4885,10 +4890,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4914,10 +4919,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4943,10 +4948,10 @@ function AppSidebar({
                           tooltip={item.label}
                           className="font-medium"
                         >
-                          <Icon className="size-4" />
-                          <span>{item.label}</span>
-                          {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
+                          <Icon className="size-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
                         </SidebarMenuButton>
+                        {item.count && <SidebarMenuBadge>{item.count}</SidebarMenuBadge>}
                       </SidebarMenuItem>
                     );
                   })}
@@ -4967,10 +4972,10 @@ function AppSidebar({
                         onClick={() => onNavigate(label)}
                         tooltip={label}
                       >
-                        <Icon />
-                        <span>{label}</span>
-                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                        <Icon className="size-4 shrink-0" />
+                        <span className="truncate">{label}</span>
                       </SidebarMenuButton>
+                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -4986,8 +4991,8 @@ function AppSidebar({
                       onClick={() => onNavigate("Overview")}
                       tooltip="Switch to SOC Command"
                     >
-                      <ShieldAlert className="size-4 text-primary" />
-                      <span>Switch to SOC Command</span>
+                      <ShieldAlert className="size-4 text-primary shrink-0" />
+                      <span className="truncate">Switch to SOC Command</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -5007,10 +5012,10 @@ function AppSidebar({
                         onClick={() => onNavigate(label)}
                         tooltip={label}
                       >
-                        <Icon />
-                        <span>{label}</span>
-                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                        <Icon className="size-4 shrink-0" />
+                        <span className="truncate">{label}</span>
                       </SidebarMenuButton>
+                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -5027,12 +5032,12 @@ function AppSidebar({
                       onClick={() => onNavigate("Overview")}
                       tooltip="SOC Operations & Live Telemetry"
                     >
-                      <ShieldAlert className="size-4 text-primary" />
-                      <span>SOC Dashboard</span>
-                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
-                        Live
-                      </SidebarMenuBadge>
+                      <ShieldAlert className="size-4 text-primary shrink-0" />
+                      <span className="truncate">SOC Dashboard</span>
                     </SidebarMenuButton>
+                    <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
+                      Live
+                    </SidebarMenuBadge>
                   </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
@@ -5050,8 +5055,8 @@ function AppSidebar({
                       onClick={() => onNavigate("My Services")}
                       tooltip="Back to Client Area"
                     >
-                      <Boxes />
-                      <span>← Back to Client Area</span>
+                      <Boxes className="size-4 shrink-0" />
+                      <span className="truncate">← Back to Client Area</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   {clientServiceDashboardItems.map(({ label, icon: Icon, count }) => (
@@ -5061,10 +5066,10 @@ function AppSidebar({
                         onClick={() => onNavigate(label)}
                         tooltip={label}
                       >
-                        <Icon />
-                        <span>{label}</span>
-                        {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
+                        <Icon className="size-4 shrink-0" />
+                        <span className="truncate">{label}</span>
                       </SidebarMenuButton>
+                      {count && <SidebarMenuBadge>{count}</SidebarMenuBadge>}
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
