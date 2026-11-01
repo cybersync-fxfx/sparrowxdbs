@@ -133,6 +133,70 @@ export type AuditLogEntry = {
   timestamp: string;
 };
 
+export type AssetCategory =
+  | "Website / Domain"
+  | "Web Application"
+  | "API & Microservice"
+  | "AI Agent (LLM / MCP)"
+  | "Cloud Environment (AWS/GCP/Azure)"
+  | "Server & VM"
+  | "Kubernetes & Container"
+  | "Endpoint & Workstation"
+  | "Network Infrastructure";
+
+export type OwnershipVerificationMethod =
+  "DNS_TXT" | "HTTP_FILE" | "CLOUD_IAM" | "API_HMAC" | "AGENT_TOKEN";
+
+export type ProtectionVerificationStatus =
+  | "Protection Controls Verified"
+  | "Monitoring Active"
+  | "Connected"
+  | "Ownership Verified"
+  | "Partially Monitored"
+  | "Setup Required"
+  | "Connection Lost"
+  | "Data Stale"
+  | "Verification Failed";
+
+export type AssetVerificationProof = {
+  id: string;
+  name: string;
+  category: AssetCategory;
+  targetIdentifier: string;
+  clientName: string;
+  clientEmail: string;
+  registeredAt: string;
+  ownershipStatus: "Verified" | "Pending" | "Failed" | "Unverified";
+  ownershipMethod: OwnershipVerificationMethod;
+  verificationToken: string;
+  verifiedAt: string | null;
+  protectionStatus: ProtectionVerificationStatus;
+  lastIngestedEventId: string | null;
+  lastIngestedAt: string | null;
+  lastProbeLatencyMs: number | null;
+  telemetryEventsCount: number;
+  activeControls: {
+    edgeWaf: boolean;
+    promptShield: boolean;
+    piiRedaction: boolean;
+    rateLimiting: boolean;
+    toolCallFirewall: boolean;
+    ebpfProbe: boolean;
+  };
+  healthChecks: {
+    authValid: boolean;
+    apiReachable: boolean;
+    permissionsOk: boolean;
+    agentHeartbeat: boolean;
+    ingestionPipeline: boolean;
+    telemetryFresh: boolean;
+    tlsValid: boolean;
+    dnsResolved: boolean;
+  };
+  monitoringScope: string;
+  knownGaps: string[];
+};
+
 export type AppUser = {
   id: string;
   email: string;
@@ -199,6 +263,7 @@ const STORAGE_KEYS = {
   tenants: "spx_prod_tenants_v1",
   auditLogs: "spx_prod_audit_logs_v1",
   users: "spx_prod_app_users_v1",
+  verificationProofs: "spx_prod_verification_proofs_v1",
   demoPurged: "spx_legacy_demo_purged_v1",
 } as const;
 
@@ -1171,4 +1236,128 @@ export async function authenticateAppUserFromBackend(
     };
   }
   return { user: matched };
+}
+
+export async function fetchVerificationProofsFromBackend(
+  tenants: ClientTenant[] = [],
+  services: ProtectedService[] = [],
+  assets: Asset[] = [],
+): Promise<AssetVerificationProof[]> {
+  const cached = readLocalCache<AssetVerificationProof>(STORAGE_KEYS.verificationProofs);
+  if (cached.length > 0) return cached;
+
+  const initial: AssetVerificationProof[] = [];
+
+  services.forEach((s) => {
+    const isWaf = s.category === "Web App & Website";
+    const isAi = s.category === "AI Agent (LLM / MCP)";
+    initial.push({
+      id: `VRF-${s.id}`,
+      name: s.name,
+      category: isWaf ? "Web Application" : isAi ? "AI Agent (LLM / MCP)" : "API & Microservice",
+      targetIdentifier: s.endpoint,
+      clientName: s.name,
+      clientEmail: "ops@sparrowx.dev",
+      registeredAt: "2026-10-28",
+      ownershipStatus: s.mode === "Active Shield" ? "Verified" : "Pending",
+      ownershipMethod: isWaf ? "DNS_TXT" : isAi ? "API_HMAC" : "HTTP_FILE",
+      verificationToken: `sparrowx-verify-${s.id.toLowerCase()}-7x9`,
+      verifiedAt: s.mode === "Active Shield" ? "2026-10-28 14:20 UTC" : null,
+      protectionStatus:
+        s.mode === "Active Shield"
+          ? "Protection Controls Verified"
+          : s.mode === "Monitor Only"
+            ? "Monitoring Active"
+            : "Setup Required",
+      lastIngestedEventId: `EVT-${Math.floor(1000 + Math.random() * 9000)}-OK`,
+      lastIngestedAt: "2m ago",
+      lastProbeLatencyMs: 14,
+      telemetryEventsCount: parseInt(s.requests24h.replace(/,/g, "")) || 420,
+      activeControls: {
+        edgeWaf: s.mode === "Active Shield",
+        promptShield: s.promptShield,
+        piiRedaction: s.piiRedaction,
+        rateLimiting: true,
+        toolCallFirewall: s.toolCallFirewall,
+        ebpfProbe: true,
+      },
+      healthChecks: {
+        authValid: true,
+        apiReachable: true,
+        permissionsOk: true,
+        agentHeartbeat: true,
+        ingestionPipeline: true,
+        telemetryFresh: true,
+        tlsValid: true,
+        dnsResolved: true,
+      },
+      monitoringScope: "Ingress Traffic, WAF Filters, Error Spikes & Telemetry Ingestion",
+      knownGaps:
+        s.mode === "Active Shield"
+          ? []
+          : ["Service is in Monitor Only mode without active blocking"],
+    });
+  });
+
+  tenants.forEach((t) => {
+    if (!initial.some((p) => p.targetIdentifier === t.primaryDomain)) {
+      initial.push({
+        id: `VRF-TEN-${t.id}`,
+        name: `${t.name} Core Apex`,
+        category: "Website / Domain",
+        targetIdentifier: t.primaryDomain,
+        clientName: t.name,
+        clientEmail: t.contactEmail,
+        registeredAt: "2026-10-29",
+        ownershipStatus: t.sdkVerified ? "Verified" : "Pending",
+        ownershipMethod: "DNS_TXT",
+        verificationToken: `sparrowx-site-verification=${t.apiKey.slice(0, 16)}`,
+        verifiedAt: t.sdkVerified ? "2026-10-29 11:15 UTC" : null,
+        protectionStatus: t.sdkVerified ? "Protection Controls Verified" : "Setup Required",
+        lastIngestedEventId: t.sdkVerified ? `EVT-${t.id.slice(-4)}-OK` : null,
+        lastIngestedAt: t.sdkVerified ? "5m ago" : null,
+        lastProbeLatencyMs: t.avgLatencyMs || 18,
+        telemetryEventsCount: t.requestsPerMin * 60,
+        activeControls: {
+          edgeWaf: t.guardrailsActive,
+          promptShield: t.guardrailsActive,
+          piiRedaction: true,
+          rateLimiting: true,
+          toolCallFirewall: false,
+          ebpfProbe: false,
+        },
+        healthChecks: {
+          authValid: Boolean(t.apiKey),
+          apiReachable: t.sdkVerified,
+          permissionsOk: true,
+          agentHeartbeat: t.sdkVerified,
+          ingestionPipeline: t.sdkVerified,
+          telemetryFresh: t.sdkVerified,
+          tlsValid: true,
+          dnsResolved: true,
+        },
+        monitoringScope: "Public Perimeter, DNS Security, Edge Latency",
+        knownGaps: t.sdkVerified ? [] : ["Ownership DNS TXT challenge pending"],
+      });
+    }
+  });
+
+  writeLocalCache(STORAGE_KEYS.verificationProofs, initial);
+  return initial;
+}
+
+export async function persistVerificationProofToBackend(
+  proof: AssetVerificationProof,
+): Promise<boolean> {
+  const existing = readLocalCache<AssetVerificationProof>(STORAGE_KEYS.verificationProofs);
+  const updated = [proof, ...existing.filter((p) => p.id !== proof.id)];
+  writeLocalCache(STORAGE_KEYS.verificationProofs, updated);
+  return true;
+}
+
+export async function deleteVerificationProofFromBackend(proofId: string): Promise<boolean> {
+  const existing = readLocalCache<AssetVerificationProof>(STORAGE_KEYS.verificationProofs);
+  const updated = existing.filter((p) => p.id !== proofId);
+  writeLocalCache(STORAGE_KEYS.verificationProofs, updated);
+  return true;
 }

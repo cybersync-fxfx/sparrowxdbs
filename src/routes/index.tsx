@@ -15,6 +15,7 @@ import { LiveOperationsView } from "@/components/LiveOperationsView";
 import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
 import { ThreatHuntingView } from "@/components/ThreatHuntingView";
 import { SiemAndDetectionRulesView } from "@/components/SiemAndDetectionRulesView";
+import { ProtectionVerificationCenter } from "@/components/ProtectionVerificationCenter";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -1220,8 +1221,14 @@ function Dashboard() {
       navLabel === "Subscription & Modules"
     ) {
       setPortalMode("client");
-    } else if (navLabel === "Help center" || navLabel === "Settings") {
-      // Retain current active portalMode
+    } else if (
+      navLabel === "Help center" ||
+      navLabel === "Settings" ||
+      navLabel === "Protection Status & Verification" ||
+      navLabel === "Protection Verification" ||
+      navLabel === "Protection Status"
+    ) {
+      // Retain current active portalMode (works in both SOC Command and Client Area)
     } else {
       // All SOC Operations (Overview, Incidents, Threat indicators, CVEs, Assets, Team, Integrations)
       setPortalMode("soc");
@@ -1660,7 +1667,27 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
-          {((portalMode === "client" && activeNav !== "Help center" && activeNav !== "Settings") ||
+          {(activeNav === "Protection Status & Verification" ||
+            activeNav === "Protection Verification" ||
+            activeNav === "Protection Status") && (
+            <ProtectionVerificationCenter
+              tenants={clientTenants}
+              services={protectedServices}
+              assets={assets}
+              auditLogs={auditLogs}
+              currentClientTenant={activeClientTenant}
+              currentUserRole={portalMode === "soc" ? "SOC Operator" : authSession.role}
+              onNavigate={handleNavigate}
+              showToast={showToast}
+            />
+          )}
+
+          {((portalMode === "client" &&
+            activeNav !== "Help center" &&
+            activeNav !== "Settings" &&
+            activeNav !== "Protection Status & Verification" &&
+            activeNav !== "Protection Verification" &&
+            activeNav !== "Protection Status") ||
             (portalMode === "soc" &&
               (activeNav === "My Services" ||
                 activeNav === "Subscriptions & Due Dates" ||
@@ -1818,6 +1845,14 @@ function Dashboard() {
                     onClick={() => handleNavigate("SIEM & Detection Rules")}
                   >
                     <Terminal className="size-3 text-primary" /> SIEM Rules
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Protection Status & Verification")}
+                  >
+                    <ShieldCheck className="size-3 text-emerald-400" /> Verify Protection
                   </Button>
                   <Button
                     size="sm"
@@ -4136,6 +4171,11 @@ function AppSidebar({
     icon: typeof Activity;
     count?: string | undefined;
   }> = [
+    {
+      label: "Protection Verification",
+      navKey: "Protection Status & Verification",
+      icon: ShieldCheck,
+    },
     { label: "Endpoints & Cloud Assets", navKey: "Assets", icon: Server },
     {
       label: "Web & AI Agent Shield",
@@ -4188,6 +4228,10 @@ function AppSidebar({
       icon: Boxes,
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
+    {
+      label: "Protection Status & Verification",
+      icon: ShieldCheck,
+    },
     { label: "Subscriptions & Due Dates", icon: Activity },
     { label: "Billing & Credits", icon: Coins },
     { label: "Profile Management", icon: Users },
@@ -4201,6 +4245,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
+    { label: "Protection Status & Verification", icon: ShieldCheck },
     ...(clientEnabledModules.includes("web_security")
       ? [{ label: "Web & WAF Security", icon: Globe2 }]
       : []),
@@ -4235,6 +4280,8 @@ function AppSidebar({
   const isInClientArea =
     !isAdminSession &&
     (activeNav === "My Services" ||
+      activeNav === "Protection Status & Verification" ||
+      activeNav === "Protection Verification" ||
       activeNav === "Subscriptions & Due Dates" ||
       activeNav === "Billing & Credits" ||
       activeNav === "Profile Management" ||
