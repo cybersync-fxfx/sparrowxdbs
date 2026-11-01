@@ -39,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
 import {
   AdminRevenueAndOutreachEngine,
+  ClientOnboardingWizard,
   LandingLiveSecurityScanner,
   LandingPricingSection,
   ViralTrustBadgeAndOutreachSection,
@@ -46,12 +47,14 @@ import {
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
 import {
   calculateServiceCost,
+  downloadPrintableInvoiceHtml,
   downloadTransactionReceipt,
   fetchBillingTransactions,
   fetchCreditBalance,
   getStoredBillingTransactions,
   getStoredCreditBalance,
   recordBillingTransaction,
+  refundBillingTransaction,
   saveStoredCreditBalance,
   CREDIT_PACKAGES,
   type BillingTransaction,
@@ -419,6 +422,15 @@ export function ClientPortalView({
         {/* TAB 1: MY SERVICES (Add Service + Click Service -> Go to Dashboard OR Manage/Rename/Delete) */}
         {currentAreaTab === "My Services" && (
           <>
+            {activeTenant && (
+              <ClientOnboardingWizard
+                tenant={activeTenant}
+                onVerifyTenantSdk={onVerifyTenantSdk}
+                onOpenSdkModal={(t) => setIntegrationTenant(t)}
+                showToast={showToast}
+              />
+            )}
+
             {showAddServiceForm && (
               <form
                 className="border border-primary/40 bg-card p-5 shadow-lg"
@@ -978,6 +990,17 @@ export function ClientPortalView({
                         >
                           Go to Dashboard <ArrowRight className="size-3.5" />
                         </Button>
+                        <Button
+                          className="h-8 px-2.5 text-xs text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            await onDeleteTenant(srv.id);
+                            showToast(`Cancelled subscription for ${srv.name}`);
+                          }}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          Cancel Plan
+                        </Button>
                       </div>
                     </div>
                   ))
@@ -1160,6 +1183,46 @@ export function ClientPortalView({
                         >
                           <Download className="size-3 mr-1" /> Receipt
                         </Button>
+                        <Button
+                          onClick={() =>
+                            downloadPrintableInvoiceHtml(tx, currentUser?.email, activeTenant?.name)
+                          }
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2.5 text-xs"
+                          title="Download Printable Tax Invoice (.html)"
+                        >
+                          <Download className="size-3 mr-1" /> Invoice
+                        </Button>
+                        {tx.status !== "refunded" &&
+                          tx.type !== "refund" &&
+                          tx.type !== "failed_attempt" && (
+                            <Button
+                              onClick={() => {
+                                const res = refundBillingTransaction(
+                                  tx.id,
+                                  "Customer requested credit refund",
+                                  activeTenant?.id,
+                                  currentUser?.email,
+                                );
+                                if (res.refundedTx) {
+                                  setCreditBalance(res.newBalance);
+                                  setBillingTransactions(
+                                    getStoredBillingTransactions(activeTenant?.id),
+                                  );
+                                  showToast(
+                                    `Refund processed for ${tx.receiptNumber}. Updated balance: ${res.newBalance} credits`,
+                                  );
+                                }
+                              }}
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-[11px] text-amber-400 hover:text-amber-300"
+                              title="Process Refund & Credit Adjustment"
+                            >
+                              Refund
+                            </Button>
+                          )}
                       </div>
                     </div>
                   ))
@@ -2137,6 +2200,7 @@ export function AdminPortalView({
               setAdminPaymentCredits(needed);
               setShowAdminPaymentModal(true);
             }}
+            onConvertProspectToTenant={onCreateTenant}
             showToast={(msg) => emitEngineToast(msg)}
           />
 
@@ -3185,83 +3249,65 @@ export function PortalLoginScreen({
       <div className="pointer-events-none fixed bottom-0 left-1/3 size-[380px] rounded-full bg-blue-500/10 blur-[160px] z-0" />
 
       {/* Top Sticky Startup Navigation Bar */}
-      <header className="sticky top-0 z-50 border-b border-[#1F1F1F] bg-black/85 backdrop-blur-xl px-4 sm:px-8 py-3.5">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setViewStage("landing")}
-              className="flex items-center gap-3 text-left group"
-            >
-              <div className="relative grid size-10 place-items-center rounded-xl bg-[#0A0A0A] border border-[#262626] p-1 text-white shadow-lg shadow-primary/20 overflow-hidden shrink-0 group-hover:border-primary/50 transition-colors">
-                <img
-                  src="/sparrowx-logo.png"
-                  alt="SparrowX Logo"
-                  className="size-full object-contain"
-                />
-                <span className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-400 border-2 border-black" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-display text-base font-bold tracking-tight text-white">
-                    sparrow<span className="text-primary">x</span>
-                  </span>
-                  <span className="hidden sm:inline-flex items-center rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
-                    Cyber Defense Startup
-                  </span>
-                </div>
-                <div className="text-[10px] font-medium uppercase tracking-wider text-zinc-400">
-                  Autonomous SOC, Web WAF & AI Guardrails
-                </div>
-              </div>
-            </button>
-          </div>
+      <header className="sticky top-0 z-50 border-b border-[#1F1F1F] bg-black/90 backdrop-blur-xl px-4 sm:px-8 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-6">
+          {/* Brand Logo (Clean & Uncluttered) */}
+          <button
+            type="button"
+            onClick={() => setViewStage("landing")}
+            className="flex items-center gap-2.5 text-left group shrink-0"
+          >
+            <div className="relative grid size-9 place-items-center rounded-xl bg-[#0A0A0A] border border-[#262626] p-1 text-white shadow-sm overflow-hidden shrink-0 group-hover:border-primary/50 transition-colors">
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX Logo"
+                className="size-full object-contain"
+              />
+              <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 border border-black" />
+            </div>
+            <div className="flex items-center gap-2 whitespace-nowrap">
+              <span className="font-display text-base font-bold tracking-tight text-white">
+                sparrow<span className="text-primary">x</span>
+              </span>
+              <span className="hidden xl:inline-flex items-center rounded-full border border-[#262626] bg-[#0A0A0A] px-2 py-0.5 text-[10px] font-medium text-zinc-400">
+                Cyber Defense
+              </span>
+            </div>
+          </button>
 
-          {/* Center Quick Navigation Links (Landing Stage) */}
+          {/* Center Quick Navigation Links (Spacious, Single-Line) */}
           {viewStage === "landing" && (
-            <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-zinc-400">
+            <nav className="hidden md:flex items-center gap-7 text-xs font-medium text-zinc-400 whitespace-nowrap">
               <a
                 href="#free-scanner"
                 className="text-primary font-semibold hover:text-orange-300 transition-colors"
               >
-                Free Domain Scanner
-              </a>
-              <a
-                href="#pricing"
-                className="text-emerald-400 font-semibold hover:text-emerald-300 transition-colors"
-              >
-                Pricing & 24h Audit
+                Free Scanner
               </a>
               <a href="#live-simulator" className="hover:text-white transition-colors">
-                Live Attack Simulator
+                Live Simulator
               </a>
               <a href="#defense-grid" className="hover:text-white transition-colors">
-                Defense Architecture
+                Platform
+              </a>
+              <a href="#pricing" className="hover:text-white transition-colors">
+                Pricing
               </a>
               <a href="#how-it-works" className="hover:text-white transition-colors">
-                60s Onboarding
+                Onboarding
               </a>
             </nav>
           )}
 
-          {/* Right Action CTAs */}
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="hidden md:flex items-center gap-2 rounded-lg border border-[#1F1F1F] bg-[#0A0A0A] px-2.5 py-1.5 text-[11px] text-zinc-400">
-              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
-                {backendSource === "supabase"
-                  ? "SparrowX Cloud Telemetry"
-                  : "SparrowX Local Engine"}
-              </span>
-            </div>
-
+          {/* Right Action CTAs (Spacious & Never Clipped) */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {viewStage === "auth" ? (
               <button
                 type="button"
                 onClick={() => setViewStage("landing")}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#0A0A0A] px-3.5 py-2 text-xs font-semibold text-zinc-200 transition-all hover:border-zinc-600 hover:text-white"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#262626] bg-[#0A0A0A] px-3.5 py-2 text-xs font-semibold text-zinc-200 transition-all hover:border-zinc-600 hover:text-white whitespace-nowrap"
               >
-                <span>← Back to Startup Story</span>
+                <span>← Back to Landing Page</span>
               </button>
             ) : (
               <>
@@ -3276,7 +3322,7 @@ export function PortalLoginScreen({
                 <button
                   type="button"
                   onClick={() => openAuthGateway("signup")}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-primary/25 transition-all hover:opacity-95 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-primary/25 transition-all hover:opacity-95 whitespace-nowrap"
                 >
                   <Shield className="size-3.5 text-white" />
                   <span>Get Protected</span>
@@ -3713,6 +3759,7 @@ export function PortalLoginScreen({
             defaultDomain={
               primaryDomain ? primaryDomain.replace(/^https?:\/\//, "") : "your-startup.io"
             }
+            tenants={tenants}
           />
 
           {/* 3-STEP 60-SECOND ONBOARDING + EMBEDDED WORKSPACE LAUNCHPAD */}
