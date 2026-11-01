@@ -12,6 +12,11 @@ import {
   verifyPasswordMatch,
 } from "@/lib/supabase";
 import { generateClientSdkSnippet } from "@/lib/client-sdk-generator";
+import {
+  collectUnifiedPlatformContext,
+  getMaskedBrainKeyStatus,
+  harvestTelemetryIntoAiMemory,
+} from "@/lib/sparrowx-ai-brain";
 
 describe("Advanced Security & AI Guardrail Features", () => {
   beforeEach(() => {
@@ -133,6 +138,89 @@ describe("Advanced Security & AI Guardrail Features", () => {
       });
       expect(snippet.code).not.toContain(fullKey);
       expect(snippet.code).toContain(masked);
+    });
+  });
+
+  describe("SparrowX Gemini AI Brain & Predictive Threat Memory", () => {
+    it("masks the Gemini API key in UI status and harvests telemetry into predictive block rules", () => {
+      const keyStatus = getMaskedBrainKeyStatus();
+      expect(keyStatus.configured).toBe(true);
+      expect(keyStatus.maskedKey).toContain("••••••••");
+
+      const digest = collectUnifiedPlatformContext({
+        activeNav: "Overview",
+        portalMode: "soc",
+        incidents: [
+          {
+            id: "INC-9991",
+            title: "SQLi Union Credential Harvest",
+            source: "api.acme.io",
+            time: "10:15",
+            severity: "Critical",
+            status: "Open",
+            assignee: "SOC",
+            summary: "Detected union select payload",
+            playbook: "WAF Block",
+            affectedAssets: 1,
+          },
+        ],
+        threatIndicators: [
+          {
+            id: "IOC-8881",
+            indicator: "198.51.100.77",
+            type: "IPv4",
+            actor: "APT-Shadow",
+            confidence: 95,
+            severity: "Critical",
+            region: "Global",
+            blocked: false,
+            lastSeen: "Just now",
+          },
+        ],
+        assets: [],
+        vulnerabilities: [],
+        protectedServices: [],
+        clientTenants: [],
+        auditLogs: [],
+      });
+
+      expect(digest.openCriticalIncidents).toBe(1);
+      expect(digest.unblockedIocsCount).toBe(1);
+
+      const harvested = harvestTelemetryIntoAiMemory({
+        incidents: [
+          {
+            id: "INC-9991",
+            title: "SQLi Union Credential Harvest",
+            source: "api.acme.io",
+            time: "10:15",
+            severity: "Critical",
+            status: "Open",
+            assignee: "SOC",
+            summary: "Detected union select payload",
+            playbook: "WAF Block",
+            affectedAssets: 1,
+          },
+        ],
+        threatIndicators: [
+          {
+            id: "IOC-8881",
+            indicator: "198.51.100.77",
+            type: "IPv4",
+            actor: "APT-Shadow",
+            confidence: 95,
+            severity: "Critical",
+            region: "Global",
+            blocked: false,
+            lastSeen: "Just now",
+          },
+        ],
+        vulnerabilities: [],
+        protectedServices: [],
+      });
+
+      expect(harvested.newlyLearned.length).toBeGreaterThanOrEqual(2);
+      expect(harvested.allPatterns.some((p) => p.indicatorValue === "198.51.100.77")).toBe(true);
     });
   });
 });

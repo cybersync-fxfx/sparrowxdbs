@@ -16,6 +16,10 @@ import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
 import { ThreatHuntingView } from "@/components/ThreatHuntingView";
 import { SiemAndDetectionRulesView } from "@/components/SiemAndDetectionRulesView";
 import { ProtectionVerificationCenter } from "@/components/ProtectionVerificationCenter";
+import {
+  GlobalAiBrainFloatingDock,
+  SparrowxAiBrainCenter,
+} from "@/components/SparrowxAiBrainCenter";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -29,6 +33,7 @@ import {
   Bell,
   BookOpen,
   Boxes,
+  Brain,
   Building2,
   Check,
   CheckCircle2,
@@ -1169,6 +1174,34 @@ function Dashboard() {
     showToast("Account profile updated");
   };
 
+  const handleEnforceGlobalAutoBlock = async (learnedCount: number) => {
+    const unblockedIocs = threatIndicators.filter((i) => !i.blocked);
+    if (unblockedIocs.length > 0) {
+      setThreatIndicators((prev) => prev.map((item) => ({ ...item, blocked: true })));
+      await Promise.all(
+        unblockedIocs.map((ioc) => persistThreatIndicatorToBackend({ ...ioc, blocked: true })),
+      );
+    }
+
+    const auditOnlyServices = protectedServices.filter((s) => s.mode === "Monitor Only");
+    if (auditOnlyServices.length > 0) {
+      setProtectedServices((prev) =>
+        prev.map((s) => ({ ...s, mode: "Active Shield" as ProtectionMode })),
+      );
+      await Promise.all(
+        auditOnlyServices.map((s) =>
+          persistProtectedServiceToBackend({ ...s, mode: "Active Shield" }),
+        ),
+      );
+    }
+
+    await recordAudit(
+      `SparrowX Gemini AI Brain learned ${learnedCount} new signature(s), auto-blocked ${unblockedIocs.length} indicator(s), and enforced Active Blocking across all services`,
+      "Global AI Brain Defense Mesh",
+      "Info",
+    );
+  };
+
   const handleSignOut = () => {
     clearSessionToken();
     setCurrentUser(null);
@@ -1222,16 +1255,18 @@ function Dashboard() {
     } else if (
       navLabel === "Help center" ||
       navLabel === "Settings" ||
+      navLabel === "AI Brain" ||
+      navLabel === "Gemini AI Brain" ||
       navLabel === "Protection Status & Verification" ||
       navLabel === "Protection Verification" ||
       navLabel === "Protection Status"
     ) {
-      // Retain current active portalMode (works in both SOC Command and Client Area)
+      // Retain current active portalMode (works in SOC Command, Client Area, and Admin)
     } else {
       // All SOC Operations (Overview, Incidents, Threat indicators, CVEs, Assets, Team, Integrations)
       setPortalMode("soc");
     }
-    setActiveNav(navLabel);
+    setActiveNav(navLabel === "Gemini AI Brain" ? "AI Brain" : navLabel);
   };
 
   if (authSession.role === "unauthenticated") {
@@ -1665,6 +1700,23 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
+          {(activeNav === "AI Brain" || activeNav === "Gemini AI Brain") && (
+            <SparrowxAiBrainCenter
+              activeNav={activeNav}
+              portalMode={portalMode}
+              incidents={incidents}
+              threatIndicators={threatIndicators}
+              assets={assets}
+              vulnerabilities={vulnerabilities}
+              protectedServices={protectedServices}
+              clientTenants={clientTenants}
+              auditLogs={auditLogs}
+              onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
+              onNavigate={handleNavigate}
+              showToast={showToast}
+            />
+          )}
+
           {(activeNav === "Protection Status & Verification" ||
             activeNav === "Protection Verification" ||
             activeNav === "Protection Status") && (
@@ -1683,6 +1735,8 @@ function Dashboard() {
           {((portalMode === "client" &&
             activeNav !== "Help center" &&
             activeNav !== "Settings" &&
+            activeNav !== "AI Brain" &&
+            activeNav !== "Gemini AI Brain" &&
             activeNav !== "Protection Status & Verification" &&
             activeNav !== "Protection Verification" &&
             activeNav !== "Protection Status") ||
@@ -1716,7 +1770,11 @@ function Dashboard() {
             />
           )}
 
-          {((portalMode === "admin" && activeNav !== "Help center" && activeNav !== "Settings") ||
+          {((portalMode === "admin" &&
+            activeNav !== "Help center" &&
+            activeNav !== "Settings" &&
+            activeNav !== "AI Brain" &&
+            activeNav !== "Gemini AI Brain") ||
             (portalMode === "soc" && activeNav === "Access Control & Audit")) && (
             <AdminPortalView
               activeNav={activeNav}
@@ -1802,6 +1860,14 @@ function Dashboard() {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2">
                     Quick Actions:
                   </span>
+                  <Button
+                    size="sm"
+                    variant="default"
+                    className="h-7 text-[11px] gap-1.5 font-semibold"
+                    onClick={() => handleNavigate("AI Brain")}
+                  >
+                    <Brain className="size-3.5" /> Gemini AI Brain
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
@@ -3872,6 +3938,20 @@ function Dashboard() {
             );
           })()}
 
+        <GlobalAiBrainFloatingDock
+          activeNav={activeNav}
+          portalMode={portalMode}
+          incidents={incidents}
+          threatIndicators={threatIndicators}
+          assets={assets}
+          vulnerabilities={vulnerabilities}
+          protectedServices={protectedServices}
+          clientTenants={clientTenants}
+          auditLogs={auditLogs}
+          onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
+          onOpenFullBrainView={() => handleNavigate("AI Brain")}
+          showToast={showToast}
+        />
         <BackgroundEngineToaster />
       </SidebarInset>
     </SidebarProvider>
@@ -4106,6 +4186,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "SOC Dashboard", navKey: "Overview", icon: Activity },
+    { label: "Gemini AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" },
     { label: "Live Operations", navKey: "Live Operations", icon: Radio },
   ];
 
@@ -4212,6 +4293,11 @@ function AppSidebar({
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
     {
+      label: "Gemini AI Brain",
+      icon: Brain,
+      count: "AI",
+    },
+    {
       label: "Protection Status & Verification",
       icon: ShieldCheck,
     },
@@ -4228,6 +4314,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
+    { label: "Gemini AI Brain", icon: Brain, count: "AI" },
     { label: "Protection Status & Verification", icon: ShieldCheck },
     ...(clientEnabledModules.includes("web_security")
       ? [{ label: "Web & WAF Security", icon: Globe2 }]
@@ -4252,6 +4339,7 @@ function AppSidebar({
         icon: Users,
         count: tenantCount > 0 ? String(tenantCount) : undefined,
       },
+      { label: "Gemini AI Brain", icon: Brain, count: "AI" },
       { label: "Performance & Kill-Switch", icon: Activity },
       {
         label: "Access Control & Audit",

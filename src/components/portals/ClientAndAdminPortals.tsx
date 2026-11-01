@@ -21,6 +21,7 @@ import {
   Mail,
   Plus,
   RefreshCw,
+  Search,
   Server,
   Shield,
   ShieldAlert,
@@ -3282,11 +3283,11 @@ export function PortalLoginScreen({
               >
                 Free Scanner
               </a>
-              <a href="#live-simulator" className="hover:text-white transition-colors">
-                Live Simulator
+              <a href="#world-threats" className="hover:text-white transition-colors">
+                Threats We Stop
               </a>
               <a href="#defense-grid" className="hover:text-white transition-colors">
-                Platform
+                What We Do
               </a>
               <a href="#pricing" className="hover:text-white transition-colors">
                 Contact Us
@@ -3604,40 +3605,45 @@ export function PortalLoginScreen({
             </div>
           </div>
 
-          {/* STARTUP MISSION SECTION: WHY WE EXIST */}
+          {/* STARTUP MISSION SECTION: WHAT WE DO, WHY WE EXIST & WORLD THREATS WE STOP */}
           <section id="startup-mission" className="mx-auto max-w-7xl px-4 sm:px-8 py-16 lg:py-20">
             <div className="max-w-3xl space-y-3">
               <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-                Why we started SparrowX: Cyber defense shouldn&apos;t be a luxury only Fortune 500s
-                can afford.
+                What is SparrowX—and why did we build it?
               </h2>
-              <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-                Attackers now use autonomous scripts and AI swarms to scan every new domain within
-                minutes of deployment. Yet most startups, indie founders, and engineering teams are
-                left completely exposed because legacy SIEM and WAF platforms require dedicated
-                security teams and $50k+ annual contracts. We are changing that.
+              <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
+                The moment you launch a website, SaaS product, API, or AI app today, automated
+                hacker scripts and AI botnets start probing it within minutes. Yet traditional
+                cybersecurity companies charge $50,000+ a year and require a full-time security
+                team.{" "}
+                <strong className="text-white">
+                  SparrowX is your autonomous 24/7 cyber defense engine
+                </strong>{" "}
+                that plugs into your app in 60 seconds, blocks real-world attacks before they touch
+                your database or AI credits, and gives you cryptographic proof that your business is
+                safe.
               </p>
             </div>
 
             <div className="mt-10 grid gap-6 md:grid-cols-3">
               {[
                 {
-                  step: "01 · THE REALITY",
-                  title: "The Threat World Is Now Automated",
-                  desc: "From SQLi and credential stuffing to LLM prompt injections that hijack AI agents, modern attacks hit APIs and web apps 24/7 without human intervention.",
-                  highlight: "Zero-day & AI-native threats",
+                  step: "01 · WHY WE EXIST",
+                  title: "Every Modern App Is a Target on Day One",
+                  desc: "Hackers don't target only big banks anymore. They run automated bots that scan every new domain for exposed APIs, SQL injection holes, leaked env keys, and unprotected OpenAI/LLM endpoints.",
+                  highlight: "24/7 automated attack waves",
                 },
                 {
-                  step: "02 · OUR RESPONSE",
-                  title: "Enterprise SOC Power for Every Team",
-                  desc: "We packaged an Edge WAF, AI Prompt Firewall, MITRE ATT&CK SIEM, and Incident Response Playbooks into a single unified command center you can deploy in 60 seconds.",
-                  highlight: "No sales calls. Instant setup.",
+                  step: "02 · WHAT WE DO",
+                  title: "An Autonomous SOC & Shield in 5 Lines of Code",
+                  desc: "We combine four enterprise systems into one lightweight platform: an Edge Web Firewall (WAF), an AI Prompt & Token-Drain Shield, a MITRE ATT&CK Threat SIEM, and Automated Compliance Reporting.",
+                  highlight: "Sub-2ms edge interception",
                 },
                 {
-                  step: "03 · OUR PROMISE",
-                  title: "Verified Proof, Never Fake Badges",
-                  desc: "Every asset you connect undergoes real DNS/HTTP ownership verification, 7-point connection health checks, and live diagnostic probes with downloadable certificates.",
-                  highlight: "100% transparent telemetry",
+                  step: "03 · WHY TEAMS TRUST US",
+                  title: "Real Cryptographic Proof—Never Fake Badges",
+                  desc: "We don't just show pretty charts. SparrowX verifies your domain via DNS/HTTP challenges, runs live 7-point diagnostic probes, exports 1-click firewall rules, and issues auditor-ready SOC 2 / ISO certificates.",
+                  highlight: "Verified live protection",
                 },
               ].map((card) => (
                 <div
@@ -3657,6 +3663,161 @@ export function PortalLoginScreen({
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* WORLD THREAT MATRIX: THE 8 REAL-WORLD ATTACKS SPARROWX NEUTRALIZES */}
+            <div id="world-threats" className="mt-16 pt-14 border-t border-[#1F1F1F]">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="max-w-3xl">
+                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
+                    GLOBAL THREAT INTELLIGENCE & ACTIVE DEFENSE MATRIX
+                  </div>
+                  <h2 className="mt-2 text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+                    What world threats does SparrowX protect you from?
+                  </h2>
+                  <p className="mt-2 text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                    Whether you run a Next.js SaaS, an e-commerce store, a fintech API, or an AI
+                    agent, here are the exact real-world attacks SparrowX intercepts before they can
+                    damage your business:
+                  </p>
+                </div>
+                <a
+                  href="#free-scanner"
+                  className="inline-flex items-center gap-2 self-start md:self-auto rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
+                >
+                  <Search className="size-3.5" />
+                  <span>Check If Your Site Is Exposed</span>
+                </a>
+              </div>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  {
+                    code: "OWASP A03 · SQLi",
+                    threat: "Database Theft & SQL Injection",
+                    danger:
+                      "Attackers inject SQL commands into forms or URLs to dump your entire user table, emails, password hashes, and billing data.",
+                    defense:
+                      "SparrowX Edge WAF parses query ASTs and drops malicious UNION/SELECT/DROP payloads in <2ms.",
+                  },
+                  {
+                    code: "OWASP LLM01 · AI",
+                    threat: "AI Prompt Injection & Jailbreaks",
+                    danger:
+                      "Malicious users trick your AI chatbot into revealing system prompts, leaking other customers' PII, or running rogue MCP tools.",
+                    defense:
+                      "Our AI Guardrail Sandbox sanitizes every prompt and blocks unauthorized tool calls before your LLM executes them.",
+                  },
+                  {
+                    code: "OWASP LLM04 · API",
+                    threat: "AI Token-Drain & Bill Bankruptcy",
+                    danger:
+                      "Automated bot scripts flood your OpenAI, Anthropic, or Gemini endpoints overnight, racking up thousands of dollars in API bills.",
+                    defense:
+                      "Autonomous velocity rate-limiting throttles abusive IPs and cuts off token-draining loops immediately.",
+                  },
+                  {
+                    code: "MITRE T1110 · BOTNET",
+                    threat: "Credential Stuffing & Account Takeover",
+                    danger:
+                      "Distributed proxy botnets test millions of leaked passwords against your /login route to hijack customer and admin accounts.",
+                    defense:
+                      "Detects brute-force bursts in real time and exports 1-click blocklists for Cloudflare, UFW, and iptables.",
+                  },
+                  {
+                    code: "OWASP A03 · XSS",
+                    threat: "Cross-Site Scripting & Cookie Theft",
+                    danger:
+                      "Attackers inject hidden JavaScript into inputs or URLs to hijack admin sessions and steal authentication tokens.",
+                    defense:
+                      "Enforces strict Content-Security-Policy (CSP) headers and neutralizes inline script injection at the edge.",
+                  },
+                  {
+                    code: "OWASP A10 · SSRF",
+                    threat: "SSRF & Cloud Key Harvesting",
+                    danger:
+                      "Hackers trick your webhooks or URL fetchers into reading internal cloud metadata (169.254.169.254) to steal AWS/GCP root keys.",
+                    defense:
+                      "Built-in SSRF and DNS-rebinding guards block private RFC 1918 and internal cloud metadata requests.",
+                  },
+                  {
+                    code: "MITRE T1059 · RCE",
+                    threat: "Zero-Day Command Injection & Scanners",
+                    danger:
+                      "Automated vulnerability scanners probe your servers 24/7 for unpatched CVEs, exposed .env files, and shell execution flaws.",
+                    defense:
+                      "Continuous CVE vulnerability tracking, server banner masking, and 1-click host isolation.",
+                  },
+                  {
+                    code: "SOC 2 · ISO 27001",
+                    threat: "Lost Enterprise Deals Due to No Compliance",
+                    danger:
+                      "Enterprise buyers refuse to sign contracts because you cannot prove active security monitoring, audit logs, or data protection.",
+                    defense:
+                      "Generates signed SOC 2 Type II, ISO 27001, and NIST readiness reports + a public Verified Protection Badge.",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.threat}
+                    className="rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-5 flex flex-col justify-between hover:border-zinc-700 transition-all"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] font-bold uppercase text-red-400 bg-red-500/10 border border-red-500/25 px-2 py-0.5 rounded">
+                          {item.code}
+                        </span>
+                        <ShieldAlert className="size-4 text-red-400 shrink-0" />
+                      </div>
+                      <h3 className="mt-3 text-sm font-bold text-white">{item.threat}</h3>
+                      <p className="mt-1.5 text-xs text-zinc-400 leading-relaxed">
+                        <strong className="text-zinc-300">Without Protection:</strong> {item.danger}
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-[#1F1F1F] text-xs text-emerald-300/90 leading-relaxed">
+                      <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
+                        <ShieldCheck className="size-3.5 shrink-0" />
+                        <span>How SparrowX Stops It:</span>
+                      </div>
+                      {item.defense}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* BEFORE VS AFTER SPARROWX COMPARISON BANNER */}
+              <div className="mt-8 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-red-500/25 bg-red-950/10 p-5">
+                  <div className="text-xs font-mono font-bold uppercase text-red-400">
+                    ✗ WITHOUT SPARROWX (EXPOSED STARTUP)
+                  </div>
+                  <ul className="mt-3 space-y-2 text-xs text-zinc-300">
+                    <li>• Origin IP, API routes, and LLM endpoints directly exposed to botnets</li>
+                    <li>• Zero visibility until a customer reports a breach or huge OpenAI bill</li>
+                    <li>• Weeks lost filling out enterprise security &amp; SOC 2 questionnaires</li>
+                    <li>• Legacy security vendors demanding $50,000/yr annual contracts</li>
+                  </ul>
+                </div>
+
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-5">
+                  <div className="text-xs font-mono font-bold uppercase text-emerald-400">
+                    ✓ WITH SPARROWX (PROTECTED &amp; VERIFIED IN 60 SECONDS)
+                  </div>
+                  <ul className="mt-3 space-y-2 text-xs text-zinc-200">
+                    <li>
+                      • SQLi, XSS, SSRF, and AI prompt jailbreaks blocked at the edge in &lt;2ms
+                    </li>
+                    <li>
+                      • Real-time SOC Command Center with Slack, Discord &amp; PagerDuty alerts
+                    </li>
+                    <li>
+                      • 1-click Cloudflare, UFW &amp; iptables blocklists + SOC 2 / ISO reports
+                    </li>
+                    <li>
+                      • Cryptographically verified Trust Badge that helps you close bigger deals
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </section>
 
