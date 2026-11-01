@@ -115,7 +115,7 @@ export function validateSafePublicTarget(rawInput: string): {
       valid: false,
       cleanHost: "",
       fullUrl: "",
-      error: "Please enter a public domain name or URL (e.g. stripe.com).",
+      error: "Please enter a public domain name or URL (e.g. yourdomain.com).",
     };
   }
   const withoutProto = trimmed.replace(/^https?:\/\//, "").replace(/^agent:\/\//, "");
@@ -900,7 +900,7 @@ export function LandingLiveSecurityScanner({
             aria-label="Public domain or URL to scan"
             value={domainInput}
             onChange={(e) => setDomainInput(e.target.value)}
-            placeholder="Enter public domain (e.g. example.com, github.com, my-startup.io)"
+            placeholder="Enter public domain (e.g. yourdomain.com)"
             className="h-11 w-full rounded-xl border border-[#2A2A2A] bg-black pl-10 pr-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-primary focus:ring-2 focus:ring-primary/25 font-mono"
           />
         </div>
@@ -926,7 +926,7 @@ export function LandingLiveSecurityScanner({
       {/* Quick sample domains */}
       <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
         <span>Try live scan on:</span>
-        {["example.com", "github.com", "news.ycombinator.com"].map((sample) => (
+        {["yourdomain.com"].map((sample) => (
           <button
             key={sample}
             type="button"
