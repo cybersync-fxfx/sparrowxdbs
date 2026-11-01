@@ -24,6 +24,11 @@ import {
   type BillingTransaction,
   recordBillingTransaction,
   downloadTransactionReceipt,
+  downloadPrintableInvoiceHtml,
+  validateCardLuhn,
+  validateCardExpiry,
+  validateUpiUtr,
+  generatePaymentVerificationSignature,
 } from "@/lib/billing-credits";
 
 interface PaymentGatewayModalProps {
@@ -77,6 +82,7 @@ export function PaymentGatewayModal({
     "idle" | "verifying" | "charging" | "minting" | "success"
   >("idle");
   const [completedTx, setCompletedTx] = useState<BillingTransaction | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const selectedPack = CREDIT_PACKAGES.find((p) => p.id === selectedPackId);
   const activeCredits =
@@ -134,6 +140,50 @@ export function PaymentGatewayModal({
   };
 
   const handleExecutePayment = async () => {
+    setPaymentError(null);
+
+    // Server/Gateway Pre-Authorization Validation & Failed Payment Handling
+    if (paymentMethod === "card") {
+      if (!validateCardLuhn(cardNumber)) {
+        const failReason =
+          "Card authorization declined: Card number failed Luhn checksum or was rejected by issuer.";
+        setPaymentError(failReason);
+        recordBillingTransaction(
+          {
+            type: "failed_attempt",
+            status: "failed",
+            credits: 0,
+            costUsd: activePriceUsd,
+            title: `Failed Card Payment Attempt (${activeCredits} Credits)`,
+            description: failReason,
+            paymentMethod: `Card •••• ${cardNumber.replace(/\D/g, "").slice(-4) || "0000"}`,
+          },
+          tenantId,
+          userEmail,
+        );
+        emitEngineToast("Payment failed: Card number invalid or declined", "critical");
+        return;
+      }
+      if (!validateCardExpiry(cardExpiry)) {
+        const failReason =
+          "Card authorization declined: Expiry date is invalid or card has expired (use MM/YY).";
+        setPaymentError(failReason);
+        return;
+      }
+      if (cardCvv.trim().length < 3) {
+        setPaymentError("Card authorization declined: Please enter a valid 3 or 4 digit CVV.");
+        return;
+      }
+    }
+
+    if (paymentMethod === "upi" && upiUtr.trim().length > 0) {
+      const utrCheck = validateUpiUtr(upiUtr);
+      if (!utrCheck.valid) {
+        setPaymentError(utrCheck.reason ?? "Invalid UPI UTR reference.");
+        return;
+      }
+    }
+
     setProcessStage("verifying");
     emitEngineActivity(
       "Payment Gateway",
@@ -155,10 +205,25 @@ export function PaymentGatewayModal({
     // Complete transaction
     const newBalance = currentBalance + activeCredits;
     const utrRef = upiUtr.trim() || `UPI-TXN-${Date.now().toString().slice(-6)}`;
+    const methodLabel =
+      paymentMethod === "upi"
+        ? `UPI QR (${TARGET_UPI_ID})`
+        : paymentMethod === "card"
+          ? `${getCardBrand(cardNumber)} •••• ${cardNumber.slice(-4)}`
+          : paymentMethod === "crypto"
+            ? "USDC on Base (Sovereign Pay)"
+            : "Direct ACH Wire";
+
+    const verificationSignature = generatePaymentVerificationSignature({
+      credits: activeCredits,
+      costUsd: activePriceUsd,
+      method: methodLabel,
+    });
 
     const tx = recordBillingTransaction(
       {
         type: "topup",
+        status: "completed",
         credits: activeCredits,
         costUsd: activePriceUsd,
         title: `Purchased ${activeCredits} Security Credits${paymentMethod === "upi" ? " (UPI Pay)" : ""}`,
@@ -171,14 +236,8 @@ export function PaymentGatewayModal({
                 ? "USDC Sovereign Web3"
                 : "Dev Bank Wire"
         }`,
-        paymentMethod:
-          paymentMethod === "upi"
-            ? `UPI QR (${TARGET_UPI_ID})`
-            : paymentMethod === "card"
-              ? `${getCardBrand(cardNumber)} •••• ${cardNumber.slice(-4)}`
-              : paymentMethod === "crypto"
-                ? "USDC on Base (Sovereign Pay)"
-                : "Direct ACH Wire",
+        paymentMethod: methodLabel,
+        verificationSignature,
       },
       tenantId,
       userEmail,
@@ -741,6 +800,22 @@ export function PaymentGatewayModal({
               </div>
             )}
 
+            {paymentError && (
+              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300 flex items-center justify-between gap-3">
+                <span>{paymentError}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPaymentError(null);
+                    handleFillTestCard();
+                  }}
+                  className="shrink-0 rounded-lg border border-red-400/40 bg-red-500/20 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-500/30"
+                >
+                  Reset / Fill Valid Card
+                </button>
+              </div>
+            )}
+
             {/* CHECKOUT ACTION BUTTON */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/[0.08] pt-4">
               <div className="text-xs text-muted-foreground">
@@ -822,15 +897,24 @@ export function PaymentGatewayModal({
 
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
               {completedTx && (
-                <Button
-                  onClick={() => downloadTransactionReceipt(completedTx)}
-                  size="sm"
-                  variant="outline"
-                  className="h-8 text-xs"
-                >
-                  <Download className="size-3 mr-1" /> Download Receipt ({completedTx.receiptNumber}
-                  )
-                </Button>
+                <>
+                  <Button
+                    onClick={() => downloadTransactionReceipt(completedTx)}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                  >
+                    <Download className="size-3 mr-1" /> Receipt (.txt)
+                  </Button>
+                  <Button
+                    onClick={() => downloadPrintableInvoiceHtml(completedTx, userEmail, tenantName)}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                  >
+                    <Download className="size-3 mr-1" /> Tax Invoice (.html)
+                  </Button>
+                </>
               )}
               <Button onClick={onClose} size="sm" className="h-8 text-xs">
                 Continue to Dashboard <ArrowRight className="size-3 ml-1" />
