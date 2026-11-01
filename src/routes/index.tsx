@@ -1784,7 +1784,7 @@ function Dashboard() {
                 onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
                 onNavigate={handleNavigate}
                 showToast={showToast}
-                initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : undefined}
+                initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : "copilot"}
               />
             ) : (
               <div className="rounded-2xl border border-destructive/30 bg-card p-8 text-center space-y-4">
@@ -2044,14 +2044,16 @@ function Dashboard() {
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2">
                     Quick Actions:
                   </span>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="h-7 text-[11px] gap-1.5 font-semibold"
-                    onClick={() => handleNavigate("AI Brain")}
-                  >
-                    <Brain className="size-3.5" /> Gemini AI Brain
-                  </Button>
+                  {authSession.role === "admin" && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-7 text-[11px] gap-1.5 font-semibold"
+                      onClick={() => handleNavigate("AI Brain")}
+                    >
+                      <Brain className="size-3.5" /> Gemini AI Brain
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"
@@ -3694,7 +3696,7 @@ function Dashboard() {
                 </article>
 
                 <article className="border border-border bg-card p-5 rounded-xl">
-                  <Clock className="size-5 text-amber-400" />
+                  <Clock3 className="size-5 text-amber-400" />
                   <h2 className="mt-3 text-base font-semibold">Activity & Operation History</h2>
                   <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
                     Full transparency record of what SparrowX has actually done: successful,
@@ -4197,20 +4199,22 @@ function Dashboard() {
             );
           })()}
 
-        <GlobalAiBrainFloatingDock
-          activeNav={activeNav}
-          portalMode={portalMode}
-          incidents={incidents}
-          threatIndicators={threatIndicators}
-          assets={assets}
-          vulnerabilities={vulnerabilities}
-          protectedServices={protectedServices}
-          clientTenants={clientTenants}
-          auditLogs={auditLogs}
-          onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
-          onOpenFullBrainView={() => handleNavigate("AI Brain")}
-          showToast={showToast}
-        />
+        {authSession.role === "admin" && (
+          <GlobalAiBrainFloatingDock
+            activeNav={activeNav}
+            portalMode={portalMode}
+            incidents={incidents}
+            threatIndicators={threatIndicators}
+            assets={assets}
+            vulnerabilities={vulnerabilities}
+            protectedServices={protectedServices}
+            clientTenants={clientTenants}
+            auditLogs={auditLogs}
+            onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
+            onOpenFullBrainView={() => handleNavigate("AI Brain")}
+            showToast={showToast}
+          />
+        )}
         <BackgroundEngineToaster />
       </SidebarInset>
     </SidebarProvider>
@@ -4446,7 +4450,9 @@ function AppSidebar({
   }> = [
     { label: "SOC Dashboard", navKey: "Overview", icon: Activity },
     { label: "Global Traffic Mesh (Live 3D)", navKey: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
-    { label: "Gemini AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" },
+    ...(isAdminSession
+      ? [{ label: "Gemini AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" }]
+      : []),
     { label: "Live Operations", navKey: "Live Operations", icon: Radio },
   ];
 
@@ -4562,11 +4568,15 @@ function AppSidebar({
       icon: Globe2,
       count: "LIVE",
     },
-    {
-      label: "Gemini AI Brain",
-      icon: Brain,
-      count: "AI",
-    },
+    ...(isAdminSession
+      ? [
+          {
+            label: "Gemini AI Brain",
+            icon: Brain,
+            count: "AI",
+          },
+        ]
+      : []),
     {
       label: "Protection Status & Verification",
       icon: ShieldCheck,
@@ -4588,7 +4598,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
-    { label: "Gemini AI Brain", icon: Brain, count: "AI" },
+    ...(isAdminSession ? [{ label: "Gemini AI Brain", icon: Brain, count: "AI" }] : []),
     { label: "Protection Status & Verification", icon: ShieldCheck },
     { label: "Defense Updates & Intel", icon: Globe2 },
     ...(clientEnabledModules.includes("web_security")

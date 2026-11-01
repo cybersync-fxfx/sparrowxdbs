@@ -1420,22 +1420,48 @@ export function GlobalAiBrainFloatingDock(
 
   return (
     <div className="fixed bottom-4 right-4 z-50">
-      {!isOpen ? (
+      {isMinimized ? (
         <button
           type="button"
-          onClick={() => setIsOpen(true)}
-          className="group flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-[#0A0A0A]/95 px-4 py-2.5 text-xs font-bold text-white shadow-[0_0_30px_rgba(240,90,40,0.3)] backdrop-blur-xl hover:border-primary transition-all cursor-pointer"
+          onClick={() => setIsMinimized(false)}
+          title={`SparrowX AI Brain (${currentDefenseVersion}) - Click to expand`}
+          className="group relative flex size-10 items-center justify-center rounded-full border border-primary/50 bg-[#0A0A0A]/95 text-primary shadow-[0_0_25px_rgba(240,90,40,0.35)] backdrop-blur-xl hover:scale-110 hover:border-primary transition-all cursor-pointer"
         >
-          <span className="relative flex size-2.5">
+          <Brain className="size-4.5 text-primary" />
+          <span className="absolute -top-0.5 -right-0.5 flex size-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex rounded-full size-2.5 bg-emerald-400" />
           </span>
-          <Brain className="size-4 text-primary" />
-          <span>SparrowX AI Brain</span>
-          <span className="rounded-md bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-mono text-emerald-300 font-bold">
-            {currentDefenseVersion}
-          </span>
         </button>
+      ) : !isOpen ? (
+        <div className="flex items-center gap-1.5 group">
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-2.5 rounded-2xl border border-primary/50 bg-[#0A0A0A]/95 px-3.5 py-2 text-xs font-bold text-white shadow-[0_0_30px_rgba(240,90,40,0.3)] backdrop-blur-xl hover:border-primary transition-all cursor-pointer"
+          >
+            <span className="relative flex size-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full size-2.5 bg-emerald-400" />
+            </span>
+            <Brain className="size-4 text-primary" />
+            <span>SparrowX AI Brain</span>
+            <span className="rounded-md bg-emerald-500/20 border border-emerald-500/30 px-1.5 py-0.5 text-[10px] font-mono text-emerald-300 font-bold">
+              {currentDefenseVersion}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMinimized(true);
+            }}
+            title="Minimize AI Brain to compact icon (prevents covering page footer)"
+            className="flex size-6 items-center justify-center rounded-full border border-zinc-700/80 bg-[#0A0A0A]/90 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors shadow-xs"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
       ) : (
         <div className="w-[360px] sm:w-[430px] rounded-2xl border border-primary/40 bg-[#0A0A0A]/98 p-4 text-white shadow-[0_0_50px_rgba(0,0,0,0.95)] backdrop-blur-xl space-y-3">
           <div className="flex items-center justify-between border-b border-[#1F1F1F] pb-2.5">
