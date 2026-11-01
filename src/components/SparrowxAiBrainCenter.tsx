@@ -1354,6 +1354,7 @@ export function GlobalAiBrainFloatingDock(
   props: SparrowxAiBrainProps & { onOpenFullBrainView?: () => void },
 ) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [quickPrompt, setQuickPrompt] = useState("");
   const [quickAnswer, setQuickAnswer] = useState<string | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);

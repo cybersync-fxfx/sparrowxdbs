@@ -32,6 +32,7 @@ import {
   GlobalAiBrainFloatingDock,
   SparrowxAiBrainCenter,
 } from "@/components/SparrowxAiBrainCenter";
+import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -1259,6 +1260,13 @@ function Dashboard() {
     visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
 
   const handleNavigate = (navLabel: string) => {
+    if (navLabel === "AI Brain" || navLabel === "Gemini AI Brain") {
+      if (authSession.role !== "admin") {
+        showToast("Gemini AI Brain is restricted to administrator accounts.", "error");
+        setActiveNav("My Services");
+        return;
+      }
+    }
     if (navLabel === "Notifications") {
       setNotificationDrawerOpen(true);
       return;
@@ -1644,26 +1652,14 @@ function Dashboard() {
               )}
             </button>
 
-            <Button
-              className="h-8.5 px-2.5 text-xs font-medium"
-              onClick={handleSignOut}
-              size="sm"
-              variant="outline"
-            >
-              <LockKeyhole className="size-3.5 text-primary" />
-              <span className="hidden sm:inline">Log Out</span>
-            </Button>
             <button
               aria-label="Open account menu"
-              className="flex size-8.5 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-secondary-foreground shadow-xs"
+              className="flex size-8.5 items-center justify-center rounded-full border border-border bg-secondary text-xs font-bold text-secondary-foreground shadow-xs hover:border-primary/50 transition-colors"
               onClick={() => setMenuOpen(!menuOpen)}
               type="button"
             >
               {userInitials}
             </button>
-
-            {/* Operational Clock positioned at the very end of the navbar */}
-            <OperationalClock />
           </div>
         </header>
 
@@ -1768,26 +1764,54 @@ function Dashboard() {
           </div>
         )}
 
-        <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
+        <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 pt-7 pb-28 sm:px-7 sm:pb-36 lg:px-9">
           {(activeNav === "AI Brain" ||
             activeNav === "Gemini AI Brain" ||
             activeNav === "Defense Updates" ||
             activeNav === "Defense Updates & Threat Intel" ||
             activeNav === "Defense Updates & Intel") && (
-            <SparrowxAiBrainCenter
-              activeNav={activeNav}
-              portalMode={portalMode}
-              incidents={incidents}
-              threatIndicators={threatIndicators}
-              assets={assets}
-              vulnerabilities={vulnerabilities}
+            authSession.role === "admin" ? (
+              <SparrowxAiBrainCenter
+                activeNav={activeNav}
+                portalMode={portalMode}
+                incidents={incidents}
+                threatIndicators={threatIndicators}
+                assets={assets}
+                vulnerabilities={vulnerabilities}
+                protectedServices={protectedServices}
+                clientTenants={clientTenants}
+                auditLogs={auditLogs}
+                onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
+                onNavigate={handleNavigate}
+                showToast={showToast}
+                initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : undefined}
+              />
+            ) : (
+              <div className="rounded-2xl border border-destructive/30 bg-card p-8 text-center space-y-4">
+                <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-destructive/15 border border-destructive/30 text-destructive">
+                  <LockKeyhole className="size-6" />
+                </div>
+                <h2 className="text-xl font-bold text-foreground">Access Restricted — Administrator Only</h2>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  The SparrowX Gemini AI Brain console is restricted to Administrator accounts.
+                  Please switch to an administrator session to access this module.
+                </p>
+                <Button onClick={() => handleNavigate("My Services")} size="sm">
+                  Return to My Services
+                </Button>
+              </div>
+            )
+          )}
+
+          {(activeNav === "Global Traffic Mesh" ||
+            activeNav === "Global Traffic Mesh (Live 3D)" ||
+            activeNav === "Global Network Mesh" ||
+            activeNav === "Live Traffic Mesh") && (
+            <GlobalTrafficMeshGlobe
+              tenants={clientTenants}
               protectedServices={protectedServices}
-              clientTenants={clientTenants}
-              auditLogs={auditLogs}
-              onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
               onNavigate={handleNavigate}
               showToast={showToast}
-              initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : undefined}
             />
           )}
 
@@ -1860,9 +1884,13 @@ function Dashboard() {
             activeNav !== "Settings" &&
             activeNav !== "AI Brain" &&
             activeNav !== "Gemini AI Brain" &&
+            activeNav !== "Global Traffic Mesh" &&
+            activeNav !== "Global Traffic Mesh (Live 3D)" &&
             activeNav !== "Protection Status & Verification" &&
             activeNav !== "Protection Verification" &&
             activeNav !== "Protection Status" &&
+            activeNav !== "Global Traffic Mesh" &&
+            activeNav !== "Global Traffic Mesh (Live 3D)" &&
             activeNav !== "Troubleshooting & Docs" &&
             activeNav !== "Troubleshooting & Error Center" &&
             activeNav !== "docs_errors" &&
@@ -1910,6 +1938,8 @@ function Dashboard() {
             activeNav !== "Settings" &&
             activeNav !== "AI Brain" &&
             activeNav !== "Gemini AI Brain" &&
+            activeNav !== "Global Traffic Mesh" &&
+            activeNav !== "Global Traffic Mesh (Live 3D)" &&
             activeNav !== "Troubleshooting & Docs" &&
             activeNav !== "Troubleshooting & Error Center" &&
             activeNav !== "docs_errors" &&
@@ -2021,6 +2051,14 @@ function Dashboard() {
                     onClick={() => handleNavigate("AI Brain")}
                   >
                     <Brain className="size-3.5" /> Gemini AI Brain
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-semibold border-primary/40 text-primary hover:bg-primary/15"
+                    onClick={() => handleNavigate("Global Traffic Mesh")}
+                  >
+                    <Globe2 className="size-3.5" /> 3D Global Traffic Mesh
                   </Button>
                   <Button
                     size="sm"
@@ -4407,6 +4445,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "SOC Dashboard", navKey: "Overview", icon: Activity },
+    { label: "Global Traffic Mesh (Live 3D)", navKey: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
     { label: "Gemini AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" },
     { label: "Live Operations", navKey: "Live Operations", icon: Radio },
   ];
@@ -4517,6 +4556,11 @@ function AppSidebar({
       label: "My Services",
       icon: Boxes,
       count: tenantCount > 0 ? String(tenantCount) : undefined,
+    },
+    {
+      label: "Global Traffic Mesh",
+      icon: Globe2,
+      count: "LIVE",
     },
     {
       label: "Gemini AI Brain",
@@ -5019,7 +5063,7 @@ function AppSidebar({
           </>
         )}
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:p-2">
+      <SidebarFooter className="border-t border-sidebar-border p-3 group-data-[collapsible=icon]:p-2 space-y-2">
         <SidebarMenu className="group-data-[collapsible=icon]:items-center">
           <SidebarMenuItem>
             <SidebarMenuButton
@@ -5100,26 +5144,51 @@ function AppSidebar({
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="mt-2 flex items-center gap-2 border-t border-sidebar-border px-1 pt-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <div className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-[10px] font-semibold">
-            {initials}
-          </div>
-          <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="truncate text-xs font-medium">{currentUser?.fullName || "Account"}</div>
-            <div className="truncate text-[10px] text-muted-foreground">
-              {currentUser?.email || "Authenticated"}
+
+        {/* Operational Clock Timer placed in left navbar bottom */}
+        <div className="pt-1">
+          <OperationalClock />
+        </div>
+
+        {/* User Account & Prominent Log Out placed in left navbar bottom */}
+        <div className="flex items-center gap-2 border-t border-sidebar-border pt-2.5 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1 group-data-[collapsible=icon]:justify-center">
+            <div className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-[10px] font-semibold border border-sidebar-border">
+              {initials}
+            </div>
+            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+              <div className="truncate text-xs font-semibold">{currentUser?.fullName || "Account"}</div>
+              <div className="truncate text-[10px] text-muted-foreground">
+                {currentUser?.email || "Authenticated"}
+              </div>
             </div>
           </div>
+          
           <Button
-            aria-label="Log out to login page"
-            className="ml-auto h-7 px-2 text-[11px] text-destructive hover:text-destructive group-data-[collapsible=icon]:hidden"
+            aria-label="Log Out to login page"
+            className="h-8 px-2.5 text-xs font-medium border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors group-data-[collapsible=icon]:hidden"
             onClick={onSignOut}
             size="sm"
-            title="Log Out to Login Page"
-            variant="ghost"
+            title="Log Out of SparrowX"
+            variant="outline"
           >
-            Log Out
+            <LockKeyhole className="size-3.5 mr-1" />
+            <span>Log Out</span>
           </Button>
+
+          {/* Icon-mode Log Out button when sidebar is collapsed */}
+          <div className="hidden group-data-[collapsible=icon]:block">
+            <Button
+              aria-label="Log out"
+              className="size-8 p-0 text-destructive hover:bg-destructive/15 hover:text-destructive"
+              onClick={onSignOut}
+              size="sm"
+              title="Log Out"
+              variant="ghost"
+            >
+              <LockKeyhole className="size-4" />
+            </Button>
+          </div>
         </div>
       </SidebarFooter>
       <SidebarRail />
@@ -5237,13 +5306,34 @@ function OperationalClock() {
   });
 
   return (
-    <div className="hidden xl:flex items-center gap-1.5 rounded-md border border-border bg-card/60 px-2 py-1 text-[11px] font-mono text-muted-foreground shadow-xs shrink-0 select-none">
-      <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-      <span className="font-semibold text-foreground">{localStr}</span>
-      <span className="text-muted-foreground/40">·</span>
-      <span>{utcStr}</span>
-      <span className="text-muted-foreground/40">·</span>
-      <span className="text-muted-foreground/80">{dateStr}</span>
+    <div className="w-full">
+      {/* Expanded sidebar view: clean, high-contrast operational telemetry clock */}
+      <div className="rounded-md border border-sidebar-border/70 bg-sidebar-accent/25 px-2.5 py-1.5 font-mono text-[11px] shadow-2xs select-none group-data-[collapsible=icon]:hidden">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1.5 font-bold text-foreground">
+            <span className="size-2 rounded-full bg-primary animate-pulse" />
+            <span>{localStr}</span>
+          </span>
+          <span className="text-[10px] text-muted-foreground font-medium">{utcStr}</span>
+        </div>
+        <div className="mt-0.5 flex items-center justify-between text-[10px] text-muted-foreground/80 font-sans">
+          <span>{dateStr}</span>
+          <span className="rounded bg-primary/10 px-1 py-0.2 font-mono text-[9px] text-primary font-bold">
+            LIVE OPS
+          </span>
+        </div>
+      </div>
+
+      {/* Collapsed sidebar view: compact pulse indicator */}
+      <div
+        className="hidden group-data-[collapsible=icon]:flex items-center justify-center py-1 cursor-default text-muted-foreground"
+        title={`${localStr} · ${utcStr} · ${dateStr}`}
+      >
+        <span className="relative flex size-2.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+          <span className="relative inline-flex rounded-full size-2.5 bg-primary" />
+        </span>
+      </div>
     </div>
   );
 }
