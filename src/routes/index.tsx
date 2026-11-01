@@ -1773,7 +1773,7 @@ function Dashboard() {
                 </section>
 
                 {/* Quick Actions Operations Toolbar */}
-                <section className="flex flex-wrap items-center gap-2 border border-border bg-card/60 p-2.5 rounded-md shadow-xs">
+                <section className="flex flex-wrap items-center gap-2 border border-border bg-card p-2.5 rounded-md shadow-xs">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-2">
                     Quick Actions:
                   </span>
@@ -1789,7 +1789,15 @@ function Dashboard() {
                     size="sm"
                     variant="outline"
                     className="h-7 text-[11px] gap-1.5 font-medium"
-                    onClick={() => handleNavigate("Alerts & Threats")}
+                    onClick={() => handleNavigate("Threat Hunting")}
+                  >
+                    <Crosshair className="size-3 text-cyan-400" /> Hunt Telemetry
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("Threat intel")}
                   >
                     <Globe2 className="size-3 text-primary" /> Block Threat IOC
                   </Button>
@@ -1797,9 +1805,17 @@ function Dashboard() {
                     size="sm"
                     variant="outline"
                     className="h-7 text-[11px] gap-1.5 font-medium"
-                    onClick={() => handleNavigate("Sites & Locations")}
+                    onClick={() => handleNavigate("Assets")}
                   >
-                    <Server className="size-3 text-primary" /> Register Host / Site
+                    <Server className="size-3 text-primary" /> Endpoints & Hosts
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px] gap-1.5 font-medium"
+                    onClick={() => handleNavigate("SIEM & Detection Rules")}
+                  >
+                    <Terminal className="size-3 text-primary" /> SIEM Rules
                   </Button>
                   <Button
                     size="sm"
@@ -1807,15 +1823,7 @@ function Dashboard() {
                     className="h-7 text-[11px] gap-1.5 font-medium"
                     onClick={() => handleNavigate("Checkpoints & Probes")}
                   >
-                    <CheckCircle2 className="size-3 text-success" /> Run Checkpoint Probes
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[11px] gap-1.5 font-medium"
-                    onClick={() => handleNavigate("Reports & Compliance")}
-                  >
-                    <FileText className="size-3 text-primary" /> Generate Report
+                    <CheckCircle2 className="size-3 text-success" /> Run Probes
                   </Button>
                   <Button
                     size="sm"
