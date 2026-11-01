@@ -1769,7 +1769,11 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 py-7 sm:px-7 lg:px-9">
-          {(activeNav === "AI Brain" || activeNav === "Gemini AI Brain") && (
+          {(activeNav === "AI Brain" ||
+            activeNav === "Gemini AI Brain" ||
+            activeNav === "Defense Updates" ||
+            activeNav === "Defense Updates & Threat Intel" ||
+            activeNav === "Defense Updates & Intel") && (
             <SparrowxAiBrainCenter
               activeNav={activeNav}
               portalMode={portalMode}
@@ -1783,6 +1787,7 @@ function Dashboard() {
               onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
               onNavigate={handleNavigate}
               showToast={showToast}
+              initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : undefined}
             />
           )}
 
@@ -3667,6 +3672,23 @@ function Dashboard() {
                   </Button>
                 </article>
 
+                <article className="border border-border bg-card p-5 rounded-xl">
+                  <Globe2 className="size-5 text-emerald-400" />
+                  <h2 className="mt-3 text-base font-semibold">Defense Updates & Threat Intel</h2>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Review live cyber threat feeds harvested from the internet (CISA KEV, AbuseIPDB,
+                    OWASP GenAI) and inspect the exact block rules added to your defense system.
+                  </p>
+                  <Button
+                    className="mt-4 h-8 px-3 text-xs"
+                    onClick={() => handleNavigate("Defense Updates")}
+                    size="sm"
+                    variant="outline"
+                  >
+                    View Defense Updates
+                  </Button>
+                </article>
+
                 <article className="border border-border bg-card p-5">
                   <Terminal className="size-5 text-primary" />
                   <h2 className="mt-3 text-base font-semibold">Web & AI Agent SDK Integration</h2>
@@ -4477,6 +4499,7 @@ function AppSidebar({
     { label: "Billing & Credits", navKey: "Billing & Credits", icon: Coins },
     { label: "Reports & Compliance", navKey: "Reports", icon: FileText },
     { label: "SOC Analysts & Access", navKey: "Team & access", icon: Users },
+    { label: "Defense Updates & Threat Intel", navKey: "Defense Updates", icon: Globe2, count: "LIVE" },
     { label: "System Status & Health", navKey: "System Status", icon: Activity },
     { label: "Activity & Operations History", navKey: "Activity History", icon: Clock3 },
     { label: "SOC Error Monitoring", navKey: "Error Monitoring", icon: AlertTriangle },
@@ -4504,6 +4527,7 @@ function AppSidebar({
       label: "Protection Status & Verification",
       icon: ShieldCheck,
     },
+    { label: "Defense Updates & Intel", icon: Globe2 },
     { label: "Subscriptions & Due Dates", icon: Activity },
     { label: "Billing & Credits", icon: Coins },
     { label: "Profile Management", icon: Users },
@@ -4522,6 +4546,7 @@ function AppSidebar({
     { label: "Client Overview", icon: Sparkles },
     { label: "Gemini AI Brain", icon: Brain, count: "AI" },
     { label: "Protection Status & Verification", icon: ShieldCheck },
+    { label: "Defense Updates & Intel", icon: Globe2 },
     ...(clientEnabledModules.includes("web_security")
       ? [{ label: "Web & WAF Security", icon: Globe2 }]
       : []),
@@ -4546,6 +4571,7 @@ function AppSidebar({
         count: tenantCount > 0 ? String(tenantCount) : undefined,
       },
       { label: "Gemini AI Brain", icon: Brain, count: "AI" },
+      { label: "Defense Updates & Intel", icon: Globe2 },
       { label: "Performance & Kill-Switch", icon: Activity },
       { label: "Error Monitoring", icon: AlertTriangle },
       { label: "System Status", icon: Activity },
@@ -4563,6 +4589,9 @@ function AppSidebar({
     (activeNav === "My Services" ||
       activeNav === "Protection Status & Verification" ||
       activeNav === "Protection Verification" ||
+      activeNav === "Defense Updates" ||
+      activeNav === "Defense Updates & Intel" ||
+      activeNav === "Defense Updates & Threat Intel" ||
       activeNav === "Subscriptions & Due Dates" ||
       activeNav === "Billing & Credits" ||
       activeNav === "Profile Management" ||
