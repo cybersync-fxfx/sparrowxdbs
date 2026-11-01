@@ -6,6 +6,11 @@ import {
   saveStoredCreditBalance,
   recordBillingTransaction,
   getStoredBillingTransactions,
+  validateCardLuhn,
+  validateCardExpiry,
+  validateUpiUtr,
+  generatePaymentVerificationSignature,
+  refundBillingTransaction,
 } from "@/lib/billing-credits";
 
 describe("Billing & Credits System", () => {
@@ -65,5 +70,42 @@ describe("Billing & Credits System", () => {
     const txs = getStoredBillingTransactions();
     expect(txs.length).toBe(1);
     expect(txs[0]?.id).toBe(tx.id);
+    expect(txs[0]?.verificationSignature).toMatch(/^SPX-SIG-/);
+  });
+
+  it("validates card numbers with Luhn checksum, expiry dates, and UPI UTR references", () => {
+    expect(validateCardLuhn("4242 4242 4242 4242")).toBe(true);
+    expect(validateCardLuhn("4000 0000 0000 0002")).toBe(false);
+    expect(validateCardLuhn("1234 5678 1234 5678")).toBe(false);
+
+    expect(validateCardExpiry("12/29")).toBe(true);
+    expect(validateCardExpiry("01/20")).toBe(false);
+
+    expect(validateUpiUtr("431298765432").valid).toBe(true);
+    expect(validateUpiUtr("").valid).toBe(false);
+
+    const sig = generatePaymentVerificationSignature({
+      credits: 500,
+      costUsd: 79,
+      method: "UPI",
+    });
+    expect(sig).toContain("500CR");
+  });
+
+  it("processes credit refunds and updates stored balance accurately", () => {
+    saveStoredCreditBalance(500);
+    const tx = recordBillingTransaction({
+      type: "topup",
+      credits: 500,
+      costUsd: 79,
+      title: "Builder Top-Up",
+      description: "UPI payment",
+      paymentMethod: "UPI",
+    });
+
+    const refundRes = refundBillingTransaction(tx.id, "Customer requested refund");
+    expect(refundRes.refundedTx).not.toBeNull();
+    expect(refundRes.newBalance).toBe(0);
+    expect(getStoredCreditBalance()).toBe(0);
   });
 });

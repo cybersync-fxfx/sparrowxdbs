@@ -3155,11 +3155,9 @@ export function PortalLoginScreen({
                 onChange={(e) => setPlanTier(e.target.value as PlanTier)}
                 className="h-9 w-full rounded-xl border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-primary"
               >
-                <option value="Starter">Starter — Indie Builders & Early Prototypes (Free)</option>
-                <option value="Growth">Growth — Startups & Production Apps ($199/mo)</option>
-                <option value="Enterprise">
-                  Enterprise — Multi-Cluster SOC & Dedicated SLA ($699/mo)
-                </option>
+                <option value="Starter">Starter — Indie Builders & Early Prototypes</option>
+                <option value="Growth">Growth — Startups & Production Apps</option>
+                <option value="Enterprise">Enterprise — Multi-Cluster SOC & Dedicated SLA</option>
               </select>
             </div>
 
@@ -3291,7 +3289,7 @@ export function PortalLoginScreen({
                 Platform
               </a>
               <a href="#pricing" className="hover:text-white transition-colors">
-                Pricing
+                Contact Us
               </a>
               <a href="#how-it-works" className="hover:text-white transition-colors">
                 Onboarding
@@ -3339,10 +3337,6 @@ export function PortalLoginScreen({
         <main className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6 py-10 lg:py-16">
           <div className="grid gap-8 lg:grid-cols-12 items-center">
             <div className="lg:col-span-5 space-y-5">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <ShieldCheck className="size-3.5" />
-                <span>Zero-Trust SOC Gateway</span>
-              </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white leading-tight">
                 Step inside your live cyber command center.
               </h1>
@@ -3613,10 +3607,6 @@ export function PortalLoginScreen({
           {/* STARTUP MISSION SECTION: WHY WE EXIST */}
           <section id="startup-mission" className="mx-auto max-w-7xl px-4 sm:px-8 py-16 lg:py-20">
             <div className="max-w-3xl space-y-3">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <Zap className="size-3.5" />
-                <span>Our Startup Manifesto</span>
-              </div>
               <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
                 Why we started SparrowX: Cyber defense shouldn&apos;t be a luxury only Fortune 500s
                 can afford.
@@ -3678,11 +3668,7 @@ export function PortalLoginScreen({
             <div className="mx-auto max-w-7xl px-4 sm:px-8">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-                    <ShieldCheck className="size-3.5" />
-                    <span>Full-Spectrum Protection Architecture</span>
-                  </div>
-                  <h2 className="mt-3 text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+                  <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
                     Four defense engines. One pitch-black command center.
                   </h2>
                 </div>
@@ -3759,10 +3745,6 @@ export function PortalLoginScreen({
             <div className="grid gap-10 lg:grid-cols-12 items-start">
               {/* Left 5 Cols: 3-Step Onboarding Flow */}
               <div className="lg:col-span-5 space-y-6">
-                <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                  <Terminal className="size-3.5" />
-                  <span>Zero-Friction Deployment</span>
-                </div>
                 <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
                   Go from exposed to verified & protected in 3 steps.
                 </h2>

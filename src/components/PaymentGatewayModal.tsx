@@ -161,7 +161,7 @@ export function PaymentGatewayModal({
           tenantId,
           userEmail,
         );
-        emitEngineToast("Payment failed: Card number invalid or declined", "critical");
+        emitEngineToast("Payment failed: Card number invalid or declined", "error");
         return;
       }
       if (!validateCardExpiry(cardExpiry)) {
