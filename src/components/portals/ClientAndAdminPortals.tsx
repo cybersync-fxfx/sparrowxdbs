@@ -3211,6 +3211,7 @@ export function PortalLoginScreen({
   const [showPassword, setShowPassword] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [loginError, setLoginError] = useState("");
+  const [showForgotNotice, setShowForgotNotice] = useState(false);
 
   // Sign-Up / Client Self-Onboarding fields
   const [fullName, setFullName] = useState("");
@@ -3665,9 +3666,18 @@ export function PortalLoginScreen({
                 <label className="text-xs font-semibold text-zinc-200" htmlFor="login-password">
                   Password
                 </label>
-                <span className="text-[11px] font-mono text-zinc-500">
-                  Zero-Trust Hashed Credential
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotNotice(!showForgotNotice)}
+                    className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
+                  >
+                    Forgot password?
+                  </button>
+                  <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline">
+                    • Hashed Credential
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
@@ -3691,6 +3701,18 @@ export function PortalLoginScreen({
                 </button>
               </div>
             </div>
+
+            {showForgotNotice && (
+              <div className="rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs text-primary space-y-1.5">
+                <div className="font-semibold flex items-center gap-1.5 text-white">
+                  <ShieldCheck className="size-3.5 text-primary" />
+                  <span>Password Reset Protocol</span>
+                </div>
+                <p className="text-[11px] text-zinc-300 leading-relaxed">
+                  To safeguard sovereign workloads, self-service automated password reset is disabled. Please contact your organization administrator or email <strong className="text-primary">security@sparrowx.net</strong> with your organization domain to verify identity and issue a secure temporary sign-in credential.
+                </p>
+              </div>
+            )}
 
             {loginError && (
               <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 text-xs text-red-300 flex items-start gap-2.5">

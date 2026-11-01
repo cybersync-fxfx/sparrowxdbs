@@ -2769,11 +2769,12 @@ export function ClientOnboardingWizard({
         `Connection verified for ${tenant.name} (${res.latencyMs}ms RTT) — Protection Active!`,
       );
     } catch (err) {
-      setTroubleshootingNote(
+      const errMsg =
         err instanceof Error
           ? err.message
-          : "Connection handshake timed out. Check your endpoint URL or firewall allowlist.",
-      );
+          : "Connection handshake timed out. Check your endpoint URL or firewall allowlist.";
+      setTroubleshootingNote(errMsg);
+      showToast(errMsg, "error");
     } finally {
       setIsVerifyingConnection(false);
     }

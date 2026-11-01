@@ -16,6 +16,18 @@ import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
 import { ThreatHuntingView } from "@/components/ThreatHuntingView";
 import { SiemAndDetectionRulesView } from "@/components/SiemAndDetectionRulesView";
 import { ProtectionVerificationCenter } from "@/components/ProtectionVerificationCenter";
+import { ErrorDocumentationCenter } from "@/components/ErrorDocumentationCenter";
+import { AdminErrorMonitoring } from "@/components/AdminErrorMonitoring";
+import { UserActivityHistory } from "@/components/UserActivityHistory";
+import { SystemStatusSection } from "@/components/SystemStatusSection";
+import {
+  notifySuccess,
+  notifyError,
+  notifyWarning,
+  notifyInfo,
+  notifyLoading,
+  registerGlobalDocsNavigator,
+} from "@/lib/feedback";
 import {
   GlobalAiBrainFloatingDock,
   SparrowxAiBrainCenter,
@@ -212,6 +224,8 @@ function Dashboard() {
 
   // Navigation & layout state
   const [activeNav, setActiveNav] = useState("Overview");
+  const [activeDocCode, setActiveDocCode] = useState<string | null>(null);
+  const [activeDocRef, setActiveDocRef] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarCollapseMode, setSidebarCollapseMode] = useState<"icon" | "offcanvas">("icon");
   const [incidentFilter, setIncidentFilter] = useState("All");
@@ -275,10 +289,32 @@ function Dashboard() {
     type: "success" | "error" | "info" | "cooking" = "success",
   ) => {
     setNotice(message);
-    emitEngineToast(message, type);
-    emitEngineActivity("Dashboard", message, type);
+    if (type === "success") {
+      notifySuccess(message, { target: activeNav });
+    } else if (type === "error") {
+      notifyError(message, {
+        target: activeNav,
+        onNavigateToDocs: (code, refId) => {
+          setActiveDocCode(code);
+          if (refId) setActiveDocRef(refId);
+          handleNavigate("Troubleshooting & Docs");
+        },
+      });
+    } else if (type === "cooking") {
+      notifyLoading(message, { target: activeNav });
+    } else {
+      notifyInfo(message, { target: activeNav });
+    }
     window.setTimeout(() => setNotice(""), 3500);
   };
+
+  useEffect(() => {
+    registerGlobalDocsNavigator((code, refId) => {
+      setActiveDocCode(code);
+      if (refId) setActiveDocRef(refId);
+      handleNavigate("Troubleshooting & Docs");
+    });
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1227,6 +1263,39 @@ function Dashboard() {
       setNotificationDrawerOpen(true);
       return;
     }
+    if (
+      navLabel === "Error Monitoring" ||
+      navLabel === "SOC Error Monitoring" ||
+      navLabel === "error_monitoring"
+    ) {
+      setPortalMode("admin");
+      setActiveNav("Error Monitoring");
+      return;
+    }
+    if (
+      navLabel === "Troubleshooting & Docs" ||
+      navLabel === "Troubleshooting & Error Center" ||
+      navLabel === "docs_errors"
+    ) {
+      setActiveNav("Troubleshooting & Docs");
+      return;
+    }
+    if (
+      navLabel === "System Status" ||
+      navLabel === "System Status & Health" ||
+      navLabel === "system_status"
+    ) {
+      setActiveNav("System Status");
+      return;
+    }
+    if (
+      navLabel === "Activity History" ||
+      navLabel === "Activity & Operations History" ||
+      navLabel === "activity_history"
+    ) {
+      setActiveNav("Activity History");
+      return;
+    }
     if (navLabel === "Client Subscriptions" || navLabel === "Performance & Kill-Switch") {
       setPortalMode("admin");
     } else if (navLabel === "Access Control & Audit") {
@@ -1732,6 +1801,55 @@ function Dashboard() {
             />
           )}
 
+          {(activeNav === "Troubleshooting & Docs" ||
+            activeNav === "Troubleshooting & Error Center" ||
+            activeNav === "docs_errors") && (
+            <ErrorDocumentationCenter
+              initialCode={activeDocCode}
+              initialReferenceId={activeDocRef}
+              onNavigateBack={() => handleNavigate(portalMode === "soc" ? "Overview" : "My Services")}
+              showToast={showToast}
+            />
+          )}
+
+          {(activeNav === "System Status" ||
+            activeNav === "System Status & Health" ||
+            activeNav === "system_status") && (
+            <SystemStatusSection
+              onNavigateToDocs={(code) => {
+                setActiveDocCode(code);
+                handleNavigate("Troubleshooting & Docs");
+              }}
+              showToast={showToast}
+            />
+          )}
+
+          {(activeNav === "Activity History" ||
+            activeNav === "Activity & Operations History" ||
+            activeNav === "activity_history") && (
+            <UserActivityHistory
+              onNavigateToDocs={(code, refId) => {
+                setActiveDocCode(code);
+                if (refId) setActiveDocRef(refId);
+                handleNavigate("Troubleshooting & Docs");
+              }}
+              showToast={showToast}
+            />
+          )}
+
+          {(activeNav === "Error Monitoring" ||
+            activeNav === "SOC Error Monitoring" ||
+            activeNav === "error_monitoring") && (
+            <AdminErrorMonitoring
+              onNavigateToDoc={(code, refId) => {
+                setActiveDocCode(code);
+                if (refId) setActiveDocRef(refId);
+                handleNavigate("Troubleshooting & Docs");
+              }}
+              showToast={showToast}
+            />
+          )}
+
           {((portalMode === "client" &&
             activeNav !== "Help center" &&
             activeNav !== "Settings" &&
@@ -1739,7 +1857,19 @@ function Dashboard() {
             activeNav !== "Gemini AI Brain" &&
             activeNav !== "Protection Status & Verification" &&
             activeNav !== "Protection Verification" &&
-            activeNav !== "Protection Status") ||
+            activeNav !== "Protection Status" &&
+            activeNav !== "Troubleshooting & Docs" &&
+            activeNav !== "Troubleshooting & Error Center" &&
+            activeNav !== "docs_errors" &&
+            activeNav !== "System Status" &&
+            activeNav !== "System Status & Health" &&
+            activeNav !== "system_status" &&
+            activeNav !== "Activity History" &&
+            activeNav !== "Activity & Operations History" &&
+            activeNav !== "activity_history" &&
+            activeNav !== "Error Monitoring" &&
+            activeNav !== "SOC Error Monitoring" &&
+            activeNav !== "error_monitoring") ||
             (portalMode === "soc" &&
               (activeNav === "My Services" ||
                 activeNav === "Subscriptions & Due Dates" ||
@@ -1774,7 +1904,19 @@ function Dashboard() {
             activeNav !== "Help center" &&
             activeNav !== "Settings" &&
             activeNav !== "AI Brain" &&
-            activeNav !== "Gemini AI Brain") ||
+            activeNav !== "Gemini AI Brain" &&
+            activeNav !== "Troubleshooting & Docs" &&
+            activeNav !== "Troubleshooting & Error Center" &&
+            activeNav !== "docs_errors" &&
+            activeNav !== "System Status" &&
+            activeNav !== "System Status & Health" &&
+            activeNav !== "system_status" &&
+            activeNav !== "Activity History" &&
+            activeNav !== "Activity & Operations History" &&
+            activeNav !== "activity_history" &&
+            activeNav !== "Error Monitoring" &&
+            activeNav !== "SOC Error Monitoring" &&
+            activeNav !== "error_monitoring") ||
             (portalMode === "soc" && activeNav === "Access Control & Audit")) && (
             <AdminPortalView
               activeNav={activeNav}
@@ -3475,6 +3617,56 @@ function Dashboard() {
               </section>
 
               <section className="grid gap-4 sm:grid-cols-3">
+                <article className="border border-border bg-card p-5 rounded-xl">
+                  <BookOpen className="size-5 text-primary" />
+                  <h2 className="mt-3 text-base font-semibold">Troubleshooting & Error Center</h2>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Search all known application error codes, view evidence-based causes, copy
+                    step-by-step repair guides, and submit safe diagnostic reports.
+                  </p>
+                  <Button
+                    className="mt-4 h-8 px-3 text-xs"
+                    onClick={() => handleNavigate("Troubleshooting & Docs")}
+                    size="sm"
+                  >
+                    Open Error Center
+                  </Button>
+                </article>
+
+                <article className="border border-border bg-card p-5 rounded-xl">
+                  <Activity className="size-5 text-emerald-400" />
+                  <h2 className="mt-3 text-base font-semibold">System Status & Health Probes</h2>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Verify real-time operational states across all 10 core subsystems: API, Auth,
+                    Database, Scanner, Firewall, AI Guardrail, SDK, and Webhooks.
+                  </p>
+                  <Button
+                    className="mt-4 h-8 px-3 text-xs"
+                    onClick={() => handleNavigate("System Status")}
+                    size="sm"
+                    variant="outline"
+                  >
+                    View System Status
+                  </Button>
+                </article>
+
+                <article className="border border-border bg-card p-5 rounded-xl">
+                  <Clock className="size-5 text-amber-400" />
+                  <h2 className="mt-3 text-base font-semibold">Activity & Operation History</h2>
+                  <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                    Full transparency record of what SparrowX has actually done: successful,
+                    pending, failed, and retried user operations with reference IDs.
+                  </p>
+                  <Button
+                    className="mt-4 h-8 px-3 text-xs"
+                    onClick={() => handleNavigate("Activity History")}
+                    size="sm"
+                    variant="outline"
+                  >
+                    View Activity Log
+                  </Button>
+                </article>
+
                 <article className="border border-border bg-card p-5">
                   <Terminal className="size-5 text-primary" />
                   <h2 className="mt-3 text-base font-semibold">Web & AI Agent SDK Integration</h2>
@@ -4285,6 +4477,10 @@ function AppSidebar({
     { label: "Billing & Credits", navKey: "Billing & Credits", icon: Coins },
     { label: "Reports & Compliance", navKey: "Reports", icon: FileText },
     { label: "SOC Analysts & Access", navKey: "Team & access", icon: Users },
+    { label: "System Status & Health", navKey: "System Status", icon: Activity },
+    { label: "Activity & Operations History", navKey: "Activity History", icon: Clock3 },
+    { label: "SOC Error Monitoring", navKey: "Error Monitoring", icon: AlertTriangle },
+    { label: "Troubleshooting & Docs", navKey: "Troubleshooting & Docs", icon: BookOpen },
     { label: "Platform Settings & MFA", navKey: "Settings", icon: Wrench },
   ];
 
@@ -4311,6 +4507,9 @@ function AppSidebar({
     { label: "Subscriptions & Due Dates", icon: Activity },
     { label: "Billing & Credits", icon: Coins },
     { label: "Profile Management", icon: Users },
+    { label: "Activity History", icon: Clock3 },
+    { label: "System Status", icon: Activity },
+    { label: "Troubleshooting & Docs", icon: BookOpen },
   ];
 
   // Service-Specific Dynamic Dashboard Sidebar: Only renders modules enabled on the selected service!
@@ -4348,6 +4547,10 @@ function AppSidebar({
       },
       { label: "Gemini AI Brain", icon: Brain, count: "AI" },
       { label: "Performance & Kill-Switch", icon: Activity },
+      { label: "Error Monitoring", icon: AlertTriangle },
+      { label: "System Status", icon: Activity },
+      { label: "Activity History", icon: Clock3 },
+      { label: "Troubleshooting & Docs", icon: BookOpen },
       {
         label: "Access Control & Audit",
         icon: LockKeyhole,
@@ -4363,6 +4566,9 @@ function AppSidebar({
       activeNav === "Subscriptions & Due Dates" ||
       activeNav === "Billing & Credits" ||
       activeNav === "Profile Management" ||
+      activeNav === "Troubleshooting & Docs" ||
+      activeNav === "System Status" ||
+      activeNav === "Activity History" ||
       !activeClientTenant);
 
   const initials = currentUser?.fullName
@@ -4833,6 +5039,16 @@ function AppSidebar({
                 </button>
               </div>
             </div>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={activeNav === "Troubleshooting & Docs" || activeNav === "Troubleshooting & Error Center"}
+              onClick={() => onNavigate("Troubleshooting & Docs")}
+              tooltip="Troubleshooting & Error Docs"
+            >
+              <BookOpen />
+              <span>Troubleshooting & Docs</span>
+            </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton

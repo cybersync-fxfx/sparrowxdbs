@@ -409,3 +409,15 @@ export function getDocFeedback(code: ErrorCode): "helpful" | "not_helpful" | nul
     return null;
   }
 }
+
+/** Clear diagnostic events and frequency tracker (used by tests / maintenance) */
+export function clearDiagnosticEvents(): void {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(FREQUENCY_KEY);
+    } catch {
+      // ignore
+    }
+  }
+}

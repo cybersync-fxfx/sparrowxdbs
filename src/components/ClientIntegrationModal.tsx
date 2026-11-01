@@ -20,6 +20,7 @@ import {
   type SdkTargetLanguage,
   type ServiceDiagnosticResult,
 } from "@/lib/client-sdk-generator";
+import { notifySuccess, notifyError, notifyLoading } from "@/lib/feedback";
 import {
   supabaseUrl,
   getSupabaseHeaders,
@@ -76,17 +77,40 @@ export function ClientIntegrationModal({
 
   const handleRunDiagnostic = async () => {
     setIsDiagnosing(true);
-    const res = await runAutomatedServiceDiagnostic(service);
-    setDiagnosticResult(res);
-    setIsDiagnosing(false);
+    try {
+      const res = await runAutomatedServiceDiagnostic(service);
+      setDiagnosticResult(res);
+      setIsDiagnosing(false);
 
-    if (res.overallStatus !== "offline") {
-      showToast(`Automated diagnostic passed — ${service.name} is verified active`);
-      if (onVerificationComplete) {
-        await onVerificationComplete(service.id);
+      if (res.overallStatus === "healthy") {
+        notifySuccess(`Automated diagnostic passed — ${service.name} is verified active (${res.avgLatencyMs}ms)`, {
+          category: "SDK & Diagnostic",
+          target: service.name,
+          latencyMs: res.avgLatencyMs,
+        });
+        if (onVerificationComplete) {
+          await onVerificationComplete(service.id);
+        }
+      } else if (res.overallStatus === "warning") {
+        showToast("Diagnostic check passed with configuration warnings", "info");
+        if (onVerificationComplete) {
+          await onVerificationComplete(service.id);
+        }
+      } else {
+        notifyError("SDK_HANDSHAKE_FAILED", {
+          target: service.name,
+          category: "SDK & Diagnostic",
+          customMessage: `Diagnostic check failed for ${service.name}. One or more security probes failed.`,
+          retryAction: handleRunDiagnostic,
+        });
       }
-    } else {
-      showToast("Diagnostic check completed with warnings");
+    } catch (err) {
+      setIsDiagnosing(false);
+      notifyError("SDK_HANDSHAKE_FAILED", {
+        target: service.name,
+        error: err,
+        retryAction: handleRunDiagnostic,
+      });
     }
   };
 
@@ -114,11 +138,22 @@ export function ClientIntegrationModal({
       if (onVerificationComplete) {
         await onVerificationComplete(service.id);
       }
-      showToast(
+      notifySuccess(
         `Verified live handshake: Security beacon emitted for ${service.name} (${latency}ms roundtrip)`,
+        {
+          category: "SDK & Diagnostic",
+          target: service.name,
+          latencyMs: latency,
+        },
       );
-    } catch {
-      showToast("Verification event sent");
+    } catch (err) {
+      notifyError("SDK_HANDSHAKE_FAILED", {
+        target: service.name,
+        category: "SDK & Diagnostic",
+        error: err,
+        customMessage: `Live verification probe failed for ${service.name}. Network handshake timed out.`,
+        retryAction: handleSendLiveProbe,
+      });
     } finally {
       setIsSendingProbe(false);
     }

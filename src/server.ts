@@ -171,6 +171,44 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     }
   }
 
+  // 4. Centralized Diagnostics Telemetry Ingest
+  if (url.pathname === "/api/v1/diagnostics") {
+    if (request.method !== "POST") {
+      return new Response(JSON.stringify({ error: "Method not allowed. Use POST." }), {
+        status: 405,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+
+    try {
+      const payload = (await request.json()) as {
+        referenceId?: string;
+        code?: string;
+        module?: string;
+        message?: string;
+      };
+
+      const refId = payload.referenceId || `SPX-ERR-${Date.now()}`;
+      return new Response(
+        JSON.stringify({
+          status: "received",
+          referenceId: refId,
+          code: payload.code || "UNKNOWN",
+          timestamp: new Date().toISOString(),
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        },
+      );
+    } catch {
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON diagnostics payload" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      );
+    }
+  }
+
   return null;
 }
 

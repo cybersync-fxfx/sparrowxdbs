@@ -178,3 +178,48 @@ function getDefaultActivityHistory(): UserOperationRecord[] {
     },
   ];
 }
+
+/**
+ * Exports user activity history into CSV string
+ */
+export function exportActivityHistoryToCsv(records?: UserOperationRecord[]): string {
+  const list = records ?? getUserActivityHistory();
+  const headers = [
+    "Operation ID",
+    "Timestamp",
+    "Category",
+    "Action",
+    "Target",
+    "Status",
+    "Duration (ms)",
+    "Error Ref ID",
+    "Details",
+  ];
+
+  const rows = list.map((item) => [
+    item.id,
+    item.timestamp,
+    item.category,
+    item.title,
+    item.affectedResource,
+    item.status,
+    item.latencyMs !== undefined ? String(item.latencyMs) : "",
+    item.errorReferenceId || "",
+    item.details.replace(/"/g, '""'),
+  ]);
+
+  return [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
+}
+
+/**
+ * Clears user activity history (used by tests / maintenance)
+ */
+export function clearUserActivityHistory(): void {
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }
+}

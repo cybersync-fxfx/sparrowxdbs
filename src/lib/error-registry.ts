@@ -1552,10 +1552,23 @@ const DOCS: Record<ErrorCode, DocInput> = {
 };
 
 export const ERROR_REGISTRY: Record<ErrorCode, ErrorDoc> = Object.fromEntries(
-  ERROR_CODES.map((code) => [
-    code,
-    { ...DOCS[code], code, updatedAt: DOCS[code].updatedAt ?? UPDATED },
-  ]),
+  ERROR_CODES.map((code) => {
+    const raw = DOCS[code];
+    return [
+      code,
+      {
+        ...raw,
+        code,
+        prevention:
+          Array.isArray(raw.prevention) && raw.prevention.length > 0
+            ? raw.prevention
+            : [
+                "Follow SparrowX operational security guidelines and verify configuration before deployment.",
+              ],
+        updatedAt: raw.updatedAt ?? UPDATED,
+      },
+    ];
+  }),
 ) as Record<ErrorCode, ErrorDoc>;
 
 export function isErrorCode(value: unknown): value is ErrorCode {
@@ -1573,7 +1586,11 @@ export function docsUrlFor(code: string, referenceId?: string): string {
 }
 
 /** Plain-text troubleshooting instructions (used by the "copy instructions" button). */
-export function formatTroubleshootingText(doc: ErrorDoc, referenceId?: string): string {
+export function formatTroubleshootingText(
+  docOrCode: ErrorDoc | ErrorCode | string,
+  referenceId?: string,
+): string {
+  const doc = typeof docOrCode === "string" ? getErrorDoc(docOrCode) : docOrCode;
   return [
     `ERROR: ${doc.code} (${doc.id})`,
     referenceId ? `Reference ID: ${referenceId}` : null,
@@ -1589,9 +1606,45 @@ export function formatTroubleshootingText(doc: ErrorDoc, referenceId?: string): 
     "",
     "Expected result:",
     `"${doc.expectedResult}"`,
+    "",
+    "Prevention & Best Practices:",
+    ...(Array.isArray(doc.prevention) ? doc.prevention.map((p) => `- ${p}`) : [`- ${doc.prevention}`]),
   ]
     .filter((line) => line !== null)
     .join("\n");
+}
+
+/** Search errors by text query, category, or severity filter */
+export function searchErrors(options?: {
+  query?: string;
+  category?: ErrorCategoryId | string;
+  severity?: ErrorSeverity;
+}): ErrorDoc[] {
+  const query = options?.query?.trim().toLowerCase();
+  const category = options?.category;
+  const severity = options?.severity;
+
+  return Object.values(ERROR_REGISTRY).filter((doc) => {
+    if (category && category !== "all" && doc.category !== category) {
+      const catObj = ERROR_CATEGORIES.find((c) => c.label === category || c.id === category);
+      if (!catObj || doc.category !== catObj.id) {
+        return false;
+      }
+    }
+    if (severity && doc.severity !== severity) {
+      return false;
+    }
+    if (query) {
+      const match =
+        doc.code.toLowerCase().includes(query) ||
+        doc.title.toLowerCase().includes(query) ||
+        doc.explanation.toLowerCase().includes(query) ||
+        doc.causes.some((c) => c.toLowerCase().includes(query)) ||
+        doc.steps.some((s) => s.toLowerCase().includes(query));
+      if (!match) return false;
+    }
+    return true;
+  });
 }
 
 /** Map an HTTP status (or network failure) to the most specific known code. */

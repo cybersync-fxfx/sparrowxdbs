@@ -168,10 +168,13 @@ export function PaymentGatewayModal({
         const failReason =
           "Card authorization declined: Expiry date is invalid or card has expired (use MM/YY).";
         setPaymentError(failReason);
+        showToast(failReason, "error");
         return;
       }
       if (cardCvv.trim().length < 3) {
-        setPaymentError("Card authorization declined: Please enter a valid 3 or 4 digit CVV.");
+        const failReason = "Card authorization declined: Please enter a valid 3 or 4 digit CVV.";
+        setPaymentError(failReason);
+        showToast(failReason, "error");
         return;
       }
     }
@@ -179,7 +182,9 @@ export function PaymentGatewayModal({
     if (paymentMethod === "upi" && upiUtr.trim().length > 0) {
       const utrCheck = validateUpiUtr(upiUtr);
       if (!utrCheck.valid) {
-        setPaymentError(utrCheck.reason ?? "Invalid UPI UTR reference.");
+        const failReason = utrCheck.reason ?? "Invalid UPI UTR reference.";
+        setPaymentError(failReason);
+        showToast(failReason, "error");
         return;
       }
     }

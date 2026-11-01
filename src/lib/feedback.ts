@@ -282,6 +282,8 @@ function detectErrorCodeFromString(msg: string): ErrorCode {
   if (lower.includes("offline") || lower.includes("network")) return "NETWORK_OFFLINE";
   if (lower.includes("save") || lower.includes("database") || lower.includes("persisted"))
     return "DB_WRITE_FAILED";
+  if (lower.includes("deploy") || lower.includes("unconfirmed"))
+    return "FIREWALL_DEPLOY_UNCONFIRMED";
   if (lower.includes("firewall") || lower.includes("rule")) return "FIREWALL_RULE_SAVE_FAILED";
   if (lower.includes("guardrail") || lower.includes("policy"))
     return "GUARDRAIL_POLICY_SAVE_FAILED";

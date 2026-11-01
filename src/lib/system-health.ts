@@ -14,6 +14,21 @@ import { verifySessionToken } from "./advanced-features";
 export type SubsystemStatus =
   "operational" | "degraded" | "partial_outage" | "major_outage" | "maintenance" | "unknown";
 
+export const SUBSYSTEM_IDS = [
+  "api_services",
+  "authentication",
+  "database",
+  "scanner",
+  "firewall",
+  "ai_guardrail",
+  "sdk_services",
+  "billing_payments",
+  "background_workers",
+  "webhooks",
+] as const;
+
+export type SubsystemId = (typeof SUBSYSTEM_IDS)[number];
+
 export interface SubsystemHealth {
   id: string;
   name: string;
@@ -78,6 +93,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "API Services & Edge Ingest",
           category: "Core API",
           status: "partial_outage",
+          latencyMs: 0,
           lastChecked: timeStr,
           details: "Failed to connect to local /api/v1/health probe.",
           uptimePct: 98.4,
@@ -111,6 +127,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "Authentication & Zero-Trust Sessions",
           category: "Identity",
           status: "degraded",
+          latencyMs: latency,
           lastChecked: timeStr,
           details: "Web Crypto API unavailable in this browser environment.",
           uptimePct: 98.0,
@@ -121,6 +138,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "Authentication & Zero-Trust Sessions",
           category: "Identity",
           status: "partial_outage",
+          latencyMs: 0,
           lastChecked: timeStr,
           details: "Authentication token verification threw unexpected error.",
           uptimePct: 95.0,
@@ -136,6 +154,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "SparrowX Cloud Sovereign Database",
           category: "Storage",
           status: "degraded",
+          latencyMs: 0,
           lastChecked: timeStr,
           details: "Cloud database not configured. Local storage fallback active.",
           uptimePct: 95.0,
@@ -178,6 +197,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "SparrowX Cloud Sovereign Database",
           category: "Storage",
           status: "partial_outage",
+          latencyMs: 0,
           lastChecked: timeStr,
           details: "Database connection failed. Check network or CORS policies.",
           uptimePct: 97.5,
@@ -210,6 +230,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "Public DNS & Security Scanner",
           category: "Inspection",
           status: "degraded",
+          latencyMs: latency,
           lastChecked: timeStr,
           details: "DNS resolver slow or returned non-200 status.",
           uptimePct: 98.5,
@@ -220,6 +241,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "Public DNS & Security Scanner",
           category: "Inspection",
           status: "partial_outage",
+          latencyMs: 0,
           lastChecked: timeStr,
           details: "Cannot reach public DoH resolver from this client.",
           uptimePct: 97.0,
@@ -283,6 +305,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "SDK Telemetry & Ingestion Gateways",
           category: "Integration",
           status: "degraded",
+          latencyMs: latency,
           lastChecked: timeStr,
           details: "Edge telemetry gateway reported elevated latency.",
           uptimePct: 99.1,
@@ -293,6 +316,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
           name: "SDK Telemetry & Ingestion Gateways",
           category: "Integration",
           status: "degraded",
+          latencyMs: 0,
           lastChecked: timeStr,
           details: "SDK verification running in offline simulator mode.",
           uptimePct: 98.0,
@@ -369,5 +393,23 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
     outageCount,
     lastProbeTime: timeStr,
     subsystems: results,
+  };
+}
+
+export function checkSystemHealthSummary(health: SystemOverallHealth): {
+  totalSubsystems: number;
+  overallState: SubsystemStatus;
+  operationalCount: number;
+  degradedCount: number;
+  outageCount: number;
+  timestamp: string;
+} {
+  return {
+    totalSubsystems: health.subsystems.length,
+    overallState: health.overallStatus,
+    operationalCount: health.operationalCount,
+    degradedCount: health.degradedCount,
+    outageCount: health.outageCount,
+    timestamp: health.lastProbeTime,
   };
 }
