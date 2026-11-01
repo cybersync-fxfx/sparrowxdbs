@@ -26,6 +26,8 @@ import {
   type ProtectedService,
   type TeamMember,
   type AuditLogEntry,
+  supabaseUrl,
+  getSupabaseHeaders,
 } from "@/lib/supabase";
 
 export function LiveOperationsView({
@@ -54,18 +56,15 @@ export function LiveOperationsView({
   const [liveLatency, setLiveLatency] = useState<number | null>(null);
   const [isPinging, setIsPinging] = useState(false);
 
-  // Measure true network roundtrip to Supabase REST endpoint
+  // Measure true network roundtrip to SparrowX Cloud Telemetry Engine
   const checkLiveLatency = async () => {
     setIsPinging(true);
     const t0 = performance.now();
     try {
       const res = await fetch(
-        "https://yidqdgufjgfyxflgvbqq.supabase.co/rest/v1/incidents?select=id&limit=1",
+        `${supabaseUrl}/rest/v1/incidents?select=id&limit=1`,
         {
-          headers: {
-            apikey: "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-",
-            Authorization: "Bearer sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-",
-          },
+          headers: getSupabaseHeaders(),
         },
       );
       if (res.ok) {
@@ -105,7 +104,7 @@ export function LiveOperationsView({
           </h1>
           <p className="mt-1 text-xs text-muted-foreground max-w-2xl leading-relaxed">
             Real-time operational status, perimeter threat drops, active on-duty personnel, and
-            direct latency telemetry to SparrowX Supabase Cloud.
+            direct latency telemetry to the SparrowX Sovereign Cloud Engine.
           </p>
         </div>
 

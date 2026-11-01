@@ -83,8 +83,8 @@ export function AiGuardrailSandbox({
       id: `AUD-${Date.now().toString().slice(-4)}`,
       actor: "Autonomous AI Guardrail",
       role: "System",
-      action: `Escalated Sandbox Threat to Supabase Queue: ${result.threatCategory} (${incId})`,
-      target: "Supabase Incident Operations",
+      action: `Escalated Sandbox Threat to SparrowX SOC Queue: ${result.threatCategory} (${incId})`,
+      target: "SparrowX Incident Operations",
       severity: result.blocked ? "Critical" : "Warning",
       timestamp: "Just now",
     });
@@ -92,7 +92,7 @@ export function AiGuardrailSandbox({
     onIncidentLogged?.(newInc);
     setEscalatedId(incId);
     setIsEscalating(false);
-    showToast?.(`Escalated ${incId} directly to Supabase Incident Operations & Audit Log!`);
+    showToast?.(`Escalated ${incId} directly to SparrowX Incident Operations & Audit Log!`);
   };
 
   return (
@@ -105,12 +105,12 @@ export function AiGuardrailSandbox({
             </span>
             <h2 className="text-base font-semibold">Interactive AI Guardrail & Threat Sandbox</h2>
             <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-mono text-emerald-400">
-              Supabase Backend Connected
+              SparrowX Core Engine Active
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Test prompt injections, PII redactions, and MCP tool-call firewalls live, and escalate
-            verified threats directly to your Supabase incident queue.
+            verified threats directly to your SparrowX SOC incident queue.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -204,14 +204,14 @@ export function AiGuardrailSandbox({
                       size="sm"
                       variant="destructive"
                       className="h-7 px-2.5 text-[11px] gap-1"
-                      title="Commit threat directly to Supabase Incidents table and Audit Log"
+                      title="Commit threat directly to SparrowX SOC Incidents and Audit Log"
                     >
                       <ShieldAlert className="size-3" />
                       {escalatedId
                         ? `Logged (${escalatedId})`
                         : isEscalating
-                          ? "Logging to Supabase..."
-                          : "Escalate to Supabase"}
+                          ? "Logging to SparrowX..."
+                          : "Escalate to SparrowX SOC"}
                     </Button>
                   )}
                 </div>

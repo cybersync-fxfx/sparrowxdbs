@@ -5,6 +5,13 @@ import {
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
+import {
+  generateSecureSparrowKey,
+  hashSecretPassword,
+  maskSecretKey,
+  verifyPasswordMatch,
+} from "@/lib/supabase";
+import { generateClientSdkSnippet } from "@/lib/client-sdk-generator";
 
 describe("Advanced Security & AI Guardrail Features", () => {
   beforeEach(() => {
@@ -97,6 +104,35 @@ describe("Advanced Security & AI Guardrail Features", () => {
       expect(verified?.email).toBe("secops@sparrowx.net");
       expect(verified?.role).toBe("admin");
       expect(verified?.permissions).toContain("incidents:write");
+    });
+  });
+
+  describe("Zero-Trust Credential Hashing, CSPRNG Key Generation & Secret Masking", () => {
+    it("hashes passwords deterministically and never stores raw plaintext", () => {
+      const raw = "SuperSecret#2026!";
+      const digest = hashSecretPassword(raw);
+      expect(digest).toMatch(/^spx_digest\$[0-9a-f]{16}$/);
+      expect(digest).not.toContain(raw);
+      expect(verifyPasswordMatch(raw, digest)).toBe(true);
+      expect(verifyPasswordMatch("WrongPassword", digest)).toBe(false);
+    });
+
+    it("generates CSPRNG API keys and masks sensitive credentials in UI & SDK snippets", () => {
+      const fullKey = generateSecureSparrowKey("spx_live_web");
+      expect(fullKey).toMatch(/^spx_live_web_[0-9a-f]{24}$/);
+
+      const masked = maskSecretKey(fullKey);
+      expect(masked).toContain("••••••••");
+      expect(masked).not.toBe(fullKey);
+
+      const snippet = generateClientSdkSnippet("nextjs", {
+        id: "SRV-101",
+        name: "Acme Gateway",
+        endpoint: "https://api.acme.io",
+        apiKey: fullKey,
+      });
+      expect(snippet.code).not.toContain(fullKey);
+      expect(snippet.code).toContain(masked);
     });
   });
 });

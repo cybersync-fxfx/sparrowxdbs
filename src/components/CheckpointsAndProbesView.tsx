@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { emitEngineActivity, emitEngineToast } from "@/components/BackgroundEngineToaster";
-import { type ClientTenant, type ProtectedService, persistAuditLogToBackend } from "@/lib/supabase";
+import { type ClientTenant, type ProtectedService, persistAuditLogToBackend, maskSecretKey } from "@/lib/supabase";
 
 export function CheckpointsAndProbesView({
   tenants,
@@ -241,7 +241,7 @@ export function CheckpointsAndProbesView({
                         <span>·</span>
                         <span>Modules: {srv.enabledModules.join(", ")}</span>
                         <span>·</span>
-                        <span className="font-mono">API Key: {srv.apiKey.slice(0, 14)}...</span>
+                        <span className="font-mono">API Key: {maskSecretKey(srv.apiKey)}</span>
                       </div>
                     </div>
                   </div>

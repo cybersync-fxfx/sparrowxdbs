@@ -1039,7 +1039,7 @@ export function ProtectionVerificationCenter({
                   <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
                     <li>Public Ingress WAF on verified root and subdomains.</li>
                     <li>LLM Guardrails on registered MCP and OpenAI/Anthropic proxies.</li>
-                    <li>Audit log ingestion from Supabase REST and Cloudflare webhooks.</li>
+                    <li>Audit log ingestion from SparrowX Telemetry Mesh and Edge webhooks.</li>
                     <li>Automated probe validation and latency health checks.</li>
                   </ul>
                 </div>
@@ -1109,9 +1109,9 @@ export function ProtectionVerificationCenter({
 
             <div className="border border-border bg-background p-3.5 rounded-sm">
               <div className="text-xs font-semibold text-foreground flex items-center justify-center gap-1 mb-1">
-                <Database className="size-3.5 text-amber-400" /> Hop 4: Supabase Store
+                <Database className="size-3.5 text-amber-400" /> Hop 4: SparrowX Core Vault
               </div>
-              <p className="text-[11px] text-muted-foreground">audit_logs & events tables</p>
+              <p className="text-[11px] text-muted-foreground">Encrypted SOC Telemetry Ledger</p>
               <span className="mt-2 inline-block rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/30">
                 Immutable Ledger
               </span>
@@ -1422,7 +1422,7 @@ export function ProtectionVerificationCenter({
                     ) : (
                       <XCircle className="size-3.5 text-destructive" />
                     )}
-                    <span>Supabase Ingestion Pipeline</span>
+                    <span>SparrowX Ingestion Pipeline</span>
                   </div>
                   <div className="flex items-center gap-2">
                     {selectedProof.healthChecks.tlsValid ? (

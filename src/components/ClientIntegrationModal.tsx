@@ -20,7 +20,7 @@ import {
   type SdkTargetLanguage,
   type ServiceDiagnosticResult,
 } from "@/lib/client-sdk-generator";
-import { supabaseUrl, getSupabaseHeaders, persistAuditLogToBackend } from "@/lib/supabase";
+import { supabaseUrl, getSupabaseHeaders, persistAuditLogToBackend, maskSecretKey } from "@/lib/supabase";
 
 export function ClientIntegrationModal({
   service,
@@ -150,7 +150,7 @@ export function ClientIntegrationModal({
             </div>
             <p className="mt-1 text-xs text-muted-foreground font-mono">
               Target: <span className="text-foreground">{service.endpoint}</span> · Key:{" "}
-              <code className="text-primary">{service.apiKey.slice(0, 16)}...</code>
+              <code className="text-primary">{maskSecretKey(service.apiKey)}</code>
             </p>
           </div>
           <Button
@@ -184,7 +184,7 @@ export function ClientIntegrationModal({
                 { id: "python_fastapi", label: "Python FastAPI" },
                 { id: "ai_agent_mcp", label: "AI Agent & MCP" },
                 { id: "curl", label: "Terminal cURL" },
-                { id: "cloudflare_worker", label: "Cloudflare" },
+                { id: "cloudflare_worker", label: "SparrowX Edge Worker" },
               ] as const
             ).map((lang) => (
               <button

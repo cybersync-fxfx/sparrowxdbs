@@ -117,7 +117,7 @@ export function IncidentStatisticsView({
           </h1>
           <p className="mt-1 text-xs text-muted-foreground max-w-2xl leading-relaxed">
             Forensic breakdown of incident severity, category distributions, containment velocity,
-            and exposure trends computed from your live Supabase cloud records.
+            and exposure trends computed from your live SparrowX Sovereign Vault records.
           </p>
         </div>
 

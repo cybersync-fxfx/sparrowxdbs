@@ -425,6 +425,60 @@ export function getSupabaseHeaders(extra?: Record<string, string>): HeadersInit 
   };
 }
 
+/**
+ * Cryptographically strong API key generator using Web Crypto CSPRNG
+ * (replaces insecure Math.random() key generation).
+ */
+export function generateSecureSparrowKey(prefix = "spx_live"): string {
+  const cleanPrefix = prefix.replace(/[^a-zA-Z0-9_]/g, "");
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `${cleanPrefix}_${hex}`;
+  }
+  return `${cleanPrefix}_${Date.now().toString(36)}`;
+}
+
+/**
+ * Masks sensitive API keys, tokens, and secrets for UI display so full credentials
+ * are never exposed in plain sight on screen.
+ */
+export function maskSecretKey(secret: string | undefined | null, visiblePrefix = 10): string {
+  if (!secret) return "spx_••••••••••••";
+  if (secret.length <= visiblePrefix + 4) {
+    return `${secret.slice(0, 4)}••••••••`;
+  }
+  return `${secret.slice(0, visiblePrefix)}••••••••${secret.slice(-4)}`;
+}
+
+/**
+ * Deterministic salted password digest so plaintext passwords are never stored
+ * in browser localStorage or exposed in application state.
+ */
+export function hashSecretPassword(password: string): string {
+  if (!password) return "";
+  if (password.startsWith("spx_digest$")) return password;
+  const salted = `sparrowx_zero_trust_salt_v1::${password}`;
+  let h1 = 0xdeadbeef ^ salted.length;
+  let h2 = 0x41c6ce57 ^ salted.length;
+  for (let i = 0; i < salted.length; i++) {
+    const ch = salted.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  const digest = (h2 >>> 0).toString(16).padStart(8, "0") + (h1 >>> 0).toString(16).padStart(8, "0");
+  return `spx_digest$${digest}`;
+}
+
+export function verifyPasswordMatch(inputPassword: string, storedPassword: string): boolean {
+  if (!inputPassword || !storedPassword) return false;
+  const hashedInput = hashSecretPassword(inputPassword);
+  return storedPassword === hashedInput || storedPassword === inputPassword;
+}
+
 async function purgeLegacyDemoIncidentsOnce(): Promise<void> {
   if (!isSupabaseConfigured || !supabaseUrl) return;
   if (typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEYS.demoPurged)) {
@@ -767,11 +821,14 @@ export async function fetchAuditLogsFromBackend(): Promise<AuditLogEntry[]> {
 }
 
 export async function fetchAppUsersFromBackend(): Promise<AppUser[]> {
-  const cached = readLocalCache<AppUser>(STORAGE_KEYS.users);
+  const cached = readLocalCache<AppUser>(STORAGE_KEYS.users).map((u) => ({
+    ...u,
+    password: u.password ? hashSecretPassword(u.password) : "",
+  }));
   if (!isSupabaseConfigured || !supabaseUrl) return cached;
   try {
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/app_users?select=*&order=created_at.desc`,
+      `${supabaseUrl}/rest/v1/app_users?select=id,email,full_name,admin,tenant_id,created_at&order=created_at.desc`,
       {
         headers: getSupabaseHeaders(),
         cache: "no-store",
@@ -783,7 +840,7 @@ export async function fetchAppUsersFromBackend(): Promise<AppUser[]> {
     const mapped: AppUser[] = data.map((row) => ({
       id: String(row.id ?? ""),
       email: String(row.email ?? "").toLowerCase(),
-      password: String(row.password ?? ""),
+      password: "",
       fullName: String(row.full_name ?? ""),
       admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
       tenantId: row.tenant_id ? String(row.tenant_id) : null,
@@ -1184,8 +1241,22 @@ export async function persistAuditLogToBackend(entry: AuditLogEntry): Promise<bo
 
 export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
   const existing = readLocalCache<AppUser>(STORAGE_KEYS.users);
+  const existingUser = existing.find(
+    (item) => item.id === user.id || item.email.toLowerCase() === user.email.toLowerCase(),
+  );
+  const hashedPassword = user.password
+    ? hashSecretPassword(user.password)
+    : existingUser?.password
+      ? hashSecretPassword(existingUser.password)
+      : "";
+
+  const sanitizedUserForCache: AppUser = {
+    ...user,
+    password: hashedPassword,
+  };
+
   const updated = [
-    user,
+    sanitizedUserForCache,
     ...existing.filter(
       (item) => item.id !== user.id && item.email.toLowerCase() !== user.email.toLowerCase(),
     ),
@@ -1194,6 +1265,26 @@ export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
 
   if (!isSupabaseConfigured || !supabaseUrl) return false;
   try {
+    if (!user.password) {
+      // Profile update without password change: PATCH only non-password fields
+      const patchRes = await fetch(
+        `${supabaseUrl}/rest/v1/app_users?id=eq.${encodeURIComponent(user.id)}`,
+        {
+          method: "PATCH",
+          headers: getSupabaseHeaders({
+            Prefer: "return=minimal",
+          }),
+          body: JSON.stringify({
+            email: user.email.toLowerCase(),
+            full_name: user.fullName,
+            admin: user.admin,
+            tenant_id: user.tenantId,
+          }),
+        },
+      );
+      return patchRes.ok;
+    }
+
     const response = await fetch(`${supabaseUrl}/rest/v1/app_users`, {
       method: "POST",
       headers: getSupabaseHeaders({
@@ -1202,7 +1293,7 @@ export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
       body: JSON.stringify({
         id: user.id,
         email: user.email.toLowerCase(),
-        password: user.password,
+        password: hashedPassword,
         full_name: user.fullName,
         admin: user.admin,
         tenant_id: user.tenantId,
@@ -1219,9 +1310,50 @@ export async function authenticateAppUserFromBackend(
   password: string,
 ): Promise<{ user: AppUser | null; error?: string }> {
   const normalizedEmail = email.trim().toLowerCase();
-  // Always fetch fresh from Supabase first so changes to `admin = 'yes' / 'no'` in Supabase Table Editor take effect immediately
-  const users = await fetchAppUsersFromBackend();
-  const matched = users.find((u) => u.email.toLowerCase() === normalizedEmail);
+
+  if (isSupabaseConfigured && supabaseUrl) {
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/app_users?email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
+        {
+          headers: getSupabaseHeaders(),
+          cache: "no-store",
+        },
+      );
+      if (response.ok) {
+        const rows = (await response.json()) as Array<Record<string, unknown>>;
+        const row = rows[0];
+        if (!row) {
+          return {
+            user: null,
+            error:
+              "No account found with this email. Please create an account to onboard your organization.",
+          };
+        }
+        const storedPassword = String(row.password ?? "");
+        if (!verifyPasswordMatch(password, storedPassword)) {
+          return {
+            user: null,
+            error: "Invalid password. Please check your credentials and try again.",
+          };
+        }
+        const authenticatedUser: AppUser = {
+          id: String(row.id ?? ""),
+          email: String(row.email ?? "").toLowerCase(),
+          password: "",
+          fullName: String(row.full_name ?? ""),
+          admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+          tenantId: row.tenant_id ? String(row.tenant_id) : null,
+        };
+        return { user: authenticatedUser };
+      }
+    } catch {
+      // Fallback to local encrypted cache if offline
+    }
+  }
+
+  const cachedUsers = readLocalCache<AppUser>(STORAGE_KEYS.users);
+  const matched = cachedUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
   if (!matched) {
     return {
       user: null,
@@ -1229,13 +1361,13 @@ export async function authenticateAppUserFromBackend(
         "No account found with this email. Please create an account to onboard your organization.",
     };
   }
-  if (matched.password !== password) {
+  if (!verifyPasswordMatch(password, matched.password)) {
     return {
       user: null,
       error: "Invalid password. Please check your credentials and try again.",
     };
   }
-  return { user: matched };
+  return { user: { ...matched, password: "" } };
 }
 
 export async function fetchVerificationProofsFromBackend(

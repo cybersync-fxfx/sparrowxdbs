@@ -115,14 +115,14 @@ export function BackgroundEngineToaster() {
       setPingLatency(latency);
       setLastPingStatus(latency > 800 ? "slow" : "healthy");
       emitEngineActivity(
-        "Supabase REST",
-        `PostgreSQL heartbeat: ${res.status} OK`,
+        "SparrowX Core Mesh",
+        `SparrowX Vault heartbeat: ${res.status} OK`,
         "info",
         latency,
       );
     } catch {
       setLastPingStatus("offline");
-      emitEngineActivity("Supabase REST", "Heartbeat probe failed to connect", "error");
+      emitEngineActivity("SparrowX Core Mesh", "Heartbeat probe failed to connect", "error");
     } finally {
       setIsPinging(false);
     }
@@ -271,7 +271,7 @@ export function BackgroundEngineToaster() {
                   onClick={runLivePing}
                   disabled={isPinging}
                   className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                  title="Run real-time ping to Supabase PostgreSQL"
+                  title="Run real-time ping to SparrowX Sovereign Vault"
                   aria-label="Ping backend"
                 >
                   <RefreshCw
@@ -293,7 +293,7 @@ export function BackgroundEngineToaster() {
             <div className="my-3 grid grid-cols-2 gap-2 text-[10px]">
               <div className="rounded-lg border border-white/10 bg-black/40 p-2">
                 <div className="text-muted-foreground flex items-center gap-1">
-                  <Database className="size-3 text-primary" /> Supabase Latency:
+                  <Database className="size-3 text-primary" /> SparrowX Vault Latency:
                 </div>
                 <div className="mt-1 font-mono font-bold text-xs text-foreground flex items-center gap-1">
                   <span>{pingLatency ? `${pingLatency} ms` : "Checking..."}</span>

@@ -1,4 +1,4 @@
-import { type ProtectedService, type ClientTenant, type Incident } from "@/lib/supabase";
+import { type ProtectedService, type ClientTenant, type Incident, maskSecretKey } from "@/lib/supabase";
 
 export type SdkTargetLanguage =
   "nextjs" | "express" | "python_fastapi" | "ai_agent_mcp" | "curl" | "cloudflare_worker";
@@ -37,6 +37,7 @@ export function generateClientSdkSnippet(
   baseUrl = "https://sparrowx.dev",
 ): { filename: string; language: string; code: string; installCmd?: string } {
   const isAi = service.category?.includes("AI") || service.endpoint.startsWith("agent://");
+  const maskedKey = maskSecretKey(service.apiKey);
 
   switch (target) {
     case "nextjs":
@@ -50,7 +51,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const SPARROWX_ENDPOINT = "${baseUrl}/api/v1/telemetry";
-const SPARROWX_API_KEY = "${service.apiKey}";
+const SPARROWX_API_KEY = process.env.SPARROWX_API_KEY ?? "${maskedKey}";
 
 // SQLi and XSS signature detection at the edge
 const MALICIOUS_PATTERNS = [
@@ -101,7 +102,7 @@ export const config = {
         installCmd: "npm i @sparrowx/node-shield",
         code: `// Express.js Middleware for ${service.name}
 const SPARROWX_ENDPOINT = "${baseUrl}/api/v1/telemetry";
-const SPARROWX_API_KEY = "${service.apiKey}";
+const SPARROWX_API_KEY = process.env.SPARROWX_API_KEY || "${maskedKey}";
 
 function sparrowxShield(req, res, next) {
   const payloadStr = JSON.stringify(req.body || {}) + req.url;
@@ -137,13 +138,14 @@ module.exports = { sparrowxShield };`,
         language: "python",
         installCmd: "pip install sparrowx-shield httpx",
         code: `# FastAPI / ASGI Middleware for ${service.name}
+import os
 import httpx
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 SPARROWX_ENDPOINT = "${baseUrl}/api/v1/telemetry"
-SPARROWX_API_KEY = "${service.apiKey}"
+SPARROWX_API_KEY = os.getenv("SPARROWX_API_KEY", "${maskedKey}")
 
 class SparrowXShieldMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -179,11 +181,12 @@ class SparrowXShieldMiddleware(BaseHTTPMiddleware):
         installCmd: "pip install sparrowx-shield openai langchain",
         code: `# AI Agent & LLM Guardrails Wrapper for ${service.name}
 # Protects against Prompt Injections, Secret Leaks, and Rogue MCP Tool Calls
+import os
 import re
 import httpx
 
 SPARROWX_ENDPOINT = "${baseUrl}/api/v1/telemetry"
-SPARROWX_API_KEY = "${service.apiKey}"
+SPARROWX_API_KEY = os.getenv("SPARROWX_API_KEY", "${maskedKey}")
 
 class SparrowXAiGuardrail:
     def __init__(self, service_id="${service.id}"):
@@ -236,7 +239,7 @@ class SparrowXAiGuardrail:
         code: `# Test live telemetry ingestion immediately from your terminal
 curl -X POST "${baseUrl}/api/v1/telemetry" \\
   -H "Content-Type: application/json" \\
-  -H "x-sparrowx-key: ${service.apiKey}" \\
+  -H "x-sparrowx-key: \${SPARROWX_API_KEY:-${maskedKey}}" \\
   -d '{
     "title": "Live Verification Ping from ${service.name}",
     "severity": "Medium",
@@ -248,27 +251,27 @@ curl -X POST "${baseUrl}/api/v1/telemetry" \\
     case "cloudflare_worker":
     default:
       return {
-        filename: "cloudflare-worker.js",
+        filename: "sparrowx-edge-worker.js",
         language: "javascript",
-        installCmd: "wrangler deploy",
-        code: `// Cloudflare Worker Edge Shield for ${service.name}
+        installCmd: "npx @sparrowx/edge-cli deploy",
+        code: `// SparrowX Edge Shield Worker for ${service.name}
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = "${service.endpoint}";
 
     // Forward request to SparrowX edge validator
-    const clientIp = request.headers.get("cf-connecting-ip") || "0.0.0.0";
+    const clientIp = request.headers.get("x-forwarded-for") || "0.0.0.0";
     if (url.search.includes("' or 1=1") || url.search.includes("<script>")) {
       ctx.waitUntil(
         fetch("${baseUrl}/api/v1/telemetry", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-sparrowx-key": "${service.apiKey}",
+            "x-sparrowx-key": env.SPARROWX_API_KEY || "${maskedKey}",
           },
           body: JSON.stringify({
-            title: "Cloudflare Edge: Malicious request blocked",
+            title: "SparrowX Edge: Malicious request blocked",
             severity: "High",
             source: origin,
             summary: "Blocked query: " + url.search + " from IP: " + clientIp,

@@ -37,6 +37,12 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
+import {
+  AdminRevenueAndOutreachEngine,
+  LandingLiveSecurityScanner,
+  LandingPricingSection,
+  ViralTrustBadgeAndOutreachSection,
+} from "@/components/GrowthAndMonetizationHub";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
 import {
   calculateServiceCost,
@@ -58,6 +64,7 @@ import {
   authenticateAppUserFromBackend,
   type ClientTenant,
   type Incident,
+  maskSecretKey,
   persistAuditLogToBackend,
   persistClientTenantToBackend,
   type PlanTier,
@@ -150,8 +157,6 @@ export function ClientPortalView({
   reports,
   incidents,
   onGenerateReport,
-  supabaseUrl,
-  supabaseAnonKey,
   showToast,
 }: {
   activeNav: string;
@@ -187,8 +192,8 @@ export function ClientPortalView({
   reports: ReportItem[];
   incidents: Incident[];
   onGenerateReport: (framework: ReportItem["framework"]) => Promise<void>;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   showToast: (msg: string) => void;
 }) {
   // Add Service Modal / Form state in Client Area
@@ -999,7 +1004,7 @@ export function ClientPortalView({
                     <span>Security Credits Balance</span>
                     <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-secondary/60 px-2 py-0.5 text-[10px] font-mono text-muted-foreground">
                       <span className="size-1.5 rounded-full bg-emerald-400" />
-                      Live PostgreSQL Ledger
+                      SparrowX Sovereign Ledger
                     </span>
                   </div>
                   <div className="mt-2 flex items-baseline gap-3">
@@ -1300,20 +1305,18 @@ export function ClientPortalView({
   const clientSdkSnippet = `// SparrowX Automated Client Guardrail SDK
 // Service: ${activeTenant.name} (${activeTenant.id})
 // Subscribed Modules: ${activeTenant.enabledModules.join(", ")}
-const SPARROWX_URL = "${supabaseUrl}";
-const SPARROWX_KEY = "${supabaseAnonKey}";
-const TENANT_API_KEY = "${activeTenant.apiKey}";
+const SPARROWX_INGEST_ENDPOINT = "https://ingest.sparrowx.io/api/v1/ingest";
+const TENANT_API_KEY = process.env.SPARROWX_API_KEY ?? "${maskSecretKey(activeTenant.apiKey)}";
 
 export async function emitSecurityTelemetry(event: {
   title: string;
   severity: "Critical" | "High" | "Medium";
   summary: string;
 }) {
-  await fetch(\`\${SPARROWX_URL}/rest/v1/incidents\`, {
+  await fetch(SPARROWX_INGEST_ENDPOINT, {
     method: "POST",
     headers: {
-      apikey: SPARROWX_KEY,
-      Authorization: \`Bearer \${SPARROWX_KEY}\`,
+      "x-sparrowx-key": TENANT_API_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -1324,7 +1327,7 @@ export async function emitSecurityTelemetry(event: {
       severity: event.severity,
       status: "Investigating",
       assignee: "Autonomous Guardrail",
-      summary: \`\${event.summary} (Tenant Key: \${TENANT_API_KEY.slice(0, 14)}...)\`,
+      summary: event.summary,
       playbook: "Client Automated Containment",
       affected_assets: 1,
     }),
@@ -1595,7 +1598,7 @@ export async function emitSecurityTelemetry(event: {
                         timestamp: "Just now",
                       });
                       showToast(
-                        `SQLi/XSS Edge Block ${next ? "enabled & logged to Supabase" : "disabled & logged"}`,
+                        `SQLi/XSS Edge Block ${next ? "enabled & logged to SparrowX Vault" : "disabled & logged"}`,
                       );
                     }}
                     size="sm"
@@ -1732,7 +1735,7 @@ export async function emitSecurityTelemetry(event: {
                         timestamp: "Just now",
                       });
                       showToast(
-                        `Prompt Shield ${next ? "enabled & logged to Supabase" : "disabled & logged"}`,
+                        `Prompt Shield ${next ? "enabled & logged to SparrowX Vault" : "disabled & logged"}`,
                       );
                     }}
                     size="sm"
@@ -2077,6 +2080,11 @@ export function AdminPortalView({
   const [newDomain, setNewDomain] = useState("");
   const [newTier, setNewTier] = useState<PlanTier>("Enterprise");
   const [newModules, setNewModules] = useState<ServiceModuleId[]>(["web_security", "ai_shield"]);
+  const [showAdminPaymentModal, setShowAdminPaymentModal] = useState(false);
+  const [adminPaymentCredits, setAdminPaymentCredits] = useState<number | undefined>(undefined);
+  const [adminCreditBalance, setAdminCreditBalance] = useState<number>(() =>
+    getStoredCreditBalance(),
+  );
 
   const toggleNewMod = (id: ServiceModuleId) => {
     setNewModules((prev) =>
@@ -2123,6 +2131,14 @@ export function AdminPortalView({
               </p>
             </div>
           </section>
+
+          <AdminRevenueAndOutreachEngine
+            onOpenPaymentModal={(needed) => {
+              setAdminPaymentCredits(needed);
+              setShowAdminPaymentModal(true);
+            }}
+            showToast={(msg) => emitEngineToast({ title: msg, tone: "success" })}
+          />
 
           <form
             className="flex flex-col gap-3 border border-border bg-card p-5"
@@ -2538,6 +2554,23 @@ export function AdminPortalView({
           </section>
         </>
       )}
+
+      {showAdminPaymentModal && (
+        <PaymentGatewayModal
+          currentBalance={adminCreditBalance}
+          neededCredits={adminPaymentCredits}
+          tenantName="SparrowX Master SOC"
+          onClose={() => {
+            setShowAdminPaymentModal(false);
+            setAdminPaymentCredits(undefined);
+          }}
+          onCreditsAdded={(newBal) => {
+            setAdminCreditBalance(newBal);
+            saveStoredCreditBalance(newBal);
+          }}
+          showToast={(msg) => emitEngineToast({ title: msg, tone: "success" })}
+        />
+      )}
     </div>
   );
 }
@@ -2589,6 +2622,14 @@ export function PortalLoginScreen({
   // Interactive Live Attack Interception Simulator on Landing Page
   const [activeAttackIdx, setActiveAttackIdx] = useState(0);
   const [isAutoSimulating, setIsAutoSimulating] = useState(true);
+
+  // Instant Landing Page Checkout & Payment Gateway State
+  const [showLandingPaymentModal, setShowLandingPaymentModal] = useState(false);
+  const [landingNeededCredits, setLandingNeededCredits] = useState<number | undefined>(500);
+  const [landingPaymentLabel, setLandingPaymentLabel] = useState<string>("SparrowX Builder Shield");
+  const [landingCreditBalance, setLandingCreditBalance] = useState<number>(() =>
+    getStoredCreditBalance(),
+  );
 
   const attackSimulations = [
     {
@@ -3179,11 +3220,20 @@ export function PortalLoginScreen({
           {/* Center Quick Navigation Links (Landing Stage) */}
           {viewStage === "landing" && (
             <nav className="hidden lg:flex items-center gap-6 text-xs font-medium text-zinc-400">
+              <a
+                href="#free-scanner"
+                className="text-primary font-semibold hover:text-orange-300 transition-colors"
+              >
+                Free Domain Scanner
+              </a>
+              <a
+                href="#pricing"
+                className="text-emerald-400 font-semibold hover:text-emerald-300 transition-colors"
+              >
+                Pricing & 24h Audit
+              </a>
               <a href="#live-simulator" className="hover:text-white transition-colors">
                 Live Attack Simulator
-              </a>
-              <a href="#startup-mission" className="hover:text-white transition-colors">
-                Our Startup Mission
               </a>
               <a href="#defense-grid" className="hover:text-white transition-colors">
                 Defense Architecture
@@ -3199,7 +3249,7 @@ export function PortalLoginScreen({
             <div className="hidden md:flex items-center gap-2 rounded-lg border border-[#1F1F1F] bg-[#0A0A0A] px-2.5 py-1.5 text-[11px] text-zinc-400">
               <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>
-                {backendSource === "supabase" ? "Supabase Live Telemetry" : "Local Engine Ready"}
+                {backendSource === "supabase" ? "SparrowX Cloud Telemetry" : "SparrowX Local Engine"}
               </span>
             </div>
 
@@ -3475,6 +3525,25 @@ export function PortalLoginScreen({
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* LIVE PUBLIC DOMAIN & API VULNERABILITY SCANNER (LEAD MAGNET) */}
+            <div className="mt-10">
+              <LandingLiveSecurityScanner
+                onClaimAndProtectDomain={(domain, suggestedOrgName) => {
+                  setPrimaryDomain(domain);
+                  setOrgName(suggestedOrgName);
+                  openAuthGateway("signup");
+                }}
+                onOpenInstantCheckout={(neededCredits, domain) => {
+                  setLandingNeededCredits(neededCredits);
+                  if (domain) {
+                    setPrimaryDomain(`https://${domain}`);
+                    setLandingPaymentLabel(`SparrowX Shield — ${domain}`);
+                  }
+                  setShowLandingPaymentModal(true);
+                }}
+              />
             </div>
           </section>
 

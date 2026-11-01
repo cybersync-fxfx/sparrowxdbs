@@ -188,8 +188,8 @@ export function PaymentGatewayModal({
     setProcessStage("success");
     onCreditsAdded(newBalance, activeCredits);
     emitEngineActivity(
-      "Cloud Ledger",
-      `Minted +${activeCredits} credits to Supabase billing_credits (Bal: ${newBalance})`,
+      "SparrowX Cloud Ledger",
+      `Minted +${activeCredits} credits to SparrowX Sovereign Ledger (Bal: ${newBalance})`,
       "success",
     );
     emitEngineToast(
@@ -817,7 +817,7 @@ export function PaymentGatewayModal({
 
             <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-400 font-mono">
               <ShieldCheck className="size-3.5" />
-              <span>Audited & Stored in Supabase PostgreSQL Cloud Ledger</span>
+              <span>Audited &amp; Stored in SparrowX Encrypted Cloud Ledger</span>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
