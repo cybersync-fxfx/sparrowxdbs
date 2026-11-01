@@ -2137,7 +2137,7 @@ export function AdminPortalView({
               setAdminPaymentCredits(needed);
               setShowAdminPaymentModal(true);
             }}
-            showToast={(msg) => emitEngineToast({ title: msg, tone: "success" })}
+            showToast={(msg) => emitEngineToast(msg)}
           />
 
           <form
@@ -2568,7 +2568,7 @@ export function AdminPortalView({
             setAdminCreditBalance(newBal);
             saveStoredCreditBalance(newBal);
           }}
-          showToast={(msg) => emitEngineToast({ title: msg, tone: "success" })}
+          showToast={(msg) => emitEngineToast(msg)}
         />
       )}
     </div>
@@ -2861,7 +2861,7 @@ export function PortalLoginScreen({
               }}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 mode === "signin"
-                  ? "bg-white text-black shadow-sm"
+                  ? "bg-primary text-white shadow-md shadow-primary/30"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -2875,7 +2875,7 @@ export function PortalLoginScreen({
               }}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 mode === "signup"
-                  ? "bg-white text-black shadow-sm"
+                  ? "bg-primary text-white shadow-md shadow-primary/30"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -2949,7 +2949,7 @@ export function PortalLoginScreen({
             <button
               type="submit"
               disabled={isSigningIn}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-white font-semibold text-sm text-black shadow-lg transition-all hover:bg-zinc-200 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4"
+              className="mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-semibold text-sm text-white shadow-lg shadow-primary/25 transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4"
             >
               <ShieldCheck className="size-4 shrink-0" />
               <span>{isSigningIn ? "Authenticating Session..." : "Sign In to Command Center"}</span>
@@ -3276,9 +3276,9 @@ export function PortalLoginScreen({
                 <button
                   type="button"
                   onClick={() => openAuthGateway("signup")}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-semibold text-black shadow-md transition-all hover:bg-zinc-200 whitespace-nowrap"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-3.5 py-2 text-xs font-semibold text-white shadow-md shadow-primary/25 transition-all hover:opacity-95 whitespace-nowrap"
                 >
-                  <Shield className="size-3.5 text-primary" />
+                  <Shield className="size-3.5 text-white" />
                   <span>Get Protected</span>
                   <ArrowRight className="size-3.5" />
                 </button>
@@ -3816,13 +3816,11 @@ export function PortalLoginScreen({
           onCreditsAdded={(newBal) => {
             setLandingCreditBalance(newBal);
             saveStoredCreditBalance(newBal);
-            emitEngineToast({
-              title:
-                "Security Credits Added! Complete your workspace signup to activate protection.",
-              tone: "success",
-            });
+            emitEngineToast(
+              "Security Credits Added! Complete your workspace signup to activate protection.",
+            );
           }}
-          showToast={(msg) => emitEngineToast({ title: msg, tone: "success" })}
+          showToast={(msg) => emitEngineToast(msg)}
         />
       )}
     </div>
