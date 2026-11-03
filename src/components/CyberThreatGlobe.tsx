@@ -1119,8 +1119,9 @@ export function CyberThreatGlobe({
                   </div>
                 </div>
               );
-            })}
-          </div>
+            })
+          )}
+        </div>
         </div>
       )}
 

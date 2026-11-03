@@ -1924,18 +1924,24 @@ function Dashboard() {
             activeNav === "Live Traffic Mesh") && (
             <GlobalTrafficMeshGlobe
               tenants={
-                portalMode === "client" || authSession.role === "client"
-                  ? activeClientTenant
-                    ? [activeClientTenant]
-                    : visibleClientTenants
-                  : clientTenants
+                authSession.role === "admin"
+                  ? clientTenants
+                  : activeClientTenant
+                  ? [activeClientTenant]
+                  : []
               }
               protectedServices={
-                portalMode === "client" || authSession.role === "client"
-                  ? visibleClientServices
-                  : protectedServices
+                authSession.role === "admin"
+                  ? protectedServices
+                  : visibleClientServices
               }
-              currentUserRole={portalMode === "client" || authSession.role === "client" ? "client" : "admin"}
+              currentUserRole={
+                authSession.role === "admin"
+                  ? "admin"
+                  : authSession.role === "client"
+                  ? "client"
+                  : "unauthenticated"
+              }
               portalMode={portalMode}
               activeTenantId={activeClientTenant?.id}
               onNavigate={handleNavigate}
@@ -1948,16 +1954,16 @@ function Dashboard() {
             activeNav === "Protection Status") && (
             <ProtectionVerificationCenter
               tenants={
-                portalMode === "client" || authSession.role === "client"
-                  ? activeClientTenant
-                    ? [activeClientTenant]
-                    : visibleClientTenants
-                  : clientTenants
+                authSession.role === "admin"
+                  ? clientTenants
+                  : activeClientTenant
+                  ? [activeClientTenant]
+                  : []
               }
               services={
-                portalMode === "client" || authSession.role === "client"
-                  ? visibleClientServices
-                  : protectedServices
+                authSession.role === "admin"
+                  ? protectedServices
+                  : visibleClientServices
               }
               assets={assets}
               auditLogs={auditLogs}
@@ -2081,26 +2087,27 @@ function Dashboard() {
             />
           )}
 
-          {((portalMode === "admin" &&
-            activeNav !== "Help center" &&
-            activeNav !== "Settings" &&
-            activeNav !== "AI Brain" &&
-            activeNav !== "SparrowX AI Brain" &&
-            activeNav !== "Global Traffic Mesh" &&
-            activeNav !== "Global Traffic Mesh (Live 3D)" &&
-            activeNav !== "Troubleshooting & Docs" &&
-            activeNav !== "Troubleshooting & Error Center" &&
-            activeNav !== "docs_errors" &&
-            activeNav !== "System Status" &&
-            activeNav !== "System Status & Health" &&
-            activeNav !== "system_status" &&
-            activeNav !== "Activity History" &&
-            activeNav !== "Activity & Operations History" &&
-            activeNav !== "activity_history" &&
-            activeNav !== "Error Monitoring" &&
-            activeNav !== "SOC Error Monitoring" &&
-            activeNav !== "error_monitoring") ||
-            (portalMode === "soc" && activeNav === "Access Control & Audit")) && (
+          {authSession.role === "admin" &&
+            ((portalMode === "admin" &&
+              activeNav !== "Help center" &&
+              activeNav !== "Settings" &&
+              activeNav !== "AI Brain" &&
+              activeNav !== "SparrowX AI Brain" &&
+              activeNav !== "Global Traffic Mesh" &&
+              activeNav !== "Global Traffic Mesh (Live 3D)" &&
+              activeNav !== "Troubleshooting & Docs" &&
+              activeNav !== "Troubleshooting & Error Center" &&
+              activeNav !== "docs_errors" &&
+              activeNav !== "System Status" &&
+              activeNav !== "System Status & Health" &&
+              activeNav !== "system_status" &&
+              activeNav !== "Activity History" &&
+              activeNav !== "Activity & Operations History" &&
+              activeNav !== "activity_history" &&
+              activeNav !== "Error Monitoring" &&
+              activeNav !== "SOC Error Monitoring" &&
+              activeNav !== "error_monitoring") ||
+              (portalMode === "soc" && activeNav === "Access Control & Audit")) && (
             <AdminPortalView
               activeNav={activeNav}
               assets={assets}
@@ -2575,7 +2582,7 @@ function Dashboard() {
             />
           )}
 
-          {portalMode === "soc" && activeNav === "Checkpoints & Probes" && (
+          {authSession.role === "admin" && portalMode === "soc" && activeNav === "Checkpoints & Probes" && (
             <CheckpointsAndProbesView
               tenants={clientTenants}
               protectedServices={protectedServices}
