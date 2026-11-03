@@ -685,7 +685,7 @@ export function GlobalTrafficMeshGlobe({
     }
 
     return list;
-  }, [tenants, resolvedTenantOrigins, customResolvedOrigin, currentUserRole, portalMode]);
+  }, [tenants, resolvedTenantOrigins, customResolvedOrigin, currentUserRole, portalMode, activeTenantId]);
 
   // Keep activeOriginId synced to active client tenant if available
   useEffect(() => {

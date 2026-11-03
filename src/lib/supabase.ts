@@ -104,7 +104,18 @@ export type ProtectedService = {
 
 export type ServiceModuleId = "web_security" | "ai_shield" | "cloud_security" | "compliance";
 
-export type PlanTier = "Starter" | "Growth" | "Enterprise";
+export type PlanTier =
+  | "Developer Starter"
+  | "Startup Shield"
+  | "Business Pro"
+  | "AI Agent & LLM Shield"
+  | "AI Agent Shield"
+  | "Enterprise Sovereign SOC"
+  | "Enterprise SOC"
+  | "Hyperscale Defense"
+  | "Starter"
+  | "Growth"
+  | "Enterprise";
 export type TenantStatus = "Active" | "Trial" | "Lockdown";
 
 export type ClientTenant = {

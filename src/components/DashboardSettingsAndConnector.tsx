@@ -20,15 +20,30 @@ import {
   Eye,
   EyeOff,
   Zap,
+  Network,
+  Table,
+  Plus,
+  Trash2,
+  Radio,
+  ArrowRight,
+  Shield,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ClientTenant } from "@/lib/supabase";
 import {
   getTenantDatabaseConfig,
   rotateTenantDashboardApiKey,
+  resetTenantApiCredentials,
   verifyWebsiteConnector,
   verifyServerConnector,
+  getTenantDatabaseIps,
+  addTenantDatabaseIp,
+  removeTenantDatabaseIp,
+  probeTenantDatabaseIp,
+  validateIpAddress,
   type SovereignTenantDatabaseConfig,
+  type TenantDatabaseIpRecord,
 } from "@/lib/tenant-database";
 
 interface DashboardSettingsAndConnectorProps {
@@ -62,10 +77,32 @@ export function DashboardSettingsAndConnector({
     getTenantDatabaseConfig(tenantId, tenantName, primaryDomain),
   );
 
+  // Credential Display & Copy State
   const [showApiKey, setShowApiKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedClientId, setCopiedClientId] = useState(false);
   const [copiedHtmlCode, setCopiedHtmlCode] = useState(false);
   const [copiedVpsCommand, setCopiedVpsCommand] = useState(false);
+
+  // API IDs & Key Reset State
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetSelection, setResetSelection] = useState<"all" | "key_only" | "id_only">("all");
+  const [isResetting, setIsResetting] = useState(false);
+  const [lastResetFeedback, setLastResetFeedback] = useState<string | null>(null);
+
+  // Dedicated Tenant IP Database Table State
+  const [tenantIps, setTenantIps] = useState<TenantDatabaseIpRecord[]>(() =>
+    getTenantDatabaseIps(tenantId),
+  );
+  const [newIpAddress, setNewIpAddress] = useState("");
+  const [newIpLabel, setNewIpLabel] = useState("");
+  const [newIpType, setNewIpType] = useState<TenantDatabaseIpRecord["type"]>("server_wan");
+  const [newIpNotes, setNewIpNotes] = useState("");
+  const [isAddingIp, setIsAddingIp] = useState(false);
+  const [ipFormError, setIpFormError] = useState<string | null>(null);
+  const [ipFormSuccess, setIpFormSuccess] = useState<string | null>(null);
+  const [probingIpId, setProbingIpId] = useState<string | null>(null);
+  const [copiedIpId, setCopiedIpId] = useState<string | null>(null);
 
   // Website connector test state
   const [websiteTestUrl, setWebsiteTestUrl] = useState(() => {
@@ -106,14 +143,19 @@ export function DashboardSettingsAndConnector({
   useEffect(() => {
     const cfg = getTenantDatabaseConfig(tenantId, tenantName, primaryDomain);
     setDbConfig(cfg);
+    setTenantIps(getTenantDatabaseIps(tenantId));
   }, [tenantId, tenantName, primaryDomain]);
 
-  const handleCopy = (text: string, type: "key" | "html" | "vps") => {
+  const handleCopy = (text: string, type: "key" | "clientId" | "html" | "vps") => {
     navigator.clipboard.writeText(text);
     if (type === "key") {
       setCopiedKey(true);
       setTimeout(() => setCopiedKey(false), 2000);
       showToast("Dashboard API Key copied to clipboard");
+    } else if (type === "clientId") {
+      setCopiedClientId(true);
+      setTimeout(() => setCopiedClientId(false), 2000);
+      showToast("Client API ID copied to clipboard");
     } else if (type === "html") {
       setCopiedHtmlCode(true);
       setTimeout(() => setCopiedHtmlCode(false), 2000);
@@ -125,10 +167,98 @@ export function DashboardSettingsAndConnector({
     }
   };
 
-  const handleRotateKey = () => {
-    const newKey = rotateTenantDashboardApiKey(tenantId);
-    setDbConfig((prev) => ({ ...prev, dashboardApiKey: newKey }));
-    showToast("Dashboard API Key successfully rotated. Remember to update your connectors.", "warning");
+  // Reset API Credentials Handler (API ID and/or API Key)
+  const handleResetCredentials = (what: "all" | "key_only" | "id_only") => {
+    setIsResetting(true);
+    try {
+      const res = resetTenantApiCredentials(tenantId, what);
+      const updatedConfig = getTenantDatabaseConfig(tenantId, tenantName, primaryDomain);
+      setDbConfig(updatedConfig);
+      setLastResetFeedback(res.message);
+      showToast(res.message, "success");
+      setShowResetConfirm(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to reset API credentials.";
+      showToast(msg, "error");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // Add IP to Dedicated Tenant Database Table
+  const handleAddIp = () => {
+    setIpFormError(null);
+    setIpFormSuccess(null);
+
+    const validation = validateIpAddress(newIpAddress);
+    if (!validation.valid) {
+      setIpFormError(validation.message || "Invalid IP address format.");
+      return;
+    }
+
+    setIsAddingIp(true);
+    try {
+      const res = addTenantDatabaseIp(tenantId, {
+        ipAddress: newIpAddress,
+        label: newIpLabel,
+        type: newIpType,
+        notes: newIpNotes,
+      });
+
+      if (res.success && res.record) {
+        setTenantIps(getTenantDatabaseIps(tenantId));
+        setIpFormSuccess(res.message);
+        setNewIpAddress("");
+        setNewIpLabel("");
+        setNewIpNotes("");
+        showToast(res.message, "success");
+
+        // Sync with VPS server host test input if applicable
+        if (newIpType === "server_wan" || newIpType === "waf_origin") {
+          setServerHostInput(res.record.ipAddress);
+        }
+      } else {
+        setIpFormError(res.message);
+        showToast(res.message, "error");
+      }
+    } finally {
+      setIsAddingIp(false);
+    }
+  };
+
+  // Remove IP from Dedicated Tenant Table
+  const handleRemoveIp = (recordId: string) => {
+    const res = removeTenantDatabaseIp(tenantId, recordId);
+    if (res.success) {
+      setTenantIps(getTenantDatabaseIps(tenantId));
+      showToast(res.message, "warning");
+    } else {
+      showToast(res.message, "error");
+    }
+  };
+
+  // Live Probe on Registered Tenant IP
+  const handleProbeIp = async (recordId: string) => {
+    setProbingIpId(recordId);
+    try {
+      const res = await probeTenantDatabaseIp(tenantId, recordId);
+      setTenantIps(getTenantDatabaseIps(tenantId));
+      if (res.success) {
+        showToast(res.message, "success");
+      } else {
+        showToast(res.message, "warning");
+      }
+    } finally {
+      setProbingIpId(null);
+    }
+  };
+
+  // Copy IP to Clipboard
+  const handleCopyIp = (ip: string, id: string) => {
+    navigator.clipboard.writeText(ip);
+    setCopiedIpId(id);
+    setTimeout(() => setCopiedIpId(null), 2000);
+    showToast(`IP ${ip} copied to clipboard`);
   };
 
   const handleRunWebsiteTest = async () => {
@@ -199,11 +329,12 @@ export function DashboardSettingsAndConnector({
   src="https://sparrowx.net/sparrowx-shield.js" 
   data-spx-key="${dbConfig.dashboardApiKey}" 
   data-spx-tenant="${tenantId}" 
+  data-spx-client-id="${dbConfig.apiClientId}"
   data-spx-domain="${primaryDomain}"
   async>
 </script>`;
 
-  const vpsConnectorCommand = `curl -sSL https://sparrowx.net/install-connector.sh | SPX_KEY="${dbConfig.dashboardApiKey}" SPX_TENANT="${tenantId}" bash`;
+  const vpsConnectorCommand = `curl -sSL https://sparrowx.net/install-connector.sh | SPX_KEY="${dbConfig.dashboardApiKey}" SPX_TENANT="${tenantId}" SPX_CLIENT_ID="${dbConfig.apiClientId}" bash`;
 
   return (
     <div className="space-y-6">
@@ -218,8 +349,8 @@ export function DashboardSettingsAndConnector({
             Settings, Dashboard API & Connectors
           </h1>
           <p className="mt-1 text-xs text-muted-foreground sm:text-sm max-w-3xl">
-            Each dashboard has a 100% physically isolated database and unique API key.
-            Connect your website or server using our drop-in connector files below.
+            Each dashboard has a 100% physically isolated database, separate IP records table, and resettable API credentials.
+            Manage your server IPs and connect your website or server using our drop-in connector files below.
           </p>
         </div>
 
@@ -228,6 +359,10 @@ export function DashboardSettingsAndConnector({
             <Database className="size-3.5" />
             <span>{dbConfig.databaseName}</span>
           </span>
+          <span className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 font-mono text-xs font-semibold text-cyan-400 flex items-center gap-1.5">
+            <Table className="size-3.5" />
+            <span>Table: {dbConfig.ipTableName}</span>
+          </span>
           <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 font-mono text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
             <ShieldCheck className="size-3.5" />
             <span>Partition {dbConfig.partitionStatus}</span>
@@ -235,7 +370,7 @@ export function DashboardSettingsAndConnector({
         </div>
       </section>
 
-      {/* 2. DASHBOARD API & DEDICATED DATABASE CONFIGURATION */}
+      {/* 2. DASHBOARD API CREDENTIALS & EASY CREDENTIAL RESET */}
       <section className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3.5">
           <div className="flex items-center gap-2">
@@ -243,30 +378,133 @@ export function DashboardSettingsAndConnector({
               <KeyRound className="size-4" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-foreground">Dashboard API & Telemetry Credentials</h2>
+              <h2 className="text-sm font-bold text-foreground">API Credentials & ID Management</h2>
               <p className="text-[11px] text-muted-foreground">
-                Private API key and endpoints for your dedicated sovereign database partition.
+                Dedicated Client API ID and private Secret Key for your isolated database partition. Reset credentials anytime with 1 click.
               </p>
             </div>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleRotateKey}
-            className="h-8 gap-1.5 text-xs font-mono text-muted-foreground hover:text-foreground"
-          >
-            <RefreshCw className="size-3 text-primary" />
-            <span>Rotate Key</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowResetConfirm(!showResetConfirm)}
+              className="h-8 gap-1.5 text-xs font-semibold border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+            >
+              <RotateCcw className="size-3" />
+              <span>Reset API IDs & Keys</span>
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {/* API Key Box */}
+        {/* Quick Reset Confirmation Panel */}
+        {showResetConfirm && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-950/20 p-4 space-y-3 animate-in fade-in-50 duration-150">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="size-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-1 text-xs">
+                <div className="font-bold text-amber-300">Reset API Credentials for {tenantName}</div>
+                <p className="text-zinc-300 leading-relaxed">
+                  Resetting credentials will immediately revoke existing tokens and issue fresh cryptographically signed keys. Connectors running previous credentials will need to be updated.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-500/20">
+              <span className="text-xs text-zinc-300">Choose action:</span>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isResetting}
+                onClick={() => handleResetCredentials("all")}
+                className="h-7 text-xs font-semibold bg-amber-500 text-black hover:bg-amber-400"
+              >
+                {isResetting && resetSelection === "all" ? "Resetting..." : "Reset Both (API ID + Secret Key)"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isResetting}
+                onClick={() => handleResetCredentials("key_only")}
+                className="h-7 text-xs border-zinc-700 hover:text-white"
+              >
+                Reset API Key Only
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isResetting}
+                onClick={() => handleResetCredentials("id_only")}
+                className="h-7 text-xs border-zinc-700 hover:text-white"
+              >
+                Reset Client ID Only
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowResetConfirm(false)}
+                className="h-7 text-xs text-muted-foreground hover:text-foreground ml-auto"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {lastResetFeedback && (
+          <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/20 p-3 text-xs text-emerald-300 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+              <span>{lastResetFeedback} Connectors have been updated with your new credentials.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastResetFeedback(null)}
+              className="text-xs text-emerald-400 hover:text-white font-mono"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Card 1: Client API ID */}
           <div className="rounded-lg border border-border bg-background p-3.5 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-foreground">Your Dashboard API Key</span>
+              <span className="text-xs font-semibold text-foreground">Client API ID</span>
+              <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase">Application ID</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={dbConfig.apiClientId}
+                className="h-9 w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-foreground outline-none select-all"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleCopy(dbConfig.apiClientId, "clientId")}
+                className="h-9 gap-1 text-xs shrink-0"
+              >
+                {copiedClientId ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                <span>{copiedClientId ? "Copied" : "Copy"}</span>
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Pass as <code className="text-primary font-mono">x-sparrowx-client-id</code> header or <code className="text-primary font-mono">data-spx-client-id</code> attribute.
+            </p>
+          </div>
+
+          {/* Card 2: Dashboard API Key */}
+          <div className="rounded-lg border border-border bg-background p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground">Dashboard API Key</span>
               <button
                 type="button"
                 onClick={() => setShowApiKey(!showApiKey)}
@@ -287,31 +525,37 @@ export function DashboardSettingsAndConnector({
                 type="button"
                 size="sm"
                 onClick={() => handleCopy(dbConfig.dashboardApiKey, "key")}
-                className="h-9 gap-1.5 text-xs shrink-0"
+                className="h-9 gap-1 text-xs shrink-0"
               >
                 {copiedKey ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
                 <span>{copiedKey ? "Copied" : "Copy"}</span>
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              Pass as <code className="text-primary font-mono">x-sparrowx-key</code> header or <code className="text-primary font-mono">data-spx-key</code> script attribute.
+              Pass as <code className="text-primary font-mono">x-sparrowx-key</code> header or <code className="text-primary font-mono">data-spx-key</code> attribute.
             </p>
           </div>
 
-          {/* Database Partition Info */}
-          <div className="rounded-lg border border-border bg-background p-3.5 space-y-2">
-            <span className="text-xs font-semibold text-foreground">Sovereign Database Architecture</span>
+          {/* Card 3: Database Partition Architecture */}
+          <div className="rounded-lg border border-border bg-background p-3.5 space-y-2 sm:col-span-2 lg:col-span-1">
+            <span className="text-xs font-semibold text-foreground">Database Partition Details</span>
             <div className="grid grid-cols-2 gap-2 text-xs font-mono">
               <div className="rounded border border-border/60 bg-card p-2">
-                <div className="text-[10px] text-muted-foreground font-sans uppercase">Schema Partition</div>
+                <div className="text-[10px] text-muted-foreground font-sans uppercase">Dedicated Database</div>
                 <div className="mt-0.5 font-bold text-primary truncate" title={dbConfig.databaseName}>
                   {dbConfig.databaseName}
                 </div>
               </div>
               <div className="rounded border border-border/60 bg-card p-2">
+                <div className="text-[10px] text-muted-foreground font-sans uppercase">Dedicated IP Table</div>
+                <div className="mt-0.5 font-bold text-cyan-400 truncate" title={dbConfig.ipTableName}>
+                  {dbConfig.ipTableName}
+                </div>
+              </div>
+              <div className="rounded border border-border/60 bg-card p-2">
                 <div className="text-[10px] text-muted-foreground font-sans uppercase">Encryption</div>
                 <div className="mt-0.5 font-bold text-emerald-400 truncate">
-                  AES-256-GCM Hardware
+                  AES-256 Hardware KMS
                 </div>
               </div>
               <div className="rounded border border-border/60 bg-card p-2">
@@ -320,18 +564,260 @@ export function DashboardSettingsAndConnector({
                   {dbConfig.apiIngestEndpoint}/verify
                 </div>
               </div>
-              <div className="rounded border border-border/60 bg-card p-2">
-                <div className="text-[10px] text-muted-foreground font-sans uppercase">Cross-Tenant Isolation</div>
-                <div className="mt-0.5 font-bold text-emerald-400 truncate">
-                  Strict Zero-Leak
-                </div>
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. WEBSITE CONNECTOR (HTML DROP-IN SCRIPT) */}
+      {/* 3. DEDICATED SEPARATE DATABASE TABLE FOR CLIENT TENANT IPS */}
+      <section className="rounded-xl border border-cyan-500/30 bg-card p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3.5">
+          <div className="flex items-center gap-2">
+            <div className="grid size-8 place-items-center rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+              <Network className="size-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <span>Dedicated Tenant IP Database Table</span>
+                <span className="rounded bg-cyan-500/20 px-2 py-0.5 font-mono text-[11px] text-cyan-300 font-bold">
+                  {dbConfig.ipTableName}
+                </span>
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                Add server WAN IPs, WAF protected origin hosts, and gateway IPs directly into your tenant&apos;s isolated database table.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="rounded-md border border-cyan-500/30 bg-cyan-950/30 px-2.5 py-1 text-xs font-mono font-semibold text-cyan-300">
+              {tenantIps.length} IP Record{tenantIps.length === 1 ? "" : "s"} in Table
+            </span>
+          </div>
+        </div>
+
+        {/* Add IP Form */}
+        <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+          <div className="font-semibold text-xs text-foreground flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Plus className="size-3.5 text-cyan-400" />
+              <span>Add IP Address to Database Table</span>
+            </span>
+            <span className="text-[10px] font-mono text-muted-foreground">
+              Target Table: <code className="text-cyan-400">{dbConfig.ipTableName}</code>
+            </span>
+          </div>
+
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <label className="text-[10px] uppercase font-semibold text-muted-foreground">IP Address or CIDR *</label>
+              <input
+                type="text"
+                value={newIpAddress}
+                onChange={(e) => {
+                  setNewIpAddress(e.target.value);
+                  setIpFormError(null);
+                }}
+                placeholder="e.g. 76.76.21.30 or 198.51.100.0/24"
+                className="mt-1 h-9 w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-foreground outline-none focus:border-cyan-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-semibold text-muted-foreground">Host Label / Name</label>
+              <input
+                type="text"
+                value={newIpLabel}
+                onChange={(e) => setNewIpLabel(e.target.value)}
+                placeholder="e.g. Primary Production Server"
+                className="mt-1 h-9 w-full rounded-md border border-border bg-card px-3 text-xs text-foreground outline-none focus:border-cyan-400"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] uppercase font-semibold text-muted-foreground">IP Purpose / Type</label>
+              <select
+                value={newIpType}
+                onChange={(e) => setNewIpType(e.target.value as TenantDatabaseIpRecord["type"])}
+                className="mt-1 h-9 w-full rounded-md border border-border bg-card px-2.5 text-xs text-foreground outline-none focus:border-cyan-400"
+              >
+                <option value="server_wan">Server Origin (WAN Public IP)</option>
+                <option value="waf_origin">WAF Protected Web Host</option>
+                <option value="allowed_inbound">Allowed Inbound Gateway</option>
+                <option value="vpn_gateway">VPN / Secure Tunnel</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col justify-end">
+              <Button
+                type="button"
+                onClick={handleAddIp}
+                disabled={isAddingIp || !newIpAddress.trim()}
+                className="h-9 gap-1.5 text-xs font-semibold bg-cyan-500 text-black hover:bg-cyan-400"
+              >
+                {isAddingIp ? (
+                  <>
+                    <RefreshCw className="size-3.5 animate-spin" />
+                    <span>Saving to Database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="size-3.5" />
+                    <span>Add IP to Database</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Error & Success Feedback */}
+          {ipFormError && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive flex items-center gap-2">
+              <AlertTriangle className="size-4 shrink-0 text-destructive" />
+              <span>{ipFormError}</span>
+            </div>
+          )}
+
+          {ipFormSuccess && (
+            <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/20 p-3 text-xs text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+              <span>{ipFormSuccess}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Database IP Records Table */}
+        <div className="rounded-lg border border-border bg-background overflow-hidden">
+          {tenantIps.length === 0 ? (
+            <div className="p-8 text-center space-y-2">
+              <Network className="size-8 mx-auto text-muted-foreground/50" />
+              <div className="text-xs font-bold text-foreground">No IP addresses registered in table yet</div>
+              <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
+                Add your website or server public IP above. It will be stored in your dedicated database table <code className="text-cyan-400">{dbConfig.ipTableName}</code> and protected by SparrowX.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-border bg-card/60 text-[10px] uppercase font-semibold text-muted-foreground">
+                  <tr>
+                    <th className="py-2.5 px-3">IP Address</th>
+                    <th className="py-2.5 px-3">Label & Type</th>
+                    <th className="py-2.5 px-3 hidden md:table-cell">Table Partition</th>
+                    <th className="py-2.5 px-3">Health / Connectivity</th>
+                    <th className="py-2.5 px-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {tenantIps.map((ipRec) => (
+                    <tr key={ipRec.id} className="hover:bg-card/40 transition-colors">
+                      <td className="py-3 px-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-foreground text-xs">{ipRec.ipAddress}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyIp(ipRec.ipAddress, ipRec.id)}
+                            className="text-muted-foreground hover:text-foreground cursor-pointer"
+                            title="Copy IP"
+                          >
+                            {copiedIpId === ipRec.id ? (
+                              <Check className="size-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="size-3" />
+                            )}
+                          </button>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-3">
+                        <div className="font-medium text-foreground">{ipRec.label}</div>
+                        <span className="mt-0.5 inline-block rounded bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-mono text-cyan-400 font-semibold">
+                          {ipRec.type === "server_wan"
+                            ? "Server Origin (WAN)"
+                            : ipRec.type === "waf_origin"
+                              ? "WAF Protected Host"
+                              : ipRec.type === "allowed_inbound"
+                                ? "Allowed Gateway"
+                                : "VPN Tunnel"}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-3 hidden md:table-cell">
+                        <code className="text-[10px] text-muted-foreground font-mono bg-card px-1.5 py-0.5 rounded border border-border/40">
+                          {ipRec.tableName}
+                        </code>
+                      </td>
+
+                      <td className="py-3 px-3">
+                        {ipRec.lastProbeStatus === "Reachable" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400">
+                            <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>Reachable ({ipRec.lastProbeLatencyMs || 12}ms)</span>
+                          </span>
+                        ) : ipRec.lastProbeStatus === "Unreachable" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[10px] font-semibold text-destructive">
+                            <span className="size-1.5 rounded-full bg-destructive" />
+                            <span>Unreachable</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold text-zinc-400">
+                            <span className="size-1.5 rounded-full bg-zinc-400" />
+                            <span>Pending Probe</span>
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={probingIpId === ipRec.id}
+                            onClick={() => handleProbeIp(ipRec.id)}
+                            className="h-7 px-2 text-[11px] gap-1 border-border/80"
+                            title="Run live connectivity probe on this IP"
+                          >
+                            <RefreshCw className={`size-3 ${probingIpId === ipRec.id ? "animate-spin text-cyan-400" : ""}`} />
+                            <span className="hidden sm:inline">Probe</span>
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setServerHostInput(ipRec.ipAddress);
+                              showToast(`Active server IP set to ${ipRec.ipAddress}`);
+                            }}
+                            className="h-7 px-2 text-[11px] text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                            title="Set as target host in VPS connector form below"
+                          >
+                            <span>Use in VPS</span>
+                          </Button>
+
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemoveIp(ipRec.id)}
+                            className="h-7 px-1.5 text-destructive hover:bg-destructive/10"
+                            title="Delete IP record from database"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* 4. WEBSITE CONNECTOR (HTML DROP-IN SCRIPT) */}
       <section className="rounded-xl border border-primary/30 bg-card p-5 space-y-4 shadow-sm">
         <div className="flex items-center gap-2.5 border-b border-border pb-3.5">
           <div className="grid size-8 place-items-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
@@ -440,7 +926,7 @@ export function DashboardSettingsAndConnector({
         </div>
       </section>
 
-      {/* 4. VPS & DEDICATED SERVER CONNECTOR */}
+      {/* 5. VPS & DEDICATED SERVER CONNECTOR */}
       <section className="rounded-xl border border-border bg-card p-5 space-y-4 shadow-sm">
         <div className="flex items-center gap-2.5 border-b border-border pb-3.5">
           <div className="grid size-8 place-items-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
@@ -449,16 +935,16 @@ export function DashboardSettingsAndConnector({
           <div>
             <h2 className="text-sm font-bold text-foreground">VPS & Dedicated Server Connector</h2>
             <p className="text-[11px] text-muted-foreground">
-              If your backend or website is hosted on a VPS (Linux/Ubuntu/Debian/CentOS/AWS EC2), run this command on your server to install the sovereign protection agent.
+              Run this 1-line shell script on your Linux VPS (Ubuntu, Debian, RHEL, Alpine) to install the autonomous security agent and bind to your database.
             </p>
           </div>
         </div>
 
-        {/* VPS Installer Command */}
+        {/* Command Box */}
         <div className="rounded-lg border border-border bg-black/90 p-4 font-mono text-xs text-zinc-300 space-y-3">
           <div className="flex items-center justify-between border-b border-white/10 pb-2">
             <span className="text-[11px] text-zinc-400 font-sans font-semibold">
-              Linux Server Terminal Command (Run as root or sudo)
+              Linux Server 1-Command Installer
             </span>
             <Button
               type="button"
@@ -471,7 +957,7 @@ export function DashboardSettingsAndConnector({
               <span>{copiedVpsCommand ? "Copied" : "Copy Command"}</span>
             </Button>
           </div>
-          <pre className="overflow-x-auto text-amber-300 leading-relaxed text-[11px] select-all">
+          <pre className="overflow-x-auto text-amber-300 leading-relaxed text-[11px]">
             {vpsConnectorCommand}
           </pre>
         </div>
@@ -536,7 +1022,7 @@ export function DashboardSettingsAndConnector({
         </div>
       </section>
 
-      {/* 5. WORKSPACE SECURITY POLICIES */}
+      {/* 6. WORKSPACE SECURITY POLICIES */}
       <section className="rounded-xl border border-border bg-card divide-y divide-border shadow-sm">
         <div className="p-4 sm:p-5">
           <h2 className="text-sm font-bold text-foreground">Workspace Security Policies</h2>

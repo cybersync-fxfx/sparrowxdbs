@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   CREDIT_PACKAGES,
+  MERCHANT_PAYMENT_CONFIG,
   calculateServiceCost,
   getStoredCreditBalance,
   saveStoredCreditBalance,
@@ -11,9 +12,15 @@ import {
   validateUpiUtr,
   generatePaymentVerificationSignature,
   refundBillingTransaction,
+  createBinanceOrder,
+  cancelBinanceOrder,
+  verifyBinanceOrderAutomation,
+  createUpiOrder,
+  cancelUpiOrder,
+  verifyUpiOrderAutomation,
 } from "@/lib/billing-credits";
 
-describe("Billing & Credits System", () => {
+describe("Billing & Credits System (Exclusive UPI & Binance Models)", () => {
   beforeEach(() => {
     localStorage.clear();
   });
@@ -28,6 +35,13 @@ describe("Billing & Credits System", () => {
     expect(starter?.priceUsd).toBe(19);
     expect(builder?.credits).toBe(500);
     expect(scale?.credits).toBe(2000);
+  });
+
+  it("enforces dedicated UPI and Binance payment configurations only", () => {
+    expect(MERCHANT_PAYMENT_CONFIG.upi.id).toBe("bm.atchuthakrishna@okhdfcbank");
+    expect(MERCHANT_PAYMENT_CONFIG.upi.payeeName).toBe("SparrowX Security");
+    expect(MERCHANT_PAYMENT_CONFIG.binance.binanceId).toBe("582910482");
+    expect(MERCHANT_PAYMENT_CONFIG.binance.acceptedCurrency).toBe("USDT");
   });
 
   it("calculates service costs dynamically based on modules and plan tiers", () => {
@@ -71,6 +85,111 @@ describe("Billing & Credits System", () => {
     expect(txs.length).toBe(1);
     expect(txs[0]?.id).toBe(tx.id);
     expect(txs[0]?.verificationSignature).toMatch(/^SPX-SIG-/);
+  });
+
+  it("creates Binance orders, verifies via automation, and grants credits", async () => {
+    expect(getStoredCreditBalance("tenant-alpha")).toBe(0);
+
+    const order = createBinanceOrder({
+      credits: 500,
+      amountUsdt: 79,
+      tenantId: "tenant-alpha",
+      userEmail: "ops@client.com",
+      expiryMinutes: 15,
+    });
+
+    expect(order.orderId).toMatch(/^SPX-BN-\d{4}-/);
+    expect(order.merchantBinanceId).toBe("582910482");
+    expect(order.status).toBe("pending");
+    expect(order.memo).toBe(order.orderId);
+
+    // Automation verifies the Binance deposit receipt
+    const result = await verifyBinanceOrderAutomation(
+      order.orderId,
+      { userBinanceId: "99182312", txId: "TX-BINANCE-12345" },
+      "tenant-alpha",
+      "ops@client.com",
+    );
+
+    expect(result.verified).toBe(true);
+    expect(result.transaction?.credits).toBe(500);
+    expect(result.transaction?.paymentMethod).toContain("Binance Pay");
+    expect(getStoredCreditBalance("tenant-alpha")).toBe(500);
+  });
+
+  it("cancels Binance orders and prevents credit grant if payment is not received or cancelled", async () => {
+    const initialBal = getStoredCreditBalance("tenant-beta");
+    expect(initialBal).toBe(0);
+
+    const order = createBinanceOrder({
+      credits: 2000,
+      amountUsdt: 249,
+      tenantId: "tenant-beta",
+      userEmail: "risk@client.com",
+    });
+
+    // Cancel order because no funds were received
+    const cancelled = cancelBinanceOrder(
+      order.orderId,
+      "Order cancelled: No Binance deposit detected within payment window",
+      "tenant-beta",
+      "risk@client.com",
+    );
+
+    expect(cancelled?.status).toBe("cancelled");
+    expect(cancelled?.cancellationReason).toContain("No Binance deposit detected");
+
+    // Attempting to verify a cancelled order fails and awards 0 credits
+    const verifyAttempt = await verifyBinanceOrderAutomation(
+      order.orderId,
+      undefined,
+      "tenant-beta",
+      "risk@client.com",
+    );
+
+    expect(verifyAttempt.verified).toBe(false);
+    expect(verifyAttempt.error).toContain("cancelled");
+    expect(getStoredCreditBalance("tenant-beta")).toBe(0);
+  });
+
+  it("creates UPI orders, verifies via automated receipt check, and grants credits on onboarding", async () => {
+    expect(getStoredCreditBalance("tenant-onboard")).toBe(0);
+
+    const upiOrder = createUpiOrder({
+      credits: 100,
+      amountInr: 1599,
+      amountUsd: 19,
+      tenantId: "tenant-onboard",
+      userEmail: "newuser@startup.io",
+    });
+
+    expect(upiOrder.orderId).toMatch(/^SPX-UPI-\d{4}-/);
+    expect(upiOrder.payeeUpiId).toBe("bm.atchuthakrishna@okhdfcbank");
+    expect(upiOrder.status).toBe("pending");
+
+    // Automated bank feed / UTR verification check
+    const verifyRes = await verifyUpiOrderAutomation(
+      upiOrder.orderId,
+      "429182901234",
+      "tenant-onboard",
+      "newuser@startup.io",
+    );
+
+    expect(verifyRes.verified).toBe(true);
+    expect(verifyRes.transaction?.credits).toBe(100);
+    expect(getStoredCreditBalance("tenant-onboard")).toBe(100);
+  });
+
+  it("cancels UPI order cleanly and audits the cancellation event", () => {
+    const upiOrder = createUpiOrder({
+      credits: 500,
+      amountInr: 6499,
+      amountUsd: 79,
+    });
+
+    const cancelled = cancelUpiOrder(upiOrder.orderId, "Customer aborted checkout");
+    expect(cancelled?.status).toBe("cancelled");
+    expect(cancelled?.cancellationReason).toBe("Customer aborted checkout");
   });
 
   it("validates card numbers with Luhn checksum, expiry dates, and UPI UTR references", () => {

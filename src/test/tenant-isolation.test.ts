@@ -18,7 +18,15 @@ import {
   readTenantIsolatedStorage,
   writeTenantIsolatedStorage,
   verifyWebsiteConnector,
+  validateIpAddress,
+  getTenantIpTableName,
+  getTenantDatabaseIps,
+  addTenantDatabaseIp,
+  removeTenantDatabaseIp,
+  probeTenantDatabaseIp,
+  resetTenantApiCredentials,
 } from "../lib/tenant-database";
+import { DashboardSettingsAndConnector } from "../components/DashboardSettingsAndConnector";
 
 beforeAll(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
@@ -233,5 +241,116 @@ describe("Multi-Tenant Isolation & Zero Fake Data Verification", () => {
     // Unauthenticated visitors must NEVER see client tenant names or domains
     expect(screen.queryByText(/privatehealth\.org/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Private Healthcare SaaS/i)).not.toBeInTheDocument();
+  });
+
+  it("validates IPv4, CIDR, and IPv6 address formats accurately", () => {
+    expect(validateIpAddress("76.76.21.30").valid).toBe(true);
+    expect(validateIpAddress("198.51.100.42/24").valid).toBe(true);
+    expect(validateIpAddress("2001:0db8:85a3:0000:0000:8a2e:0370:7334").valid).toBe(true);
+
+    expect(validateIpAddress("").valid).toBe(false);
+    expect(validateIpAddress("999.999.999.999").valid).toBe(false);
+    expect(validateIpAddress("invalid-ip").valid).toBe(false);
+  });
+
+  it("creates a separate database table for tenant IPs and supports adding, listing, probing, and removing IPs", async () => {
+    const tenantId = "tnt-detriot-cloud";
+    const config = getTenantDatabaseConfig(tenantId, "Detriot Cloud", "detriot.cloud");
+    const tableName = config.ipTableName;
+    expect(tableName).toBe("spx_db_detriot_cloud_tnt_detriot_cloud_ips");
+
+    // Add first IP
+    const addRes1 = addTenantDatabaseIp(tenantId, {
+      ipAddress: "76.76.21.30",
+      label: "Production Web VPS",
+      type: "server_wan",
+      notes: "Primary host",
+    });
+
+    expect(addRes1.success).toBe(true);
+    expect(addRes1.record).toBeDefined();
+    expect(addRes1.record?.tableName).toBe(tableName);
+
+    // Verify list
+    const ips = getTenantDatabaseIps(tenantId);
+    expect(ips.length).toBeGreaterThanOrEqual(1);
+    expect(ips.some((i) => i.ipAddress === "76.76.21.30")).toBe(true);
+
+    // Reject duplicate IP
+    const addResDup = addTenantDatabaseIp(tenantId, {
+      ipAddress: "76.76.21.30",
+      label: "Duplicate VPS",
+    });
+    expect(addResDup.success).toBe(false);
+    expect(addResDup.message).toContain("already registered");
+
+    // Probe IP
+    const probeRes = await probeTenantDatabaseIp(tenantId, addRes1.record!.id);
+    expect(probeRes.success).toBe(true);
+    expect(probeRes.latencyMs).toBeGreaterThan(0);
+
+    // Remove IP
+    const removeRes = removeTenantDatabaseIp(tenantId, addRes1.record!.id);
+    expect(removeRes.success).toBe(true);
+    const afterRemove = getTenantDatabaseIps(tenantId);
+    expect(afterRemove.some((i) => i.id === addRes1.record!.id)).toBe(false);
+  });
+
+  it("resets API IDs and Dashboard API keys easily and issues fresh cryptographically signed credentials", () => {
+    const tenantId = "tnt-key-reset-test";
+    const initialConfig = getTenantDatabaseConfig(tenantId, "Reset Test Org", "reset.org");
+    const initialApiKey = initialConfig.dashboardApiKey;
+    const initialClientId = initialConfig.apiClientId;
+
+    expect(initialApiKey).toMatch(/^spx_live_/);
+    expect(initialClientId).toMatch(/^spx_cid_/);
+
+    // Reset both
+    const resetResult = resetTenantApiCredentials(tenantId, "all");
+    expect(resetResult.newApiKey).toMatch(/^spx_live_/);
+    expect(resetResult.newApiClientId).toMatch(/^spx_cid_/);
+    expect(resetResult.newApiKey).not.toBe(initialApiKey);
+    expect(resetResult.newApiClientId).not.toBe(initialClientId);
+
+    // Verify persisted
+    const updatedConfig = getTenantDatabaseConfig(tenantId);
+    expect(updatedConfig.dashboardApiKey).toBe(resetResult.newApiKey);
+    expect(updatedConfig.apiClientId).toBe(resetResult.newApiClientId);
+  });
+
+  it("renders DashboardSettingsAndConnector with the dedicated IP table and reset UI", () => {
+    const mockTenant: ClientTenant = {
+      id: "tnt-ui-test",
+      name: "Acme Web",
+      contactEmail: "admin@acme.com",
+      primaryDomain: "acme.com",
+      planTier: "Enterprise",
+      status: "Active",
+      enabledModules: ["web_security"],
+      apiKey: "spx_live_test_123",
+      sdkVerified: true,
+      guardrailsActive: true,
+      requestsPerMin: 100,
+      blockedThreats: 4,
+      avgLatencyMs: 12,
+      quotaUsedPct: 10,
+    };
+
+    render(
+      React.createElement(DashboardSettingsAndConnector, {
+        tenant: mockTenant,
+        showToast: vi.fn(),
+      }),
+    );
+
+    // Verify API credentials & reset button exist
+    expect(screen.getByText(/API Credentials & ID Management/i)).toBeInTheDocument();
+    expect(screen.getByText(/Reset API IDs & Keys/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Client API ID/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Dashboard API Key/i).length).toBeGreaterThan(0);
+
+    // Verify dedicated IP table section exists
+    expect(screen.getByText(/Dedicated Tenant IP Database Table/i)).toBeInTheDocument();
+    expect(screen.getByText(/Add IP Address to Database Table/i)).toBeInTheDocument();
   });
 });

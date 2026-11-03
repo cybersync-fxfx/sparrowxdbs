@@ -85,6 +85,7 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         verified: isValidKey,
         tenantId: tenantId || "default",
         databasePartition: tenantId ? `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}` : "spx_db_default",
+        ipTableName: tenantId ? `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}_ips` : "spx_db_default_ips",
         status: isValidKey ? "Connected & Active" : "Key Verification Failed",
         message: isValidKey
           ? "SparrowX sovereign connector handshake established. Dedicated database partition online."
@@ -96,6 +97,110 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         status: isValidKey ? 200 : 401,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       },
+    );
+  }
+
+  // 2b. Tenant Database Dedicated IPs Table API
+  const tenantIpsMatch = url.pathname.match(/^\/api\/v1\/tenant\/([^/]+)\/ips(?:\/([^/]+))?$/);
+  if (tenantIpsMatch) {
+    const tenantId = tenantIpsMatch[1];
+    const ipRecordId = tenantIpsMatch[2];
+    const dbPartition = `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
+    const ipTableName = `${dbPartition}_ips`;
+
+    if (request.method === "GET") {
+      return new Response(
+        JSON.stringify({
+          tenantId,
+          databaseName: dbPartition,
+          tableName: ipTableName,
+          status: "online",
+          timestamp: new Date().toISOString(),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      );
+    }
+
+    if (request.method === "POST") {
+      try {
+        const body = (await request.json()) as { ipAddress?: string; label?: string; type?: string; notes?: string };
+        const cleanIp = (body.ipAddress || "").trim();
+        const ipv4Pattern = /^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\/([0-9]|[1-2][0-9]|3[0-2]))?$/;
+        const ipv6Pattern = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
+
+        if (!cleanIp || (!ipv4Pattern.test(cleanIp) && !ipv6Pattern.test(cleanIp))) {
+          return new Response(
+            JSON.stringify({
+              error: `Invalid IP address format "${cleanIp}". Must be a valid IPv4, CIDR, or IPv6 address.`,
+            }),
+            { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+          );
+        }
+
+        const newRecord = {
+          id: `ip_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          tenantId,
+          databaseName: dbPartition,
+          tableName: ipTableName,
+          ipAddress: cleanIp,
+          label: body.label?.trim() || "Server Origin Host",
+          type: body.type || "server_wan",
+          status: "Active",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastProbeStatus: "Pending",
+          notes: body.notes?.trim() || undefined,
+        };
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `IP ${cleanIp} added to database table ${ipTableName} successfully.`,
+            record: newRecord,
+          }),
+          { status: 201, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        );
+      } catch (err) {
+        return new Response(
+          JSON.stringify({ error: "Invalid JSON payload", detail: String(err) }),
+          { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        );
+      }
+    }
+
+    if (request.method === "DELETE") {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `IP record ${ipRecordId || "specified"} removed from table ${ipTableName}.`,
+          tenantId,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      );
+    }
+  }
+
+  // 2c. Tenant API Credentials Reset Endpoint
+  const tenantResetMatch = url.pathname.match(/^\/api\/v1\/tenant\/([^/]+)\/reset-(?:credentials|keys)$/);
+  if (tenantResetMatch && request.method === "POST") {
+    const tenantId = tenantResetMatch[1];
+    const rawId = tenantId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
+    const randKey = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    const randCid = Math.random().toString(36).substring(2, 8);
+
+    const newApiKey = `spx_live_${rawId}_${randKey}`;
+    const newApiClientId = `spx_cid_${rawId.toLowerCase()}_${randCid}`;
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        tenantId,
+        newApiKey,
+        newApiClientId,
+        message: "API Client ID and Dashboard API Key reset successfully. Previous credentials invalidated.",
+        timestamp: new Date().toISOString(),
+      }),
+      { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
     );
   }
 

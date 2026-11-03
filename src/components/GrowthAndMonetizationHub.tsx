@@ -23,6 +23,7 @@ import {
   Plus,
   QrCode,
   Radar,
+  Radio,
   RefreshCw,
   Search,
   Send,
@@ -3614,30 +3615,92 @@ export function ClientOnboardingWizard({
 
       {/* Step Content */}
       {activeStep === 1 && (
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3 text-xs">
-          <div className="font-semibold text-foreground">
-            Step 1: Connect Website, API, or AI Service
+        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3.5 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-2.5">
+            <div className="font-semibold text-foreground text-sm flex items-center gap-2">
+              <Globe2 className="size-4 text-primary" />
+              <span>Step 1 · Easy Guided Setup for Website, AI Products &amp; Backend APIs</span>
+            </div>
+            <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">
+              Zero Code Rewrite Required
+            </span>
           </div>
-          <p className="text-muted-foreground">
-            Target endpoint <code className="text-foreground">{tenant.primaryDomain}</code> is
-            registered with modules:{" "}
-            <strong className="text-primary">{tenant.enabledModules.join(", ")}</strong>.
+
+          <p className="text-muted-foreground leading-relaxed">
+            Target endpoint <code className="text-foreground font-bold">{tenant.primaryDomain}</code> is
+            ready to link to your dashboard with active modules:{" "}
+            <strong className="text-primary">{tenant.enabledModules.join(", ")}</strong>. Choose your integration method below:
           </p>
-          <div className="flex flex-wrap gap-2">
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 font-semibold text-foreground hover:border-primary cursor-pointer"
+              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
             >
-              <Terminal className="size-3.5 text-primary" />
-              <span>View Drop-In SDK Snippet (Next.js / Express / FastAPI / MCP)</span>
+              <div className="flex items-center justify-between">
+                <Globe2 className="size-4 text-primary" />
+                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-primary/15 text-primary">1-Line</span>
+              </div>
+              <div className="font-bold text-white text-xs">Website Drop-In</div>
+              <p className="text-[10px] text-zinc-400">HTML script tag for WordPress, Shopify, Webflow</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenSdkModal(tenant)}
+              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <Cpu className="size-4 text-cyan-400" />
+                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-cyan-500/15 text-cyan-300">MCP Tool</span>
+              </div>
+              <div className="font-bold text-white text-xs">AI Agent &amp; LLM</div>
+              <p className="text-[10px] text-zinc-400">OpenAI, Gemini, Anthropic &amp; MCP tool firewall</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenSdkModal(tenant)}
+              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <Radio className="size-4 text-amber-400" />
+                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/15 text-amber-300">&lt; 3ms</span>
+              </div>
+              <div className="font-bold text-white text-xs">Voice &amp; Multimodal</div>
+              <p className="text-[10px] text-zinc-400">Real-time WebRTC audio &amp; streaming guardrails</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenSdkModal(tenant)}
+              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+            >
+              <div className="flex items-center justify-between">
+                <Zap className="size-4 text-emerald-400" />
+                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-300">FastAPI/Node</span>
+              </div>
+              <div className="font-bold text-white text-xs">Backend APIs</div>
+              <p className="text-[10px] text-zinc-400">Next.js Edge, Express, Python FastAPI middleware</p>
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => onOpenSdkModal(tenant)}
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary via-orange-500 to-amber-500 px-4 py-2 font-bold text-white shadow-md hover:scale-[1.01] transition-transform cursor-pointer"
+            >
+              <Terminal className="size-4" />
+              <span>Launch Guided Integration Studio (Website, AI &amp; Cloud Setup)</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveStep(2)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 font-semibold text-primary-foreground cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3.5 py-2 font-semibold text-foreground hover:border-primary cursor-pointer"
             >
-              <span>Next: Legacy Migration Check →</span>
+              <span>Next: Safe Migration Check →</span>
             </button>
           </div>
         </div>

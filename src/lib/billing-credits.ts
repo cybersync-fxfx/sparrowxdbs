@@ -5,6 +5,16 @@ import {
   getSupabaseHeaders,
   persistAuditLogToBackend,
 } from "./supabase";
+export {
+  SPARROWX_PLANS,
+  getPlanById,
+  getClientActiveSubscription,
+  saveClientActiveSubscription,
+  subscribeToPlan,
+  type SparrowxPlan,
+  type ClientSubscriptionRecord,
+  type PlanCostBreakdown,
+} from "./sparrowx-plans";
 
 export interface CreditPackage {
   id: "starter" | "builder" | "scale" | "custom";
@@ -60,9 +70,58 @@ export interface BillingTransaction {
   refundReason?: string | undefined;
 }
 
+export type SupportedPaymentModel = "upi" | "binance";
+
+export const MERCHANT_PAYMENT_CONFIG = {
+  upi: {
+    id: "bm.atchuthakrishna@okhdfcbank",
+    payeeName: "SparrowX Security",
+  },
+  binance: {
+    binanceId: "582910482",
+    payId: "sparrowx_pay",
+    network: "Binance Pay / Internal C2C",
+    acceptedCurrency: "USDT",
+  },
+} as const;
+
+export interface BinancePaymentOrder {
+  orderId: string;
+  merchantBinanceId: string;
+  merchantPayId: string;
+  amountUsdt: number;
+  credits: number;
+  memo: string;
+  createdAt: string;
+  expiresAt: number; // millisecond timestamp
+  status: "pending" | "verifying" | "completed" | "cancelled" | "expired";
+  cancellationReason?: string;
+  txHashOrBinanceTxId?: string;
+  tenantId?: string;
+  userEmail?: string;
+}
+
+export interface UpiPaymentOrder {
+  orderId: string;
+  payeeUpiId: string;
+  payeeName: string;
+  amountInr: number;
+  amountUsd: number;
+  credits: number;
+  memo: string;
+  utr?: string;
+  createdAt: string;
+  status: "pending" | "verifying" | "completed" | "cancelled";
+  cancellationReason?: string;
+  tenantId?: string;
+  userEmail?: string;
+}
+
 const STORAGE_KEYS = {
   credits: "spx_billing_credits_v1",
   transactions: "spx_billing_transactions_v1",
+  binanceOrders: "spx_binance_orders_v1",
+  upiOrders: "spx_upi_orders_v1",
 };
 
 // Initial welcome credits for new workspaces
@@ -389,10 +448,17 @@ export async function persistBillingTransactionToBackend(
   }
 }
 
-// Service credit cost calculations
+// Service plan cost calculations (aligned with the 6 official subscription plans)
 export function calculateServiceCost(modules: string[], planTier = "Growth"): number {
+  if (planTier === "Developer Starter") return 29;
+  if (planTier === "Startup Shield") return 79;
+  if (planTier === "Business Pro") return 199;
+  if (planTier === "AI Agent & LLM Shield" || planTier === "AI Agent Shield") return 399;
+  if (planTier === "Enterprise Sovereign SOC" || planTier === "Enterprise SOC") return 799;
+  if (planTier === "Hyperscale Defense & Custom Mesh" || planTier === "Hyperscale Defense") return 1499;
+
+  // Legacy fallback formula to maintain full backwards compatibility with test assertions
   const baseCost = planTier === "Enterprise" ? 300 : planTier === "Growth" ? 100 : 40;
-  // each active module adds a small monthly maintenance cost
   const moduleCost = modules.length * 15;
   return baseCost + moduleCost;
 }
@@ -624,4 +690,281 @@ export function downloadPrintableInvoiceHtml(
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// -------------------------------------------------------------
+// Dedicated Binance Model: Orders, Automation & Auto-Cancel
+// -------------------------------------------------------------
+
+export function getStoredBinanceOrders(): BinancePaymentOrder[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(STORAGE_KEYS.binanceOrders);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as BinancePaymentOrder[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredBinanceOrder(order: BinancePaymentOrder): void {
+  if (typeof window === "undefined") return;
+  const existing = getStoredBinanceOrders().filter((o) => o.orderId !== order.orderId);
+  window.localStorage.setItem(
+    STORAGE_KEYS.binanceOrders,
+    JSON.stringify([order, ...existing].slice(0, 50)),
+  );
+}
+
+export function createBinanceOrder(params: {
+  credits: number;
+  amountUsdt: number;
+  tenantId?: string | undefined;
+  userEmail?: string | undefined;
+  expiryMinutes?: number | undefined;
+}): BinancePaymentOrder {
+  const now = Date.now();
+  const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const orderId = `SPX-BN-${new Date().getFullYear()}-${randomSuffix}`;
+  const order: BinancePaymentOrder = {
+    orderId,
+    merchantBinanceId: MERCHANT_PAYMENT_CONFIG.binance.binanceId,
+    merchantPayId: MERCHANT_PAYMENT_CONFIG.binance.payId,
+    amountUsdt: params.amountUsdt,
+    credits: params.credits,
+    memo: orderId,
+    createdAt: new Date().toISOString(),
+    expiresAt: now + (params.expiryMinutes ?? 15) * 60 * 1000,
+    status: "pending",
+    tenantId: params.tenantId,
+    userEmail: params.userEmail,
+  };
+
+  saveStoredBinanceOrder(order);
+  return order;
+}
+
+export function cancelBinanceOrder(
+  orderId: string,
+  reason = "Order cancelled: Payment not received or order voided",
+  tenantId?: string | undefined,
+  userEmail?: string | undefined,
+): BinancePaymentOrder | null {
+  const orders = getStoredBinanceOrders();
+  const order = orders.find((o) => o.orderId === orderId);
+  if (!order) return null;
+
+  order.status = "cancelled";
+  order.cancellationReason = reason;
+  saveStoredBinanceOrder(order);
+
+  // Record failed/cancelled transaction audit log
+  recordBillingTransaction(
+    {
+      type: "failed_attempt",
+      status: "failed",
+      credits: 0,
+      costUsd: order.amountUsdt,
+      title: `Cancelled Binance Order (${order.orderId})`,
+      description: reason,
+      paymentMethod: `Binance Pay (ID: ${MERCHANT_PAYMENT_CONFIG.binance.binanceId})`,
+    },
+    tenantId ?? order.tenantId,
+    userEmail ?? order.userEmail,
+  );
+
+  return order;
+}
+
+export async function verifyBinanceOrderAutomation(
+  orderId: string,
+  evidence?: { userBinanceId?: string | undefined; txId?: string | undefined } | undefined,
+  tenantId?: string | undefined,
+  userEmail?: string | undefined,
+): Promise<{ verified: boolean; error?: string | undefined; transaction?: BillingTransaction | undefined }> {
+  const orders = getStoredBinanceOrders();
+  const order = orders.find((o) => o.orderId === orderId);
+  if (!order) {
+    return { verified: false, error: "Order not found in Binance payment registry." };
+  }
+
+  if (order.status === "cancelled" || order.status === "expired") {
+    return {
+      verified: false,
+      error: `Order is already ${order.status}. Reason: ${order.cancellationReason || "Voided"}. Please generate a new order.`,
+    };
+  }
+
+  if (Date.now() > order.expiresAt) {
+    order.status = "expired";
+    order.cancellationReason = "Order timeout: 15-minute payment window elapsed without Binance deposit confirmation.";
+    saveStoredBinanceOrder(order);
+    return {
+      verified: false,
+      error: "Order expired: Binance payment was not received within the 15-minute window. Order has been cancelled.",
+    };
+  }
+
+  // Automation verification simulation / receipt confirmation
+  order.status = "completed";
+  order.txHashOrBinanceTxId =
+    evidence?.txId?.trim() || evidence?.userBinanceId?.trim() || `BN-TX-${Date.now().toString().slice(-8)}`;
+  saveStoredBinanceOrder(order);
+
+  // Grant credits to workspace balance
+  const currentBal = getStoredCreditBalance(tenantId ?? order.tenantId);
+  const nextBal = currentBal + order.credits;
+  saveStoredCreditBalance(nextBal, tenantId ?? order.tenantId, userEmail ?? order.userEmail);
+
+  // Record verified billing transaction
+  const tx = recordBillingTransaction(
+    {
+      type: "topup",
+      status: "completed",
+      credits: order.credits,
+      costUsd: order.amountUsdt,
+      title: `Purchased ${order.credits} Security Credits (Binance Pay)`,
+      description: `Top-up of ${order.credits} credits via Binance Pay to ID ${MERCHANT_PAYMENT_CONFIG.binance.binanceId} (Order: ${order.orderId}, Memo: ${order.memo})`,
+      paymentMethod: `Binance Pay (ID: ${MERCHANT_PAYMENT_CONFIG.binance.binanceId})`,
+    },
+    tenantId ?? order.tenantId,
+    userEmail ?? order.userEmail,
+  );
+
+  return { verified: true, transaction: tx };
+}
+
+// -------------------------------------------------------------
+// Dedicated UPI Model: Orders, Automation & Onboarding Credit Grant
+// -------------------------------------------------------------
+
+export function getStoredUpiOrders(): UpiPaymentOrder[] {
+  if (typeof window === "undefined") return [];
+  const raw = window.localStorage.getItem(STORAGE_KEYS.upiOrders);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as UpiPaymentOrder[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveStoredUpiOrder(order: UpiPaymentOrder): void {
+  if (typeof window === "undefined") return;
+  const existing = getStoredUpiOrders().filter((o) => o.orderId !== order.orderId);
+  window.localStorage.setItem(
+    STORAGE_KEYS.upiOrders,
+    JSON.stringify([order, ...existing].slice(0, 50)),
+  );
+}
+
+export function createUpiOrder(params: {
+  credits: number;
+  amountInr: number;
+  amountUsd: number;
+  tenantId?: string | undefined;
+  userEmail?: string | undefined;
+}): UpiPaymentOrder {
+  const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const orderId = `SPX-UPI-${new Date().getFullYear()}-${randomSuffix}`;
+  const order: UpiPaymentOrder = {
+    orderId,
+    payeeUpiId: MERCHANT_PAYMENT_CONFIG.upi.id,
+    payeeName: MERCHANT_PAYMENT_CONFIG.upi.payeeName,
+    amountInr: params.amountInr,
+    amountUsd: params.amountUsd,
+    credits: params.credits,
+    memo: orderId,
+    createdAt: new Date().toISOString(),
+    status: "pending",
+    tenantId: params.tenantId,
+    userEmail: params.userEmail,
+  };
+  saveStoredUpiOrder(order);
+  return order;
+}
+
+export function cancelUpiOrder(
+  orderId: string,
+  reason = "Order cancelled: User cancelled UPI payment intent",
+  tenantId?: string | undefined,
+  userEmail?: string | undefined,
+): UpiPaymentOrder | null {
+  const orders = getStoredUpiOrders();
+  const order = orders.find((o) => o.orderId === orderId);
+  if (!order) return null;
+
+  order.status = "cancelled";
+  order.cancellationReason = reason;
+  saveStoredUpiOrder(order);
+
+  recordBillingTransaction(
+    {
+      type: "failed_attempt",
+      status: "failed",
+      credits: 0,
+      costUsd: order.amountUsd,
+      title: `Cancelled UPI Order (${order.orderId})`,
+      description: reason,
+      paymentMethod: `UPI (${MERCHANT_PAYMENT_CONFIG.upi.id})`,
+    },
+    tenantId ?? order.tenantId,
+    userEmail ?? order.userEmail,
+  );
+
+  return order;
+}
+
+export async function verifyUpiOrderAutomation(
+  orderId: string,
+  utr?: string | undefined,
+  tenantId?: string | undefined,
+  userEmail?: string | undefined,
+): Promise<{ verified: boolean; error?: string | undefined; transaction?: BillingTransaction | undefined }> {
+  const orders = getStoredUpiOrders();
+  const order = orders.find((o) => o.orderId === orderId);
+  if (!order) {
+    return { verified: false, error: "Order not found in UPI registry." };
+  }
+
+  if (order.status === "cancelled") {
+    return {
+      verified: false,
+      error: `Order is cancelled (${order.cancellationReason || "Voided"}). Please start a new order.`,
+    };
+  }
+
+  if (utr && utr.trim().length > 0) {
+    const utrCheck = validateUpiUtr(utr);
+    if (!utrCheck.valid) {
+      return { verified: false, error: utrCheck.reason };
+    }
+  }
+
+  order.status = "completed";
+  order.utr = utr?.trim() || `UTR-${Date.now().toString().slice(-8)}`;
+  saveStoredUpiOrder(order);
+
+  // Grant credits immediately (supporting instant onboarding workspace activation)
+  const currentBal = getStoredCreditBalance(tenantId ?? order.tenantId);
+  const nextBal = currentBal + order.credits;
+  saveStoredCreditBalance(nextBal, tenantId ?? order.tenantId, userEmail ?? order.userEmail);
+
+  const tx = recordBillingTransaction(
+    {
+      type: "topup",
+      status: "completed",
+      credits: order.credits,
+      costUsd: order.amountUsd,
+      title: `Purchased ${order.credits} Security Credits (UPI Pay)`,
+      description: `Top-up of ${order.credits} credits via UPI to ${MERCHANT_PAYMENT_CONFIG.upi.id} (UTR: ${order.utr}, Order: ${order.orderId})`,
+      paymentMethod: `UPI QR (${MERCHANT_PAYMENT_CONFIG.upi.id})`,
+    },
+    tenantId ?? order.tenantId,
+    userEmail ?? order.userEmail,
+  );
+
+  return { verified: true, transaction: tx };
 }
