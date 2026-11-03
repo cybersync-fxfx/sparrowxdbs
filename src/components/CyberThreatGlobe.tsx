@@ -152,20 +152,26 @@ interface ImpactPulse {
 // Helper to create glowing 3D city name labels
 function createTextSprite(text: string, isOrigin = false): THREE.Sprite {
   const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
+  canvas.width = 160;
+  canvas.height = 40;
   const ctx = canvas.getContext("2d");
   if (ctx) {
-    ctx.font = "bold 24px monospace";
-    ctx.fillStyle = isOrigin ? "#ff8800" : "#9ef5ff";
-    ctx.shadowColor = isOrigin ? "rgba(255, 120, 0, 0.8)" : "rgba(0, 229, 255, 0.8)";
-    ctx.shadowBlur = 8;
-    ctx.fillText(text, 10, 42);
+    ctx.clearRect(0, 0, 160, 40);
+    ctx.font = "bold 13px 'SF Mono', 'JetBrains Mono', monospace";
+    ctx.fillStyle = isOrigin ? "#ffaa33" : "#7fe8ff";
+    ctx.shadowColor = isOrigin ? "rgba(255, 120, 0, 0.6)" : "rgba(0, 229, 255, 0.6)";
+    ctx.shadowBlur = 3;
+    ctx.fillText(text, 6, 24);
   }
   const tex = new THREE.CanvasTexture(canvas);
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mat = new THREE.SpriteMaterial({
+    map: tex,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0.85,
+  });
   const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(16, 4, 1);
+  sprite.scale.set(6.5, 1.6, 1);
   return sprite;
 }
 
@@ -228,9 +234,9 @@ export function CyberThreatGlobe({
   // Dragging, Orbit & Inertia
   const isDraggingRef = useRef(false);
   const lastMousePosRef = useRef({ x: 0, y: 0 });
-  const rotVelocityRef = useRef({ x: 0, y: 0.0015 });
-  const targetCameraDistanceRef = useRef(235);
-  const currentCameraDistanceRef = useRef(235);
+  const rotVelocityRef = useRef({ x: 0, y: 0.0012 });
+  const targetCameraDistanceRef = useRef(280);
+  const currentCameraDistanceRef = useRef(280);
   const raycasterRef = useRef<THREE.Raycaster>(new THREE.Raycaster());
   const mouseNdcRef = useRef<THREE.Vector2>(new THREE.Vector2(-999, -999));
 
@@ -261,7 +267,7 @@ export function CyberThreatGlobe({
       const dist = srcVec.distanceTo(dstVec);
 
       // Arc height curves naturally above Earth (higher for longer distances)
-      const arcHeight = Math.min(52, Math.max(12, dist * 0.38));
+      const arcHeight = Math.min(36, Math.max(8, dist * 0.26));
       const steps = 64;
       const points: THREE.Vector3[] = [];
 
@@ -287,7 +293,7 @@ export function CyberThreatGlobe({
       arcsGroup.add(line);
 
       // 2. Glowing leading projectile head
-      const headGeom = new THREE.SphereGeometry(1.6, 16, 16);
+      const headGeom = new THREE.SphereGeometry(0.85, 12, 12);
       const headMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         blending: THREE.AdditiveBlending,
@@ -305,7 +311,7 @@ export function CyberThreatGlobe({
 
       const sparkMat = new THREE.PointsMaterial({
         color: hexColor,
-        size: 2.8,
+        size: 2.0,
         transparent: true,
         opacity: 0.85,
         blending: THREE.AdditiveBlending,
@@ -338,8 +344,8 @@ export function CyberThreatGlobe({
       const pulsesGroup = pulsesGroupRef.current;
       if (!pulsesGroup) return;
 
-      const pos = latLonToVector3(dst.lat, dst.lon, 100.8);
-      const ringGeom = new THREE.RingGeometry(0.8, 2.2, 32);
+      const pos = latLonToVector3(dst.lat, dst.lon, 100.4);
+      const ringGeom = new THREE.RingGeometry(0.3, 0.8, 28);
       const hexColor = getSeverityColor(severity);
       const ringMat = new THREE.MeshBasicMaterial({
         color: hexColor,
@@ -534,21 +540,21 @@ export function CyberThreatGlobe({
     const heightPx = rect.height || (typeof height === "number" ? height : 560);
     renderer.setSize(width, heightPx);
 
-    const camera = new THREE.PerspectiveCamera(45, width / heightPx, 1, 2000);
-    camera.position.set(0, 45, currentCameraDistanceRef.current);
+    const camera = new THREE.PerspectiveCamera(38, width / heightPx, 1, 2000);
+    camera.position.set(0, 30, currentCameraDistanceRef.current);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    // Lighting (Warm Sunlight + Deep Blue Starlight + Cyan Cyber Accent)
-    const sunLight = new THREE.DirectionalLight(0xfff8ee, 2.2);
-    sunLight.position.set(300, 150, 220);
+    // Lighting (Warm Sunlight off-axis for realistic Day/Night Terminator)
+    const sunLight = new THREE.DirectionalLight(0xfff6ea, 2.2);
+    sunLight.position.set(-350, 160, 180);
     scene.add(sunLight);
 
-    const ambientLight = new THREE.AmbientLight(0x061528, 1.1);
+    const ambientLight = new THREE.AmbientLight(0x020814, 0.55);
     scene.add(ambientLight);
 
-    const cyberRimLight = new THREE.DirectionalLight(0x00e5ff, 0.6);
-    cyberRimLight.position.set(-250, -80, -200);
+    const cyberRimLight = new THREE.DirectionalLight(0x0055aa, 0.4);
+    cyberRimLight.position.set(300, -80, -220);
     scene.add(cyberRimLight);
 
     // Root Earth Pivot Group
@@ -557,32 +563,41 @@ export function CyberThreatGlobe({
     scene.add(earthGroup);
     earthGroupRef.current = earthGroup;
 
+    // Load authentic NASA satellite maps
+    const textureLoader = new THREE.TextureLoader();
+    const earthDayTex = textureLoader.load("/textures/globe/earth_day.jpg");
+    const earthNightTex = textureLoader.load("/textures/globe/earth_lights.png");
+    const earthSpecTex = textureLoader.load("/textures/globe/earth_specular.jpg");
+    const cloudTex = textureLoader.load("/textures/globe/earth_clouds.png");
+    const earthNormalTex = textureLoader.load("/textures/globe/earth_normal.jpg");
+
+    earthDayTex.colorSpace = THREE.SRGBColorSpace;
+    earthNightTex.colorSpace = THREE.SRGBColorSpace;
+    cloudTex.colorSpace = THREE.SRGBColorSpace;
+
     // 1. Earth Surface Mesh with Realistic Specular & Night City Lights
     const R = 100;
-    const earthDayTex = generateEarthDayTexture(2048, 1024);
-    const earthNightTex = generateEarthNightTexture(2048, 1024);
-    const earthSpecTex = generateEarthSpecularTexture(1024, 512);
-
     const earthGeom = new THREE.SphereGeometry(R, 64, 64);
-    const earthMat = new THREE.MeshPhongMaterial({
+    const earthMat = new THREE.MeshStandardMaterial({
       map: earthDayTex,
+      normalMap: earthNormalTex,
+      normalScale: new THREE.Vector2(0.75, 0.75),
+      roughnessMap: earthSpecTex,
+      roughness: 0.65,
+      metalness: 0.08,
       emissiveMap: earthNightTex,
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.9,
-      specularMap: earthSpecTex,
-      specular: new THREE.Color(0x2288cc),
-      shininess: 28,
+      emissive: new THREE.Color(0xffe8ba),
+      emissiveIntensity: 1.25,
     });
     const earthMesh = new THREE.Mesh(earthGeom, earthMat);
     earthGroup.add(earthMesh);
 
     // 2. Atmospheric Clouds Layer (rotates independently)
-    const cloudTex = generateEarthCloudTexture(2048, 1024);
-    const cloudGeom = new THREE.SphereGeometry(R + 1.4, 64, 64);
+    const cloudGeom = new THREE.SphereGeometry(R + 0.65, 64, 64);
     const cloudMat = new THREE.MeshStandardMaterial({
       map: cloudTex,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.38,
       blending: THREE.NormalBlending,
       depthWrite: false,
     });
@@ -590,19 +605,13 @@ export function CyberThreatGlobe({
     earthGroup.add(cloudsMesh);
     cloudsMeshRef.current = cloudsMesh;
 
-    // 3. Inner Atmosphere Cyan Haze
-    const innerAtmoGeom = new THREE.SphereGeometry(R + 2.0, 64, 64);
-    const innerAtmoMat = createInnerAtmosphereMaterial(new THREE.Color(0x00a8ff));
-    const innerAtmoMesh = new THREE.Mesh(innerAtmoGeom, innerAtmoMat);
-    earthGroup.add(innerAtmoMesh);
-
-    // 4. Outer Atmospheric Rayleigh Limb Halo (BackSide Fresnel Glow)
-    const haloGeom = new THREE.SphereGeometry(R + 14.0, 64, 64);
-    const haloMat = createAtmosphereMaterial(new THREE.Color(0x00e5ff), 0.85, 3.2);
+    // 3. Razor-thin Atmospheric Rayleigh Limb Halo (BackSide Fresnel Glow)
+    const haloGeom = new THREE.SphereGeometry(R * 1.025, 64, 64);
+    const haloMat = createAtmosphereMaterial(new THREE.Color(0x0088ff), 0.5, 4.0);
     const haloMesh = new THREE.Mesh(haloGeom, haloMat);
     scene.add(haloMesh);
 
-    // 5. City Pins & Radar Beacons Layer
+    // 4. City Pins & Radar Beacons Layer
     const cityPinsGroup = new THREE.Group();
     earthGroup.add(cityPinsGroup);
     cityPinsGroupRef.current = cityPinsGroup;
@@ -611,14 +620,14 @@ export function CyberThreatGlobe({
     const cityLabelSprites: { sprite: THREE.Sprite; normal: THREE.Vector3 }[] = [];
 
     cities.forEach((city) => {
-      const pos = latLonToVector3(city.lat, city.lon, R + 0.8);
-
-      // Core illuminated beacon pin
+      const pos = latLonToVector3(city.lat, city.lon, R + 0.3);
       const isOrigin = city.isOrigin;
-      const pinGeom = new THREE.SphereGeometry(isOrigin ? 2.2 : 1.4, 16, 16);
+      const normal = pos.clone().normalize();
+
+      // Core illuminated micro-beacon pin
+      const pinGeom = new THREE.SphereGeometry(isOrigin ? 0.9 : 0.6, 16, 16);
       const pinMat = new THREE.MeshBasicMaterial({
         color: isOrigin ? 0xff7700 : 0x00e5ff,
-        blending: THREE.AdditiveBlending,
       });
       const pinMesh = new THREE.Mesh(pinGeom, pinMat);
       pinMesh.position.copy(pos);
@@ -626,14 +635,27 @@ export function CyberThreatGlobe({
       cityPinsGroup.add(pinMesh);
       pinMeshes.push({ mesh: pinMesh, city });
 
-      // Ground radar circle
-      const radarGeom = new THREE.RingGeometry(0.8, isOrigin ? 3.5 : 2.4, 32);
+      // Tactical vertical beacon needle
+      const spikeLen = isOrigin ? 3.2 : 2.2;
+      const spikeGeom = new THREE.CylinderGeometry(0.06, 0.06, spikeLen, 8);
+      spikeGeom.translate(0, spikeLen / 2, 0);
+      const spikeMat = new THREE.MeshBasicMaterial({
+        color: isOrigin ? 0xff9922 : 0x00d4ff,
+        transparent: true,
+        opacity: 0.75,
+      });
+      const spikeMesh = new THREE.Mesh(spikeGeom, spikeMat);
+      spikeMesh.position.copy(pos);
+      spikeMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+      cityPinsGroup.add(spikeMesh);
+
+      // Subtle ground radar micro-ring
+      const radarGeom = new THREE.RingGeometry(0.3, isOrigin ? 1.3 : 0.8, 24);
       const radarMat = new THREE.MeshBasicMaterial({
         color: isOrigin ? 0xff7700 : 0x00e5ff,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.5,
-        blending: THREE.AdditiveBlending,
+        opacity: 0.35,
         depthWrite: false,
       });
       const radarMesh = new THREE.Mesh(radarGeom, radarMat);
@@ -643,10 +665,10 @@ export function CyberThreatGlobe({
 
       // Floating 3D City Name Label Sprite
       const labelSprite = createTextSprite(city.name, isOrigin);
-      const labelPos = pos.clone().add(pos.clone().normalize().multiplyScalar(2.6));
+      const labelPos = pos.clone().add(normal.clone().multiplyScalar(spikeLen + 1.2));
       labelSprite.position.copy(labelPos);
       cityPinsGroup.add(labelSprite);
-      cityLabelSprites.push({ sprite: labelSprite, normal: pos.clone().normalize() });
+      cityLabelSprites.push({ sprite: labelSprite, normal });
     });
 
     // 6. Groups for Arcs & Impact Shockwaves
@@ -835,14 +857,13 @@ export function CyberThreatGlobe({
       earthNightTex.dispose();
       cloudTex.dispose();
       earthSpecTex.dispose();
+      earthNormalTex.dispose();
 
       // Dispose geometries & materials
       earthGeom.dispose();
       earthMat.dispose();
       cloudGeom.dispose();
       cloudMat.dispose();
-      innerAtmoGeom.dispose();
-      innerAtmoMat.dispose();
       haloGeom.dispose();
       haloMat.dispose();
 

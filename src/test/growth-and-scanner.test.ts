@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import {
   validateSafePublicTarget,
   isPrivateOrReservedIp,
@@ -77,12 +77,64 @@ describe("Public Scanner, SSRF Guard, Prospect CRM & Badge Verification", () => 
     expect(dmPitch).toContain("example.com");
   }, 15000);
 
+  it("refuses to produce a report for a domain that does not exist (NXDOMAIN)", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("dns.google") || url.includes("cloudflare-dns.com")) {
+        return new Response(JSON.stringify({ Status: 3 }), { status: 200 });
+      }
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+    try {
+      await expect(runLivePublicDomainScan("lol.inc")).rejects.toThrow(/does not exist/i);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("refuses to produce a report when the domain has no A/AAAA records", async () => {
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("dns.google") || url.includes("cloudflare-dns.com")) {
+        return new Response(JSON.stringify({ Status: 0 }), { status: 200 });
+      }
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+    try {
+      await expect(runLivePublicDomainScan("parked-example.com")).rejects.toThrow(/no A\/AAAA/i);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it("contextually identifies AI services and performs dedicated LLM prompt guardrail checks", async () => {
-    const aiResult = await runLivePublicDomainScan("https://chat.myagent.ai/api/chat");
-    expect(aiResult.targetCategory).toBe("AI Agent & LLM Endpoint");
-    const aiCategories = aiResult.findings.map((f) => f.category);
-    expect(aiCategories).toContain("AI & API Shield");
-    expect(aiResult.advisory?.targetCategory).toBe("AI Agent & LLM Endpoint");
+    // Mock DNS so the AI-category logic is tested against a resolvable host
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("dns.google") && url.includes("type=A") && !url.includes("type=AAAA")) {
+        return new Response(
+          JSON.stringify({ Status: 0, Answer: [{ type: 1, data: "93.184.215.14" }] }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("dns.google")) {
+        return new Response(JSON.stringify({ Status: 0 }), { status: 200 });
+      }
+      throw new TypeError("Failed to fetch");
+    }) as typeof fetch;
+    try {
+      const aiResult = await runLivePublicDomainScan("https://chat.myagent.ai/api/chat");
+      expect(aiResult.targetCategory).toBe("AI Agent & LLM Endpoint");
+      expect(aiResult.httpsReachable).toBe(false);
+      const aiCategories = aiResult.findings.map((f) => f.category);
+      expect(aiCategories).toContain("AI & API Shield");
+      expect(aiResult.advisory?.targetCategory).toBe("AI Agent & LLM Endpoint");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   }, 15000);
 
   it("manages admin prospects, tracks report views, and stores quotations", () => {

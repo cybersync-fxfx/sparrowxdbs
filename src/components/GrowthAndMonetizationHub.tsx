@@ -294,6 +294,9 @@ export async function runLivePublicDomainScan(
   let securityTxtPresent = false;
 
   // 1. Live DNS-over-HTTPS A & AAAA lookup (with DNSSEC AD flag check)
+  // DNS RCODE: 0 = NOERROR, 2 = SERVFAIL, 3 = NXDOMAIN (domain does not exist)
+  let dnsRcode: number | null = null;
+  let dnsLookupSucceeded = false;
   try {
     const [dnsARes, dnsAAAARes] = await Promise.all([
       fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanHost)}&type=A`),
@@ -301,9 +304,12 @@ export async function runLivePublicDomainScan(
     ]);
     if (dnsARes.ok) {
       const data = (await dnsARes.json()) as {
+        Status?: number;
         Answer?: Array<{ data?: string; type?: number }>;
         AD?: boolean;
       };
+      dnsLookupSucceeded = true;
+      if (typeof data.Status === "number") dnsRcode = data.Status;
       if (data.AD === true) dnssecVerified = true;
       if (Array.isArray(data.Answer)) {
         resolvedIps = data.Answer.filter((a) => a.type === 1 && typeof a.data === "string").map(
@@ -322,7 +328,51 @@ export async function runLivePublicDomainScan(
       }
     }
   } catch {
-    // Fallback if offline
+    // Google DoH unreachable — try Cloudflare DoH below
+  }
+
+  // Fallback resolver: Cloudflare DoH (only if Google DoH failed entirely)
+  if (!dnsLookupSucceeded) {
+    try {
+      const cfRes = await fetch(
+        `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(cleanHost)}&type=A`,
+        { headers: { accept: "application/dns-json" } },
+      );
+      if (cfRes.ok) {
+        const cf = (await cfRes.json()) as {
+          Status?: number;
+          Answer?: Array<{ data?: string; type?: number }>;
+        };
+        dnsLookupSucceeded = true;
+        if (typeof cf.Status === "number") dnsRcode = cf.Status;
+        if (Array.isArray(cf.Answer)) {
+          resolvedIps = cf.Answer.filter((a) => a.type === 1 && typeof a.data === "string").map(
+            (a) => a.data as string,
+          );
+        }
+      }
+    } catch {
+      // both resolvers unreachable
+    }
+  }
+
+  // HONEST FAILURE: never fabricate a security report for a target we cannot resolve
+  if (!dnsLookupSucceeded) {
+    throw new Error(
+      `DNS lookup failed: could not reach any DNS resolver to look up ${cleanHost}. Check your internet connection and try again.`,
+    );
+  }
+  if (dnsRcode === 3) {
+    throw new Error(
+      `Domain not found: ${cleanHost} does not exist (DNS NXDOMAIN). Check the spelling or make sure the domain is registered.`,
+    );
+  }
+  if (resolvedIps.length === 0 && ipv6Records.length === 0) {
+    throw new Error(
+      dnsRcode === 2
+        ? `DNS server failure: the nameservers for ${cleanHost} are not responding (SERVFAIL). The domain may be misconfigured.`
+        : `No website found: ${cleanHost} exists but has no A/AAAA records pointing to a server, so there is nothing to scan.`,
+    );
   }
 
   // DNS Rebinding check: reject if any resolved IP is private/loopback/metadata
@@ -391,7 +441,8 @@ export async function runLivePublicDomainScan(
     clearTimeout(timeoutId);
   } catch {
     latencyMs = Math.max(18, Math.round(performance.now() - startMs));
-    httpsReachable = resolvedIps.length > 0;
+    // Honest result: the HTTPS probe failed, so the site is NOT reachable over HTTPS
+    httpsReachable = false;
   }
 
   onProgress?.(80, "Running safe endpoint hygiene check (/.well-known/security.txt)...");

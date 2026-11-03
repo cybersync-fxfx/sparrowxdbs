@@ -4287,87 +4287,76 @@ export function PortalLoginScreen({
                 </div>
               </button>
 
-              {/* Live SOC Edge Status Pill (Visible on Desktop) */}
-              <div className="hidden lg:flex items-center gap-1.5 rounded-full border border-white/5 bg-white/[0.03] px-2.5 py-1 text-[11px] font-mono text-zinc-400 shadow-xs">
+              {/* Live SOC Edge Status Pill (Visible on large screens) */}
+              <div className="hidden xl:flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-[11px] font-mono text-zinc-400">
                 <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-zinc-300 font-medium">SHIELD ACTIVE</span>
                 <span className="text-zinc-600">·</span>
-                <span className="text-emerald-400/90 font-bold">0.8ms WAF</span>
+                <span className="text-emerald-400 font-bold">0.8ms WAF</span>
               </div>
             </div>
 
             {/* Center Quick Navigation Links (Capsule Cyber Dock) */}
             {viewStage === "landing" && (
-              <nav className="hidden md:flex items-center gap-1 lg:gap-1.5 rounded-full border border-white/5 bg-white/[0.03] p-1 text-xs font-medium text-zinc-400 shadow-inner backdrop-blur-md">
+              <nav className="hidden md:flex items-center gap-1 rounded-full border border-white/10 bg-black/40 px-2 py-1 text-xs font-medium text-zinc-400 backdrop-blur-xl shadow-inner">
                 <a
                   href="#free-scanner"
                   onClick={() => setActiveSection("free-scanner")}
-                  className={`group relative inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 transition-all ${
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 transition-all whitespace-nowrap ${
                     activeSection === "free-scanner"
-                      ? "border border-primary/40 bg-gradient-to-r from-primary/25 via-orange-500/20 to-amber-500/25 text-orange-300 shadow-[0_0_12px_rgba(249,115,22,0.3)] font-semibold"
-                      : "border border-primary/25 bg-primary/10 text-primary hover:border-primary/50 hover:bg-primary/20 hover:text-orange-200"
+                      ? "bg-white/10 text-white font-semibold shadow-xs"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Sparkles className="size-3 text-primary animate-pulse" />
-                  <span>Free Scanner</span>
-                  <span className="rounded-full bg-primary/30 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-orange-200">
-                    Live
-                  </span>
+                  Free Scanner
                 </a>
 
                 <a
                   href="#world-threats"
                   onClick={() => setActiveSection("world-threats")}
-                  className={`group inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-all hover:bg-white/[0.08] hover:text-white ${
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 transition-all whitespace-nowrap ${
                     activeSection === "world-threats"
-                      ? "bg-white/[0.1] text-white font-semibold shadow-xs"
-                      : "text-zinc-400"
+                      ? "bg-white/10 text-white font-semibold shadow-xs"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <ShieldAlert className="size-3.5 text-zinc-400 group-hover:text-primary transition-colors" />
-                  <span>Threats We Stop</span>
-                  <span className="hidden xl:inline-block text-[10px] text-zinc-500 font-mono">40+</span>
+                  Threats We Stop
                 </a>
 
                 <a
                   href="#defense-grid"
                   onClick={() => setActiveSection("defense-grid")}
-                  className={`group inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-all hover:bg-white/[0.08] hover:text-white ${
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 transition-all whitespace-nowrap ${
                     activeSection === "defense-grid"
-                      ? "bg-white/[0.1] text-white font-semibold shadow-xs"
-                      : "text-zinc-400"
+                      ? "bg-white/10 text-white font-semibold shadow-xs"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Globe2 className="size-3.5 text-zinc-400 group-hover:text-primary transition-colors" />
-                  <span>What We Do</span>
+                  What We Do
                 </a>
 
                 <a
                   href="#pricing"
                   onClick={() => setActiveSection("pricing")}
-                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 transition-all hover:bg-white/[0.08] hover:text-white ${
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 transition-all whitespace-nowrap ${
                     activeSection === "pricing"
-                      ? "bg-white/[0.1] text-white font-semibold shadow-xs"
-                      : "text-zinc-400"
+                      ? "bg-white/10 text-white font-semibold shadow-xs"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <span>Contact Us</span>
+                  Contact Us
                 </a>
 
                 <a
                   href="#how-it-works"
                   onClick={() => setActiveSection("how-it-works")}
-                  className={`group inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-all hover:bg-white/[0.08] hover:text-white ${
+                  className={`inline-flex items-center rounded-full px-3 py-1.5 transition-all whitespace-nowrap ${
                     activeSection === "how-it-works"
-                      ? "bg-white/[0.1] text-white font-semibold shadow-xs"
-                      : "text-zinc-400"
+                      ? "bg-white/10 text-white font-semibold shadow-xs"
+                      : "text-zinc-400 hover:text-white hover:bg-white/5"
                   }`}
                 >
-                  <Zap className="size-3.5 text-zinc-400 group-hover:text-amber-400 transition-colors" />
-                  <span>Onboarding</span>
-                  <span className="hidden xl:inline-block rounded-md border border-white/10 bg-white/5 px-1 py-0.2 text-[9px] text-zinc-400 font-mono">
-                    60s
-                  </span>
+                  Onboarding
                 </a>
               </nav>
             )}

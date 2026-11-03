@@ -494,7 +494,7 @@ export async function verifyWebsiteConnector(
     const dnsAudit = await runLivePublicDomainScan(cleanDomain);
     const latency = Math.round(performance.now() - startTime);
 
-    if (!dnsAudit.dnsResolved || !dnsAudit.resolvedIps || dnsAudit.resolvedIps.length === 0) {
+    if (!dnsAudit.resolvedIps || dnsAudit.resolvedIps.length === 0) {
       const errorMsg = `Website connection failed: Domain "${cleanDomain}" cannot be resolved via authoritative DNS. Check your DNS configuration and ensure the domain exists.`;
       
       // Update config with failed state
@@ -540,8 +540,12 @@ export async function verifyWebsiteConnector(
       details: {
         domain: cleanDomain,
         ip: dnsAudit.resolvedIps[0],
-        sslStatus: dnsAudit.sslStatus,
-        securityHeadersCount: dnsAudit.securityHeadersPresent.length,
+        sslStatus: dnsAudit.httpsReachable ? "HTTPS reachable" : "HTTPS unreachable",
+        securityHeadersCount: [
+          dnsAudit.hstsHeaderPresent,
+          dnsAudit.cspHeaderPresent,
+          dnsAudit.xFrameOptionsPresent,
+        ].filter(Boolean).length,
       },
     };
   } catch (err) {
