@@ -87,7 +87,7 @@ export function DashboardSettingsAndConnector({
 
   // Server connector test state
   const [serverHostInput, setServerHostInput] = useState(() => {
-    return dbConfig.connectors.vpsServer.serverIp || "104.21.55.19";
+    return dbConfig.connectors.vpsServer.serverIp || "";
   });
   const [isTestingServer, setIsTestingServer] = useState(false);
   const [serverResult, setServerResult] = useState<{
@@ -486,7 +486,7 @@ export function DashboardSettingsAndConnector({
               type="text"
               value={serverHostInput}
               onChange={(e) => setServerHostInput(e.target.value)}
-              placeholder="e.g. 104.21.55.19 or api.myserver.com"
+              placeholder="e.g. 198.51.100.42 or api.myserver.com"
               className="h-9 w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-foreground outline-none focus:border-primary"
             />
             <Button

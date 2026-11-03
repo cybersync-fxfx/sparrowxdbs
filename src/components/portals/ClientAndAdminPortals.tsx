@@ -3404,43 +3404,6 @@ export function PortalLoginScreen({
     },
   ];
 
-  const activeSim = attackSimulations[activeAttackIdx] ?? {
-    id: "sqli",
-    shortTab: "SQLi DB Shield",
-    vector: "SQLi Union Credential Harvest",
-    mitre: "T1190 · Public App Exploit",
-    severity: "CRITICAL",
-    attackerIp: "185.220.101.44 (Tor Exit · DE)",
-    payload: `GET /api/v1/users?id=1' UNION SELECT password_hash,api_secret FROM auth_users--`,
-    target: "api.production-gateway.io",
-    action: "HTTP 403 DROP + IP Quarantined at Edge WAF",
-    latency: "1.4ms",
-    ruleId: "SPX-WAF-942100",
-    tasks: [
-      {
-        stepLabel: "Intercepting Inbound TLS Request at Edge Proxy",
-        detail: "Captured GET /api/v1/users from 185.220.101.44 before reaching origin DB",
-        timeMs: "0.2ms",
-      },
-      {
-        stepLabel: "Deep AST SQL Token Tree Inspection",
-        detail: "Flagged injected UNION SELECT & auth_users schema enumeration tokens",
-        timeMs: "0.6ms",
-      },
-      {
-        stepLabel: "Autonomous Connection Drop & IP Quarantine",
-        detail: "Terminated socket with HTTP 403 Forbidden · 0 bytes leaked from PostgreSQL",
-        timeMs: "1.1ms",
-      },
-      {
-        stepLabel: "SparrowX AI Brain Inoculation & Firewall Sync",
-        detail: "Pushed permanent block rule SPX-WAF-942100 to Cloudflare & UFW perimeter",
-        timeMs: "1.4ms",
-      },
-    ],
-    explanation:
-      "SparrowX Edge Middleware parses AST token trees in real time, neutralizing SQL injection payloads before they ever reach your database pool.",
-  };
 
   const renderAuthCard = () => (
     <div className="relative w-full">
@@ -4390,20 +4353,20 @@ export function PortalLoginScreen({
                     <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-1">
                       <div className="flex items-center gap-2">
                         <ShieldCheck className="size-3.5 text-primary" />
-                        <span className="text-xs font-bold text-white">Authoritative DNS-over-HTTPS Verification</span>
+                        <span className="text-xs font-bold text-white">Authoritative Anycast DNS Verification</span>
                       </div>
                       <p className="text-[11px] text-zinc-400 leading-relaxed pl-5.5">
-                        Every domain scan executes authentic live Google DoH queries, SSL certificate handshakes, and OWASP security header audits without simulated metrics.
+                        Every domain scan executes authentic live SparrowX Anycast DNS queries, SSL certificate handshakes, and OWASP security header audits without simulated metrics.
                       </p>
                     </div>
 
                     <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-1">
                       <div className="flex items-center gap-2">
                         <Brain className="size-3.5 text-emerald-400" />
-                        <span className="text-xs font-bold text-white">Gemini Threat Intelligence Core</span>
+                        <span className="text-xs font-bold text-white">SparrowX AI Threat Intelligence Core</span>
                       </div>
                       <p className="text-[11px] text-zinc-400 leading-relaxed pl-5.5">
-                        Autonomous edge filtering and AI prompt sanitization powered by Gemini 2.5 Flash with administrator-only access control.
+                        Autonomous edge filtering and AI prompt sanitization powered by SparrowX AI Autonomous Neural Engine with administrator-only access control.
                       </p>
                     </div>
                   </div>

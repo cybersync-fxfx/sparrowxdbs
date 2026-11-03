@@ -171,13 +171,13 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "SparrowX" },
+      { title: "SparrowX | Here for you" },
       {
         name: "description",
         content:
           "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
       },
-      { property: "og:title", content: "SparrowX" },
+      { property: "og:title", content: "SparrowX | Here for you" },
       {
         property: "og:description",
         content:
@@ -312,7 +312,7 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    document.title = "SparrowX";
+    document.title = "SparrowX | Here for you";
     registerGlobalDocsNavigator((code, refId) => {
       setActiveDocCode(code);
       if (refId) setActiveDocRef(refId);
@@ -1307,7 +1307,7 @@ function Dashboard() {
   }, [protectedServices, visibleClientTenants, authSession]);
 
   const handleNavigate = (navLabel: string) => {
-    if (navLabel === "AI Brain" || navLabel === "SparrowX AI Brain" || navLabel === "Gemini AI Brain") {
+    if (navLabel === "AI Brain" || navLabel === "SparrowX AI Brain") {
       if (authSession.role !== "admin") {
         showToast("SparrowX AI Brain is restricted to administrator accounts.", "error");
         setActiveNav("My Services");
@@ -1425,7 +1425,7 @@ function Dashboard() {
       navLabel === "Help center" ||
       navLabel === "Settings" ||
       navLabel === "AI Brain" ||
-      navLabel === "Gemini AI Brain" ||
+      navLabel === "SparrowX AI Brain" ||
       navLabel === "Protection Status & Verification" ||
       navLabel === "Protection Verification" ||
       navLabel === "Protection Status" ||
@@ -1441,7 +1441,7 @@ function Dashboard() {
         setPortalMode("client");
       }
     }
-    setActiveNav(navLabel === "Gemini AI Brain" ? "AI Brain" : navLabel);
+    setActiveNav(navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel);
   };
 
   if (authSession.role === "unauthenticated") {
@@ -1881,7 +1881,7 @@ function Dashboard() {
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 pt-7 pb-28 sm:px-7 sm:pb-36 lg:px-9">
           {(activeNav === "AI Brain" ||
-            activeNav === "Gemini AI Brain" ||
+            activeNav === "SparrowX AI Brain" ||
             activeNav === "Defense Updates" ||
             activeNav === "Defense Updates & Threat Intel" ||
             activeNav === "Defense Updates & Intel") && (
@@ -2031,7 +2031,7 @@ function Dashboard() {
             activeNav !== "Help center" &&
             activeNav !== "Settings" &&
             activeNav !== "AI Brain" &&
-            activeNav !== "Gemini AI Brain" &&
+            activeNav !== "SparrowX AI Brain" &&
             activeNav !== "Global Traffic Mesh" &&
             activeNav !== "Global Traffic Mesh (Live 3D)" &&
             activeNav !== "Protection Status & Verification" &&
@@ -2085,7 +2085,7 @@ function Dashboard() {
             activeNav !== "Help center" &&
             activeNav !== "Settings" &&
             activeNav !== "AI Brain" &&
-            activeNav !== "Gemini AI Brain" &&
+            activeNav !== "SparrowX AI Brain" &&
             activeNav !== "Global Traffic Mesh" &&
             activeNav !== "Global Traffic Mesh (Live 3D)" &&
             activeNav !== "Troubleshooting & Docs" &&
@@ -4556,7 +4556,7 @@ function AppSidebar({
     { label: "SOC Dashboard", navKey: "Overview", icon: Activity },
     { label: "Global Traffic Mesh", navKey: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
     ...(isAdminSession
-      ? [{ label: "Gemini AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" }]
+      ? [{ label: "SparrowX AI Brain", navKey: "AI Brain", icon: Brain, count: "AI" }]
       : []),
     { label: "Live Operations", navKey: "Live Operations", icon: Radio },
   ];

@@ -20,15 +20,15 @@
 * **Autonomous AI Agent & LLM Shield**: Edge inspection of LLM prompts and Model Context Protocol (MCP) tool executions to neutralize prompt injections, jailbreaks, and sensitive PII leaks.
 * **Perimeter Web & WAF Protection**: Edge firewalling against OWASP Top 10, automated DDoS/bot challenges, and 1-click blocklist export (`iptables`, `UFW`, `Cloudflare`).
 * **Multi-Tenant Client Portal**: Dedicated self-service workspace where clients manage subscribed services, inspect real-time logs, and integrate drop-in telemetry SDKs.
-* **Autonomous Billing & Security Credits**: Automated credit-metered service provisioning, transaction ledger, and payment gateway backed by Supabase PostgreSQL.
-* **Live Supabase PostgreSQL Backend**: Full row-level security (RLS) schema supporting incidents, threat feeds, assets, vulnerabilities, audit logs, and client subscriptions.
+* **Autonomous Billing & Security Credits**: Automated credit-metered service provisioning, transaction ledger, and sovereign payment gateway.
+* **Live High-Availability Security Datastore**: Full row-level security (RLS) schema supporting incidents, threat feeds, assets, vulnerabilities, audit logs, and client subscriptions.
 
 ---
 
 ## Architecture & Technology Stack
 
 * **Framework**: React 19, TanStack Router, TanStack React Query, Vite 8.
-* **Database & Persistence**: Supabase PostgreSQL with REST API and offline cache fallback.
+* **Database & Persistence**: High-Availability Cloud PostgreSQL REST Datastore with offline cache fallback.
 * **Design & Styling**: Tailwind CSS, Radix UI Primitives, Lucide Icons, Plus Jakarta Sans, JetBrains Mono.
 * **Testing & Quality**: Vitest, TypeScript (Strict Mode), ESLint.
 

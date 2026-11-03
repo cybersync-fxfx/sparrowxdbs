@@ -49,7 +49,7 @@ export function generateClientSdkSnippet(
       return {
         filename: "middleware.ts",
         language: "typescript",
-        installCmd: "npm i @sparrowx/edge-shield",
+        installCmd: "Zero npm install required (Native Edge Middleware)",
         code: `// Next.js Edge Middleware — SparrowX Autonomous Shield
 // Protects ${service.name} (${service.endpoint})
 import { NextResponse } from "next/server";
@@ -104,7 +104,7 @@ export const config = {
       return {
         filename: "sparrowx-middleware.js",
         language: "javascript",
-        installCmd: "npm i @sparrowx/node-shield",
+        installCmd: "Zero npm install required (Drop-in file: sparrowx-shield.js)",
         code: `// Express.js Middleware for ${service.name}
 const SPARROWX_ENDPOINT = "${baseUrl}/api/v1/telemetry";
 const SPARROWX_API_KEY = process.env.SPARROWX_API_KEY || "${maskedKey}";
@@ -141,7 +141,7 @@ module.exports = { sparrowxShield };`,
       return {
         filename: "sparrowx_shield.py",
         language: "python",
-        installCmd: "pip install sparrowx-shield httpx",
+        installCmd: "pip install httpx",
         code: `# FastAPI / ASGI Middleware for ${service.name}
 import os
 import httpx
@@ -183,7 +183,7 @@ class SparrowXShieldMiddleware(BaseHTTPMiddleware):
       return {
         filename: "sparrowx_ai_guardrails.py",
         language: "python",
-        installCmd: "pip install sparrowx-shield",
+        installCmd: "pip install httpx",
         code: `# AI Agent & LLM Guardrails Wrapper for ${service.name}
 # Protects against Prompt Injections, Secret Leaks, and Rogue MCP Tool Calls
 import os
@@ -240,7 +240,7 @@ class SparrowXAiGuardrail:
       return {
         filename: "test-telemetry.sh",
         language: "bash",
-        installCmd: "curl (built-in terminal)",
+        installCmd: "Built-in terminal (curl)",
         code: `# Test live telemetry ingestion immediately from your terminal
 curl -X POST "${baseUrl}/api/v1/telemetry" \\
   -H "Content-Type: application/json" \\
@@ -258,7 +258,7 @@ curl -X POST "${baseUrl}/api/v1/telemetry" \\
       return {
         filename: "sparrowx-edge-worker.js",
         language: "javascript",
-        installCmd: "npx @sparrowx/edge-cli deploy",
+        installCmd: "Zero npm install required (Cloudflare Worker standard fetch)",
         code: `// SparrowX Edge Shield Worker for ${service.name}
 export default {
   async fetch(request, env, ctx) {

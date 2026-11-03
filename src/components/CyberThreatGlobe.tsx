@@ -60,6 +60,7 @@ export interface CyberThreatGlobeProps {
   className?: string;
   height?: string | number;
   liveWsUrl?: string | null;
+  enableSimulation?: boolean;
   simIntervalMs?: number;
   maxFeed?: number;
   customCities?: ThreatCity[];
@@ -172,6 +173,7 @@ export function CyberThreatGlobe({
   className = "",
   height = 560,
   liveWsUrl = null,
+  enableSimulation = false,
   simIntervalMs = 1800,
   maxFeed = 7,
   customCities,
@@ -195,9 +197,9 @@ export function CyberThreatGlobe({
   } | null>(null);
 
   const [stats, setStats] = useState({
-    totalEvents: 873,
-    highEvents: 242,
-    criticalEvents: 58,
+    totalEvents: 0,
+    highEvents: 0,
+    criticalEvents: 0,
     activeArcs: 0,
     protectedAssets: 48,
   });
@@ -219,9 +221,9 @@ export function CyberThreatGlobe({
 
   const activeArcsListRef = useRef<ActiveArc[]>([]);
   const activePulsesListRef = useRef<ImpactPulse[]>([]);
-  const totalCountRef = useRef(873);
-  const highCountRef = useRef(242);
-  const criticalCountRef = useRef(58);
+  const totalCountRef = useRef(0);
+  const highCountRef = useRef(0);
+  const criticalCountRef = useRef(0);
 
   // Dragging, Orbit & Inertia
   const isDraggingRef = useRef(false);
@@ -435,16 +437,16 @@ export function CyberThreatGlobe({
     rotVelocityRef.current = { x: 0, y: 0 };
   };
 
-  // Continuous Threat Simulation Loop
+  // Threat Loop (runs only when explicit enableSimulation is requested or live events arrive)
   useEffect(() => {
-    if (!isPlaying || liveWsUrl) return;
+    if (!enableSimulation || !isPlaying || liveWsUrl) return;
 
     const interval = window.setInterval(() => {
       triggerAttackEvent();
     }, simIntervalMs / speedMultiplier);
 
     return () => window.clearInterval(interval);
-  }, [isPlaying, liveWsUrl, simIntervalMs, speedMultiplier, triggerAttackEvent]);
+  }, [enableSimulation, isPlaying, liveWsUrl, simIntervalMs, speedMultiplier, triggerAttackEvent]);
 
   // WebSocket Live Feed Integration
   useEffect(() => {
@@ -1028,7 +1030,7 @@ export function CyberThreatGlobe({
               <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
               SPARROWX SOC LIVE
             </span>
-            <span>DEMO STREAM</span>
+            <span>PERIMETER NOMINAL</span>
           </div>
         </div>
       )}
@@ -1055,7 +1057,18 @@ export function CyberThreatGlobe({
           </div>
 
           <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto no-scrollbar pointer-events-auto">
-            {activeEvents.map((evt) => {
+            {activeEvents.length === 0 ? (
+              <div className="rounded-lg border border-cyan-500/20 bg-[#071321]/80 p-3 text-[11px] text-[#8295A8] backdrop-blur-md space-y-1">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  <span>Perimeter Nominal</span>
+                </div>
+                <p className="text-[10px] leading-relaxed text-zinc-400">
+                  Zero active malicious vectors intercepted. Connect your website or server in Settings to stream live telemetry.
+                </p>
+              </div>
+            ) : (
+              activeEvents.map((evt) => {
               const isCrit = evt.severity === "critical";
               const isHigh = evt.severity === "high";
               const isMed = evt.severity === "med";

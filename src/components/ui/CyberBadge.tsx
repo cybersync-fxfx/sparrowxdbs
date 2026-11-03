@@ -12,7 +12,7 @@ import {
   FileCheck2,
   AlertTriangle,
   Globe2,
-  Sparkles,
+  Terminal,
   Server,
   Activity,
   Flame,
@@ -32,7 +32,7 @@ export type CyberEmblemVariant =
   | "audit"
   | "warning"
   | "globe"
-  | "sparkles"
+  | "terminal"
   | "server"
   | "radar";
 
@@ -153,13 +153,13 @@ const variantStyles: Record<
     iconColor: "text-sky-400",
     badgeStyle: "bg-sky-500/10 text-sky-300 border-sky-500/30",
   },
-  sparkles: {
-    icon: Sparkles,
-    accentColor: "text-yellow-400",
-    bgGradient: "from-yellow-500/20 via-amber-500/10 to-transparent",
-    borderColor: "border-yellow-500/30",
-    iconColor: "text-yellow-400",
-    badgeStyle: "bg-yellow-500/10 text-yellow-300 border-yellow-500/30",
+  terminal: {
+    icon: Terminal,
+    accentColor: "text-primary",
+    bgGradient: "from-primary/20 via-orange-500/10 to-transparent",
+    borderColor: "border-primary/30",
+    iconColor: "text-primary",
+    badgeStyle: "bg-primary/10 text-primary border-primary/30",
   },
   server: {
     icon: Server,

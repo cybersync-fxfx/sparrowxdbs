@@ -37,7 +37,7 @@ describe("SparrowX AI Brain Admin-Only Access Control", () => {
       navLabel: string,
       userRole: "admin" | "client" | "unauthenticated",
     ): { allowed: boolean; redirectedTo?: string; error?: string } => {
-      if (navLabel === "AI Brain" || navLabel === "SparrowX AI Brain" || navLabel === "Gemini AI Brain") {
+      if (navLabel === "AI Brain" || navLabel === "SparrowX AI Brain") {
         if (userRole !== "admin") {
           return {
             allowed: false,
