@@ -5,6 +5,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Boxes,
+  Brain,
   Check,
   CheckCircle2,
   ChevronRight,
