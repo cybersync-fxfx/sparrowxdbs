@@ -789,3 +789,476 @@ export async function analyzeAndLearnCustomThreatPayload(params: {
   saveLearnedThreatPatterns(updated);
   return newPattern;
 }
+
+// ============================================================================
+// GEMINI PRO AI DEEP SECURITY SCAN ADVISORY & 5-MINUTE PROTECTION ENGINE
+// ============================================================================
+
+export interface AiVulnerabilityItem {
+  id: string;
+  name: string;
+  riskRating: "Critical" | "High" | "Medium";
+  owaspCategory: string;
+  description: string;
+  howSparrowxProtects: string;
+}
+
+export interface WhatSparrowxSavesItem {
+  threat: string;
+  dangerWithoutSparrowx: string;
+  howSparrowxSafes: string;
+  remediationTime: string;
+}
+
+export interface FiveMinuteProtectionPlan {
+  step1: string;
+  step2: string;
+  step3: string;
+  estimatedTime: string;
+}
+
+export interface AiScanDeepAdvisory {
+  executiveSummary: string;
+  targetCategory: "Web Application & SaaS" | "API & Cloud Service" | "AI Agent & LLM Endpoint";
+  exploitScenario: string;
+  recommendedAction: string;
+  recommendedPackage: "Starter Shield" | "Builder SOC Pack" | "24h Done-For-You Audit";
+  customerConversionPitch: string;
+  modelUsed: string;
+  liveAiGenerated: boolean;
+  aiVulnerabilities: AiVulnerabilityItem[];
+  whatSparrowxSaves: WhatSparrowxSavesItem[];
+  fiveMinuteProtectionPlan: FiveMinuteProtectionPlan;
+}
+
+export function buildDeterministicScanAdvisory(params: {
+  cleanHost: string;
+  score: number;
+  grade: string;
+  riskLevel: string;
+  targetCategory: "Web Application & SaaS" | "API & Cloud Service" | "AI Agent & LLM Endpoint";
+  findings: Array<{
+    category: string;
+    title: string;
+    status: string;
+    detail: string;
+    evidence: string;
+  }>;
+  serverBanner: string | null;
+  originIp: string;
+  corsPermissive: boolean;
+}): AiScanDeepAdvisory {
+  if (params.targetCategory === "AI Agent & LLM Endpoint") {
+    return {
+      executiveSummary: `${params.cleanHost} operates active AI/LLM interfaces scoring ${params.score}/100 [Grade ${params.grade}] with unshielded prompt processing.`,
+      targetCategory: params.targetCategory,
+      exploitScenario:
+        "Attackers can submit indirect prompt injection payloads to bypass system instructions, leak hidden API keys, and loop automated queries to drain thousands of dollars in LLM inference costs overnight.",
+      recommendedAction:
+        "Mount the SparrowX AI Agent Guardrail SDK ahead of your LLM runtime to sanitize inputs, enforce token rate-limits, and firewall tool calls in <2ms.",
+      recommendedPackage: params.score < 60 ? "24h Done-For-You Audit" : "Builder SOC Pack",
+      customerConversionPitch:
+        "One runaway prompt loop or jailbreak can bankrupt your API credits or leak user data. SparrowX installs in minutes to insulate your models, while our Builder SOC pack gives you 500 security credits and real-time telemetry.",
+      modelUsed: "gemini-3.8-flash (SparrowX Neural Fallback)",
+      liveAiGenerated: false,
+      aiVulnerabilities: [
+        {
+          id: "AI-VULN-01",
+          name: "Direct & Indirect Prompt Injection",
+          riskRating: "Critical",
+          owaspCategory: "OWASP LLM01",
+          description:
+            "Untrusted user inputs or third-party web content can hijack model instructions, override developer guardrails, and execute unauthorized actions.",
+          howSparrowxProtects:
+            "SparrowX AI Prompt Firewall sanitizes all prompt payloads in <2ms, dropping adversarial jailbreaks and recursive prompt loops before your LLM processes them.",
+        },
+        {
+          id: "AI-VULN-02",
+          name: "Model Denial of Service & Token-Drain Exhaustion",
+          riskRating: "High",
+          owaspCategory: "OWASP LLM04",
+          description:
+            "Automated bot scripts flood completion endpoints with complex token-heavy prompts, spiking inference bills into thousands of dollars.",
+          howSparrowxProtects:
+            "Autonomous token-bucket velocity rate limiting caps session compute and cuts off abusive bots before expensive LLM inference occurs.",
+        },
+        {
+          id: "AI-VULN-03",
+          name: "Proprietary System Prompt & PII Exfiltration",
+          riskRating: "High",
+          owaspCategory: "OWASP LLM06",
+          description:
+            "Clever adversarial phrasing tricks models into regurgitating hidden developer prompts, internal system instructions, and customer PII.",
+          howSparrowxProtects:
+            "SparrowX Output Redactor parses model streams in real time, masking API keys, system prompts, and sensitive customer data.",
+        },
+        {
+          id: "AI-VULN-04",
+          name: "Insecure Agent Tool / MCP Action Execution",
+          riskRating: "Critical",
+          owaspCategory: "OWASP LLM07",
+          description:
+            "Agents with MCP or database tool access can be tricked by malicious prompt context to execute destructive shell or SQL queries.",
+          howSparrowxProtects:
+            "SparrowX Agent Tool Sandbox inspects every tool call, enforcing strict parameter boundaries and blocking dangerous system commands.",
+        },
+      ],
+      whatSparrowxSaves: [
+        {
+          threat: "Runaway LLM Inference Bills ($5,000+ API Debt)",
+          dangerWithoutSparrowx:
+            "Uncapped bot traffic triggers hundreds of thousands of LLM API requests overnight, maxing out corporate credit cards.",
+          howSparrowxSafes:
+            "Automatic velocity throttling and session token caps instantly neutralize abusive query loops.",
+          remediationTime: "< 2ms runtime / 5 min setup",
+        },
+        {
+          threat: "System Prompt & Model IP Theft",
+          dangerWithoutSparrowx:
+            "Competitors and hackers dump your handcrafted agent personas, proprietary logic, and private business rules.",
+          howSparrowxSafes:
+            "Deep prompt sanitization strips jailbreak instructions and blocks prompt leakage attempts at the edge.",
+          remediationTime: "< 2ms runtime / 5 min setup",
+        },
+        {
+          threat: "Rogue Agent Database & Shell Execution",
+          dangerWithoutSparrowx:
+            "Insecure tool calling lets attackers trick autonomous agents into modifying production databases or running unauthorized APIs.",
+          howSparrowxSafes:
+            "Tool-call firewall verifies function arguments and blocks destructive commands before execution.",
+          remediationTime: "< 2ms runtime / 5 min setup",
+        },
+      ],
+      fiveMinuteProtectionPlan: {
+        step1: "Claim your domain and connect your AI service inside SparrowX (60s)",
+        step2: "Drop our 5-line Express, Next.js, or Python AI Shield middleware into your API route (120s)",
+        step3: "Activate the live AI Guardrail Sandbox and display your verified Trust Badge (120s)",
+        estimatedTime: "5 Minutes",
+      },
+    };
+  }
+
+  if (params.targetCategory === "API & Cloud Service") {
+    return {
+      executiveSummary: `${params.cleanHost} exposes cloud API endpoints scoring ${params.score}/100 [Grade ${params.grade}] with visible origin routing.`,
+      targetCategory: params.targetCategory,
+      exploitScenario:
+        params.corsPermissive
+          ? "Permissive wildcard CORS (*) combined with missing rate-limiting enables malicious webapps to make cross-origin authenticated requests and harvest backend data."
+          : `Origin IP (${params.originIp}) is publicly routable, allowing attackers to bypass CDN and DNS proxies to launch direct layer 7 denial-of-service and credential-stuffing attacks.`,
+      recommendedAction:
+        "Wrap endpoints with SparrowX Edge WAF middleware to restrict CORS, mask origin IP addresses, and enforce sub-second threat blocking.",
+      recommendedPackage: params.score < 50 ? "24h Done-For-You Audit" : "Builder SOC Pack",
+      customerConversionPitch:
+        "Exposed backend APIs are the #1 attack vector for automated credential stuffing. SparrowX drops in at the edge with 5 lines of code, immediately halting malicious bots without impacting legitimate customers.",
+      modelUsed: "gemini-3.8-flash (SparrowX Neural Fallback)",
+      liveAiGenerated: false,
+      aiVulnerabilities: [
+        {
+          id: "API-VULN-01",
+          name: "Broken Object Level Authorization & Data Scraping",
+          riskRating: "Critical",
+          owaspCategory: "OWASP API1",
+          description:
+            "Unrestricted endpoint enumeration lets attackers crawl incremental resource IDs and scrape sensitive customer records.",
+          howSparrowxProtects:
+            "SparrowX Edge WAF detects rapid ID enumeration patterns and blocks anomalous scraper IPs at L7.",
+        },
+        {
+          id: "API-VULN-02",
+          name: "Automated Credential Stuffing & Auth Flooding",
+          riskRating: "High",
+          owaspCategory: "OWASP API2",
+          description:
+            "Botnets test lists of compromised credentials against /login and /api/auth routes without velocity friction.",
+          howSparrowxProtects:
+            "Behavioral entropy checks and rate-limiting drop bot-driven brute-force waves before they hit your auth server.",
+        },
+        {
+          id: "API-VULN-03",
+          name: "Server-Side Request Forgery (SSRF) Cloud Key Theft",
+          riskRating: "Critical",
+          owaspCategory: "OWASP API7",
+          description:
+            "Unvalidated webhook or URL fetcher endpoints query internal AWS/GCP metadata (169.254.169.254) to steal cloud IAM keys.",
+          howSparrowxProtects:
+            "Built-in SSRF and DNS-rebinding guard blocks all RFC 1918 private and cloud metadata requests at the edge.",
+        },
+      ],
+      whatSparrowxSaves: [
+        {
+          threat: "Direct Origin Server IP Exploitation",
+          dangerWithoutSparrowx:
+            "Scanners bypass DNS proxies to attack origin IP directly with port scans and zero-day L7 exploits.",
+          howSparrowxSafes:
+            "SparrowX Edge Shield masks origin IP and drops all traffic not originating from authenticated edge proxies.",
+          remediationTime: "< 2ms runtime / 5 min setup",
+        },
+        {
+          threat: "Credential Stuffing Account Takeover",
+          dangerWithoutSparrowx:
+            "Account takeover waves compromise user accounts, triggering support tickets and brand damage.",
+          howSparrowxSafes:
+            "Autonomous velocity throttling halts brute-force bursts while keeping normal users unhindered.",
+          remediationTime: "< 2ms runtime / 5 min setup",
+        },
+        {
+          threat: "Cloud Metadata (169.254.169.254) Compromise",
+          dangerWithoutSparrowx:
+            "Attackers trick backend endpoints into exposing AWS/GCP root credentials and cloud databases.",
+          howSparrowxSafes:
+            "Rigorous SSRF edge filtering blocks all private IP lookups and cloud metadata queries.",
+          remediationTime: "< 2ms runtime / 5 min setup",
+        },
+      ],
+      fiveMinuteProtectionPlan: {
+        step1: "Claim API endpoint and choose your rate-limit policy in SparrowX (60s)",
+        step2: "Paste 5 lines of middleware into your Express, FastAPI, or Cloudflare Worker router (120s)",
+        step3: "Verify live traffic telemetry and enable real-time Discord/Slack alerts (120s)",
+        estimatedTime: "5 Minutes",
+      },
+    };
+  }
+
+  // Standard Web Application & SaaS
+  return {
+    executiveSummary: `${params.cleanHost} scores ${params.score}/100 [Grade ${params.grade} · ${params.riskLevel}] with perimeter defense and defensive header gaps.`,
+    targetCategory: params.targetCategory,
+    exploitScenario:
+      "Missing strict Content-Security-Policy (CSP) and frame restriction headers leaves web sessions vulnerable to DOM-based XSS, credential harvesting, and clickjacking attacks. Automated scanners actively probe exposed server banners for unpatched vulnerabilities.",
+    recommendedAction:
+      "Deploy SparrowX Edge WAF middleware to instantly inject hardened CSP/HSTS headers, mask server technology banners, and block SQLi/XSS probes at the edge.",
+    recommendedPackage: params.score < 45 ? "24h Done-For-You Audit" : "Starter Shield",
+    customerConversionPitch:
+      "Enterprise clients and smart customers check your security posture before doing business. SparrowX eliminates every single red flag in 60 seconds and gives you a cryptographically verified Trust Badge to help you close deals faster.",
+    modelUsed: "gemini-3.8-flash (SparrowX Neural Fallback)",
+    liveAiGenerated: false,
+    aiVulnerabilities: [
+      {
+        id: "WEB-VULN-01",
+        name: "SQL Injection (SQLi) & Database Exfiltration",
+        riskRating: "Critical",
+        owaspCategory: "OWASP A03",
+        description:
+          "Malicious SQL payloads in search inputs, query parameters, or form fields can dump user tables, hashed passwords, and billing information.",
+        howSparrowxProtects:
+          "SparrowX Edge WAF parses query ASTs and drops UNION/SELECT/DROP injection strings in <2ms before they touch your database.",
+      },
+      {
+        id: "WEB-VULN-02",
+        name: "Cross-Site Scripting (XSS) & Session Hijacking",
+        riskRating: "High",
+        owaspCategory: "OWASP A07",
+        description:
+          "Missing Content-Security-Policy (CSP) headers allows injected scripts to execute in user browsers, stealing auth tokens and session cookies.",
+        howSparrowxProtects:
+          "SparrowX automatically injects strict CSP and HSTS headers, neutralizing inline script injection and enforcing TLS.",
+      },
+      {
+        id: "WEB-VULN-03",
+        name: "Iframe Clickjacking & UI Redressing",
+        riskRating: "Medium",
+        owaspCategory: "OWASP A05",
+        description:
+          "Missing X-Frame-Options allows attackers to frame your web app inside malicious sites, tricking users into clicking hidden buttons.",
+        howSparrowxProtects:
+          "Enforces strict frame-ancestors restrictions on every response to block framing attempts globally.",
+      },
+      {
+        id: "WEB-VULN-04",
+        name: "Automated Bot Scrapers & Content Theft",
+        riskRating: "Medium",
+        owaspCategory: "OWASP Automated Threats",
+        description:
+          "Automated scrapers crawl product catalogs, proprietary assets, and customer pages, increasing server bandwidth costs.",
+        howSparrowxProtects:
+          "Distinguishes legitimate search engines from malicious scrapers and blocks bot traffic at the edge.",
+      },
+    ],
+    whatSparrowxSaves: [
+      {
+        threat: "Customer Database Dumping (SQLi)",
+        dangerWithoutSparrowx:
+          "A single unescaped query parameter exposes customer emails, passwords, and order history to public dumps.",
+        howSparrowxSafes:
+          "Edge WAF blocks SQL injection AST signatures in sub-2ms with zero code refactoring.",
+        remediationTime: "< 2ms runtime / 5 min setup",
+      },
+      {
+        threat: "User Session & Cookie Theft (XSS)",
+        dangerWithoutSparrowx:
+          "Attackers hijack authenticated user sessions and admin dashboards using injected scripts.",
+        howSparrowxSafes:
+          "Automated injection of strict CSP and secure cookie policies stops malicious script execution.",
+        remediationTime: "< 2ms runtime / 5 min setup",
+      },
+      {
+        threat: "Failed Enterprise Security Questionnaires",
+        dangerWithoutSparrowx:
+          "B2B prospects walk away from deals because of missing security headers, missing CAA, and no SOC verification.",
+        howSparrowxSafes:
+          "Instant verified Trust Badge and signed SOC 2 / ISO readiness documentation proves active protection.",
+        remediationTime: "< 2ms runtime / 5 min setup",
+      },
+    ],
+    fiveMinuteProtectionPlan: {
+      step1: "Claim your domain and generate unique security API key in SparrowX (60s)",
+      step2: "Add 5-line middleware to your Next.js, Express, or Cloudflare codebase (120s)",
+      step3: "Embed your verified Trust Badge and activate live 24/7 SOC monitoring (120s)",
+      estimatedTime: "5 Minutes",
+    },
+  };
+}
+
+export async function analyzeScanWithGeminiBrain(params: {
+  cleanHost: string;
+  score: number;
+  grade: string;
+  riskLevel: string;
+  targetCategory: "Web Application & SaaS" | "API & Cloud Service" | "AI Agent & LLM Endpoint";
+  findings: Array<{
+    category: string;
+    title: string;
+    status: string;
+    detail: string;
+    evidence: string;
+  }>;
+  serverBanner: string | null;
+  originIp: string;
+  corsPermissive: boolean;
+}): Promise<AiScanDeepAdvisory> {
+  const apiKey = resolveActiveGeminiApiKey();
+  const selectedModel: SparrowxBrainModel = "gemini-3.8-flash";
+
+  if (apiKey) {
+    try {
+      const client = new GoogleGenAI({ apiKey });
+      const isAiTarget = params.targetCategory === "AI Agent & LLM Endpoint";
+      const isApiTarget = params.targetCategory === "API & Cloud Service";
+
+      const prompt = `Target Asset: ${params.cleanHost}
+Target Category: ${params.targetCategory}
+Calculated Score: ${params.score}/100 (Grade: ${params.grade}, Risk: ${params.riskLevel})
+Origin IP: ${params.originIp}
+Server Banner Leaks: ${params.serverBanner ?? "Masked / Not Leaked"}
+Permissive Wildcard CORS: ${params.corsPermissive ? "YES (*)" : "NO"}
+
+STRICT ARCHITECTURE CONSTRAINTS:
+${
+  isAiTarget
+    ? "- Target EXPOSES AN AI / LLM INTERFACE. Focus on OWASP Top 10 for LLM: prompt injection, token-drain DDoS, system prompt leakage, and insecure tool/MCP execution."
+    : isApiTarget
+      ? "- Target is a CLOUD API / MICROSERVICE. Focus on OWASP API Security Top 10: broken object auth, rate limiting, and SSRF. NEVER CLAIM PROMPT INJECTION OR LLM INJECTION."
+      : "- Target is a STANDARD WEB APPLICATION & SAAS (Non-AI). ABSOLUTE RULE: DO NOT MENTION PROMPT INJECTION, LLM, OR AI JAILBREAKS. Focus EXCLUSIVELY on OWASP Web Top 10: SQL injection (SQLi), Cross-Site Scripting (XSS), Clickjacking, Content-Security-Policy (CSP), CORS, and server exposure."
+}
+
+Key Verified Findings:
+${params.findings.map((f) => `- [${f.status.toUpperCase()}] ${f.category}: ${f.title} (Detail: ${f.detail})`).join("\n")}
+
+Respond with ONLY a raw JSON object (no markdown code fence) with these exact keys:
+{
+  "executiveSummary": "2 authoritative sentences summarizing the scan results",
+  "exploitScenario": "Realistic explanation of how an attacker exploits these specific gaps against this ${params.targetCategory}. NEVER claim prompt injection if target is a standard website.",
+  "recommendedAction": "Concrete 60-second fix using SparrowX edge middleware",
+  "recommendedPackage": "${params.score < 50 ? "24h Done-For-You Audit" : isAiTarget ? "Builder SOC Pack" : "Starter Shield"}",
+  "customerConversionPitch": "Compelling 2-sentence founder pitch on why choosing SparrowX protects their revenue and saves them time.",
+  "aiVulnerabilities": [
+    {
+      "id": "VULN-01",
+      "name": "Vulnerability Name",
+      "riskRating": "Critical",
+      "owaspCategory": "OWASP Category",
+      "description": "Specific risk description",
+      "howSparrowxProtects": "How SparrowX edge shield neutralizes this in <2ms"
+    }
+  ],
+  "whatSparrowxSaves": [
+    {
+      "threat": "Threat Name",
+      "dangerWithoutSparrowx": "The catastrophic consequence without protection",
+      "howSparrowxSafes": "How SparrowX protects this asset",
+      "remediationTime": "< 2ms runtime / 5 min setup"
+    }
+  ],
+  "fiveMinuteProtectionPlan": {
+    "step1": "Step 1 description (60s)",
+    "step2": "Step 2 description (120s)",
+    "step3": "Step 3 description (120s)",
+    "estimatedTime": "5 Minutes"
+  }
+}`;
+
+      const interactionPromise = client.interactions.create({
+        model: selectedModel,
+        system_instruction:
+          "You are the SparrowX Autonomous Cyber Defense AI Brain powered by Google Gemini Pro reasoning. You provide high-level, technical, founder-focused cybersecurity advice that is completely tailored to their real target category. Output valid JSON only.",
+        input: prompt,
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Gemini API Timeout")), 2800),
+      );
+
+      const interaction = await Promise.race([interactionPromise, timeoutPromise]);
+
+      const text = interaction.output_text?.trim() || "";
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed.executiveSummary && parsed.exploitScenario) {
+          const fallback = buildDeterministicScanAdvisory(params);
+
+          // Strictly filter vulnerabilities so prompt injection / LLM items NEVER leak into standard websites
+          const rawVulns = Array.isArray(parsed.aiVulnerabilities) && parsed.aiVulnerabilities.length > 0
+            ? parsed.aiVulnerabilities
+            : fallback.aiVulnerabilities;
+
+          const sanitizedVulns = rawVulns.filter((v: any) => {
+            if (!isAiTarget) {
+              const str = `${v.name || ""} ${v.owaspCategory || ""} ${v.description || ""}`.toLowerCase();
+              return (
+                !str.includes("prompt injection") &&
+                !str.includes("llm") &&
+                !str.includes("jailbreak") &&
+                !str.includes("token-drain") &&
+                !str.includes("ai agent")
+              );
+            }
+            return true;
+          });
+
+          return {
+            executiveSummary: parsed.executiveSummary,
+            targetCategory: params.targetCategory,
+            exploitScenario: parsed.exploitScenario,
+            recommendedAction: parsed.recommendedAction,
+            recommendedPackage:
+              parsed.recommendedPackage === "Starter Shield" ||
+              parsed.recommendedPackage === "Builder SOC Pack" ||
+              parsed.recommendedPackage === "24h Done-For-You Audit"
+                ? parsed.recommendedPackage
+                : params.score < 50
+                  ? "24h Done-For-You Audit"
+                  : "Builder SOC Pack",
+            customerConversionPitch: parsed.customerConversionPitch,
+            modelUsed: selectedModel,
+            liveAiGenerated: true,
+            aiVulnerabilities: sanitizedVulns.length > 0 ? sanitizedVulns : fallback.aiVulnerabilities,
+            whatSparrowxSaves:
+              Array.isArray(parsed.whatSparrowxSaves) && parsed.whatSparrowxSaves.length > 0
+                ? parsed.whatSparrowxSaves
+                : fallback.whatSparrowxSaves,
+            fiveMinuteProtectionPlan:
+              parsed.fiveMinuteProtectionPlan?.step1 && parsed.fiveMinuteProtectionPlan?.step2
+                ? parsed.fiveMinuteProtectionPlan
+                : fallback.fiveMinuteProtectionPlan,
+          };
+        }
+      }
+    } catch {
+      // Fall through to deterministic neural synthesis
+    }
+  }
+
+  return buildDeterministicScanAdvisory(params);
+}

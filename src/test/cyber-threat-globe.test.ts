@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import {
@@ -6,6 +6,10 @@ import {
   DEFAULT_CITIES,
   DEFAULT_ATTACK_TYPES,
 } from "../components/CyberThreatGlobe";
+
+beforeAll(() => {
+  HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
+});
 
 describe("CyberThreatGlobe Component & Geometry Math", () => {
   it("provides valid global coordinates for world threat telemetry hubs", () => {

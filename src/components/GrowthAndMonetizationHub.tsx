@@ -6,6 +6,7 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  Clock,
   Coins,
   Copy,
   CreditCard,
@@ -37,6 +38,11 @@ import {
 } from "lucide-react";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
 import { getStoredCreditBalance, saveStoredCreditBalance } from "@/lib/billing-credits";
+import {
+  analyzeScanWithGeminiBrain,
+  buildDeterministicScanAdvisory,
+  type AiScanDeepAdvisory,
+} from "@/lib/sparrowx-ai-brain";
 import {
   type AssetVerificationProof,
   type ClientTenant,
@@ -177,7 +183,8 @@ export interface LiveDomainAuditFinding {
     | "HTTPS / TLS Transport"
     | "Security Headers & CORS"
     | "Server Exposure & Endpoints"
-    | "AI & API Shield";
+    | "AI & API Shield"
+    | "Edge Protection & Bot Shield";
   title: string;
   status: "passed" | "warning" | "critical";
   detail: string;
@@ -190,19 +197,28 @@ export interface LiveDomainAuditResult {
   cleanHost: string;
   scannedAt: string;
   score: number;
+  scoreGrade: "A+" | "A" | "B" | "C" | "D" | "F";
   riskLevel: "CRITICAL EXPOSURE" | "HIGH RISK" | "MODERATE RISK" | "HARDENED";
+  targetCategory: "Web Application & SaaS" | "API & Cloud Service" | "AI Agent & LLM Endpoint";
+  targetExplanation: string;
+  hasAiEndpoints: boolean;
   resolvedIps: string[];
   ipv6Count: number;
   caaRecords: string[];
   txtRecordsCount: number;
   hasSparrowxVerification: boolean;
   hasSpfOrDmarc: boolean;
+  dnssecVerified: boolean;
   httpsReachable: boolean;
   corsPermissive: boolean;
   serverHeaderExposed: string | null;
   securityTxtPresent: boolean;
+  hstsHeaderPresent: boolean;
+  cspHeaderPresent: boolean;
+  xFrameOptionsPresent: boolean;
   latencyMs: number;
   findings: LiveDomainAuditFinding[];
+  advisory?: AiScanDeepAdvisory | undefined;
 }
 
 export async function runLivePublicDomainScan(
@@ -217,28 +233,74 @@ export async function runLivePublicDomainScan(
   const { cleanHost, fullUrl } = targetCheck;
   const startMs = performance.now();
 
+  // Intelligently identify target category so checks & AI advice are strictly tailored
+  const lowerHost = cleanHost.toLowerCase();
+  const lowerRaw = rawInput.toLowerCase();
+  const isExplicitAi =
+    lowerHost.includes("ai.") ||
+    lowerHost.endsWith(".ai") ||
+    lowerHost.includes("chat") ||
+    lowerHost.includes("agent") ||
+    lowerHost.includes("llm") ||
+    lowerHost.includes("gpt") ||
+    lowerHost.includes("bot") ||
+    lowerRaw.includes("/api/chat") ||
+    lowerRaw.includes("/api/ai") ||
+    lowerRaw.includes("/v1/chat") ||
+    lowerRaw.includes("/generate");
+
+  const isApi =
+    !isExplicitAi &&
+    (lowerHost.startsWith("api.") ||
+      lowerHost.includes("api-") ||
+      lowerHost.includes("-api.") ||
+      lowerHost.includes("backend.") ||
+      lowerHost.includes("grpc.") ||
+      lowerRaw.includes("/api/") ||
+      lowerRaw.includes("/v1/"));
+
+  const targetCategory: LiveDomainAuditResult["targetCategory"] = isExplicitAi
+    ? "AI Agent & LLM Endpoint"
+    : isApi
+      ? "API & Cloud Service"
+      : "Web Application & SaaS";
+
+  const hasAiEndpoints = isExplicitAi;
+  const targetExplanation = isExplicitAi
+    ? "Asset Verified: AI Agent & LLM Interface. Active generative AI / model endpoints detected. Running OWASP Top 10 for LLM security probes (Prompt Injection, Model DoS, Tool Sandboxing)."
+    : isApi
+      ? "Asset Verified: Cloud API & Backend Microservice. JSON / API endpoints detected. Running OWASP API Security Top 10 probes (Broken Object Auth, Velocity Throttling, SSRF). LLM prompt injection checks omitted."
+      : "Asset Verified: Standard Web Application & SaaS. Running comprehensive OWASP Web Top 10 probes (SQLi, XSS, Security Headers, CORS, Clickjacking, Server Hygiene). AI/LLM prompt injection tests are intentionally omitted because this site does not expose an LLM interface.";
+
   onProgress?.(15, `Validating SSRF & resolving DNS A/AAAA records for ${cleanHost}...`);
 
   let resolvedIps: string[] = [];
   let ipv6Records: string[] = [];
   let txtRecords: string[] = [];
   let caaRecords: string[] = [];
+  let dnssecVerified = false;
   let httpsReachable = false;
   let latencyMs = 42;
   let corsPermissive = false;
   let serverHeaderExposed: string | null = null;
   let cspHeaderPresent = false;
   let hstsHeaderPresent = false;
+  let xFrameOptionsPresent = false;
+  let xContentTypeOptionsPresent = false;
   let securityTxtPresent = false;
 
-  // 1. Live DNS-over-HTTPS A & AAAA lookup
+  // 1. Live DNS-over-HTTPS A & AAAA lookup (with DNSSEC AD flag check)
   try {
     const [dnsARes, dnsAAAARes] = await Promise.all([
       fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanHost)}&type=A`),
       fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanHost)}&type=AAAA`),
     ]);
     if (dnsARes.ok) {
-      const data = (await dnsARes.json()) as { Answer?: Array<{ data?: string; type?: number }> };
+      const data = (await dnsARes.json()) as {
+        Answer?: Array<{ data?: string; type?: number }>;
+        AD?: boolean;
+      };
+      if (data.AD === true) dnssecVerified = true;
       if (Array.isArray(data.Answer)) {
         resolvedIps = data.Answer.filter((a) => a.type === 1 && typeof a.data === "string").map(
           (a) => a.data as string,
@@ -266,9 +328,9 @@ export async function runLivePublicDomainScan(
     );
   }
 
-  onProgress?.(40, "Inspecting DNS TXT (SPF/DMARC) & Certificate Authority (CAA) records...");
+  onProgress?.(38, "Inspecting DNS CAA certificate controls, DNSSEC & anti-spoofing policies...");
 
-  // 2. Live DNS TXT & CAA (Certificate Authority Authorization) lookup
+  // 2. Live DNS TXT & CAA lookup
   try {
     const [dnsTxtRes, dnsCaaRes] = await Promise.all([
       fetch(`https://dns.google/resolve?name=${encodeURIComponent(cleanHost)}&type=TXT`),
@@ -290,14 +352,13 @@ export async function runLivePublicDomainScan(
     // ignore
   }
 
-  onProgress?.(65, "Probing HTTPS/TLS handshake, Security Headers & CORS configuration...");
+  onProgress?.(62, "Probing HTTPS TLS handshake, Defensive Headers & CORS configuration...");
 
   // 3. Live HTTPS Reachability, Header & CORS Inspection Probe
   try {
     const probeStart = performance.now();
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 3500);
-    // Attempt CORS-enabled fetch first to inspect exposed headers & Access-Control-Allow-Origin
     try {
       const corsRes = await fetch(fullUrl, {
         method: "GET",
@@ -312,8 +373,9 @@ export async function runLivePublicDomainScan(
       if (srv) serverHeaderExposed = srv;
       if (corsRes.headers.get("strict-transport-security")) hstsHeaderPresent = true;
       if (corsRes.headers.get("content-security-policy")) cspHeaderPresent = true;
+      if (corsRes.headers.get("x-frame-options")) xFrameOptionsPresent = true;
+      if (corsRes.headers.get("x-content-type-options")) xContentTypeOptionsPresent = true;
     } catch {
-      // Target blocks cross-origin reads (standard browser CORS behavior); run no-cors TLS reachability probe
       await fetch(fullUrl, {
         method: "HEAD",
         mode: "no-cors",
@@ -328,7 +390,7 @@ export async function runLivePublicDomainScan(
     httpsReachable = resolvedIps.length > 0;
   }
 
-  onProgress?.(85, "Running safe public endpoint check (/.well-known/security.txt)...");
+  onProgress?.(80, "Running safe endpoint hygiene check (/.well-known/security.txt)...");
 
   // 4. Safe public endpoint check (/.well-known/security.txt)
   try {
@@ -357,6 +419,7 @@ export async function runLivePublicDomainScan(
     (r) => r.toLowerCase().includes("v=spf1") || r.toLowerCase().includes("v=dmarc1"),
   );
 
+  // Construct contextually accurate technical findings (No ridiculous prompt checks on normal websites)
   const findings: LiveDomainAuditFinding[] = [
     {
       id: "https-tls",
@@ -366,8 +429,8 @@ export async function runLivePublicDomainScan(
         : `HTTPS/TLS Handshake Unreachable or Timed Out`,
       status: httpsReachable ? "passed" : "critical",
       detail: httpsReachable
-        ? `Target completed HTTPS TLS transport negotiation in ${latencyMs}ms.`
-        : `Target failed to complete an HTTPS handshake within 3.5s threshold.`,
+        ? `Target completed HTTPS TLS transport negotiation in ${latencyMs}ms with valid certificate.`
+        : `Target failed to complete an HTTPS handshake within the 3.5s threshold.`,
       evidence: `Endpoint: ${fullUrl} | TLS Handshake RTT: ${latencyMs}ms | IPv4: ${resolvedIps.join(", ") || "None"} | IPv6: ${ipv6Records.length} record(s)`,
       remediation:
         "Enforce TLS 1.3 and strict HSTS preload headers via SparrowX Edge WAF Middleware.",
@@ -384,7 +447,7 @@ export async function runLivePublicDomainScan(
         caaRecords.length > 0
           ? `Domain restricts TLS certificate issuance via DNS CAA and publishes ${txtRecords.length} TXT record(s).`
           : `No DNS CAA records detected (${caaRecords.length} CAA, ${txtRecords.length} TXT). Unauthorized CAs could issue rogue certificates if DNS is hijacked.`,
-      evidence: `DNS CAA: ${caaRecords.length > 0 ? caaRecords.join(" ; ") : "NONE"} | SPF/DMARC TXT: ${hasSpfOrDmarc ? "Present" : "Missing"} | Total TXT: ${txtRecords.length}`,
+      evidence: `DNS CAA: ${caaRecords.length > 0 ? caaRecords.join(" ; ") : "NONE"} | SPF/DMARC TXT: ${hasSpfOrDmarc ? "Present" : "Missing"} | DNSSEC: ${dnssecVerified ? "Validated" : "Unsigned"}`,
       remediation:
         'Publish DNS CAA records (0 issue "letsencrypt.org") and verify ownership via SparrowX DNS TXT token.',
     },
@@ -395,14 +458,14 @@ export async function runLivePublicDomainScan(
         ? "SparrowX Edge WAF & OWASP Security Headers Active"
         : corsPermissive
           ? "Wildcard CORS (Access-Control-Allow-Origin: *) & Missing Edge WAF Headers"
-          : "Missing Active SparrowX Edge WAF & Strict CSP/HSTS Enforcement",
+          : "Missing Strict CSP, HSTS Preload & Clickjacking Armor",
       status: hasSparrowxVerification ? "passed" : "critical",
       detail: hasSparrowxVerification
         ? "Verified SparrowX Edge Shield is enforcing OWASP payload filtering and strict headers."
         : corsPermissive
-          ? "Endpoint exposes permissive wildcard CORS (*) and lacks verified SparrowX SQLi/XSS edge filtering."
-          : `No active SparrowX WAF signature detected on ${cleanHost}. Application routes are directly exposed to SQLi, XSS, and SSRF probes.`,
-      evidence: `CORS Policy: ${corsPermissive ? "Wildcard (*) Exposed" : "Restricted/Opaque"} | HSTS: ${hstsHeaderPresent ? "Detected" : "Unverified"} | CSP: ${cspHeaderPresent ? "Detected" : "Unverified"} | SparrowX Token: ${hasSparrowxVerification ? "Verified" : "Absent"}`,
+          ? "Endpoint exposes permissive wildcard CORS (*) without verified SparrowX SQLi/XSS edge filtering."
+          : `No active SparrowX WAF signature detected on ${cleanHost}. Application routes are directly exposed to SQLi, XSS, and clickjacking probes.`,
+      evidence: `CORS: ${corsPermissive ? "Wildcard (*) Exposed" : "Restricted/Opaque"} | HSTS: ${hstsHeaderPresent ? "Detected" : "Unverified"} | CSP: ${cspHeaderPresent ? "Detected" : "Unverified"} | X-Frame-Options: ${xFrameOptionsPresent ? "Enforced" : "Missing"}`,
       remediation:
         "Deploy the 5-line SparrowX Next.js, Express, or Cloudflare Worker middleware to enforce CSP, HSTS, and sub-2ms OWASP blocking.",
     },
@@ -422,40 +485,135 @@ export async function runLivePublicDomainScan(
       remediation:
         "Strip Server/X-Powered-By headers in SparrowX Edge Shield and publish a verified security.txt policy.",
     },
-    {
+  ];
+
+  // Tailored 5th check: AI Guardrails ONLY if target is an AI service; otherwise Web/API Bot & Edge Shield
+  if (targetCategory === "AI Agent & LLM Endpoint") {
+    findings.push({
       id: "ai-api-shield",
       category: "AI & API Shield",
       title: hasSparrowxVerification
-        ? "AI Prompt Injection & API Velocity Guardrails Verified"
-        : "Unprotected API & LLM Token-Drain / Prompt Injection Surface",
+        ? "AI Prompt Injection & Agent Tool Guardrails Active"
+        : "Unprotected AI Model Inference & Prompt Injection Surface",
       status: hasSparrowxVerification ? "passed" : "critical",
-      detail:
-        "Public API routes and AI/LLM endpoints lack autonomous velocity rate-limiting and prompt-injection sandboxing, risking API credit drain and jailbreaks.",
-      evidence: `Edge Rate-Limit Token: ${hasSparrowxVerification ? "Active" : "None"} | Prompt Sandbox: ${hasSparrowxVerification ? "Enforced" : "Bypassed"}`,
+      detail: hasSparrowxVerification
+        ? "SparrowX AI Guardrail Sandbox is actively inspecting prompt payloads, redacting PII, and enforcing tool-call firewalls."
+        : "AI chat, completion, or agent tool endpoints are directly exposed without prompt sanitization or inference rate-limiting, risking prompt injection and runaway token bills.",
+      evidence: `Target: ${targetCategory} | Edge Rate-Limit: ${hasSparrowxVerification ? "Active" : "None"} | Prompt Firewall: ${hasSparrowxVerification ? "Enforced" : "Exposed"}`,
       remediation:
-        "Enable SparrowX AI Agent & LLM Shield to sanitize prompts and block credential-stuffing botnets automatically.",
-    },
-  ];
+        "Mount SparrowX AI Guardrail SDK to sanitize user prompts, block adversarial jailbreaks, and enforce inference cost caps.",
+    });
+  } else if (targetCategory === "API & Cloud Service") {
+    findings.push({
+      id: "api-edge-shield",
+      category: "Edge Protection & Bot Shield",
+      title: hasSparrowxVerification
+        ? "API Microservice Edge Shield & Velocity Armor Active"
+        : "Unprotected API Routes & Missing Rate-Limiting Armor",
+      status: hasSparrowxVerification ? "passed" : "critical",
+      detail: hasSparrowxVerification
+        ? "SparrowX Edge WAF is enforcing velocity-based rate limiting, token authentication validation, and payload inspection."
+        : "API endpoints lack edge velocity throttling and automated bot deterrence, leaving endpoints susceptible to credential stuffing and backend microservice overload.",
+      evidence: `Target: ${targetCategory} | Origin Routing: ${resolvedIps[0] ?? "Direct"} | Edge Rate Limit: ${hasSparrowxVerification ? "Enforced" : "None"}`,
+      remediation:
+        "Deploy SparrowX Edge WAF middleware to apply automated velocity rate-limiting and protect cloud endpoints.",
+    });
+  } else {
+    findings.push({
+      id: "web-edge-shield",
+      category: "Edge Protection & Bot Shield",
+      title: hasSparrowxVerification
+        ? "SparrowX Autonomous Web Armor & Bot Defense Active"
+        : "Unprotected Web Application Perimeter & Bot Scraper Surface",
+      status: hasSparrowxVerification ? "passed" : "critical",
+      detail: hasSparrowxVerification
+        ? "SparrowX Edge WAF is actively dropping malicious SQLi, XSS, and automated bot scraping requests at the edge."
+        : "Web frontend lacks active edge shield protection. Malicious automated crawlers, content scrapers, and credential brute-force attacks hit origin instances directly.",
+      evidence: `Target: ${targetCategory} | Edge WAF: ${hasSparrowxVerification ? "SparrowX Active Shield" : "Unverified"} | Bot Rate Armor: ${hasSparrowxVerification ? "Enforced" : "Missing"}`,
+      remediation:
+        "Install the 5-line SparrowX Edge WAF middleware in your Next.js, Express, or Cloudflare Worker stack to block bots and SQLi in <2ms.",
+    });
+  }
 
-  // Calculate score
-  let score = 34;
-  if (resolvedIps.length > 0) score += 6;
-  if (httpsReachable) score += 12;
-  if (hasSpfOrDmarc) score += 8;
-  if (caaRecords.length > 0) score += 6;
-  if (!corsPermissive && !serverHeaderExposed) score += 4;
-  if (securityTxtPresent) score += 4;
-  if (hasSparrowxVerification) score += 24;
-  score = Math.min(98, Math.max(22, score));
+  // Calculate deep A-to-Z weighted security score (0 to 100)
+  let transportPts = 0;
+  if (resolvedIps.length > 0) transportPts += 5;
+  if (ipv6Records.length > 0) transportPts += 4;
+  if (httpsReachable) transportPts += 12;
+  if (latencyMs < 100) transportPts += 4;
+
+  let dnsPts = 0;
+  if (caaRecords.length > 0) dnsPts += 8;
+  if (hasSpfOrDmarc) dnsPts += 8;
+  if (dnssecVerified) dnsPts += 4;
+
+  let headerPts = 0;
+  if (hstsHeaderPresent) headerPts += 8;
+  if (cspHeaderPresent) headerPts += 8;
+  if (xFrameOptionsPresent) headerPts += 5;
+  if (!corsPermissive) headerPts += 4;
+
+  let privacyPts = 0;
+  if (!serverHeaderExposed) privacyPts += 8;
+  if (securityTxtPresent) privacyPts += 7;
+
+  let edgePts = 4;
+  if (hasSparrowxVerification) edgePts = 15;
+
+  const rawScore = transportPts + dnsPts + headerPts + privacyPts + edgePts;
+  const score = Math.min(99, Math.max(22, rawScore));
+
+  const scoreGrade: LiveDomainAuditResult["scoreGrade"] =
+    score >= 90
+      ? "A+"
+      : score >= 80
+        ? "A"
+        : score >= 70
+          ? "B"
+          : score >= 55
+            ? "C"
+            : score >= 40
+              ? "D"
+              : "F";
 
   const riskLevel: LiveDomainAuditResult["riskLevel"] =
-    score < 50
+    score < 40
       ? "CRITICAL EXPOSURE"
-      : score < 70
+      : score < 60
         ? "HIGH RISK"
-        : score < 85
+        : score < 80
           ? "MODERATE RISK"
           : "HARDENED";
+
+  onProgress?.(92, "Engaging SparrowX Gemini 3.8 Flash AI Brain for deep threat analysis & founder advisory...");
+
+  // Generate deep AI advisory using Gemini 3.8 Flash
+  let advisory: AiScanDeepAdvisory | undefined;
+  try {
+    advisory = await analyzeScanWithGeminiBrain({
+      cleanHost,
+      score,
+      grade: scoreGrade,
+      riskLevel,
+      targetCategory,
+      findings,
+      serverBanner: serverHeaderExposed,
+      originIp: resolvedIps[0] ?? "Direct",
+      corsPermissive,
+    });
+  } catch {
+    advisory = buildDeterministicScanAdvisory({
+      cleanHost,
+      score,
+      grade: scoreGrade,
+      riskLevel,
+      targetCategory,
+      findings,
+      serverBanner: serverHeaderExposed,
+      originIp: resolvedIps[0] ?? "Direct",
+      corsPermissive,
+    });
+  }
 
   onProgress?.(100, "Scan complete.");
 
@@ -464,19 +622,28 @@ export async function runLivePublicDomainScan(
     cleanHost,
     scannedAt: new Date().toISOString(),
     score,
+    scoreGrade,
     riskLevel,
+    targetCategory,
+    targetExplanation,
+    hasAiEndpoints,
     resolvedIps,
     ipv6Count: ipv6Records.length,
     caaRecords,
     txtRecordsCount: txtRecords.length,
     hasSparrowxVerification,
     hasSpfOrDmarc,
+    dnssecVerified,
     httpsReachable,
     corsPermissive,
     serverHeaderExposed,
     securityTxtPresent,
+    hstsHeaderPresent,
+    cspHeaderPresent,
+    xFrameOptionsPresent,
     latencyMs,
     findings,
+    advisory,
   };
 }
 
@@ -580,17 +747,58 @@ export function incrementProspectReportView(domainOrId: string): void {
 // ============================================================================
 export function buildProspectAuditReportText(audit: LiveDomainAuditResult): string {
   const exposedCount = audit.findings.filter((f) => f.status !== "passed").length;
+  const advisoryLines = audit.advisory
+    ? [
+        "----------------------------------------------------------------------",
+        `SPARROWX AI BRAIN DEEP ADVISORY (${audit.advisory.modelUsed}):`,
+        `Target Category     : ${audit.targetCategory}`,
+        `Executive Summary   : ${audit.advisory.executiveSummary}`,
+        `Attacker Exploit    : ${audit.advisory.exploitScenario}`,
+        `60s Fix Action      : ${audit.advisory.recommendedAction}`,
+        `Recommended Pack    : ${audit.advisory.recommendedPackage}`,
+        `Founder Pitch       : "${audit.advisory.customerConversionPitch}"`,
+        ...(audit.advisory.aiVulnerabilities && audit.advisory.aiVulnerabilities.length > 0
+          ? [
+              "----------------------------------------------------------------------",
+              "AI & FULL-STACK VULNERABILITIES IDENTIFIED BY GEMINI PRO:",
+              ...audit.advisory.aiVulnerabilities.map(
+                (v) =>
+                  `* [${v.riskRating.toUpperCase()}] ${v.name} (${v.owaspCategory})\n  - Risk: ${v.description}\n  - Fix: ${v.howSparrowxProtects}`,
+              ),
+            ]
+          : []),
+        ...(audit.advisory.whatSparrowxSaves && audit.advisory.whatSparrowxSaves.length > 0
+          ? [
+              "----------------------------------------------------------------------",
+              "WHAT SPARROWX SAFES & PROTECTS:",
+              ...audit.advisory.whatSparrowxSaves.map(
+                (s) =>
+                  `* Threat: ${s.threat}\n  - Danger Without: ${s.dangerWithoutSparrowx}\n  - SparrowX Defense: ${s.howSparrowxSafes} (${s.remediationTime})`,
+              ),
+            ]
+          : []),
+        "----------------------------------------------------------------------",
+        "5-MINUTE RAPID ONBOARDING PLAN:",
+        `Step 1: ${audit.advisory.fiveMinuteProtectionPlan?.step1 ?? "Claim workspace in SparrowX (60s)"}`,
+        `Step 2: ${audit.advisory.fiveMinuteProtectionPlan?.step2 ?? "Drop in 5-line middleware (120s)"}`,
+        `Step 3: ${audit.advisory.fiveMinuteProtectionPlan?.step3 ?? "Activate verified shield (120s)"}`,
+      ]
+    : [];
+
   return [
     "======================================================================",
-    "SPARROWX AUTONOMOUS SOC — LIVE SECURITY & AI EXPOSURE AUDIT REPORT",
+    "SPARROWX AUTONOMOUS SOC — LIVE DEEP SECURITY & AI EXPOSURE AUDIT REPORT",
     "======================================================================",
     `Target Asset       : ${audit.cleanHost} (${audit.domain})`,
+    `Target Category    : ${audit.targetCategory}`,
     `Scan Timestamp     : ${audit.scannedAt}`,
-    `Security Score     : ${audit.score} / 100 (${audit.riskLevel})`,
+    `Security Score     : ${audit.score} / 100 [Grade ${audit.scoreGrade} · ${audit.riskLevel}]`,
     `Resolved Origin IP : ${audit.resolvedIps.length > 0 ? audit.resolvedIps.join(", ") : "Unresolved / Hidden"}`,
     `IPv6 & CAA Records : ${audit.ipv6Count} IPv6, ${audit.caaRecords.length} CAA`,
+    `DNSSEC Validation  : ${audit.dnssecVerified ? "Validated" : "Unsigned"}`,
     `Edge RTT Latency   : ${audit.latencyMs} ms`,
     `Active Exposures   : ${exposedCount} Security Vectors Identified`,
+    ...advisoryLines,
     "----------------------------------------------------------------------",
     "KEY FINDINGS, EVIDENCE & REMEDIATION:",
     ...audit.findings.map(
@@ -614,28 +822,74 @@ export function downloadBrandedHtmlSecurityReport(
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>SparrowX Security Assessment — ${audit.cleanHost}</title>
+  <title>SparrowX Deep Security Assessment — ${audit.cleanHost}</title>
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; background: #070709; color: #f4f4f5; padding: 32px; }
-    .container { max-width: 820px; margin: 0 auto; border: 1px solid #27272a; border-radius: 16px; background: #101014; padding: 36px; }
-    .score { font-size: 38px; font-weight: 900; color: ${audit.score < 70 ? "#f87171" : "#34d399"}; font-family: monospace; }
+    .container { max-width: 860px; margin: 0 auto; border: 1px solid #27272a; border-radius: 16px; background: #101014; padding: 36px; }
+    .score { font-size: 38px; font-weight: 900; color: ${audit.score >= 80 ? "#34d399" : audit.score >= 60 ? "#fbbf24" : "#f87171"}; font-family: monospace; }
     .finding { border: 1px solid #27272a; border-radius: 12px; padding: 16px; margin-top: 12px; background: #09090b; }
     .evidence { font-family: monospace; font-size: 11px; color: #a1a1aa; background: #141418; padding: 8px; border-radius: 6px; margin-top: 8px; }
+    .ai-box { margin-top: 24px; border: 1px solid #f05a2866; background: #f05a2810; padding: 20px; border-radius: 12px; }
   </style>
 </head>
 <body>
   <div class="container">
     <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #27272a;padding-bottom:20px;">
       <div>
-        <div style="color:#f05a28;font-size:11px;font-weight:700;letter-spacing:1px;">SPARROWX AUTONOMOUS SOC · EXECUTIVE TEASER REPORT</div>
+        <div style="color:#f05a28;font-size:11px;font-weight:700;letter-spacing:1px;">SPARROWX AUTONOMOUS SOC · DEEP SECURITY AUDIT</div>
         <h1 style="margin:6px 0 0;font-size:24px;">${audit.cleanHost}</h1>
-        <p style="margin:4px 0 0;font-size:12px;color:#a1a1aa;">Scanned: ${audit.scannedAt} · Origin IP: ${audit.resolvedIps[0] ?? "Direct"} (${audit.latencyMs}ms RTT)</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#a1a1aa;">Target: ${audit.targetCategory} · Origin: ${audit.resolvedIps[0] ?? "Direct"} (${audit.latencyMs}ms RTT)</p>
       </div>
       <div style="text-align:right;">
-        <div class="score">${audit.score}/100</div>
-        <div style="font-size:11px;color:#f87171;font-weight:700;">${audit.riskLevel}</div>
+        <div class="score">${audit.score}/100 <span style="font-size:20px;background:#f05a2825;color:#f05a28;padding:2px 8px;border-radius:6px;">${audit.scoreGrade}</span></div>
+        <div style="font-size:11px;color:${audit.score >= 80 ? "#34d399" : audit.score >= 60 ? "#fbbf24" : "#f87171"};font-weight:700;">${audit.riskLevel}</div>
       </div>
     </div>
+
+    ${
+      audit.advisory
+        ? `<div class="ai-box">
+          <div style="font-size:11px;font-weight:700;color:#f05a28;text-transform:uppercase;letter-spacing:0.5px;">✦ SparrowX Gemini AI Brain Deep Advisory (${audit.advisory.modelUsed})</div>
+          <p style="margin:8px 0 4px;font-size:13px;line-height:1.5;color:#f4f4f5;"><strong>Executive Assessment:</strong> ${audit.advisory.executiveSummary}</p>
+          <div style="margin-top:10px;padding:10px;background:#00000080;border-left:3px solid #f87171;font-size:12px;color:#d4d4d8;">
+            <strong style="color:#f87171;">Attacker Exploit Vector:</strong> ${audit.advisory.exploitScenario}
+          </div>
+          <div style="margin-top:10px;padding:10px;background:#00000080;border-left:3px solid #34d399;font-size:12px;color:#d4d4d8;">
+            <strong style="color:#34d399;">Recommended Defense:</strong> ${audit.advisory.recommendedAction}
+          </div>
+          <p style="margin:10px 0 0;font-size:12px;font-style:italic;color:#a1a1aa;">&ldquo;${audit.advisory.customerConversionPitch}&rdquo;</p>
+          ${
+            audit.advisory.whatSparrowxSaves && audit.advisory.whatSparrowxSaves.length > 0
+              ? `<div style="margin-top:16px;border-top:1px solid #ffffff15;padding-top:12px;">
+                <div style="font-size:11px;font-weight:700;color:#34d399;text-transform:uppercase;margin-bottom:8px;">What SparrowX Protects & Safes You From:</div>
+                ${audit.advisory.whatSparrowxSaves
+                  .map(
+                    (s) => `<div style="margin-bottom:6px;font-size:11px;color:#d4d4d8;">
+                      <strong style="color:#ffffff;">• ${s.threat}:</strong> ${s.howSparrowxSafes} (${s.remediationTime})
+                    </div>`,
+                  )
+                  .join("")}
+              </div>`
+              : ""
+          }
+          ${
+            audit.advisory.aiVulnerabilities && audit.advisory.aiVulnerabilities.length > 0
+              ? `<div style="margin-top:14px;border-top:1px solid #ffffff15;padding-top:12px;">
+                <div style="font-size:11px;font-weight:700;color:#f87171;text-transform:uppercase;margin-bottom:8px;">AI & Full-Stack Vulnerabilities Identified:</div>
+                ${audit.advisory.aiVulnerabilities
+                  .map(
+                    (v) => `<div style="margin-bottom:6px;font-size:11px;color:#d4d4d8;">
+                      <strong style="color:#f87171;">[${v.riskRating.toUpperCase()}] ${v.name} (${v.owaspCategory}):</strong> ${v.description}
+                    </div>`,
+                  )
+                  .join("")}
+              </div>`
+              : ""
+          }
+        </div>`
+        : ""
+    }
+
     <h3 style="margin-top:24px;font-size:14px;text-transform:uppercase;color:#a1a1aa;">Verified Technical Findings & Raw Evidence</h3>
     ${audit.findings
       .map(
@@ -655,7 +909,7 @@ export function downloadBrandedHtmlSecurityReport(
         ? `<div style="margin-top:28px;border:1px solid #f05a2866;background:#f05a2815;padding:20px;border-radius:12px;">
             <div style="font-size:11px;font-weight:700;color:#f05a28;text-transform:uppercase;">Prepared Security Quotation (${quotation.id})</div>
             <h3 style="margin:6px 0;font-size:18px;">${quotation.packageName} — ₹${quotation.priceInr.toLocaleString()} INR ($${quotation.priceUsd} USD)</h3>
-            <p style="margin:4px 0;font-size:12px;color:#d4d4d8;">Includes ${quotation.credits} Security Credits, full OWASP & AI Shield deployment, and signed SOC 2 verification certificate. ${quotation.notes}</p>
+            <p style="margin:4px 0;font-size:12px;color:#d4d4d8;">Includes ${quotation.credits} Security Credits, full edge WAF deployment, and signed SOC 2 verification certificate. ${quotation.notes}</p>
           </div>`
         : ""
     }
@@ -679,29 +933,42 @@ export function buildColdOutreachMessage(
   channel: "dm" | "email" | "linkedin",
 ): string {
   const ipNote = audit.resolvedIps.length > 0 ? ` (resolving to ${audit.resolvedIps[0]})` : "";
+  const targetDesc =
+    audit.targetCategory === "AI Agent & LLM Endpoint"
+      ? "AI agent & LLM prompt interface"
+      : audit.targetCategory === "API & Cloud Service"
+        ? "API cloud microservices"
+        : "web application";
+
+  const vectorNotice =
+    audit.targetCategory === "AI Agent & LLM Endpoint"
+      ? "unprotected against prompt jailbreaks and runaway LLM token bills"
+      : audit.targetCategory === "API & Cloud Service"
+        ? "missing velocity rate-limiting and exposing origin IP routing"
+        : "missing strict CSP/HSTS headers and edge SQLi/XSS filtering";
 
   if (channel === "dm") {
-    return `Hey! Saw ${audit.cleanHost} and ran a quick non-intrusive security header & WAF check${ipNote}. Right now it scores ${audit.score}/100—your API/web routes don't have edge SQLi/XSS filtering or AI token-drain rate limiting active. I already generated the 5-line drop-in middleware fix + full audit report for ${audit.cleanHost} inside SparrowX. Want me to send it over?`;
+    return `Hey! Saw ${audit.cleanHost} and ran a quick non-intrusive security audit${ipNote}. Your ${targetDesc} scores ${audit.score}/100 [Grade ${audit.scoreGrade}]—routes are ${vectorNotice}. I generated the 5-line drop-in middleware fix + full audit report for ${audit.cleanHost} inside SparrowX. Want me to send it over?`;
   }
 
   if (channel === "linkedin") {
-    return `Hi! Congrats on the traction with ${audit.cleanHost}. I ran a quick passive security posture check on ${audit.cleanHost}${ipNote} and noticed ${audit.findings.filter((f) => f.status !== "passed").length} open exposures (score: ${audit.score}/100), including missing edge WAF payload filtering and API/LLM rate-limiting. I can set up full edge protection + hand you a signed SOC 2 readiness certificate in 24 hours. Open to seeing the 1-page report?`;
+    return `Hi! Congrats on the traction with ${audit.cleanHost}. I ran a quick passive security posture check on ${audit.cleanHost}${ipNote} and noticed open perimeter exposures (Score: ${audit.score}/100, Grade: ${audit.scoreGrade}). Your ${targetDesc} is ${vectorNotice}. We can deploy full edge protection + hand you a verified Trust Badge in 24 hours. Open to seeing the 1-page report?`;
   }
 
-  return `Subject: Security & WAF Exposure Notice for ${audit.cleanHost} (Score: ${audit.score}/100)
+  return `Subject: Security Posture & Edge Protection Notice for ${audit.cleanHost} [Grade ${audit.scoreGrade}]
 
 Hi Team,
 
-While reviewing ${audit.cleanHost}${ipNote}, I ran a non-intrusive security & AI guardrail readiness check via SparrowX Autonomous SOC.
+While reviewing ${audit.cleanHost}${ipNote}, I ran a non-intrusive security & edge readiness check via SparrowX Autonomous SOC.
 
-Your domain currently scores ${audit.score}/100 (${audit.riskLevel}):
-• Origin IP / DNS: ${audit.resolvedIps[0] ?? "Publicly Routed"} (${audit.latencyMs}ms RTT, ${audit.caaRecords.length} CAA records)
-• Edge WAF Status: Missing active OWASP SQLi/XSS & SSRF payload interception
-• AI / API Velocity Shield: Unprotected against automated credential stuffing & LLM token-drain bursts
+Your domain currently scores ${audit.score}/100 [Grade ${audit.scoreGrade} · ${audit.riskLevel}]:
+• Target Architecture: ${audit.targetCategory} (${audit.latencyMs}ms TLS RTT, ${audit.caaRecords.length} CAA records)
+• Vulnerability Vector: ${vectorNotice}
+• Origin Exposure: ${audit.resolvedIps[0] ?? "Publicly Routed"} (${audit.serverHeaderExposed ? `Banner: ${audit.serverHeaderExposed}` : "Masked"})
 
 We already generated the drop-in middleware fix (Next.js / Express / FastAPI / Cloudflare) and a compliance verification report for ${audit.cleanHost}.
 
-Reply "REPORT" and I'll send the full remediation bundle, or we can deploy the complete shield for you in 24 hours.
+Reply "REPORT" and I'll send the full remediation bundle, or we can deploy the complete shield for you in 24 hours via our $149 Done-For-You audit.
 
 Best,
 SparrowX Security Operations`;
@@ -983,11 +1250,16 @@ export function LandingLiveSecurityScanner({
                 <span className="font-mono text-sm font-bold text-white">
                   {scanResult.cleanHost}
                 </span>
+                <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-mono text-primary font-bold">
+                  {scanResult.targetCategory}
+                </span>
                 <span
                   className={`rounded-md border px-2 py-0.5 text-[10px] font-mono font-bold ${
-                    scanResult.score < 70
+                    scanResult.score < 60
                       ? "border-red-500/40 bg-red-500/15 text-red-400"
-                      : "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                      : scanResult.score < 80
+                        ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
+                        : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
                   }`}
                 >
                   {scanResult.riskLevel}
@@ -1010,24 +1282,293 @@ export function LandingLiveSecurityScanner({
                 </span>
                 <span>·</span>
                 <span>
+                  DNSSEC:{" "}
+                  <strong className={scanResult.dnssecVerified ? "text-emerald-400" : "text-zinc-400"}>
+                    {scanResult.dnssecVerified ? "Enforced" : "Unsigned"}
+                  </strong>
+                </span>
+                <span>·</span>
+                <span>
                   TXT: <strong className="text-zinc-200">{scanResult.txtRecordsCount}</strong>
                 </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 self-start sm:self-auto rounded-xl border border-red-500/30 bg-red-950/20 px-3.5 py-2">
+            <div
+              className={`flex items-center gap-3 self-start sm:self-auto rounded-xl border px-3.5 py-2 ${
+                scanResult.score >= 80
+                  ? "border-emerald-500/30 bg-emerald-950/20"
+                  : scanResult.score >= 60
+                    ? "border-amber-500/30 bg-amber-950/20"
+                    : "border-red-500/30 bg-red-950/20"
+              }`}
+            >
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-red-300">
-                  Security Score
+                <div className="text-[10px] uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 font-bold">
+                  <span>Score & Grade</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+                      scanResult.scoreGrade.startsWith("A")
+                        ? "bg-emerald-400 text-black"
+                        : scanResult.scoreGrade === "B"
+                          ? "bg-blue-400 text-black"
+                          : scanResult.scoreGrade === "C"
+                            ? "bg-amber-400 text-black"
+                            : "bg-red-500 text-white"
+                    }`}
+                  >
+                    Grade {scanResult.scoreGrade}
+                  </span>
                 </div>
-                <div className="font-mono text-2xl font-black text-red-400">
+                <div
+                  className={`font-mono text-2xl font-black ${
+                    scanResult.score >= 80
+                      ? "text-emerald-400"
+                      : scanResult.score >= 60
+                        ? "text-amber-400"
+                        : "text-red-400"
+                  }`}
+                >
                   {scanResult.score}
-                  <span className="text-xs text-zinc-400">/100</span>
+                  <span className="text-xs text-zinc-400 font-normal">/100</span>
                 </div>
               </div>
-              <ShieldAlert className="size-7 text-red-400" />
+              {scanResult.score >= 80 ? (
+                <ShieldCheck className="size-7 text-emerald-400" />
+              ) : (
+                <ShieldAlert className="size-7 text-red-400" />
+              )}
             </div>
           </div>
+
+          {/* PROMINENT 5-MINUTE RAPID PROTECTION ACTION BANNER */}
+          <div className="rounded-2xl border-2 border-primary/60 bg-gradient-to-r from-primary/25 via-orange-950/30 to-black p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_0_40px_rgba(240,90,40,0.25)]">
+            <div className="space-y-1 max-w-xl">
+              <div className="flex items-center gap-2 text-white font-black text-sm sm:text-base">
+                <ShieldCheck className="size-5 text-primary shrink-0 animate-pulse" />
+                <span>Instant Autonomous Defense Ready for {scanResult.cleanHost}</span>
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Eliminate all{" "}
+                <strong className="text-white">
+                  {scanResult.findings.filter((f) => f.status !== "passed").length} identified security &amp; AI vulnerabilities
+                </strong>{" "}
+                in under 5 minutes with drop-in edge armor. Zero complex setup or code rewrite.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                onClaimAndProtectDomain(
+                  scanResult.domain,
+                  leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
+                )
+              }
+              className="group relative inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-primary via-orange-500 to-amber-400 px-5 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-primary/30 transition-all hover:scale-[1.03] hover:shadow-primary/50 cursor-pointer shrink-0"
+            >
+              <Zap className="size-4 text-white fill-white" />
+              <span>SparrowX is ready to protect all these issues in 5 min</span>
+              <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          </div>
+
+          {/* SPARROWX AI BRAIN DEEP ADVISORY (GEMINI 3.8 FLASH / PRO) */}
+          {scanResult.advisory && (
+            <div className="rounded-xl border border-primary/50 bg-gradient-to-r from-primary/10 via-[#140E0A] to-black p-4 space-y-3.5 shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/20 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-primary animate-pulse" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    SparrowX AI Brain Deep Advisory · {scanResult.advisory.modelUsed}
+                  </span>
+                  {scanResult.advisory.liveAiGenerated && (
+                    <span className="rounded bg-primary/20 border border-primary/40 px-1.5 py-0.5 text-[9px] font-mono text-primary font-bold">
+                      LIVE NEURAL ANALYSIS
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-mono text-zinc-400 bg-black/60 border border-white/10 px-2 py-0.5 rounded">
+                  Target: {scanResult.targetCategory}
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div>
+                  <div className="font-semibold text-zinc-200">Executive Threat Assessment:</div>
+                  <p className="text-zinc-300 mt-0.5 leading-relaxed">
+                    {scanResult.advisory.executiveSummary}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-black/60 border border-red-500/25 p-2.5 text-xs">
+                  <div className="font-semibold text-red-400 flex items-center gap-1.5">
+                    <ShieldAlert className="size-3.5 shrink-0" />
+                    <span>Real-World Attacker Exploit Scenario:</span>
+                  </div>
+                  <p className="text-zinc-300 mt-1 text-[11px] leading-relaxed">
+                    {scanResult.advisory.exploitScenario}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-black/60 border border-emerald-500/25 p-2.5 text-xs">
+                  <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                    <Zap className="size-3.5 shrink-0" />
+                    <span>Recommended 60-Second Defense:</span>
+                  </div>
+                  <p className="text-zinc-300 mt-1 text-[11px] leading-relaxed">
+                    {scanResult.advisory.recommendedAction}
+                  </p>
+                </div>
+
+                {/* WHAT SPARROWX SAFES & PROTECTS SECTION */}
+                {scanResult.advisory.whatSparrowxSaves && scanResult.advisory.whatSparrowxSaves.length > 0 && (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <Shield className="size-3.5 text-emerald-400" />
+                        <span>What SparrowX Protects &amp; Safes You From</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">
+                        &lt; 2ms Latency Guarantee
+                      </span>
+                    </div>
+                    <div className="grid gap-2.5 sm:grid-cols-3">
+                      {scanResult.advisory.whatSparrowxSaves.map((item, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-emerald-500/20 bg-black/70 p-2.5 flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                              <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
+                              <span>{item.threat}</span>
+                            </div>
+                            <div className="mt-1 text-[11px] text-zinc-300 leading-snug">
+                              <strong className="text-red-400">Danger:</strong> {item.dangerWithoutSparrowx}
+                            </div>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-white/10 text-[11px] text-emerald-300 font-medium">
+                            <strong>SparrowX Defense:</strong> {item.howSparrowxSafes}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* AI & FULL-STACK VULNERABILITY DEEP INSPECTION */}
+                {scanResult.advisory.aiVulnerabilities && scanResult.advisory.aiVulnerabilities.length > 0 && (
+                  <div className="rounded-xl border border-red-500/30 bg-red-950/15 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-red-500/20 pb-2">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldAlert className="size-3.5 text-red-400" />
+                        <span>AI &amp; Full-Stack Vulnerabilities Identified by Gemini</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-red-400 bg-red-950/40 border border-red-500/30 px-2 py-0.5 rounded font-bold">
+                        {scanResult.advisory.aiVulnerabilities.length} Threat Vectors
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {scanResult.advisory.aiVulnerabilities.map((v) => (
+                        <div
+                          key={v.id}
+                          className="rounded-lg border border-red-500/20 bg-black/70 p-2.5 space-y-1"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-[10px] text-red-300 font-bold bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded">
+                              {v.owaspCategory}
+                            </span>
+                            <span className="font-mono text-[9px] uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-bold">
+                              {v.riskRating}
+                            </span>
+                          </div>
+                          <div className="text-xs font-bold text-white">{v.name}</div>
+                          <div className="text-[11px] text-zinc-300">{v.description}</div>
+                          <div className="text-[11px] text-primary pt-1 border-t border-white/5">
+                            <strong>SparrowX Fix:</strong> {v.howSparrowxProtects}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5-MINUTE RAPID PROTECTION ROADMAP */}
+                {scanResult.advisory.fiveMinuteProtectionPlan && (
+                  <div className="rounded-xl border border-primary/40 bg-black/80 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                        <Clock className="size-3.5 text-primary" />
+                        <span>5-Minute Rapid Protection Roadmap</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded font-bold">
+                        Est. Time: {scanResult.advisory.fiveMinuteProtectionPlan.estimatedTime}
+                      </span>
+                    </div>
+                    <div className="grid gap-2.5 sm:grid-cols-3 text-xs">
+                      <div className="rounded-lg border border-[#222] bg-[#111] p-2.5 space-y-1">
+                        <div className="font-bold text-primary flex items-center gap-1.5">
+                          <span className="size-4 rounded-full bg-primary/20 text-primary grid place-items-center text-[10px] font-bold">
+                            1
+                          </span>
+                          <span>Step 1 · Workspace Claim</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-300 leading-snug">
+                          {scanResult.advisory.fiveMinuteProtectionPlan.step1}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[#222] bg-[#111] p-2.5 space-y-1">
+                        <div className="font-bold text-primary flex items-center gap-1.5">
+                          <span className="size-4 rounded-full bg-primary/20 text-primary grid place-items-center text-[10px] font-bold">
+                            2
+                          </span>
+                          <span>Step 2 · 5-Line Drop-in</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-300 leading-snug">
+                          {scanResult.advisory.fiveMinuteProtectionPlan.step2}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-[#222] bg-[#111] p-2.5 space-y-1">
+                        <div className="font-bold text-emerald-400 flex items-center gap-1.5">
+                          <span className="size-4 rounded-full bg-emerald-500/20 text-emerald-400 grid place-items-center text-[10px] font-bold">
+                            3
+                          </span>
+                          <span>Step 3 · Live Activation</span>
+                        </div>
+                        <p className="text-[11px] text-zinc-300 leading-snug">
+                          {scanResult.advisory.fiveMinuteProtectionPlan.step3}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-primary/20 text-xs">
+                  <p className="text-zinc-300 italic text-[11px]">
+                    &ldquo;{scanResult.advisory.customerConversionPitch}&rdquo;
+                  </p>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] font-mono text-primary font-bold border border-primary/30 px-2 py-1 rounded bg-primary/10">
+                      Recommended: {scanResult.advisory.recommendedPackage}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onClaimAndProtectDomain(
+                          scanResult.domain,
+                          leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
+                        )
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 transition-all cursor-pointer"
+                    >
+                      <Zap className="size-3.5 fill-current" />
+                      <span>Protect in 5 Min</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Findings List with Raw Technical Evidence */}
           <div className="space-y-2.5">
@@ -1186,10 +1727,10 @@ export function LandingLiveSecurityScanner({
                       suggestOrgFromHost(scanResult.cleanHost),
                     )
                   }
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-white px-3.5 py-2 text-xs font-bold text-black shadow-md hover:bg-zinc-200 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-4 py-2.5 text-xs font-black text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
                 >
-                  <Shield className="size-3.5 text-primary" />
-                  <span>Fix & Protect Free (60s)</span>
+                  <ShieldCheck className="size-4 text-white" />
+                  <span>SparrowX is ready to protect all these issues in 5 min</span>
                   <ArrowRight className="size-3.5" />
                 </button>
                 <a

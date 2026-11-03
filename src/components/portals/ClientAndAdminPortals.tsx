@@ -4172,8 +4172,27 @@ export function PortalLoginScreen({
       ) : (
         /* STAGE 2: EYE-CATCHING ANIMATED CYBER DEFENSE STARTUP LANDING PAGE */
         <main className="relative z-10">
+          {/* TOP FIRST: LIVE PUBLIC DOMAIN & API VULNERABILITY SCANNER (FIRST THING VISITORS SEE & USE) */}
+          <section className="mx-auto max-w-7xl px-4 sm:px-8 pt-6 pb-2 sm:pt-8 sm:pb-3">
+            <LandingLiveSecurityScanner
+              onClaimAndProtectDomain={(domain, suggestedOrgName) => {
+                setPrimaryDomain(domain);
+                setOrgName(suggestedOrgName);
+                openAuthGateway("signup");
+              }}
+              onOpenInstantCheckout={(neededCredits, domain) => {
+                setLandingNeededCredits(neededCredits);
+                if (domain) {
+                  setPrimaryDomain(`https://${domain}`);
+                  setLandingPaymentLabel(`SparrowX Shield — ${domain}`);
+                }
+                setShowLandingPaymentModal(true);
+              }}
+            />
+          </section>
+
           {/* HERO SECTION */}
-          <section className="mx-auto max-w-7xl px-4 sm:px-8 pt-10 pb-14 lg:pt-16 lg:pb-20">
+          <section className="mx-auto max-w-7xl px-4 sm:px-8 pt-6 pb-14 lg:pt-10 lg:pb-20">
             <div className="grid gap-10 lg:grid-cols-12 items-center">
               {/* Hero Left: Startup Story & High-Impact Value Proposition */}
               <div className="lg:col-span-6 space-y-6">
@@ -4215,32 +4234,6 @@ export function PortalLoginScreen({
                     <LockKeyhole className="size-4 text-primary" />
                     <span>Sign In to SOC Console</span>
                   </button>
-                </div>
-
-                {/* Live Startup Proof Pills */}
-                <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[#1F1F1F]">
-                  <div className="rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3">
-                    <div className="text-lg sm:text-xl font-black text-white font-mono">
-                      &lt; 2ms
-                    </div>
-                    <div className="text-[11px] text-zinc-400 mt-0.5">
-                      Edge WAF & AI Prompt Inspection Latency
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3">
-                    <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono">
-                      100%
-                    </div>
-                    <div className="text-[11px] text-zinc-400 mt-0.5">
-                      Cryptographic Ownership & Live Probe Proof
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3">
-                    <div className="text-lg sm:text-xl font-black text-primary font-mono">24/7</div>
-                    <div className="text-[11px] text-zinc-400 mt-0.5">
-                      Autonomous SIEM & MITRE TTP Correlation
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -4470,46 +4463,105 @@ export function PortalLoginScreen({
                 </div>
               </div>
             </div>
-
-            {/* LIVE PUBLIC DOMAIN & API VULNERABILITY SCANNER (LEAD MAGNET) */}
-            <div className="mt-10">
-              <LandingLiveSecurityScanner
-                onClaimAndProtectDomain={(domain, suggestedOrgName) => {
-                  setPrimaryDomain(domain);
-                  setOrgName(suggestedOrgName);
-                  openAuthGateway("signup");
-                }}
-                onOpenInstantCheckout={(neededCredits, domain) => {
-                  setLandingNeededCredits(neededCredits);
-                  if (domain) {
-                    setPrimaryDomain(`https://${domain}`);
-                    setLandingPaymentLabel(`SparrowX Shield — ${domain}`);
-                  }
-                  setShowLandingPaymentModal(true);
-                }}
-              />
-            </div>
           </section>
 
           {/* CONTINUOUS ANIMATED THREAT TICKER MARQUEE */}
-          <div className="border-y border-[#1F1F1F] bg-[#070707] py-3 overflow-hidden">
-            <div className="flex w-max animate-spx-marquee items-center gap-8 text-xs font-mono text-zinc-400">
+          <div className="border-y border-[#1F1F1F] bg-[#070707] py-2.5 overflow-hidden">
+            <div className="flex w-max animate-spx-marquee items-center gap-4 text-xs font-sans">
               {[
-                "⚡ SQL INJECTION UNION EXFILTRATION — BLOCKED AT EDGE",
-                "🛡️ LLM PROMPT JAILBREAK & SYSTEM PROMPT LEAK — SANITIZED",
-                "🔒 DNS TXT & HTTP TOKEN OWNERSHIP VERIFICATION — CRYPTOGRAPHICALLY PROVEN",
-                "🚨 BOTNET CREDENTIAL STUFFING WAVE — ASN QUARANTINED",
-                "🧬 MITRE ATT&CK TTP CORRELATION — LIVE SIEM TELEMETRY",
-                "⚙️ 1-CLICK CLOUDFLARE, UFW & IPTABLES BLOCKLIST EXPORT",
-                "⚡ SSRF & METADATA CREDENTIAL HARVESTING — INTERCEPTED",
-                "🛡️ MCP AI TOOL EXECUTION GUARDRAILS — ZERO-TRUST ENFORCED",
-                "🔒 DNS TXT & HTTP TOKEN OWNERSHIP VERIFICATION — CRYPTOGRAPHICALLY PROVEN",
-                "🚨 BOTNET CREDENTIAL STUFFING WAVE — ASN QUARANTINED",
+                {
+                  icon: "⚡",
+                  title: "SQL Injection Exfiltration",
+                  action: "Blocked at Edge",
+                  actionClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
+                },
+                {
+                  icon: "🛡️",
+                  title: "LLM System Prompt Extraction",
+                  action: "Sanitized",
+                  actionClass: "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
+                },
+                {
+                  icon: "🔒",
+                  title: "DNS & HTTP Ownership Proof",
+                  action: "Cryptographically Verified",
+                  actionClass: "bg-primary/10 text-primary border-primary/25",
+                },
+                {
+                  icon: "🚨",
+                  title: "Botnet Credential Stuffing Wave",
+                  action: "ASN Quarantined",
+                  actionClass: "bg-rose-500/10 text-rose-400 border-rose-500/25",
+                },
+                {
+                  icon: "🧬",
+                  title: "MITRE ATT&CK TTP Correlation",
+                  action: "Live SIEM Telemetry",
+                  actionClass: "bg-blue-500/10 text-blue-400 border-blue-500/25",
+                },
+                {
+                  icon: "⚙️",
+                  title: "Cloudflare & iptables Dynamic Export",
+                  action: "1-Click Sync",
+                  actionClass: "bg-zinc-800 text-zinc-300 border-zinc-700",
+                },
+                {
+                  icon: "⚡",
+                  title: "SSRF & Metadata Credential Harvest",
+                  action: "Intercepted",
+                  actionClass: "bg-amber-500/10 text-amber-400 border-amber-500/25",
+                },
+                {
+                  icon: "🛡️",
+                  title: "MCP AI Tool Execution Guardrails",
+                  action: "Zero-Trust Enforced",
+                  actionClass: "bg-purple-500/10 text-purple-400 border-purple-500/25",
+                },
+                // Duplicate items for seamless infinite marquee loop
+                {
+                  icon: "⚡",
+                  title: "SQL Injection Exfiltration",
+                  action: "Blocked at Edge",
+                  actionClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
+                },
+                {
+                  icon: "🛡️",
+                  title: "LLM System Prompt Extraction",
+                  action: "Sanitized",
+                  actionClass: "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
+                },
+                {
+                  icon: "🔒",
+                  title: "DNS & HTTP Ownership Proof",
+                  action: "Cryptographically Verified",
+                  actionClass: "bg-primary/10 text-primary border-primary/25",
+                },
+                {
+                  icon: "🚨",
+                  title: "Botnet Credential Stuffing Wave",
+                  action: "ASN Quarantined",
+                  actionClass: "bg-rose-500/10 text-rose-400 border-rose-500/25",
+                },
+                {
+                  icon: "🧬",
+                  title: "MITRE ATT&CK TTP Correlation",
+                  action: "Live SIEM Telemetry",
+                  actionClass: "bg-blue-500/10 text-blue-400 border-blue-500/25",
+                },
               ].map((item, index) => (
-                <span key={index} className="inline-flex items-center gap-2 whitespace-nowrap">
-                  <span className="text-primary">●</span>
-                  <span>{item}</span>
-                </span>
+                <div
+                  key={index}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/5 bg-zinc-950/80 px-3 py-1 text-xs whitespace-nowrap shadow-xs"
+                >
+                  <span className="text-sm select-none">{item.icon}</span>
+                  <span className="font-medium text-zinc-200">{item.title}</span>
+                  <span className="text-zinc-600 font-bold">·</span>
+                  <span
+                    className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${item.actionClass}`}
+                  >
+                    {item.action}
+                  </span>
+                </div>
               ))}
             </div>
           </div>

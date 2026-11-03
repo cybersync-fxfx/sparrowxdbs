@@ -170,17 +170,17 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "SparrowX | Security operations" },
+      { title: "SparrowX" },
       {
         name: "description",
         content:
-          "Production security operations, live incident response, and Web & AI Agent guardrails.",
+          "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
       },
-      { property: "og:title", content: "SparrowX | Security operations" },
+      { property: "og:title", content: "SparrowX" },
       {
         property: "og:description",
         content:
-          "Production security operations, live incident response, and Web & AI Agent guardrails.",
+          "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -311,6 +311,7 @@ function Dashboard() {
   };
 
   useEffect(() => {
+    document.title = "SparrowX";
     registerGlobalDocsNavigator((code, refId) => {
       setActiveDocCode(code);
       if (refId) setActiveDocRef(refId);
@@ -1248,17 +1249,53 @@ function Dashboard() {
     showToast("Logged out of account");
   };
 
-  const visibleClientTenants =
-    authSession.role === "client"
-      ? clientTenants.filter(
-          (t) =>
-            t.contactEmail.toLowerCase() === authSession.userEmail.toLowerCase() ||
-            t.id === authSession.tenantId,
-        )
-      : clientTenants;
+  const visibleClientTenants = useMemo(() => {
+    if (authSession.role !== "client") return clientTenants;
+    return clientTenants.filter((t) => {
+      if (authSession.tenantId) {
+        return t.id === authSession.tenantId;
+      }
+      return t.contactEmail.toLowerCase() === authSession.userEmail.toLowerCase();
+    });
+  }, [clientTenants, authSession]);
 
-  const activeClientTenant =
-    visibleClientTenants.find((t) => t.id === selectedTenantId) ?? visibleClientTenants[0] ?? null;
+  const activeClientTenant = useMemo(() => {
+    return (
+      visibleClientTenants.find((t) => t.id === selectedTenantId) ??
+      visibleClientTenants[0] ??
+      null
+    );
+  }, [visibleClientTenants, selectedTenantId]);
+
+  const visibleClientServices = useMemo(() => {
+    if (authSession.role !== "client") return protectedServices;
+    const clientTenantIds = new Set(visibleClientTenants.map((t) => t.id));
+    const clientDomains = new Set(
+      visibleClientTenants
+        .map((t) =>
+          t.primaryDomain
+            .replace(/^https?:\/\//i, "")
+            .replace(/^agent:\/\//i, "")
+            .split("/")[0]
+            .split(":")[0]
+            .trim()
+            .toLowerCase(),
+        )
+        .filter(Boolean),
+    );
+    return protectedServices.filter((s) => {
+      if (s.tenantId && clientTenantIds.has(s.tenantId)) return true;
+      const cleanEp = s.endpoint
+        .replace(/^https?:\/\//i, "")
+        .replace(/^agent:\/\//i, "")
+        .split("/")[0]
+        .split(":")[0]
+        .trim()
+        .toLowerCase();
+      if (clientDomains.has(cleanEp)) return true;
+      return false;
+    });
+  }, [protectedServices, visibleClientTenants, authSession]);
 
   const handleNavigate = (navLabel: string) => {
     if (navLabel === "AI Brain" || navLabel === "Gemini AI Brain") {
@@ -1268,6 +1305,31 @@ function Dashboard() {
         return;
       }
     }
+
+    if (authSession.role === "client") {
+      // Strict multi-tenant isolation: prevent client users from opening global SOC or admin screens
+      const restrictedForClients = [
+        "Overview",
+        "Dashboard",
+        "Security Overview",
+        "Live Operations",
+        "Incidents",
+        "Threat Hunting",
+        "Incident Statistics",
+        "Detection Rules & SIEM",
+        "Checkpoints & Probes",
+        "Client Subscriptions",
+        "Performance & Kill-Switch",
+        "Access Control & Audit",
+      ];
+      if (restrictedForClients.includes(navLabel)) {
+        showToast("Access Restricted: This view requires Administrator or SOC privileges.", "error");
+        setActiveNav("My Services");
+        setPortalMode("client");
+        return;
+      }
+    }
+
     if (navLabel === "Notifications") {
       setNotificationDrawerOpen(true);
       return;
@@ -1277,6 +1339,10 @@ function Dashboard() {
       navLabel === "SOC Error Monitoring" ||
       navLabel === "error_monitoring"
     ) {
+      if (authSession.role !== "admin") {
+        showToast("Access Restricted: Error Monitoring Dashboard is for Administrators.", "error");
+        return;
+      }
       setPortalMode("admin");
       setActiveNav("Error Monitoring");
       return;
@@ -1314,8 +1380,16 @@ function Dashboard() {
       return;
     }
     if (navLabel === "Client Subscriptions" || navLabel === "Performance & Kill-Switch") {
+      if (authSession.role !== "admin") {
+        showToast("Access Restricted: Admin Master requires Administrator credentials.", "error");
+        return;
+      }
       setPortalMode("admin");
     } else if (navLabel === "Access Control & Audit") {
+      if (authSession.role !== "admin") {
+        showToast("Access Restricted: Access Control requires Administrator credentials.", "error");
+        return;
+      }
       if (portalMode !== "soc") {
         setPortalMode("admin");
       }
@@ -1345,12 +1419,18 @@ function Dashboard() {
       navLabel === "Gemini AI Brain" ||
       navLabel === "Protection Status & Verification" ||
       navLabel === "Protection Verification" ||
-      navLabel === "Protection Status"
+      navLabel === "Protection Status" ||
+      navLabel === "Global Traffic Mesh" ||
+      navLabel === "Live Traffic Mesh"
     ) {
       // Retain current active portalMode (works in SOC Command, Client Area, and Admin)
     } else {
       // All SOC Operations (Overview, Incidents, Threat indicators, CVEs, Assets, Team, Integrations)
-      setPortalMode("soc");
+      if (authSession.role === "admin") {
+        setPortalMode("soc");
+      } else {
+        setPortalMode("client");
+      }
     }
     setActiveNav(navLabel === "Gemini AI Brain" ? "AI Brain" : navLabel);
   };
@@ -1573,35 +1653,35 @@ function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Top Workspace Switcher (SOC Dashboard vs Client Area) */}
-            <div className="flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
-              <button
-                type="button"
-                onClick={() => handleNavigate("Overview")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                  portalMode === "soc"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                }`}
-                title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
-              >
-                <ShieldAlert className="size-3.5" />
-                <span>SOC Command</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleNavigate("My Services")}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                  portalMode === "client"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                }`}
-                title="Client Portal (Protected Services, Credits, SDKs)"
-              >
-                <Boxes className="size-3.5" />
-                <span>Client Area</span>
-              </button>
-              {authSession.role === "admin" && (
+            {/* Top Workspace Switcher (SOC Dashboard vs Client Area vs Admin) */}
+            {authSession.role === "admin" ? (
+              <div className="flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("Overview")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    portalMode === "soc"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  }`}
+                  title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
+                >
+                  <ShieldAlert className="size-3.5" />
+                  <span>SOC Command</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("My Services")}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    portalMode === "client"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                  }`}
+                  title="Client Portal (Protected Services, Credits, SDKs)"
+                >
+                  <Boxes className="size-3.5" />
+                  <span>Client Area</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => handleNavigate("Client Subscriptions")}
@@ -1615,8 +1695,18 @@ function Dashboard() {
                   <Users className="size-3.5" />
                   <span>Admin Master</span>
                 </button>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-1 text-xs shadow-sm">
+                <Boxes className="size-3.5 text-primary" />
+                <span className="font-semibold text-foreground">
+                  {activeClientTenant?.name || "Client"} Dashboard
+                </span>
+                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold">
+                  {activeClientTenant?.planTier || "Active"}
+                </span>
+              </div>
+            )}
 
             {/* Global Search Bar */}
             <div className="hidden h-8.5 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground lg:flex shadow-xs">
@@ -1715,6 +1805,7 @@ function Dashboard() {
                 </>
               ) : (
                 <>
+                {authSession.role === "admin" && (
                   <Button
                     className="w-full justify-start text-xs font-medium"
                     onClick={() => {
@@ -1726,6 +1817,7 @@ function Dashboard() {
                   >
                     <ShieldAlert className="size-3.5 text-primary" /> SOC Dashboard & Incidents
                   </Button>
+                )}
                   <Button
                     className="w-full justify-start text-xs font-medium"
                     onClick={() => {
@@ -1817,8 +1909,21 @@ function Dashboard() {
             activeNav === "Global Network Mesh" ||
             activeNav === "Live Traffic Mesh") && (
             <GlobalTrafficMeshGlobe
-              tenants={clientTenants}
-              protectedServices={protectedServices}
+              tenants={
+                portalMode === "client" || authSession.role === "client"
+                  ? activeClientTenant
+                    ? [activeClientTenant]
+                    : visibleClientTenants
+                  : clientTenants
+              }
+              protectedServices={
+                portalMode === "client" || authSession.role === "client"
+                  ? visibleClientServices
+                  : protectedServices
+              }
+              currentUserRole={portalMode === "client" || authSession.role === "client" ? "client" : "admin"}
+              portalMode={portalMode}
+              activeTenantId={activeClientTenant?.id}
               onNavigate={handleNavigate}
               showToast={showToast}
             />
@@ -1828,12 +1933,28 @@ function Dashboard() {
             activeNav === "Protection Verification" ||
             activeNav === "Protection Status") && (
             <ProtectionVerificationCenter
-              tenants={clientTenants}
-              services={protectedServices}
+              tenants={
+                portalMode === "client" || authSession.role === "client"
+                  ? activeClientTenant
+                    ? [activeClientTenant]
+                    : visibleClientTenants
+                  : clientTenants
+              }
+              services={
+                portalMode === "client" || authSession.role === "client"
+                  ? visibleClientServices
+                  : protectedServices
+              }
               assets={assets}
               auditLogs={auditLogs}
               currentClientTenant={activeClientTenant}
-              currentUserRole={portalMode === "soc" ? "SOC Operator" : authSession.role}
+              currentUserRole={
+                portalMode === "client" || authSession.role === "client"
+                  ? "client"
+                  : portalMode === "soc"
+                  ? "SOC Operator"
+                  : authSession.role
+              }
               onNavigate={handleNavigate}
               showToast={showToast}
             />
@@ -5054,26 +5175,28 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
 
-            <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>Security Operations</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      className="font-medium text-primary hover:text-primary"
-                      onClick={() => onNavigate("Overview")}
-                      tooltip="SOC Operations & Live Telemetry"
-                    >
-                      <ShieldAlert className="size-4 text-primary shrink-0" />
-                      <span className="truncate">SOC Dashboard</span>
-                    </SidebarMenuButton>
-                    <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
-                      Live
-                    </SidebarMenuBadge>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
+            {isAdminSession && (
+              <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+                <SidebarGroupLabel>Security Operations</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        className="font-medium text-primary hover:text-primary"
+                        onClick={() => onNavigate("Overview")}
+                        tooltip="SOC Operations & Live Telemetry"
+                      >
+                        <ShieldAlert className="size-4 text-primary shrink-0" />
+                        <span className="truncate">SOC Dashboard</span>
+                      </SidebarMenuButton>
+                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
+                        Live
+                      </SidebarMenuBadge>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </>
         ) : (
           <>

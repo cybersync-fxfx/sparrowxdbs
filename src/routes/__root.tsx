@@ -78,21 +78,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SparrowX | Autonomous Security Operations Platform & AI Guardrails" },
+      { title: "SparrowX" },
       {
         name: "description",
         content:
-          "Production security operations, live incident response, and Web & AI Agent guardrails.",
+          "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
       },
       { name: "author", content: "SparrowX" },
       {
         property: "og:title",
-        content: "SparrowX | Autonomous Security Operations Platform & AI Guardrails",
+        content: "SparrowX",
       },
       {
         property: "og:description",
         content:
-          "Production security operations, live incident response, and Web & AI Agent guardrails.",
+          "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
       },
       { property: "og:type", content: "website" },
       { property: "og:image", content: "/sparrowx-logo.png" },
@@ -105,6 +105,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: appCss,
       },
       { rel: "icon", href: "/sparrowx-logo.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
       { rel: "apple-touch-icon", href: "/sparrowx-logo.png" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

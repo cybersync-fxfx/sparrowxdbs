@@ -88,6 +88,7 @@ export type ProtectionMode = "Active Shield" | "Monitor Only" | "Lockdown";
 
 export type ProtectedService = {
   id: string;
+  tenantId?: string;
   name: string;
   category: ServiceCategory;
   endpoint: string;
@@ -160,6 +161,7 @@ export type ProtectionVerificationStatus =
 
 export type AssetVerificationProof = {
   id: string;
+  tenantId?: string;
   name: string;
   category: AssetCategory;
   targetIdentifier: string;
@@ -1377,58 +1379,63 @@ export async function fetchVerificationProofsFromBackend(
   assets: Asset[] = [],
 ): Promise<AssetVerificationProof[]> {
   const cached = readLocalCache<AssetVerificationProof>(STORAGE_KEYS.verificationProofs);
-  if (cached.length > 0) return cached;
+  const manualProofs = cached.filter((p) => p.id.startsWith("VRF-MANUAL"));
 
   const initial: AssetVerificationProof[] = [];
 
   services.forEach((s) => {
     const isWaf = s.category === "Web App & Website";
     const isAi = s.category === "AI Agent (LLM / MCP)";
+    const reqCount = parseInt(s.requests24h.replace(/,/g, ""), 10) || 0;
+    const isConfigured = s.mode === "Active Shield" && reqCount > 0;
+
     initial.push({
       id: `VRF-${s.id}`,
+      tenantId: s.tenantId,
       name: s.name,
       category: isWaf ? "Web Application" : isAi ? "AI Agent (LLM / MCP)" : "API & Microservice",
       targetIdentifier: s.endpoint,
       clientName: s.name,
       clientEmail: "ops@sparrowx.dev",
       registeredAt: "2026-10-28",
-      ownershipStatus: s.mode === "Active Shield" ? "Verified" : "Pending",
+      ownershipStatus: isConfigured ? "Verified" : "Pending",
       ownershipMethod: isWaf ? "DNS_TXT" : isAi ? "API_HMAC" : "HTTP_FILE",
       verificationToken: `sparrowx-verify-${s.id.toLowerCase()}-7x9`,
-      verifiedAt: s.mode === "Active Shield" ? "2026-10-28 14:20 UTC" : null,
-      protectionStatus:
-        s.mode === "Active Shield"
-          ? "Protection Controls Verified"
-          : s.mode === "Monitor Only"
-            ? "Monitoring Active"
-            : "Setup Required",
-      lastIngestedEventId: `EVT-${Math.floor(1000 + Math.random() * 9000)}-OK`,
-      lastIngestedAt: "2m ago",
-      lastProbeLatencyMs: 14,
-      telemetryEventsCount: parseInt(s.requests24h.replace(/,/g, "")) || 420,
+      verifiedAt: isConfigured ? "2026-10-28 14:20 UTC" : null,
+      protectionStatus: isConfigured
+        ? "Protection Controls Verified"
+        : s.mode === "Monitor Only"
+          ? "Monitoring Active"
+          : "Setup Required",
+      lastIngestedEventId: isConfigured ? `EVT-${Math.floor(1000 + Math.random() * 9000)}-OK` : null,
+      lastIngestedAt: isConfigured ? "2m ago" : null,
+      lastProbeLatencyMs: isConfigured ? 14 : 0,
+      telemetryEventsCount: reqCount,
       activeControls: {
         edgeWaf: s.mode === "Active Shield",
         promptShield: s.promptShield,
         piiRedaction: s.piiRedaction,
-        rateLimiting: true,
+        rateLimiting: isConfigured,
         toolCallFirewall: s.toolCallFirewall,
-        ebpfProbe: true,
+        ebpfProbe: isConfigured,
       },
       healthChecks: {
-        authValid: true,
-        apiReachable: true,
-        permissionsOk: true,
-        agentHeartbeat: true,
-        ingestionPipeline: true,
-        telemetryFresh: true,
-        tlsValid: true,
-        dnsResolved: true,
+        authValid: Boolean(s.apiKey),
+        apiReachable: isConfigured,
+        permissionsOk: Boolean(s.apiKey),
+        agentHeartbeat: isConfigured,
+        ingestionPipeline: isConfigured,
+        telemetryFresh: isConfigured,
+        tlsValid: isConfigured,
+        dnsResolved: isConfigured,
       },
       monitoringScope: "Ingress Traffic, WAF Filters, Error Spikes & Telemetry Ingestion",
-      knownGaps:
-        s.mode === "Active Shield"
-          ? []
-          : ["Service is in Monitor Only mode without active blocking"],
+      knownGaps: isConfigured
+        ? []
+        : [
+            "Endpoint integration pending: no live telemetry received yet",
+            "Setup required: configure DNS CNAME/TXT or attach SparrowX API key",
+          ],
     });
   });
 
@@ -1436,6 +1443,7 @@ export async function fetchVerificationProofsFromBackend(
     if (!initial.some((p) => p.targetIdentifier === t.primaryDomain)) {
       initial.push({
         id: `VRF-TEN-${t.id}`,
+        tenantId: t.id,
         name: `${t.name} Core Apex`,
         category: "Website / Domain",
         targetIdentifier: t.primaryDomain,
@@ -1475,8 +1483,16 @@ export async function fetchVerificationProofsFromBackend(
     }
   });
 
-  writeLocalCache(STORAGE_KEYS.verificationProofs, initial);
-  return initial;
+  // Merge any relevant manual proofs
+  const combined = [...initial];
+  manualProofs.forEach((mp) => {
+    if (!combined.some((c) => c.id === mp.id)) {
+      combined.push(mp);
+    }
+  });
+
+  writeLocalCache(STORAGE_KEYS.verificationProofs, combined);
+  return combined;
 }
 
 export async function persistVerificationProofToBackend(

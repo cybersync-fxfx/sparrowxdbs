@@ -464,6 +464,7 @@ export function GlobalTrafficMeshGlobe({
   tenants = [],
   protectedServices = [],
   currentUserRole = "client",
+  portalMode,
   activeTenantId,
   onNavigate,
   showToast,
@@ -471,6 +472,7 @@ export function GlobalTrafficMeshGlobe({
   tenants?: ClientTenant[] | undefined;
   protectedServices?: ProtectedService[] | undefined;
   currentUserRole?: "admin" | "client" | "unauthenticated" | undefined;
+  portalMode?: "client" | "admin" | "soc" | undefined;
   activeTenantId?: string | null | undefined;
   onNavigate?: ((nav: string) => void) | undefined;
   showToast?: ((msg: string) => void) | undefined;
@@ -478,10 +480,10 @@ export function GlobalTrafficMeshGlobe({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Active Origin Server Host
-  const [activeOriginId, setActiveOriginId] = useState<string>("origin-sparrowx-net");
+  const [activeOriginId, setActiveOriginId] = useState<string>("");
   const [globeVisualEngine, setGlobeVisualEngine] = useState<"threat_matrix" | "infrastructure">("threat_matrix");
   const [filterMode, setFilterMode] = useState<"ALL" | "ALLOWED" | "BLOCKED" | "AI">("ALL");
-  const [isStreaming, setIsStreaming] = useState<boolean>(true);
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [streamSpeedMs, setStreamSpeedMs] = useState<number>(650);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedPacket, setSelectedPacket] = useState<LiveConnectionPacket | null>(null);
@@ -493,6 +495,7 @@ export function GlobalTrafficMeshGlobe({
   const [isResolvingDns, setIsResolvingDns] = useState<boolean>(false);
   const [dnsResolutionFeedback, setDnsResolutionFeedback] = useState<string | null>(null);
   const [resolvedTenantOrigins, setResolvedTenantOrigins] = useState<Record<string, OriginHostConfig>>({});
+  const [customResolvedOrigin, setCustomResolvedOrigin] = useState<OriginHostConfig | null>(null);
 
   // Background Automatic DNS Resolution for client's verified domains
   useEffect(() => {
@@ -529,26 +532,39 @@ export function GlobalTrafficMeshGlobe({
     });
   }, [tenants]);
 
-  // Combine real origins: Strictly isolated per client session
+  // Combine real origins: Strictly isolated per client session with strict deduplication
   const allOrigins: OriginHostConfig[] = useMemo(() => {
-    // If client mode: ONLY show this client's verified tenant/services
-    if (currentUserRole === "client") {
-      const list: OriginHostConfig[] = [];
+    const list: OriginHostConfig[] = [];
+    const seenDomains = new Set<string>();
 
+    const addUniqueOrigin = (origin: OriginHostConfig) => {
+      const cleanDom = sanitizeDomainName(origin.domain);
+      if (!cleanDom || seenDomains.has(cleanDom)) return;
+      seenDomains.add(cleanDom);
+      list.push({
+        ...origin,
+        domain: cleanDom,
+      });
+    };
+
+    const isClientSession = currentUserRole === "client" || portalMode === "client";
+
+    // 1. CLIENT MODE: STRICT TENANT ISOLATION (ZERO LEAKS OF OTHER CLIENTS' DATA)
+    if (isClientSession) {
       tenants.forEach((tenant) => {
         const clean = sanitizeDomainName(tenant.primaryDomain);
-        const existingResolved = resolvedTenantOrigins[tenant.id];
+        if (!clean) return;
 
-        if (existingResolved) {
-          list.push(existingResolved);
+        const resolved = resolvedTenantOrigins[tenant.id];
+        if (resolved) {
+          addUniqueOrigin(resolved);
         } else {
-          const defaultIp = clean === "sparrowx.net" ? "64.29.17.65" : "104.21.55.19";
-          list.push({
+          addUniqueOrigin({
             id: `tenant-${tenant.id}`,
-            name: `${tenant.name} (${clean || tenant.primaryDomain})`,
-            domain: clean || "sparrowx.net",
-            ip: defaultIp,
-            allIps: [defaultIp],
+            name: `${tenant.name} (${clean})`,
+            domain: clean,
+            ip: "Resolving DNS...",
+            allIps: [],
             provider: "Authoritative Cloud Edge",
             region: "Global Cloud Edge",
             geo: {
@@ -569,38 +585,29 @@ export function GlobalTrafficMeshGlobe({
         }
       });
 
-      // Include any user-resolved custom hosts added in this session
-      Object.values(resolvedTenantOrigins).forEach((o) => {
-        if (!list.some((existing) => existing.id === o.id)) {
-          list.push(o);
-        }
-      });
-
-      // If the client hasn't added any domain yet, fall back to the core SparrowX edge
-      if (list.length === 0) {
-        list.push(PRESET_ORIGINS[0]);
+      // Include custom host resolved by THIS client in this specific session
+      if (customResolvedOrigin) {
+        addUniqueOrigin(customResolvedOrigin);
       }
 
       return list;
     }
 
-    // Admin mode: show all client tenants plus the core platform edge
-    const list: OriginHostConfig[] = [...PRESET_ORIGINS];
-
+    // 2. ADMIN / SOC MODE: Show tenants associated with the current scope
     tenants.forEach((tenant) => {
       const clean = sanitizeDomainName(tenant.primaryDomain);
-      const existingResolved = resolvedTenantOrigins[tenant.id];
+      if (!clean) return;
 
-      if (existingResolved) {
-        list.push(existingResolved);
+      const resolved = resolvedTenantOrigins[tenant.id];
+      if (resolved) {
+        addUniqueOrigin(resolved);
       } else {
-        const defaultIp = clean === "sparrowx.net" ? "64.29.17.65" : "104.21.55.19";
-        list.push({
+        addUniqueOrigin({
           id: `tenant-${tenant.id}`,
           name: `${tenant.name} (${tenant.planTier})`,
           domain: clean,
-          ip: defaultIp,
-          allIps: [defaultIp],
+          ip: "Resolving DNS...",
+          allIps: [],
           provider: "Resolving Authoritative DNS...",
           region: "California, US",
           geo: {
@@ -621,8 +628,17 @@ export function GlobalTrafficMeshGlobe({
       }
     });
 
+    if (customResolvedOrigin) {
+      addUniqueOrigin(customResolvedOrigin);
+    }
+
+    // Fallback: If platform has zero onboarded tenants, use sovereign edge
+    if (list.length === 0) {
+      PRESET_ORIGINS.forEach(addUniqueOrigin);
+    }
+
     return list;
-  }, [tenants, resolvedTenantOrigins, currentUserRole]);
+  }, [tenants, resolvedTenantOrigins, customResolvedOrigin, currentUserRole, portalMode]);
 
   // Keep activeOriginId synced to active client tenant if available
   useEffect(() => {
@@ -685,7 +701,7 @@ export function GlobalTrafficMeshGlobe({
         dnsResolver: res.resolverUsed,
       };
 
-      setResolvedTenantOrigins((prev) => ({ ...prev, [newOrigin.id]: newOrigin }));
+      setCustomResolvedOrigin(newOrigin);
       setActiveOriginId(newOrigin.id);
       setCustomDomainInput("");
       setDnsResolutionFeedback(
@@ -701,10 +717,8 @@ export function GlobalTrafficMeshGlobe({
     }
   }, [showToast]);
 
-  // Packets & Animation State
-  const [packets, setPackets] = useState<LiveConnectionPacket[]>(() => {
-    return Array.from({ length: 14 }, () => createSampleNetworkPacket(PRESET_ORIGINS[0]));
-  });
+  // Packets & Animation State (Starts empty on clean workspace)
+  const [packets, setPackets] = useState<LiveConnectionPacket[]>([]);
 
   const arcsRef = useRef<ConnectionArc[]>([]);
   const ripplesRef = useRef<RippleWave[]>([]);
@@ -717,7 +731,7 @@ export function GlobalTrafficMeshGlobe({
 
   // 1. Packet Streaming Engine
   useEffect(() => {
-    if (!isStreaming) return;
+    if (!isStreaming || !activeOrigin) return;
     const interval = window.setInterval(() => {
       const newPkt = createSampleNetworkPacket(activeOrigin);
 
@@ -1051,43 +1065,45 @@ export function GlobalTrafficMeshGlobe({
       });
 
       // --- ORIGIN SERVER HOST PIN (Where the user's webapp/site lives) ---
-      const originPt = projectGeo(activeOrigin.geo.lat, activeOrigin.geo.lng);
-      if (originPt.visible) {
-        ctx.save();
+      if (activeOrigin) {
+        const originPt = projectGeo(activeOrigin.geo.lat, activeOrigin.geo.lng);
+        if (originPt.visible) {
+          ctx.save();
 
-        const pulse = (Date.now() % 1500) / 1500;
-        ctx.beginPath();
-        ctx.arc(originPt.x, originPt.y, 7 + pulse * 24, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(249, 115, 22, ${1 - pulse})`;
-        ctx.lineWidth = 2.2;
-        ctx.stroke();
+          const pulse = (Date.now() % 1500) / 1500;
+          ctx.beginPath();
+          ctx.arc(originPt.x, originPt.y, 7 + pulse * 24, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(249, 115, 22, ${1 - pulse})`;
+          ctx.lineWidth = 2.2;
+          ctx.stroke();
 
-        ctx.beginPath();
-        ctx.arc(originPt.x, originPt.y, 4 + pulse * 14, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(249, 115, 22, ${0.8 - pulse * 0.8})`;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(originPt.x, originPt.y, 4 + pulse * 14, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(249, 115, 22, ${0.8 - pulse * 0.8})`;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
 
-        // Origin Beacon Pin Core
-        ctx.beginPath();
-        ctx.arc(originPt.x, originPt.y, 6, 0, Math.PI * 2);
-        ctx.fillStyle = "#f97316";
-        ctx.fill();
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
+          // Origin Beacon Pin Core
+          ctx.beginPath();
+          ctx.arc(originPt.x, originPt.y, 6, 0, Math.PI * 2);
+          ctx.fillStyle = "#f97316";
+          ctx.fill();
+          ctx.strokeStyle = "#ffffff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
 
-        // Origin Label Badge
-        ctx.font = "bold 11px monospace";
-        ctx.fillStyle = "#ffffff";
-        ctx.textAlign = "center";
-        ctx.fillText(`📍 ${activeOrigin.domain}`, originPt.x, originPt.y - 18);
+          // Origin Label Badge
+          ctx.font = "bold 11px monospace";
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.fillText(`📍 ${activeOrigin.domain}`, originPt.x, originPt.y - 18);
 
-        ctx.font = "10px monospace";
-        ctx.fillStyle = "#f97316";
-        ctx.fillText(`${activeOrigin.ip} (${activeOrigin.region.split(",")[0]})`, originPt.x, originPt.y - 5);
+          ctx.font = "10px monospace";
+          ctx.fillStyle = "#f97316";
+          ctx.fillText(`${activeOrigin.ip} (${activeOrigin.region.split(",")[0]})`, originPt.x, originPt.y - 5);
 
-        ctx.restore();
+          ctx.restore();
+        }
       }
 
       ctx.restore();
@@ -1312,7 +1328,7 @@ export default sparrowxShield;
                 type="text"
                 value={customDomainInput}
                 onChange={(e) => setCustomDomainInput(e.target.value)}
-                placeholder="Enter domain to resolve its real IP (e.g. yourdomain.com, sparrowx.net)..."
+                placeholder="Enter domain to resolve its real IP (e.g. yourdomain.com, api.cloud.io)..."
                 className="h-9 w-full rounded-md border border-border bg-background pl-9 pr-3 text-xs text-foreground outline-none focus:border-primary font-mono"
               />
             </div>
@@ -1329,27 +1345,33 @@ export default sparrowxShield;
           {/* Quick pills of user tenants & scanned domains */}
           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
             <span className="text-[11px] text-muted-foreground font-semibold">Your Live App Hosts:</span>
-            {allOrigins.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => {
-                  setActiveOriginId(o.id);
-                  if (showToast) showToast(`Origin focused on ${o.domain} (${o.ip})`);
-                }}
-                className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-[11px] font-mono transition-all ${
-                  activeOriginId === o.id
-                    ? "border-primary bg-primary text-primary-foreground font-bold shadow-xs"
-                    : "border-border bg-background text-foreground hover:border-primary/50"
-                }`}
-              >
-                <span>{o.geo.flag}</span>
-                <span>{o.domain}</span>
-                <span className={activeOriginId === o.id ? "text-primary-foreground/90 font-bold" : "text-primary font-semibold"}>
-                  [{o.ip}]
-                </span>
-              </button>
-            ))}
+            {allOrigins.length === 0 ? (
+              <span className="text-[11px] text-muted-foreground italic font-mono">
+                No active hosts registered for this tenant. Enter a domain above to resolve and inspect live traffic.
+              </span>
+            ) : (
+              allOrigins.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  onClick={() => {
+                    setActiveOriginId(o.id);
+                    if (showToast) showToast(`Origin focused on ${o.domain} (${o.ip})`);
+                  }}
+                  className={`inline-flex items-center gap-1.5 rounded border px-2.5 py-1 text-[11px] font-mono transition-all ${
+                    activeOriginId === o.id
+                      ? "border-primary bg-primary text-primary-foreground font-bold shadow-xs"
+                      : "border-border bg-background text-foreground hover:border-primary/50"
+                  }`}
+                >
+                  <span>{o.geo.flag}</span>
+                  <span>{o.domain}</span>
+                  <span className={activeOriginId === o.id ? "text-primary-foreground/90 font-bold" : "text-primary font-semibold"}>
+                    [{o.ip}]
+                  </span>
+                </button>
+              ))
+            )}
           </div>
 
           {dnsResolutionFeedback && (
@@ -1413,53 +1435,63 @@ export default sparrowxShield;
           </div>
 
           {/* Active Origin Server Host Details Badge */}
-          <div className="mt-3.5 grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:grid-cols-4 font-mono">
-            <div>
-              <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Real Origin Host IP</div>
-              <div className="mt-0.5 text-xs font-bold text-foreground">
-                {activeOrigin.ip}
+          {activeOrigin ? (
+            <div className="mt-3.5 grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:grid-cols-4 font-mono">
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Real Origin Host IP</div>
+                <div className="mt-0.5 text-xs font-bold text-foreground">
+                  {activeOrigin.ip}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {activeOrigin.allIps && activeOrigin.allIps.length > 1
+                    ? `${activeOrigin.allIps.join(", ")}`
+                    : activeOrigin.domain}
+                </div>
               </div>
-              <div className="text-[10px] text-muted-foreground">
-                {activeOrigin.allIps && activeOrigin.allIps.length > 1
-                  ? `${activeOrigin.allIps.join(", ")}`
-                  : activeOrigin.domain}
-              </div>
-            </div>
 
-            <div>
-              <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Host Datacenter & ASN</div>
-              <div className="mt-0.5 text-xs font-semibold text-foreground flex items-center gap-1 truncate font-sans">
-                <span>{activeOrigin.geo.flag}</span>
-                <span className="truncate">{activeOrigin.region}</span>
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Host Datacenter & ASN</div>
+                <div className="mt-0.5 text-xs font-semibold text-foreground flex items-center gap-1 truncate font-sans">
+                  <span>{activeOrigin.geo.flag}</span>
+                  <span className="truncate">{activeOrigin.region}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground truncate">{activeOrigin.provider}</div>
               </div>
-              <div className="text-[10px] text-muted-foreground truncate">{activeOrigin.provider}</div>
-            </div>
 
-            <div>
-              <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">WAF & Defense Status</div>
-              <div className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-400 font-sans">
-                <ShieldCheck className="size-3.5" />
-                <span>{activeOrigin.wafMode}</span>
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">WAF & Defense Status</div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-emerald-400 font-sans">
+                  <ShieldCheck className="size-3.5" />
+                  <span>{activeOrigin.wafMode}</span>
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  {activeOrigin.dnsVerified ? (
+                    <span className="text-emerald-400">DNS A-Record Verified</span>
+                  ) : (
+                    <span>Querying Google DoH</span>
+                  )}
+                </div>
               </div>
-              <div className="text-[10px] text-muted-foreground">
-                {activeOrigin.dnsVerified ? (
-                  <span className="text-emerald-400">DNS A-Record Verified</span>
-                ) : (
-                  <span>Querying Google DoH</span>
-                )}
-              </div>
-            </div>
 
-            <div>
-              <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Live Ping & Coordinates</div>
-              <div className="mt-0.5 text-xs text-foreground">
-                {activeOrigin.geo.lat.toFixed(4)}°, {activeOrigin.geo.lng.toFixed(4)}°
-              </div>
-              <div className="text-[10px] text-emerald-400 font-bold">
-                ~{activeOrigin.baseLatencyMs}ms Live Ping
+              <div>
+                <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Live Ping & Coordinates</div>
+                <div className="mt-0.5 text-xs text-foreground">
+                  {activeOrigin.geo.lat.toFixed(4)}°, {activeOrigin.geo.lng.toFixed(4)}°
+                </div>
+                <div className="text-[10px] text-emerald-400 font-bold">
+                  ~{activeOrigin.baseLatencyMs}ms Live Ping
+                </div>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="mt-3.5 flex items-center justify-between rounded-lg border border-border/70 bg-card/40 p-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <span className="size-2 rounded-full bg-zinc-600" />
+                No active endpoints or domains connected yet. Enter your public domain above to resolve and monitor.
+              </span>
+              <span className="font-mono text-[10px] text-zinc-500">Not Configured</span>
+            </div>
+          )}
         </div>
 
         {/* Live Counters Breakdown */}
@@ -1596,27 +1628,67 @@ export default sparrowxShield;
             </div>
 
             {/* Origin Target Pin HUD Overlay */}
-            <div className="pointer-events-none absolute right-4 top-4 z-10 hidden sm:flex flex-col items-end gap-1">
-              <div className="rounded-xl border border-primary/40 bg-card/90 p-3 shadow-xl backdrop-blur-md font-mono">
-                <div className="flex items-center gap-2 text-xs font-bold text-foreground font-sans">
-                  <span className="size-2 rounded-full bg-primary animate-pulse" />
-                  Host: {activeOrigin.name}
-                </div>
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  Real IP: <span className="text-primary font-bold">{activeOrigin.ip}</span>
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  Domain: {activeOrigin.domain}
-                </div>
-                <div className="text-[10px] text-muted-foreground">
-                  Datacenter: {activeOrigin.region}
-                </div>
-                <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400 font-sans">
-                  <CheckCircle2 className="size-3" />
-                  <span>Live Inbound Arcs Terminate Here</span>
+            {activeOrigin && (
+              <div className="pointer-events-none absolute right-4 top-4 z-10 hidden sm:flex flex-col items-end gap-1">
+                <div className="rounded-xl border border-primary/40 bg-card/90 p-3 shadow-xl backdrop-blur-md font-mono">
+                  <div className="flex items-center gap-2 text-xs font-bold text-foreground font-sans">
+                    <span className="size-2 rounded-full bg-primary animate-pulse" />
+                    Host: {activeOrigin.name}
+                  </div>
+                  <div className="mt-1 text-[11px] text-muted-foreground">
+                    Real IP: <span className="text-primary font-bold">{activeOrigin.ip}</span>
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Domain: {activeOrigin.domain}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">
+                    Datacenter: {activeOrigin.region}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400 font-sans">
+                    <CheckCircle2 className="size-3" />
+                    <span>Live Inbound Arcs Terminate Here</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Standby Not-Configured Overlay when no domain or service is integrated */}
+            {!activeOrigin && (
+              <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 p-6 text-center backdrop-blur-[2px]">
+                <div className="pointer-events-auto rounded-2xl border border-border/80 bg-card/95 p-6 shadow-2xl max-w-md">
+                  <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/90 text-zinc-400">
+                    <Globe2 className="size-6 text-zinc-400" />
+                  </div>
+                  <h4 className="mt-3.5 text-sm font-semibold text-foreground">Traffic Mesh Standby · Not Configured</h4>
+                  <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                    No active endpoints or domains are connected yet. Enter your public domain above or connect a service in Web &amp; AI Shield to start traffic analysis.
+                  </p>
+                  <div className="mt-4 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const input = document.getElementById("quick-domain-input");
+                        input?.focus();
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
+                    >
+                      <Plus className="size-3.5" />
+                      Add Domain
+                    </button>
+                    {onNavigate && (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate("Web & AI Shield")}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+                      >
+                        <ShieldCheck className="size-3.5 text-primary" />
+                        Web &amp; AI Shield
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* HTML5 Canvas Element */}
             <canvas
@@ -1632,7 +1704,7 @@ export default sparrowxShield;
             {/* Bottom Ticker Strip */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-card/90 px-4 py-2.5 text-xs font-mono">
               <div className="flex items-center gap-2 font-sans">
-                <Radio className="size-3.5 text-primary animate-pulse" />
+                <Radio className={`size-3.5 ${isStreaming ? "text-primary animate-pulse" : "text-zinc-500"}`} />
                 <span className="font-semibold text-foreground">Latest Inbound Connection:</span>
                 {packets[0] ? (
                   <span className="font-mono text-[11px] text-muted-foreground">
@@ -1652,12 +1724,20 @@ export default sparrowxShield;
                     ] · {packets[0].latencyMs}ms
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">Listening for network packets...</span>
+                  <span className="text-zinc-500 font-mono text-[11px]">
+                    {isStreaming ? "Listening for network packets..." : "Stream paused · Waiting for connection"}
+                  </span>
                 )}
               </div>
 
               <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span>Origin Real IP: <strong className="text-foreground">{activeOrigin.ip}</strong> ({activeOrigin.region.split(",")[0]})</span>
+                <span>
+                  Origin Real IP:{" "}
+                  <strong className="text-foreground">
+                    {activeOrigin ? activeOrigin.ip : "Not Configured"}
+                  </strong>{" "}
+                  {activeOrigin ? `(${activeOrigin.region.split(",")[0]})` : "· Standby"}
+                </span>
               </div>
             </div>
           </section>

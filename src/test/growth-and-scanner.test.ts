@@ -50,14 +50,40 @@ describe("Public Scanner, SSRF Guard, Prospect CRM & Badge Verification", () => 
     expect(result.score).toBeLessThanOrEqual(100);
     expect(result.findings.length).toBeGreaterThanOrEqual(5);
     expect(result.findings[0]?.evidence).toBeTruthy();
+    expect(result.scoreGrade).toMatch(/^[A-F](\+)?$/);
+    expect(result.targetCategory).toBe("Web Application & SaaS");
+
+    // CRITICAL: Ensure regular website never falsely reports AI Prompt Injection
+    const findingCategories = result.findings.map((f) => f.category);
+    expect(findingCategories).not.toContain("AI & API Shield");
+    expect(findingCategories).toContain("Edge Protection & Bot Shield");
+
+    // Verify AI advisory generation with What SparrowX Safes & 5-Min Plan
+    expect(result.advisory).toBeDefined();
+    expect(result.advisory?.customerConversionPitch).toBeTruthy();
+    expect(result.advisory?.recommendedAction).toBeTruthy();
+    expect(result.advisory?.whatSparrowxSaves?.length).toBeGreaterThan(0);
+    expect(result.advisory?.aiVulnerabilities?.length).toBeGreaterThan(0);
+    expect(result.advisory?.fiveMinuteProtectionPlan?.estimatedTime).toBe("5 Minutes");
 
     const reportTxt = buildProspectAuditReportText(result);
     expect(reportTxt).toContain("example.com");
     expect(reportTxt).toContain("Evidence :");
+    expect(reportTxt).toContain("SPARROWX AI BRAIN DEEP ADVISORY");
+    expect(reportTxt).toContain("WHAT SPARROWX SAFES & PROTECTS");
+    expect(reportTxt).toContain("5-MINUTE RAPID ONBOARDING PLAN");
 
     const dmPitch = buildColdOutreachMessage(result, "dm");
     expect(dmPitch).toContain("example.com");
-  });
+  }, 15000);
+
+  it("contextually identifies AI services and performs dedicated LLM prompt guardrail checks", async () => {
+    const aiResult = await runLivePublicDomainScan("https://chat.myagent.ai/api/chat");
+    expect(aiResult.targetCategory).toBe("AI Agent & LLM Endpoint");
+    const aiCategories = aiResult.findings.map((f) => f.category);
+    expect(aiCategories).toContain("AI & API Shield");
+    expect(aiResult.advisory?.targetCategory).toBe("AI Agent & LLM Endpoint");
+  }, 15000);
 
   it("manages admin prospects, tracks report views, and stores quotations", () => {
     const rec: ProspectRecord = {

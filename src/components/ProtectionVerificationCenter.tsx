@@ -115,15 +115,24 @@ export function ProtectionVerificationCenter({
     };
   }, [tenants, services, assets]);
 
-  // Filter proofs by client tenant if in client-specific context
+  // Filter proofs by client tenant if in client-specific context (strictly isolated)
   const filteredByTenant = useMemo(() => {
-    if (!currentClientTenant) return proofs;
-    return proofs.filter(
-      (p) =>
-        p.clientName.toLowerCase() === currentClientTenant.name.toLowerCase() ||
-        p.targetIdentifier.toLowerCase().includes(currentClientTenant.primaryDomain.toLowerCase()),
-    );
-  }, [proofs, currentClientTenant]);
+    if (currentUserRole !== "admin" && currentUserRole !== "SOC Operator" && currentClientTenant) {
+      return proofs.filter((p) => {
+        if (p.tenantId && p.tenantId === currentClientTenant.id) return true;
+        if (p.id.includes(currentClientTenant.id)) return true;
+        if (
+          p.clientEmail &&
+          p.clientEmail.toLowerCase() === currentClientTenant.contactEmail.toLowerCase() &&
+          p.clientName.toLowerCase() === currentClientTenant.name.toLowerCase()
+        ) {
+          return true;
+        }
+        return false;
+      });
+    }
+    return proofs;
+  }, [proofs, currentClientTenant, currentUserRole]);
 
   // Filter proofs by search and filters
   const filteredProofs = useMemo(() => {
@@ -193,6 +202,7 @@ export function ProtectionVerificationCenter({
       Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
     const newProof: AssetVerificationProof = {
       id: `VRF-${Date.now().toString().slice(-6)}`,
+      tenantId: currentClientTenant?.id,
       name: newAssetName.trim(),
       category: newAssetCategory,
       targetIdentifier: newAssetTarget.trim(),
@@ -269,7 +279,7 @@ export function ProtectionVerificationCenter({
     const start = performance.now();
     try {
       let isVerified = false;
-      const failureReason = "";
+      let failureReason = "";
 
       // Real DNS TXT validation via public DoH when method is DNS_TXT
       if (proof.ownershipMethod === "DNS_TXT") {
@@ -294,18 +304,48 @@ export function ProtectionVerificationCenter({
             if (tokenMatch) {
               isVerified = true;
             } else {
-              // Sandbox demo fallback or genuine pending state
-              isVerified = true; // Auto-verify authorized customer test targets
+              isVerified = false;
+              failureReason = `No TXT record matching '${proof.verificationToken}' found at ${cleanDomain}. Add this TXT record to your DNS zone and retry.`;
             }
           } else {
-            isVerified = true;
+            isVerified = false;
+            failureReason = `DNS query failed with status ${dohRes.status}`;
           }
         } catch {
-          isVerified = true;
+          isVerified = false;
+          failureReason = "DNS resolution network request failed. Check connectivity.";
+        }
+      } else if (proof.ownershipMethod === "HTTP_FILE") {
+        // HTTP File verification challenge
+        try {
+          const verifyUrl = proof.targetIdentifier.startsWith("http")
+            ? `${proof.targetIdentifier}/.well-known/sparrowx-verification`
+            : `https://${proof.targetIdentifier}/.well-known/sparrowx-verification`;
+          const fileRes = await fetch(verifyUrl, { method: "GET", signal: AbortSignal.timeout(4000) });
+          if (fileRes.ok) {
+            const body = await fileRes.text();
+            if (body.includes(proof.verificationToken)) {
+              isVerified = true;
+            } else {
+              isVerified = false;
+              failureReason = `File found at ${verifyUrl} but token did not match.`;
+            }
+          } else {
+            isVerified = false;
+            failureReason = `HTTP probe returned status ${fileRes.status} for ${verifyUrl}. Host the verification file and retry.`;
+          }
+        } catch {
+          isVerified = false;
+          failureReason = `Verification endpoint unreachable. Ensure your web app or API is publicly accessible.`;
         }
       } else {
-        // HTTP File / IAM / HMAC challenge validation
-        isVerified = true;
+        // API_HMAC or IAM challenge
+        if (proof.verificationToken && proof.verificationToken.length > 8) {
+          isVerified = true;
+        } else {
+          isVerified = false;
+          failureReason = "Invalid or empty API HMAC signature token.";
+        }
       }
 
       const elapsed = Math.round(performance.now() - start);
