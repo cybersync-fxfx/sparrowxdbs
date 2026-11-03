@@ -1341,6 +1341,22 @@ export function LandingLiveSecurityScanner({
             </div>
           </div>
 
+          {/* STEP 1: ASSET FINGERPRINTING & ARCHITECTURE IDENTIFICATION */}
+          <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-3.5 space-y-1.5 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-500/20 pb-1.5">
+              <span className="font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5 font-mono text-[11px]">
+                <Search className="size-3.5 text-blue-400" />
+                <span>Step 1 · Asset &amp; Architecture Identification</span>
+              </span>
+              <span className="text-[10px] font-mono text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded font-bold">
+                {scanResult.targetCategory}
+              </span>
+            </div>
+            <p className="text-zinc-200 text-[11px] leading-relaxed">
+              {scanResult.targetExplanation}
+            </p>
+          </div>
+
           {/* PROMINENT 5-MINUTE RAPID PROTECTION ACTION BANNER */}
           <div className="rounded-2xl border-2 border-primary/60 bg-gradient-to-r from-primary/25 via-orange-950/30 to-black p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_0_40px_rgba(240,90,40,0.25)]">
             <div className="space-y-1 max-w-xl">
@@ -1462,7 +1478,13 @@ export function LandingLiveSecurityScanner({
                     <div className="flex items-center justify-between border-b border-red-500/20 pb-2">
                       <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                         <ShieldAlert className="size-3.5 text-red-400" />
-                        <span>AI &amp; Full-Stack Vulnerabilities Identified by Gemini</span>
+                        <span>
+                          {scanResult.targetCategory === "AI Agent & LLM Endpoint"
+                            ? "AI & LLM Vulnerabilities Identified by Gemini (OWASP Top 10 for LLM)"
+                            : scanResult.targetCategory === "API & Cloud Service"
+                              ? "API & Microservice Vulnerabilities Identified by Gemini (OWASP API Top 10)"
+                              : "Web Application & Infrastructure Vulnerabilities (OWASP Top 10)"}
+                        </span>
                       </span>
                       <span className="text-[10px] font-mono text-red-400 bg-red-950/40 border border-red-500/30 px-2 py-0.5 rounded font-bold">
                         {scanResult.advisory.aiVulnerabilities.length} Threat Vectors
