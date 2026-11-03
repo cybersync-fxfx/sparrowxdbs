@@ -600,48 +600,61 @@ export function GlobalTrafficMeshGlobe({
       return list;
     }
 
-    // 2. ADMIN / SOC MODE: Show tenants associated with the current scope
-    tenants.forEach((tenant) => {
-      const clean = sanitizeDomainName(tenant.primaryDomain);
-      if (!clean) return;
-
-      const resolved = resolvedTenantOrigins[tenant.id];
-      if (resolved) {
-        addUniqueOrigin(resolved);
+    // 2. UNAUTHENTICATED VISITOR MODE: ZERO CLIENT DATA LEAKS
+    if (currentUserRole === "unauthenticated") {
+      if (customResolvedOrigin) {
+        addUniqueOrigin(customResolvedOrigin);
       } else {
-        addUniqueOrigin({
-          id: `tenant-${tenant.id}`,
-          name: `${tenant.name} (${tenant.planTier})`,
-          domain: clean,
-          ip: "Resolving DNS...",
-          allIps: [],
-          provider: "Resolving Authoritative DNS...",
-          region: "California, US",
-          geo: {
-            lat: 34.0119,
-            lng: -117.86,
-            country: "United States",
-            countryCode: "US",
-            city: "Walnut, CA",
-            flag: "🇺🇸",
-          },
-          status: "Protected & Active",
-          wafMode: tenant.guardrailsActive ? "Active Shield" : "Monitor Only",
-          uptimePct: 99.98,
-          baseLatencyMs: tenant.avgLatencyMs || 11,
-          dnsVerified: false,
-          dnsResolver: "Querying SparrowX Anycast DNS...",
-        });
+        // Fallback to single neutral public SparrowX Anycast node so 3D mesh has a baseline coordinate
+        PRESET_ORIGINS.forEach(addUniqueOrigin);
       }
-    });
-
-    if (customResolvedOrigin) {
-      addUniqueOrigin(customResolvedOrigin);
+      return list;
     }
 
-    // Fallback: If platform has zero onboarded tenants in Admin mode only
-    if (!isClientSession && list.length === 0) {
-      PRESET_ORIGINS.forEach(addUniqueOrigin);
+    // 3. ADMIN / SOC MODE: Show tenants strictly to authenticated administrators
+    if (currentUserRole === "admin") {
+      tenants.forEach((tenant) => {
+        const clean = sanitizeDomainName(tenant.primaryDomain);
+        if (!clean) return;
+
+        const resolved = resolvedTenantOrigins[tenant.id];
+        if (resolved) {
+          addUniqueOrigin(resolved);
+        } else {
+          addUniqueOrigin({
+            id: `tenant-${tenant.id}`,
+            name: `${tenant.name} (${tenant.planTier})`,
+            domain: clean,
+            ip: "Resolving DNS...",
+            allIps: [],
+            provider: "Resolving Authoritative DNS...",
+            region: "California, US",
+            geo: {
+              lat: 34.0119,
+              lng: -117.86,
+              country: "United States",
+              countryCode: "US",
+              city: "Walnut, CA",
+              flag: "🇺🇸",
+            },
+            status: "Protected & Active",
+            wafMode: tenant.guardrailsActive ? "Active Shield" : "Monitor Only",
+            uptimePct: 99.98,
+            baseLatencyMs: tenant.avgLatencyMs || 11,
+            dnsVerified: false,
+            dnsResolver: "Querying SparrowX Anycast DNS...",
+          });
+        }
+      });
+
+      if (customResolvedOrigin) {
+        addUniqueOrigin(customResolvedOrigin);
+      }
+
+      // Fallback: If platform has zero onboarded tenants in Admin mode only
+      if (list.length === 0) {
+        PRESET_ORIGINS.forEach(addUniqueOrigin);
+      }
     }
 
     return list;
