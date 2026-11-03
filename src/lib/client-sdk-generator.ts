@@ -6,7 +6,15 @@ import {
 } from "@/lib/supabase";
 
 export type SdkTargetLanguage =
-  "nextjs" | "express" | "python_fastapi" | "ai_agent_mcp" | "curl" | "cloudflare_worker";
+  | "html_script"
+  | "nextjs"
+  | "express"
+  | "python_fastapi"
+  | "ai_agent_mcp"
+  | "ai_voice_multimodal"
+  | "cloudflare_worker"
+  | "docker_sidecar"
+  | "curl";
 
 export type DiagnosticStep = {
   name: string;
@@ -45,6 +53,24 @@ export function generateClientSdkSnippet(
   const maskedKey = maskSecretKey(service.apiKey);
 
   switch (target) {
+    case "html_script":
+      return {
+        filename: "index.html",
+        language: "html",
+        installCmd: "Zero npm install required · Paste inside <head> on any website",
+        code: `<!-- SparrowX Autonomous Shield — 1-Line Drop-in Website Armor -->
+<!-- Paste inside <head> on any Website (WordPress, Webflow, Shopify, React, HTML) -->
+<script
+  src="${baseUrl}/sparrowx-shield.js"
+  data-site-id="${service.id}"
+  data-api-key="${maskedKey}"
+  data-endpoint="${service.endpoint}"
+  data-auto-block="true"
+  data-anti-bot="active"
+  async
+></script>`,
+      };
+
     case "nextjs":
       return {
         filename: "middleware.ts",
@@ -234,6 +260,69 @@ class SparrowXAiGuardrail:
             },
             timeout=2.0,
         )`,
+      };
+
+    case "ai_voice_multimodal":
+      return {
+        filename: "sparrowx_voice_guard.py",
+        language: "python",
+        installCmd: "pip install websockets httpx",
+        code: `# SparrowX Live Voice & Multimodal Stream Shield
+# Protects real-time WebRTC & WebSocket bidirectional agent audio/video
+import asyncio
+import os
+import json
+import websockets
+
+SPARROWX_API_KEY = os.getenv("SPARROWX_API_KEY", "${maskedKey}")
+SPARROWX_STREAM_GATEWAY = "wss://sparrowx.dev/v1/voice-guardrail"
+
+async def protect_voice_session(client_ws, llm_ws, session_id="${service.id}"):
+    """Bidirectional real-time voice & prompt injection sanitizer (< 3ms latency)."""
+    async with websockets.connect(
+        f"{SPARROWX_STREAM_GATEWAY}?key={SPARROWX_API_KEY}&session={session_id}"
+    ) as guard_ws:
+        async def forward_audio_to_llm():
+            async for audio_chunk in client_ws:
+                # Real-time acoustic & text prompt-injection inspection
+                await guard_ws.send(audio_chunk)
+                verified = await guard_ws.recv()
+                if b"HALT_INJECTION" in verified:
+                    await client_ws.send(json.dumps({
+                        "event": "security_halt",
+                        "error": "Voice Prompt Injection Blocked by SparrowX Guardrail."
+                    }))
+                    continue
+                await llm_ws.send(verified)
+
+        async def forward_model_to_client():
+            async for model_chunk in llm_ws:
+                await client_ws.send(model_chunk)
+
+        await asyncio.gather(forward_audio_to_llm(), forward_model_to_client())`,
+      };
+
+    case "docker_sidecar":
+      return {
+        filename: "docker-compose.sparrowx.yml",
+        language: "yaml",
+        installCmd: "docker compose -f docker-compose.sparrowx.yml up -d",
+        code: `# SparrowX Edge Armor Sidecar Container
+# Routes inbound traffic through SparrowX Autonomous Inspection Engine
+services:
+  sparrowx-armor:
+    image: ghcr.io/sparrowx/edge-armor:latest
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - SPARROWX_SERVICE_ID=${service.id}
+      - SPARROWX_UPSTREAM_TARGET=${service.endpoint}
+      - SPARROWX_API_KEY=\${SPARROWX_API_KEY:-${maskedKey}}
+      - SPARROWX_WAF_ENFORCED=true
+      - SPARROWX_AI_GUARDRAIL_LEVEL=strict
+      - SPARROWX_TELEMETRY_INGEST=${baseUrl}/api/v1/telemetry`,
       };
 
     case "curl":

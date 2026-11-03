@@ -202,4 +202,36 @@ describe("Multi-Tenant Isolation & Zero Fake Data Verification", () => {
     expect(result.success).toBe(false);
     expect(result.message).toContain("Please enter a valid website domain");
   });
+
+  it("ensures unauthenticated visitors never receive or see any client tenant domains", () => {
+    const sensitiveClientTenant: ClientTenant = {
+      id: "tnt-sensitive",
+      name: "Private Healthcare SaaS",
+      contactEmail: "ciso@privatehealth.org",
+      primaryDomain: "privatehealth.org",
+      planTier: "Enterprise",
+      status: "Active",
+      enabledModules: ["web_security"],
+      apiKey: "spx_secret_key",
+      sdkVerified: true,
+      guardrailsActive: true,
+      requestsPerMin: 500,
+      blockedThreats: 88,
+      avgLatencyMs: 8,
+      quotaUsedPct: 40,
+    };
+
+    render(
+      React.createElement(GlobalTrafficMeshGlobe, {
+        tenants: [sensitiveClientTenant],
+        currentUserRole: "unauthenticated",
+        portalMode: undefined,
+        activeTenantId: null,
+      }),
+    );
+
+    // Unauthenticated visitors must NEVER see client tenant names or domains
+    expect(screen.queryByText(/privatehealth\.org/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Private Healthcare SaaS/i)).not.toBeInTheDocument();
+  });
 });
