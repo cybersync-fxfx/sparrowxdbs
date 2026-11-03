@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from "react";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import {
   Search,
   BookOpen,
@@ -715,14 +716,14 @@ server {
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
             When you enter a domain like <code className="text-primary font-mono">sparrowx.net</code> into the 3D Globe,
-            SparrowX queries Google DNS DoH (<code className="text-white font-mono">8.8.8.8</code>) and Cloudflare DoH (<code className="text-white font-mono">1.1.1.1</code>).
+            SparrowX queries authoritative Anycast DoH (<code className="text-white font-mono">8.8.8.8</code>) and Cloudflare DoH (<code className="text-white font-mono">1.1.1.1</code>).
             It resolves the exact same A-record that your operating system's <code className="text-white font-mono">ping</code> command sees (e.g. <strong className="text-white font-mono">64.29.17.65</strong>).
           </p>
 
           <div className="grid gap-3 sm:grid-cols-3 pt-2">
             <div className="rounded-lg border border-white/10 bg-background/60 p-3.5 font-mono text-xs">
               <span className="text-[10px] text-primary uppercase font-bold">1. DNS Query</span>
-              <div className="mt-1 font-semibold text-white">Google DoH 8.8.8.8</div>
+              <div className="mt-1 font-semibold text-white">Anycast DoH 8.8.8.8</div>
               <div className="mt-0.5 text-[10px] text-muted-foreground">
                 GET https://dns.google/resolve?name=sparrowx.net&type=A
               </div>
@@ -738,7 +739,10 @@ server {
 
             <div className="rounded-lg border border-white/10 bg-background/60 p-3.5 font-mono text-xs">
               <span className="text-[10px] text-cyan-400 uppercase font-bold">3. GeoIP Pinning</span>
-              <div className="mt-1 font-semibold text-white">Walnut, California, US 🇺🇸</div>
+              <div className="mt-1 font-semibold text-white flex items-center gap-1.5">
+                <span>Walnut, California, US</span>
+                <CountryFlag code="US" className="size-4" />
+              </div>
               <div className="mt-0.5 text-[10px] text-muted-foreground">
                 Amazon.com, Inc. (AS16509) · 34.01° N, 117.86° W
               </div>

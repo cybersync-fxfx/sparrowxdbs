@@ -157,7 +157,7 @@ export function getMaskedBrainKeyStatus(): {
   return {
     configured: key.length > 10,
     maskedKey: key ? maskSecretKey(key) : "Not Configured",
-    providerLabel: "SparrowX Neural Core (Gemini 3.8 Flash / Gemini 4 Argon)",
+    providerLabel: "SparrowX AI Autonomous Neural Engine",
   };
 }
 
@@ -553,7 +553,7 @@ export async function querySparrowxGeminiBrain(params: {
   const apiKey = resolveActiveGeminiApiKey();
   const learnedPatterns = getLearnedThreatPatterns();
 
-  const systemInstruction = `You are the SparrowX Autonomous Cyber Defense AI Brain, powered by Google Gemini (${selectedModel}).
+  const systemInstruction = `You are the SparrowX Autonomous Cyber Defense AI Brain.
 You act as the central neural intelligence for the entire SparrowX SOC, Client Protection Verification Center, SIEM, Threat Hunting, and Web/AI Shield platform.
 Your primary mission:
 1. Analyze live telemetry across all dashboards (Incidents, Threat Indicators, Assets, Vulnerabilities, Protected Web & AI Services, and Client Verification Proofs).
@@ -690,7 +690,7 @@ app.use(sparrowx.aiBrainShield({
 > **Next Action:** Click **"Learn & Auto-Block All Future Threats"** in the AI Brain console to immediately quarantine all ${digest.unblockedIocsCount} unblocked IOCs and apply virtual WAF patches for all ${digest.openVulnerabilities} open CVEs.`;
   }
 
-  return `### 🧠 SparrowX Gemini AI Brain — Live Cross-Dashboard Assessment (\`${digest.activeNav}\`)
+  return `### 🧠 SparrowX AI Brain — Live Cross-Dashboard Assessment (\`${digest.activeNav}\`)
 
 I have analyzed your real-time telemetry across the **${digest.portalMode.toUpperCase()}** workspace:
 
@@ -859,7 +859,7 @@ export function buildDeterministicScanAdvisory(params: {
       recommendedPackage: params.score < 60 ? "24h Done-For-You Audit" : "Builder SOC Pack",
       customerConversionPitch:
         "One runaway prompt loop or jailbreak can bankrupt your API credits or leak user data. SparrowX installs in minutes to insulate your models, while our Builder SOC pack gives you 500 security credits and real-time telemetry.",
-      modelUsed: "gemini-3.8-flash (SparrowX Neural Fallback)",
+      modelUsed: "SparrowX AI Autonomous Neural Engine",
       liveAiGenerated: false,
       aiVulnerabilities: [
         {
@@ -951,7 +951,7 @@ export function buildDeterministicScanAdvisory(params: {
       recommendedPackage: params.score < 50 ? "24h Done-For-You Audit" : "Builder SOC Pack",
       customerConversionPitch:
         "Exposed backend APIs are the #1 attack vector for automated credential stuffing. SparrowX drops in at the edge with 5 lines of code, immediately halting malicious bots without impacting legitimate customers.",
-      modelUsed: "gemini-3.8-flash (SparrowX Neural Fallback)",
+      modelUsed: "SparrowX AI Autonomous Neural Engine",
       liveAiGenerated: false,
       aiVulnerabilities: [
         {
@@ -1031,7 +1031,7 @@ export function buildDeterministicScanAdvisory(params: {
     recommendedPackage: params.score < 45 ? "24h Done-For-You Audit" : "Starter Shield",
     customerConversionPitch:
       "Enterprise clients and smart customers check your security posture before doing business. SparrowX eliminates every single red flag in 60 seconds and gives you a cryptographically verified Trust Badge to help you close deals faster.",
-    modelUsed: "gemini-3.8-flash (SparrowX Neural Fallback)",
+    modelUsed: "SparrowX AI Autonomous Neural Engine",
     liveAiGenerated: false,
     aiVulnerabilities: [
       {
@@ -1191,12 +1191,12 @@ Respond with ONLY a raw JSON object (no markdown code fence) with these exact ke
       const interactionPromise = client.interactions.create({
         model: selectedModel,
         system_instruction:
-          "You are the SparrowX Autonomous Cyber Defense AI Brain powered by Google Gemini Pro reasoning. You provide high-level, technical, founder-focused cybersecurity advice that is completely tailored to their real target category. Output valid JSON only.",
+          "You are the SparrowX Autonomous Cyber Defense AI Brain powered by SparrowX AI Deep Reasoning. You provide high-level, technical, founder-focused cybersecurity advice that is completely tailored to their real target category. Output valid JSON only.",
         input: prompt,
       });
 
       const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Gemini API Timeout")), 2800),
+        setTimeout(() => reject(new Error("SparrowX AI API Timeout")), 2800),
       );
 
       const interaction = await Promise.race([interactionPromise, timeoutPromise]);
@@ -1241,7 +1241,7 @@ Respond with ONLY a raw JSON object (no markdown code fence) with these exact ke
                   ? "24h Done-For-You Audit"
                   : "Builder SOC Pack",
             customerConversionPitch: parsed.customerConversionPitch,
-            modelUsed: selectedModel,
+            modelUsed: "SparrowX AI Autonomous Core",
             liveAiGenerated: true,
             aiVulnerabilities: sanitizedVulns.length > 0 ? sanitizedVulns : fallback.aiVulnerabilities,
             whatSparrowxSaves:
@@ -1262,3 +1262,7 @@ Respond with ONLY a raw JSON object (no markdown code fence) with these exact ke
 
   return buildDeterministicScanAdvisory(params);
 }
+
+export const querySparrowxAiBrain = querySparrowxGeminiBrain;
+export const analyzeScanWithAiBrain = analyzeScanWithGeminiBrain;
+export const resolveActiveAiBrainApiKey = resolveActiveGeminiApiKey;

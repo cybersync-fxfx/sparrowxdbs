@@ -11,6 +11,14 @@ import {
   type ClientTenant,
   type ProtectedService,
 } from "../lib/supabase";
+import {
+  buildTenantDatabaseName,
+  getTenantDatabaseConfig,
+  generateTenantApiKey,
+  readTenantIsolatedStorage,
+  writeTenantIsolatedStorage,
+  verifyWebsiteConnector,
+} from "../lib/tenant-database";
 
 beforeAll(() => {
   HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
@@ -159,5 +167,39 @@ describe("Multi-Tenant Isolation & Zero Fake Data Verification", () => {
     const serviceProof = proofs.find((p) => p.id === "VRF-srv-a-1");
     expect(serviceProof).toBeDefined();
     expect(serviceProof?.name).toBe("Acme Web Portal");
+  });
+
+  it("provisions an isolated database partition with dedicated API key for each tenant", () => {
+    const dbName = buildTenantDatabaseName("Detriot Cloud", "TNT-8492");
+    expect(dbName).toBe("spx_db_detriot_cloud_tnt_8492");
+
+    const configA = getTenantDatabaseConfig("TNT-8492", "Detriot Cloud", "detriot.cloud");
+    expect(configA.databaseName).toBe("spx_db_detriot_cloud_tnt_8492");
+    expect(configA.dashboardApiKey).toMatch(/^spx_live_/);
+    expect(configA.partitionStatus).toBe("Ready");
+
+    // Test cross-tenant storage isolation:
+    // Writing to Tenant A's partition MUST NOT leak into Tenant B's partition
+    writeTenantIsolatedStorage("TNT-A", "incidents", [{ id: "INC-A1", title: "Tenant A Alert" }]);
+    writeTenantIsolatedStorage("TNT-B", "incidents", [{ id: "INC-B1", title: "Tenant B Alert" }]);
+
+    const tenantAIncidents = readTenantIsolatedStorage("TNT-A", "incidents");
+    const tenantBIncidents = readTenantIsolatedStorage("TNT-B", "incidents");
+
+    expect(tenantAIncidents).toHaveLength(1);
+    expect(tenantAIncidents[0].id).toBe("INC-A1");
+
+    expect(tenantBIncidents).toHaveLength(1);
+    expect(tenantBIncidents[0].id).toBe("INC-B1");
+
+    // Zero cross-tenant leakage
+    expect(tenantAIncidents.find((i: any) => i.id === "INC-B1")).toBeUndefined();
+    expect(tenantBIncidents.find((i: any) => i.id === "INC-A1")).toBeUndefined();
+  });
+
+  it("verifies website connector returns honest error when domain is invalid", async () => {
+    const result = await verifyWebsiteConnector("TNT-TEST", "x");
+    expect(result.success).toBe(false);
+    expect(result.message).toContain("Please enter a valid website domain");
   });
 });

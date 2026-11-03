@@ -202,7 +202,7 @@ export function SparrowxAiBrainCenter({
     setConfig(next);
     setNewKeyInput("");
     setShowKeyConfig(false);
-    showToast("Gemini API Key securely updated and masked in SparrowX Brain Vault", "success");
+    showToast("SparrowX AI Key securely updated and masked in SparrowX Brain Vault", "success");
   };
 
   const handleRunNeuralHarvestAndAutoBlock = async () => {
@@ -370,7 +370,7 @@ export function SparrowxAiBrainCenter({
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-0.5 text-[11px] font-mono font-bold text-emerald-400">
                 <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                GEMINI NEURAL BRAIN ONLINE
+                SPARROWX AI BRAIN ONLINE
               </span>
               <span className="rounded-full border border-emerald-500/30 bg-emerald-950/40 px-2.5 py-0.5 text-[11px] font-mono text-emerald-300 font-bold">
                 Defense Mesh: <strong>{currentDefenseVersion}</strong>
@@ -435,7 +435,7 @@ export function SparrowxAiBrainCenter({
           <div className="mt-5 pt-4 border-t border-[#1F1F1F] grid gap-4 lg:grid-cols-12 items-end">
             <div className="lg:col-span-5 space-y-1.5">
               <span className="text-xs font-semibold text-white block">
-                Select Active Gemini Neural Model (`@google/genai`)
+                Select Active SparrowX AI Neural Engine Mode
               </span>
               <div className="grid grid-cols-2 gap-2">
                 <button
@@ -447,7 +447,7 @@ export function SparrowxAiBrainCenter({
                       : "border-[#262626] bg-black text-zinc-400 hover:text-white"
                   }`}
                 >
-                  <div className="text-xs font-bold">gemini-3.8-flash</div>
+                  <div className="text-xs font-bold">SparrowX AI Fast Neural</div>
                   <div className="text-[10px] text-zinc-400">
                     1M Context · Sub-second Agentic SOC Brain
                   </div>
@@ -461,7 +461,7 @@ export function SparrowxAiBrainCenter({
                       : "border-[#262626] bg-black text-zinc-400 hover:text-white"
                   }`}
                 >
-                  <div className="text-xs font-bold">gemini-4-argon</div>
+                  <div className="text-xs font-bold">SparrowX AI Deep Reasoning</div>
                   <div className="text-[10px] text-zinc-400">
                     1M Context · Deep Threat Reasoning & Research
                   </div>
@@ -475,18 +475,18 @@ export function SparrowxAiBrainCenter({
             >
               <div className="flex-1">
                 <label
-                  htmlFor="gemini-vault-key"
+                  htmlFor="sparrowx-ai-vault-key"
                   className="text-xs font-semibold text-zinc-300 block mb-1"
                 >
-                  Update Gemini API Key (Stored Masked in SparrowX Vault · Active:{" "}
+                  Update SparrowX AI Key (Stored Masked in SparrowX Vault · Active:{" "}
                   <code className="text-emerald-400">{keyStatus.maskedKey}</code>)
                 </label>
                 <input
-                  id="gemini-vault-key"
+                  id="sparrowx-ai-vault-key"
                   type="password"
                   value={newKeyInput}
                   onChange={(e) => setNewKeyInput(e.target.value)}
-                  placeholder="Paste Gemini API key to rotate vault credential..."
+                  placeholder="Paste SparrowX AI key to rotate vault credential..."
                   className="h-9 w-full rounded-xl border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-primary"
                 />
               </div>
@@ -597,7 +597,7 @@ export function SparrowxAiBrainCenter({
           }`}
         >
           <Bot className="size-4" />
-          <span>Gemini Security Copilot & Payload Learner</span>
+          <span>SparrowX AI Copilot & Payload Learner</span>
         </button>
 
         <button
@@ -949,7 +949,7 @@ export function SparrowxAiBrainCenter({
                   </span>
                   <div>
                     <h2 className="text-sm font-bold text-white">
-                      Gemini Security Copilot (All-Dashboard Context)
+                      SparrowX AI Copilot (All-Dashboard Context)
                     </h2>
                     <p className="text-[11px] text-zinc-400">
                       Stateful `interactions.create` session with live access to Incidents, SIEM,
@@ -996,7 +996,7 @@ export function SparrowxAiBrainCenter({
                   <div className="rounded-xl border border-dashed border-[#262626] bg-black/50 p-5 text-xs text-zinc-400 space-y-2">
                     <div className="font-bold text-white flex items-center gap-2">
                       <Bot className="size-4 text-primary" />
-                      <span>SparrowX Gemini AI Brain Ready</span>
+                      <span>SparrowX AI Brain Ready</span>
                     </div>
                     <p className="leading-relaxed">
                       I am actively monitoring <strong>{digest.totalIncidents} incident(s)</strong>,{" "}
@@ -1035,7 +1035,7 @@ export function SparrowxAiBrainCenter({
                   <div className="rounded-xl border border-primary/30 bg-black p-3.5 text-xs text-zinc-300 flex items-center gap-2.5">
                     <RefreshCw className="size-4 text-primary animate-spin shrink-0" />
                     <span>
-                      Gemini Brain (`{config.model}`) is correlating multi-dashboard telemetry and
+                      SparrowX AI Brain is correlating multi-dashboard telemetry and
                       synthesizing predictive block rules...
                     </span>
                   </div>
@@ -1054,7 +1054,7 @@ export function SparrowxAiBrainCenter({
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask Gemini Brain to analyze telemetry, hunt threats, or write block rules..."
+                  placeholder="Ask SparrowX AI Brain to analyze telemetry, hunt threats, or write block rules..."
                   className="h-10 flex-1 rounded-xl border border-[#262626] bg-black px-3.5 text-xs text-white outline-none focus:border-primary"
                 />
                 <button
@@ -1469,7 +1469,7 @@ export function GlobalAiBrainFloatingDock(
               <Brain className="size-4 text-primary" />
               <div>
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <span>SparrowX Gemini AI Brain</span>
+                  <span>SparrowX AI Brain</span>
                   <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] font-mono text-emerald-400 font-bold">
                     {currentDefenseVersion}
                   </span>
@@ -1541,7 +1541,7 @@ export function GlobalAiBrainFloatingDock(
           {isQuerying && (
             <div className="rounded-xl border border-primary/30 bg-black p-3 text-xs text-zinc-300 flex items-center gap-2">
               <RefreshCw className="size-3.5 text-primary animate-spin" />
-              <span>Gemini Brain is querying telemetry & threat memory...</span>
+              <span>SparrowX AI Brain is querying telemetry & threat memory...</span>
             </div>
           )}
 

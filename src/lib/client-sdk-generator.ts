@@ -183,7 +183,7 @@ class SparrowXShieldMiddleware(BaseHTTPMiddleware):
       return {
         filename: "sparrowx_ai_guardrails.py",
         language: "python",
-        installCmd: "pip install sparrowx-shield openai langchain",
+        installCmd: "pip install sparrowx-shield",
         code: `# AI Agent & LLM Guardrails Wrapper for ${service.name}
 # Protects against Prompt Injections, Secret Leaks, and Rogue MCP Tool Calls
 import os

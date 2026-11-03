@@ -9,12 +9,15 @@ import {
   Clock,
   Coins,
   Copy,
+  Cpu,
   CreditCard,
   Download,
   ExternalLink,
   Eye,
   FileText,
+  Filter,
   Globe2,
+  Layers,
   Lock,
   Mail,
   Plus,
@@ -28,7 +31,6 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Terminal,
   Trash2,
   TrendingUp,
@@ -36,6 +38,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
+import { CyberEmblem, CyberPill } from "@/components/ui/CyberBadge";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
 import { getStoredCreditBalance, saveStoredCreditBalance } from "@/lib/billing-credits";
 import {
@@ -585,7 +588,7 @@ export async function runLivePublicDomainScan(
           ? "MODERATE RISK"
           : "HARDENED";
 
-  onProgress?.(92, "Engaging SparrowX Gemini 3.8 Flash AI Brain for deep threat analysis & founder advisory...");
+  onProgress?.(92, "Engaging SparrowX AI Neural Engine for deep threat analysis & founder advisory...");
 
   // Generate deep AI advisory using Gemini 3.8 Flash
   let advisory: AiScanDeepAdvisory | undefined;
@@ -760,7 +763,7 @@ export function buildProspectAuditReportText(audit: LiveDomainAuditResult): stri
         ...(audit.advisory.aiVulnerabilities && audit.advisory.aiVulnerabilities.length > 0
           ? [
               "----------------------------------------------------------------------",
-              "AI & FULL-STACK VULNERABILITIES IDENTIFIED BY GEMINI PRO:",
+              "AI & FULL-STACK VULNERABILITIES IDENTIFIED BY SPARROWX AI:",
               ...audit.advisory.aiVulnerabilities.map(
                 (v) =>
                   `* [${v.riskRating.toUpperCase()}] ${v.name} (${v.owaspCategory})\n  - Risk: ${v.description}\n  - Fix: ${v.howSparrowxProtects}`,
@@ -849,7 +852,7 @@ export function downloadBrandedHtmlSecurityReport(
     ${
       audit.advisory
         ? `<div class="ai-box">
-          <div style="font-size:11px;font-weight:700;color:#f05a28;text-transform:uppercase;letter-spacing:0.5px;">✦ SparrowX Gemini AI Brain Deep Advisory (${audit.advisory.modelUsed})</div>
+          <div style="font-size:11px;font-weight:700;color:#f05a28;text-transform:uppercase;letter-spacing:0.5px;">✦ SparrowX AI Brain Deep Advisory (${audit.advisory.modelUsed})</div>
           <p style="margin:8px 0 4px;font-size:13px;line-height:1.5;color:#f4f4f5;"><strong>Executive Assessment:</strong> ${audit.advisory.executiveSummary}</p>
           <div style="margin-top:10px;padding:10px;background:#00000080;border-left:3px solid #f87171;font-size:12px;color:#d4d4d8;">
             <strong style="color:#f87171;">Attacker Exploit Vector:</strong> ${audit.advisory.exploitScenario}
@@ -992,6 +995,8 @@ export function LandingLiveSecurityScanner({
   const [scanResult, setScanResult] = useState<LiveDomainAuditResult | null>(null);
   const [copiedOutreach, setCopiedOutreach] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [findingsFilter, setFindingsFilter] = useState<"all" | "vulnerabilities" | "passed">("all");
+  const [copiedEvidenceId, setCopiedEvidenceId] = useState<string | null>(null);
 
   // Lead Capture state after scan
   const [leadName, setLeadName] = useState("");
@@ -1242,578 +1247,782 @@ export function LandingLiveSecurityScanner({
       )}
 
       {/* LIVE SCAN RESULTS CARD */}
-      {scanResult && !isScanning && (
-        <div className="mt-5 space-y-4 rounded-xl border border-[#262626] bg-black/95 p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1F1F1F] pb-4">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm font-bold text-white">
-                  {scanResult.cleanHost}
-                </span>
-                <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-mono text-primary font-bold">
-                  {scanResult.targetCategory}
-                </span>
-                <span
-                  className={`rounded-md border px-2 py-0.5 text-[10px] font-mono font-bold ${
-                    scanResult.score < 60
-                      ? "border-red-500/40 bg-red-500/15 text-red-400"
-                      : scanResult.score < 80
-                        ? "border-amber-500/40 bg-amber-500/15 text-amber-300"
-                        : "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-                  }`}
-                >
-                  {scanResult.riskLevel}
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] font-mono text-zinc-400">
-                <span>
-                  Origin IP:{" "}
-                  <strong className="text-zinc-200">
-                    {scanResult.resolvedIps[0] ?? "Unmasked / Direct"}
-                  </strong>
-                </span>
-                <span>·</span>
-                <span>
-                  TLS RTT: <strong className="text-zinc-200">{scanResult.latencyMs}ms</strong>
-                </span>
-                <span>·</span>
-                <span>
-                  DNS CAA: <strong className="text-zinc-200">{scanResult.caaRecords.length}</strong>
-                </span>
-                <span>·</span>
-                <span>
-                  DNSSEC:{" "}
-                  <strong className={scanResult.dnssecVerified ? "text-emerald-400" : "text-zinc-400"}>
-                    {scanResult.dnssecVerified ? "Enforced" : "Unsigned"}
-                  </strong>
-                </span>
-                <span>·</span>
-                <span>
-                  TXT: <strong className="text-zinc-200">{scanResult.txtRecordsCount}</strong>
-                </span>
-              </div>
-            </div>
+      {scanResult && !isScanning && (() => {
+        const criticalFindings = scanResult.findings.filter((f) => f.status === "critical");
+        const warningFindings = scanResult.findings.filter((f) => f.status === "warning");
+        const passedFindings = scanResult.findings.filter((f) => f.status === "passed");
+        const vulnFindings = scanResult.findings.filter((f) => f.status !== "passed");
 
-            <div
-              className={`flex items-center gap-3 self-start sm:self-auto rounded-xl border px-3.5 py-2 ${
-                scanResult.score >= 80
-                  ? "border-emerald-500/30 bg-emerald-950/20"
-                  : scanResult.score >= 60
-                    ? "border-amber-500/30 bg-amber-950/20"
-                    : "border-red-500/30 bg-red-950/20"
-              }`}
-            >
-              <div>
-                <div className="text-[10px] uppercase tracking-wider text-zinc-400 flex items-center gap-1.5 font-bold">
-                  <span>Score & Grade</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                      scanResult.scoreGrade.startsWith("A")
-                        ? "bg-emerald-400 text-black"
-                        : scanResult.scoreGrade === "B"
-                          ? "bg-blue-400 text-black"
-                          : scanResult.scoreGrade === "C"
-                            ? "bg-amber-400 text-black"
-                            : "bg-red-500 text-white"
-                    }`}
-                  >
-                    Grade {scanResult.scoreGrade}
+        const displayedFindings =
+          findingsFilter === "vulnerabilities"
+            ? vulnFindings
+            : findingsFilter === "passed"
+              ? passedFindings
+              : scanResult.findings;
+
+        return (
+          <div className="mt-5 space-y-5 rounded-2xl border border-[#27272a] bg-gradient-to-b from-[#111215] via-[#0b0c0e] to-[#08080a] p-4 sm:p-6 shadow-2xl relative overflow-hidden">
+            {/* Top Accent Gradient Line */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-amber-500 to-emerald-500" />
+
+            {/* TOP EXECUTIVE POSTURE & TELEMETRY HUD */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 border-b border-[#1f2228] pb-5">
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-base font-bold text-white flex items-center gap-2">
+                    <Globe2 className="size-4 text-primary" />
+                    <span>{scanResult.cleanHost}</span>
                   </span>
-                </div>
-                <div
-                  className={`font-mono text-2xl font-black ${
-                    scanResult.score >= 80
-                      ? "text-emerald-400"
-                      : scanResult.score >= 60
-                        ? "text-amber-400"
-                        : "text-red-400"
-                  }`}
-                >
-                  {scanResult.score}
-                  <span className="text-xs text-zinc-400 font-normal">/100</span>
-                </div>
-              </div>
-              {scanResult.score >= 80 ? (
-                <ShieldCheck className="size-7 text-emerald-400" />
-              ) : (
-                <ShieldAlert className="size-7 text-red-400" />
-              )}
-            </div>
-          </div>
-
-          {/* STEP 1: ASSET FINGERPRINTING & ARCHITECTURE IDENTIFICATION */}
-          <div className="rounded-xl border border-blue-500/30 bg-blue-950/20 p-3.5 space-y-1.5 text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-500/20 pb-1.5">
-              <span className="font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5 font-mono text-[11px]">
-                <Search className="size-3.5 text-blue-400" />
-                <span>Step 1 · Asset &amp; Architecture Identification</span>
-              </span>
-              <span className="text-[10px] font-mono text-blue-300 bg-blue-500/15 border border-blue-500/30 px-2 py-0.5 rounded font-bold">
-                {scanResult.targetCategory}
-              </span>
-            </div>
-            <p className="text-zinc-200 text-[11px] leading-relaxed">
-              {scanResult.targetExplanation}
-            </p>
-          </div>
-
-          {/* PROMINENT 5-MINUTE RAPID PROTECTION ACTION BANNER */}
-          <div className="rounded-2xl border-2 border-primary/60 bg-gradient-to-r from-primary/25 via-orange-950/30 to-black p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_0_40px_rgba(240,90,40,0.25)]">
-            <div className="space-y-1 max-w-xl">
-              <div className="flex items-center gap-2 text-white font-black text-sm sm:text-base">
-                <ShieldCheck className="size-5 text-primary shrink-0 animate-pulse" />
-                <span>Instant Autonomous Defense Ready for {scanResult.cleanHost}</span>
-              </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                Eliminate all{" "}
-                <strong className="text-white">
-                  {scanResult.findings.filter((f) => f.status !== "passed").length} identified security &amp; AI vulnerabilities
-                </strong>{" "}
-                in under 5 minutes with drop-in edge armor. Zero complex setup or code rewrite.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() =>
-                onClaimAndProtectDomain(
-                  scanResult.domain,
-                  leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
-                )
-              }
-              className="group relative inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-primary via-orange-500 to-amber-400 px-5 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-primary/30 transition-all hover:scale-[1.03] hover:shadow-primary/50 cursor-pointer shrink-0"
-            >
-              <Zap className="size-4 text-white fill-white" />
-              <span>SparrowX is ready to protect all these issues in 5 min</span>
-              <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-
-          {/* SPARROWX AI BRAIN DEEP ADVISORY (GEMINI 3.8 FLASH / PRO) */}
-          {scanResult.advisory && (
-            <div className="rounded-xl border border-primary/50 bg-gradient-to-r from-primary/10 via-[#140E0A] to-black p-4 space-y-3.5 shadow-md">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/20 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-primary animate-pulse" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">
-                    SparrowX AI Brain Deep Advisory · {scanResult.advisory.modelUsed}
-                  </span>
-                  {scanResult.advisory.liveAiGenerated && (
-                    <span className="rounded bg-primary/20 border border-primary/40 px-1.5 py-0.5 text-[9px] font-mono text-primary font-bold">
-                      LIVE NEURAL ANALYSIS
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] font-mono text-zinc-400 bg-black/60 border border-white/10 px-2 py-0.5 rounded">
-                  Target: {scanResult.targetCategory}
-                </span>
-              </div>
-
-              <div className="space-y-2.5 text-xs">
-                <div>
-                  <div className="font-semibold text-zinc-200">Executive Threat Assessment:</div>
-                  <p className="text-zinc-300 mt-0.5 leading-relaxed">
-                    {scanResult.advisory.executiveSummary}
-                  </p>
+                  <CyberPill
+                    icon="shield"
+                    label={scanResult.targetCategory}
+                    variant="cyan"
+                    size="sm"
+                  />
+                  <CyberPill
+                    icon={scanResult.score < 80 ? "alert" : "check"}
+                    label={scanResult.riskLevel}
+                    variant={
+                      scanResult.score < 60
+                        ? "red"
+                        : scanResult.score < 80
+                          ? "amber"
+                          : "emerald"
+                    }
+                    size="sm"
+                  />
                 </div>
 
-                <div className="rounded-lg bg-black/60 border border-red-500/25 p-2.5 text-xs">
-                  <div className="font-semibold text-red-400 flex items-center gap-1.5">
-                    <ShieldAlert className="size-3.5 shrink-0" />
-                    <span>Real-World Attacker Exploit Scenario:</span>
+                {/* Real-Time Live Infrastructure Telemetry Matrix */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 font-mono text-[11px]">
+                  <div className="rounded-lg border border-white/5 bg-black/50 p-2">
+                    <span className="text-[10px] uppercase text-zinc-500 block">Origin Target</span>
+                    <strong className="text-zinc-200 truncate block">
+                      {scanResult.resolvedIps[0] ?? "Direct DNS"}
+                    </strong>
                   </div>
-                  <p className="text-zinc-300 mt-1 text-[11px] leading-relaxed">
-                    {scanResult.advisory.exploitScenario}
-                  </p>
-                </div>
-
-                <div className="rounded-lg bg-black/60 border border-emerald-500/25 p-2.5 text-xs">
-                  <div className="font-semibold text-emerald-400 flex items-center gap-1.5">
-                    <Zap className="size-3.5 shrink-0" />
-                    <span>Recommended 60-Second Defense:</span>
+                  <div className="rounded-lg border border-white/5 bg-black/50 p-2">
+                    <span className="text-[10px] uppercase text-zinc-500 block">TLS RTT</span>
+                    <strong className="text-zinc-200 block">{scanResult.latencyMs}ms</strong>
                   </div>
-                  <p className="text-zinc-300 mt-1 text-[11px] leading-relaxed">
-                    {scanResult.advisory.recommendedAction}
-                  </p>
-                </div>
-
-                {/* WHAT SPARROWX SAFES & PROTECTS SECTION */}
-                {scanResult.advisory.whatSparrowxSaves && scanResult.advisory.whatSparrowxSaves.length > 0 && (
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                        <Shield className="size-3.5 text-emerald-400" />
-                        <span>What SparrowX Protects &amp; Safes You From</span>
-                      </span>
-                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">
-                        &lt; 2ms Latency Guarantee
-                      </span>
-                    </div>
-                    <div className="grid gap-2.5 sm:grid-cols-3">
-                      {scanResult.advisory.whatSparrowxSaves.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg border border-emerald-500/20 bg-black/70 p-2.5 flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                              <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
-                              <span>{item.threat}</span>
-                            </div>
-                            <div className="mt-1 text-[11px] text-zinc-300 leading-snug">
-                              <strong className="text-red-400">Danger:</strong> {item.dangerWithoutSparrowx}
-                            </div>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-white/10 text-[11px] text-emerald-300 font-medium">
-                            <strong>SparrowX Defense:</strong> {item.howSparrowxSafes}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="rounded-lg border border-white/5 bg-black/50 p-2">
+                    <span className="text-[10px] uppercase text-zinc-500 block">DNS CAA Records</span>
+                    <strong className="text-zinc-200 block">
+                      {scanResult.caaRecords.length} records
+                    </strong>
                   </div>
-                )}
-
-                {/* AI & FULL-STACK VULNERABILITY DEEP INSPECTION */}
-                {scanResult.advisory.aiVulnerabilities && scanResult.advisory.aiVulnerabilities.length > 0 && (
-                  <div className="rounded-xl border border-red-500/30 bg-red-950/15 p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between border-b border-red-500/20 pb-2">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                        <ShieldAlert className="size-3.5 text-red-400" />
-                        <span>
-                          {scanResult.targetCategory === "AI Agent & LLM Endpoint"
-                            ? "AI & LLM Vulnerabilities Identified by Gemini (OWASP Top 10 for LLM)"
-                            : scanResult.targetCategory === "API & Cloud Service"
-                              ? "API & Microservice Vulnerabilities Identified by Gemini (OWASP API Top 10)"
-                              : "Web Application & Infrastructure Vulnerabilities (OWASP Top 10)"}
-                        </span>
-                      </span>
-                      <span className="text-[10px] font-mono text-red-400 bg-red-950/40 border border-red-500/30 px-2 py-0.5 rounded font-bold">
-                        {scanResult.advisory.aiVulnerabilities.length} Threat Vectors
-                      </span>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {scanResult.advisory.aiVulnerabilities.map((v) => (
-                        <div
-                          key={v.id}
-                          className="rounded-lg border border-red-500/20 bg-black/70 p-2.5 space-y-1"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-[10px] text-red-300 font-bold bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded">
-                              {v.owaspCategory}
-                            </span>
-                            <span className="font-mono text-[9px] uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-bold">
-                              {v.riskRating}
-                            </span>
-                          </div>
-                          <div className="text-xs font-bold text-white">{v.name}</div>
-                          <div className="text-[11px] text-zinc-300">{v.description}</div>
-                          <div className="text-[11px] text-primary pt-1 border-t border-white/5">
-                            <strong>SparrowX Fix:</strong> {v.howSparrowxProtects}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 5-MINUTE RAPID PROTECTION ROADMAP */}
-                {scanResult.advisory.fiveMinuteProtectionPlan && (
-                  <div className="rounded-xl border border-primary/40 bg-black/80 p-3.5 space-y-2.5">
-                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                      <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                        <Clock className="size-3.5 text-primary" />
-                        <span>5-Minute Rapid Protection Roadmap</span>
-                      </span>
-                      <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded font-bold">
-                        Est. Time: {scanResult.advisory.fiveMinuteProtectionPlan.estimatedTime}
-                      </span>
-                    </div>
-                    <div className="grid gap-2.5 sm:grid-cols-3 text-xs">
-                      <div className="rounded-lg border border-[#222] bg-[#111] p-2.5 space-y-1">
-                        <div className="font-bold text-primary flex items-center gap-1.5">
-                          <span className="size-4 rounded-full bg-primary/20 text-primary grid place-items-center text-[10px] font-bold">
-                            1
-                          </span>
-                          <span>Step 1 · Workspace Claim</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-300 leading-snug">
-                          {scanResult.advisory.fiveMinuteProtectionPlan.step1}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-[#222] bg-[#111] p-2.5 space-y-1">
-                        <div className="font-bold text-primary flex items-center gap-1.5">
-                          <span className="size-4 rounded-full bg-primary/20 text-primary grid place-items-center text-[10px] font-bold">
-                            2
-                          </span>
-                          <span>Step 2 · 5-Line Drop-in</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-300 leading-snug">
-                          {scanResult.advisory.fiveMinuteProtectionPlan.step2}
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-[#222] bg-[#111] p-2.5 space-y-1">
-                        <div className="font-bold text-emerald-400 flex items-center gap-1.5">
-                          <span className="size-4 rounded-full bg-emerald-500/20 text-emerald-400 grid place-items-center text-[10px] font-bold">
-                            3
-                          </span>
-                          <span>Step 3 · Live Activation</span>
-                        </div>
-                        <p className="text-[11px] text-zinc-300 leading-snug">
-                          {scanResult.advisory.fiveMinuteProtectionPlan.step3}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-primary/20 text-xs">
-                  <p className="text-zinc-300 italic text-[11px]">
-                    &ldquo;{scanResult.advisory.customerConversionPitch}&rdquo;
-                  </p>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono text-primary font-bold border border-primary/30 px-2 py-1 rounded bg-primary/10">
-                      Recommended: {scanResult.advisory.recommendedPackage}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onClaimAndProtectDomain(
-                          scanResult.domain,
-                          leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
-                        )
-                      }
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 transition-all cursor-pointer"
-                    >
-                      <Zap className="size-3.5 fill-current" />
-                      <span>Protect in 5 Min</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Findings List with Raw Technical Evidence */}
-          <div className="space-y-2.5">
-            {scanResult.findings.map((finding) => {
-              const isCrit = finding.status === "critical";
-              const isWarn = finding.status === "warning";
-              return (
-                <div
-                  key={finding.id}
-                  className={`rounded-xl border p-3.5 text-xs ${
-                    isCrit
-                      ? "border-red-500/30 bg-red-950/15"
-                      : isWarn
-                        ? "border-amber-500/30 bg-amber-950/15"
-                        : "border-emerald-500/25 bg-emerald-950/10"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      {isCrit ? (
-                        <ShieldAlert className="size-4 text-red-400 shrink-0 mt-0.5" />
-                      ) : isWarn ? (
-                        <AlertTriangle className="size-4 text-amber-400 shrink-0 mt-0.5" />
-                      ) : (
-                        <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-mono uppercase text-zinc-400">
-                            [{finding.category}]
-                          </span>
-                          <span className="font-semibold text-white">{finding.title}</span>
-                        </div>
-                        <div className="text-[11px] text-zinc-300 mt-1">{finding.detail}</div>
-                        <div className="mt-1.5 rounded bg-black/80 border border-white/10 px-2.5 py-1 font-mono text-[10px] text-zinc-400 break-all">
-                          Evidence: {finding.evidence}
-                        </div>
-                        {finding.status !== "passed" && (
-                          <div className="mt-1.5 text-[11px] text-primary font-medium">
-                            Remediation: {finding.remediation}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <span
-                      className={`shrink-0 rounded px-1.5 py-0.5 font-mono text-[9px] uppercase font-bold ${
-                        isCrit
-                          ? "bg-red-500/20 text-red-300"
-                          : isWarn
-                            ? "bg-amber-500/20 text-amber-300"
-                            : "bg-emerald-500/20 text-emerald-300"
+                  <div className="rounded-lg border border-white/5 bg-black/50 p-2">
+                    <span className="text-[10px] uppercase text-zinc-500 block">DNSSEC Status</span>
+                    <strong
+                      className={`block font-semibold ${
+                        scanResult.dnssecVerified ? "text-emerald-400" : "text-amber-400"
                       }`}
                     >
-                      {finding.status}
-                    </span>
+                      {scanResult.dnssecVerified ? "Enforced" : "Unsigned"}
+                    </strong>
+                  </div>
+                  <div className="rounded-lg border border-white/5 bg-black/50 p-2 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] uppercase text-zinc-500 block">TXT Records</span>
+                    <strong className="text-zinc-200 block">
+                      {scanResult.txtRecordsCount} published
+                    </strong>
                   </div>
                 </div>
-              );
-            })}
-          </div>
 
-          {/* LEAD CAPTURE FORM AFTER SCAN */}
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-4">
-            {leadCaptured ? (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-300">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
-                  <span>
-                    <strong>Full HTML Audit Report downloaded!</strong> We also registered{" "}
-                    <code>{scanResult.cleanHost}</code> for priority remediation.
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    onClaimAndProtectDomain(
-                      scanResult.domain,
-                      leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
-                    )
-                  }
-                  className="rounded-lg bg-emerald-400 px-3 py-1.5 text-xs font-bold text-black hover:bg-emerald-300 cursor-pointer shrink-0"
-                >
-                  Open My Workspace Now →
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleCaptureLead} className="space-y-2.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Mail className="size-3.5 text-emerald-400" />
-                    <span>
-                      Send Full Executive HTML Audit Report & Drop-In Middleware for{" "}
-                      <code className="text-emerald-300">{scanResult.cleanHost}</code>
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-emerald-400">
-                    INSTANT DOWNLOAD + EMAIL RECORD
-                  </span>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-4">
-                  <input
-                    type="text"
-                    required
-                    value={leadName}
-                    onChange={(e) => setLeadName(e.target.value)}
-                    placeholder="Your Name"
-                    className="h-9 rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-emerald-400"
-                  />
-                  <input
-                    type="email"
-                    required
-                    value={leadEmail}
-                    onChange={(e) => setLeadEmail(e.target.value)}
-                    placeholder="Work Email (you@company.com)"
-                    className="h-9 rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-emerald-400"
-                  />
-                  <input
-                    type="text"
-                    value={leadCompany}
-                    onChange={(e) => setLeadCompany(e.target.value)}
-                    placeholder="Company / App Name"
-                    className="h-9 rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-emerald-400"
-                  />
+                {/* Quick Share / Export Action Bar */}
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   <button
-                    type="submit"
-                    className="h-9 rounded-lg bg-emerald-500 px-3 text-xs font-bold text-black hover:bg-emerald-400 transition-colors cursor-pointer"
+                    type="button"
+                    onClick={handleShareScanLink}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:border-primary/50 hover:text-white transition-colors cursor-pointer"
                   >
-                    Unlock Full HTML Report
+                    {shareCopied ? (
+                      <Check className="size-3 text-emerald-400" />
+                    ) : (
+                      <Share2 className="size-3 text-primary" />
+                    )}
+                    <span>{shareCopied ? "Share URL Copied" : "Share Audit URL"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadAuditTxt}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:border-primary/50 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <Download className="size-3 text-primary" />
+                    <span>Download TXT</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadBrandedHtmlSecurityReport(scanResult)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/70 px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:border-emerald-500/50 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <FileText className="size-3 text-emerald-400" />
+                    <span>Executive HTML Report</span>
                   </button>
                 </div>
-              </form>
-            )}
-          </div>
+              </div>
 
-          {/* High-Converting Monetization CTA Box inside Scanner */}
-          <div className="rounded-xl border border-primary/40 bg-gradient-to-r from-primary/15 via-orange-500/10 to-black p-4">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-              <div>
-                <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-                  <Zap className="size-4 text-primary" />
-                  <span>
-                    Auto-Remediate {scanResult.cleanHost} & Deploy Edge WAF + AI Shield Now
-                  </span>
+              {/* POSTURE SCORE & EXECUTIVE GRADE CARD */}
+              <div
+                className={`flex items-center gap-4 self-start lg:self-auto rounded-2xl border p-4 backdrop-blur-md shrink-0 shadow-lg ${
+                  scanResult.score >= 80
+                    ? "border-emerald-500/30 bg-emerald-950/20 shadow-emerald-950/30"
+                    : scanResult.score >= 60
+                      ? "border-amber-500/30 bg-amber-950/20 shadow-amber-950/30"
+                      : "border-red-500/30 bg-red-950/20 shadow-red-950/30"
+                }`}
+              >
+                <div className="flex flex-col items-center justify-center">
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 font-bold mb-1">
+                    Security Score
+                  </div>
+                  <div
+                    className={`font-mono text-3xl sm:text-4xl font-black ${
+                      scanResult.score >= 80
+                        ? "text-emerald-400"
+                        : scanResult.score >= 60
+                          ? "text-amber-400"
+                          : "text-red-400"
+                    }`}
+                  >
+                    {scanResult.score}
+                    <span className="text-xs text-zinc-400 font-normal">/100</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono font-black ${
+                        scanResult.scoreGrade.startsWith("A")
+                          ? "bg-emerald-400 text-black"
+                          : scanResult.scoreGrade === "B"
+                            ? "bg-blue-400 text-black"
+                            : scanResult.scoreGrade === "C"
+                              ? "bg-amber-400 text-black"
+                              : "bg-red-500 text-white"
+                      }`}
+                    >
+                      GRADE {scanResult.scoreGrade}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-[11px] text-zinc-300 mt-0.5">
-                  Get your drop-in Next.js/Express/Cloudflare middleware, block SQLi & prompt
-                  injections, and download your signed SOC 2 verification certificate.
+
+                <div className="h-16 w-px bg-white/10 hidden sm:block" />
+
+                <div className="space-y-1.5 font-mono text-[11px]">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-red-400 flex items-center gap-1 font-semibold">
+                      <ShieldAlert className="size-3" />
+                      Critical
+                    </span>
+                    <strong className="text-white bg-red-500/20 border border-red-500/40 px-1.5 py-0.5 rounded">
+                      {criticalFindings.length}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-amber-400 flex items-center gap-1 font-semibold">
+                      <AlertTriangle className="size-3" />
+                      Warnings
+                    </span>
+                    <strong className="text-white bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 rounded">
+                      {warningFindings.length}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-emerald-400 flex items-center gap-1 font-semibold">
+                      <CheckCircle2 className="size-3" />
+                      Passed
+                    </span>
+                    <strong className="text-white bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded">
+                      {passedFindings.length}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* STEP 1: ASSET FINGERPRINTING & ARCHITECTURE IDENTIFICATION */}
+            <div className="rounded-xl border border-sky-500/30 bg-sky-950/20 p-3.5 space-y-1.5 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-sky-500/20 pb-1.5">
+                <span className="font-bold text-sky-300 uppercase tracking-wider flex items-center gap-2 font-mono text-[11px]">
+                  <Search className="size-3.5 text-sky-400" />
+                  <span>Step 1 · Asset &amp; Architecture Fingerprint</span>
+                </span>
+                <span className="text-[10px] font-mono text-sky-300 bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 rounded font-bold">
+                  {scanResult.targetCategory}
+                </span>
+              </div>
+              <p className="text-zinc-200 text-[11px] leading-relaxed">
+                {scanResult.targetExplanation}
+              </p>
+            </div>
+
+            {/* HIGH-IMPACT 5-MINUTE RAPID DEFENSE CALLOUT */}
+            <div className="rounded-2xl border-2 border-primary/60 bg-gradient-to-r from-primary/20 via-orange-950/30 to-black p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[0_0_40px_rgba(240,90,40,0.22)]">
+              <div className="space-y-1 max-w-xl">
+                <div className="flex items-center gap-2 text-white font-black text-sm sm:text-base">
+                  <ShieldCheck className="size-5 text-primary shrink-0" />
+                  <span>Autonomous Defense Ready for {scanResult.cleanHost}</span>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">
+                  Remediate all{" "}
+                  <strong className="text-white font-mono">
+                    {vulnFindings.length} detected security &amp; API exposures
+                  </strong>{" "}
+                  in under 5 minutes with drop-in edge armor. No code refactoring or infrastructure overhaul required.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() =>
-                    onClaimAndProtectDomain(
-                      scanResult.domain,
-                      suggestOrgFromHost(scanResult.cleanHost),
-                    )
-                  }
-                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-4 py-2.5 text-xs font-black text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
-                >
-                  <ShieldCheck className="size-4 text-white" />
-                  <span>SparrowX is ready to protect all these issues in 5 min</span>
-                  <ArrowRight className="size-3.5" />
-                </button>
-                <a
-                  href="#pricing"
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
-                >
-                  <Mail className="size-3.5" />
-                  <span>Contact Security Team</span>
-                </a>
+              <button
+                type="button"
+                onClick={() =>
+                  onClaimAndProtectDomain(
+                    scanResult.domain,
+                    leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
+                  )
+                }
+                className="group relative inline-flex items-center justify-center gap-2.5 rounded-xl bg-gradient-to-r from-primary via-orange-500 to-amber-500 px-5 py-3 text-xs sm:text-sm font-black text-white shadow-lg shadow-primary/30 transition-all hover:scale-[1.02] hover:shadow-primary/50 cursor-pointer shrink-0"
+              >
+                <Zap className="size-4 text-white fill-white" />
+                <span>Protect {scanResult.cleanHost} in 5 Min</span>
+                <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+
+            {/* SPARROWX AUTONOMOUS THREAT INTELLIGENCE & SOC ADVISORY */}
+            {scanResult.advisory && (
+              <div className="rounded-2xl border border-primary/40 bg-gradient-to-b from-[#140e0b] via-[#0e0c0b] to-black p-4 sm:p-5 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-primary/20 pb-3">
+                  <div className="flex items-center gap-3">
+                    <CyberEmblem variant="radar" size="sm" />
+                    <div>
+                      <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                        <span>SparrowX Autonomous Threat Intelligence</span>
+                        <span className="font-mono text-[10px] text-primary font-semibold">
+                          ({scanResult.advisory.modelUsed})
+                        </span>
+                      </div>
+                      <div className="text-[10px] font-mono text-zinc-400">
+                        SOC Threat Telemetry &amp; Deep Exposure Analysis
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-[10px] font-mono font-bold text-primary">
+                      <span className="size-1.5 rounded-full bg-primary animate-ping" />
+                      <span>LIVE SOC TELEMETRY</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-400 bg-black/60 border border-white/10 px-2 py-0.5 rounded">
+                      Target: {scanResult.targetCategory}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-3.5 text-xs">
+                  {/* Executive Assessment */}
+                  <div className="rounded-xl border border-white/5 bg-black/50 p-3.5 space-y-1">
+                    <div className="font-mono text-[11px] font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-2">
+                      <Terminal className="size-3.5 text-primary" />
+                      <span>Executive Posture Assessment</span>
+                    </div>
+                    <p className="text-zinc-200 text-xs leading-relaxed">
+                      {scanResult.advisory.executiveSummary}
+                    </p>
+                  </div>
+
+                  {/* Red Team Exploit Scenario */}
+                  <div className="rounded-xl border border-red-500/30 bg-gradient-to-r from-red-950/20 via-black to-black p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-red-400 font-bold font-mono text-[11px] uppercase tracking-wider border-b border-red-500/20 pb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldAlert className="size-3.5 shrink-0" />
+                        <span>Real-World Attacker Exploit Scenario (Red Team View)</span>
+                      </div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-mono">
+                        THREAT VECTOR
+                      </span>
+                    </div>
+                    <p className="text-zinc-200 text-xs leading-relaxed">
+                      {scanResult.advisory.exploitScenario}
+                    </p>
+                  </div>
+
+                  {/* 60-Second Autonomous Defense Playbook */}
+                  <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-r from-emerald-950/20 via-black to-black p-3.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-emerald-400 font-bold font-mono text-[11px] uppercase tracking-wider border-b border-emerald-500/20 pb-1.5">
+                      <div className="flex items-center gap-1.5">
+                        <Zap className="size-3.5 shrink-0" />
+                        <span>Recommended 60-Second Edge Remediation</span>
+                      </div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                        INSTANT MITIGATION
+                      </span>
+                    </div>
+                    <p className="text-zinc-200 text-xs leading-relaxed">
+                      {scanResult.advisory.recommendedAction}
+                    </p>
+                  </div>
+
+                  {/* WHAT SPARROWX SAFES & PROTECTS SECTION */}
+                  {scanResult.advisory.whatSparrowxSaves &&
+                    scanResult.advisory.whatSparrowxSaves.length > 0 && (
+                      <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/15 p-3.5 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-500/20 pb-2">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                            <Shield className="size-3.5 text-emerald-400" />
+                            <span>What SparrowX Protects &amp; Safes You From</span>
+                          </span>
+                          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">
+                            &lt; 2ms Latency SLA Guarantee
+                          </span>
+                        </div>
+                        <div className="grid gap-2.5 sm:grid-cols-3">
+                          {scanResult.advisory.whatSparrowxSaves.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="rounded-lg border border-emerald-500/20 bg-black/75 p-3 flex flex-col justify-between"
+                            >
+                              <div>
+                                <div className="text-xs font-bold text-white flex items-center gap-1.5 font-mono">
+                                  <CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />
+                                  <span>{item.threat}</span>
+                                </div>
+                                <div className="mt-1.5 text-[11px] text-zinc-300 leading-snug">
+                                  <strong className="text-red-400">Danger:</strong>{" "}
+                                  {item.dangerWithoutSparrowx}
+                                </div>
+                              </div>
+                              <div className="mt-2.5 pt-2 border-t border-white/10 text-[11px] text-emerald-300 font-medium">
+                                <strong>SparrowX Defense:</strong> {item.howSparrowxSafes}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* IDENTIFIED VULNERABILITY VECTORS (OWASP TOP 10) */}
+                  {scanResult.advisory.aiVulnerabilities &&
+                    scanResult.advisory.aiVulnerabilities.length > 0 && (
+                      <div className="rounded-xl border border-red-500/30 bg-red-950/15 p-3.5 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-red-500/20 pb-2">
+                          <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                            <ShieldAlert className="size-3.5 text-red-400" />
+                            <span>
+                              {scanResult.targetCategory === "AI Agent & LLM Endpoint"
+                                ? "Identified AI Threat Vectors (OWASP Top 10 for LLM)"
+                                : scanResult.targetCategory === "API & Cloud Service"
+                                  ? "Identified API Threat Vectors (OWASP API Security Top 10)"
+                                  : "Identified Application Vulnerabilities (OWASP Top 10)"}
+                            </span>
+                          </span>
+                          <span className="text-[10px] font-mono text-red-400 bg-red-950/40 border border-red-500/30 px-2 py-0.5 rounded font-bold">
+                            {scanResult.advisory.aiVulnerabilities.length} Attack Vectors
+                          </span>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {scanResult.advisory.aiVulnerabilities.map((v) => (
+                            <div
+                              key={v.id}
+                              className="rounded-lg border border-red-500/20 bg-black/75 p-3 space-y-1.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-[10px] text-red-300 font-bold bg-red-500/10 border border-red-500/30 px-1.5 py-0.5 rounded">
+                                  {v.owaspCategory}
+                                </span>
+                                <span className="font-mono text-[9px] uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 font-bold">
+                                  {v.riskRating}
+                                </span>
+                              </div>
+                              <div className="text-xs font-bold text-white">{v.name}</div>
+                              <div className="text-[11px] text-zinc-300">{v.description}</div>
+                              <div className="text-[11px] text-primary pt-1 border-t border-white/5 font-medium">
+                                <strong>SparrowX Defense:</strong> {v.howSparrowxProtects}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* 5-MINUTE RAPID PROTECTION ROADMAP */}
+                  {scanResult.advisory.fiveMinuteProtectionPlan && (
+                    <div className="rounded-xl border border-primary/30 bg-black/80 p-3.5 space-y-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 font-mono">
+                          <Clock className="size-3.5 text-primary" />
+                          <span>5-Minute Rapid Protection Roadmap</span>
+                        </span>
+                        <span className="text-[10px] font-mono text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded font-bold">
+                          Est. Time: {scanResult.advisory.fiveMinuteProtectionPlan.estimatedTime}
+                        </span>
+                      </div>
+                      <div className="grid gap-2.5 sm:grid-cols-3 text-xs">
+                        <div className="rounded-lg border border-white/10 bg-[#111215] p-3 space-y-1">
+                          <div className="font-bold text-primary flex items-center gap-2 font-mono text-[11px]">
+                            <span className="size-5 rounded-md bg-primary/20 text-primary grid place-items-center text-[10px] font-bold">
+                              01
+                            </span>
+                            <span>Workspace Claim</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-300 leading-snug">
+                            {scanResult.advisory.fiveMinuteProtectionPlan.step1}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-[#111215] p-3 space-y-1">
+                          <div className="font-bold text-primary flex items-center gap-2 font-mono text-[11px]">
+                            <span className="size-5 rounded-md bg-primary/20 text-primary grid place-items-center text-[10px] font-bold">
+                              02
+                            </span>
+                            <span>5-Line Drop-in</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-300 leading-snug">
+                            {scanResult.advisory.fiveMinuteProtectionPlan.step2}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-[#111215] p-3 space-y-1">
+                          <div className="font-bold text-emerald-400 flex items-center gap-2 font-mono text-[11px]">
+                            <span className="size-5 rounded-md bg-emerald-500/20 text-emerald-400 grid place-items-center text-[10px] font-bold">
+                              03
+                            </span>
+                            <span>Live Activation</span>
+                          </div>
+                          <p className="text-[11px] text-zinc-300 leading-snug">
+                            {scanResult.advisory.fiveMinuteProtectionPlan.step3}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Summary Bar */}
+                  <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-primary/20 text-xs">
+                    <p className="text-zinc-300 italic text-[11px]">
+                      &ldquo;{scanResult.advisory.customerConversionPitch}&rdquo;
+                    </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] font-mono text-primary font-bold border border-primary/30 px-2 py-1 rounded bg-primary/10">
+                        Recommended: {scanResult.advisory.recommendedPackage}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onClaimAndProtectDomain(
+                            scanResult.domain,
+                            leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
+                          )
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow hover:bg-primary/90 transition-all cursor-pointer"
+                      >
+                        <Zap className="size-3.5 fill-current" />
+                        <span>Protect in 5 Min</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TECHNICAL FINDINGS INSPECTION PANEL WITH FILTER TABS */}
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2">
+                  <Filter className="size-4 text-zinc-400" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider font-mono">
+                    Technical Findings &amp; Evidence ({displayedFindings.length})
+                  </span>
+                </div>
+                <div className="inline-flex items-center rounded-lg border border-white/10 bg-black/60 p-0.5 text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => setFindingsFilter("all")}
+                    className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                      findingsFilter === "all"
+                        ? "bg-primary text-black font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    All ({scanResult.findings.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFindingsFilter("vulnerabilities")}
+                    className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                      findingsFilter === "vulnerabilities"
+                        ? "bg-red-500 text-white font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Vulnerabilities ({vulnFindings.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFindingsFilter("passed")}
+                    className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
+                      findingsFilter === "passed"
+                        ? "bg-emerald-500 text-black font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Passed ({passedFindings.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Finding Cards List */}
+              <div className="space-y-2.5">
+                {displayedFindings.map((finding) => {
+                  const isCrit = finding.status === "critical";
+                  const isWarn = finding.status === "warning";
+                  return (
+                    <div
+                      key={finding.id}
+                      className={`rounded-xl border p-4 text-xs transition-colors ${
+                        isCrit
+                          ? "border-red-500/30 bg-red-950/15"
+                          : isWarn
+                            ? "border-amber-500/30 bg-amber-950/15"
+                            : "border-emerald-500/25 bg-emerald-950/10"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          {isCrit ? (
+                            <ShieldAlert className="size-4 text-red-400 shrink-0 mt-0.5" />
+                          ) : isWarn ? (
+                            <AlertTriangle className="size-4 text-amber-400 shrink-0 mt-0.5" />
+                          ) : (
+                            <CheckCircle2 className="size-4 text-emerald-400 shrink-0 mt-0.5" />
+                          )}
+                          <div className="min-w-0 space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[10px] font-mono uppercase text-zinc-400 bg-white/5 border border-white/10 px-1.5 py-0.5 rounded">
+                                {finding.category}
+                              </span>
+                              <span className="font-semibold text-white">{finding.title}</span>
+                            </div>
+                            <div className="text-[11px] text-zinc-300 leading-relaxed">
+                              {finding.detail}
+                            </div>
+
+                            {/* Raw Evidence Terminal Box with Copy Button */}
+                            <div className="relative rounded-lg bg-black/90 border border-white/10 px-3 py-2 font-mono text-[11px] text-zinc-300">
+                              <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-white/5 text-[9px] uppercase tracking-wider text-zinc-500">
+                                <span>Probe Evidence</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void navigator.clipboard.writeText(finding.evidence);
+                                    setCopiedEvidenceId(finding.id);
+                                    setTimeout(() => setCopiedEvidenceId(null), 2000);
+                                  }}
+                                  className="inline-flex items-center gap-1 text-zinc-400 hover:text-primary transition-colors cursor-pointer"
+                                >
+                                  {copiedEvidenceId === finding.id ? (
+                                    <>
+                                      <Check className="size-2.5 text-emerald-400" />
+                                      <span className="text-emerald-400">Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="size-2.5" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              <code className="text-zinc-300 break-all select-all block">
+                                {finding.evidence}
+                              </code>
+                            </div>
+
+                            {finding.status !== "passed" && (
+                              <div className="rounded-md bg-primary/10 border border-primary/20 px-2.5 py-1 text-[11px] text-primary font-medium flex items-start gap-1.5">
+                                <Zap className="size-3.5 shrink-0 mt-0.5" />
+                                <span>
+                                  <strong>SparrowX Defense:</strong> {finding.remediation}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase font-bold ${
+                            isCrit
+                              ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                              : isWarn
+                                ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                          }`}
+                        >
+                          {finding.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Downloadable & Shareable Report + Outreach Tools */}
-            <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-              <span className="text-zinc-400">Shareable Report & Founder Outreach Actions:</span>
-              <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleDownloadAuditTxt}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#262626] bg-black px-2.5 py-1 text-[11px] font-medium text-zinc-200 hover:border-zinc-600 cursor-pointer"
-                >
-                  <Download className="size-3 text-primary" />
-                  <span>Report (.txt)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => downloadBrandedHtmlSecurityReport(scanResult)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#262626] bg-black px-2.5 py-1 text-[11px] font-medium text-zinc-200 hover:border-zinc-600 cursor-pointer"
-                >
-                  <FileText className="size-3 text-emerald-400" />
-                  <span>Branded Report (.html)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleShareScanLink}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#262626] bg-black px-2.5 py-1 text-[11px] font-medium text-zinc-200 hover:border-zinc-600 cursor-pointer"
-                >
-                  {shareCopied ? (
-                    <Check className="size-3 text-emerald-400" />
-                  ) : (
-                    <Share2 className="size-3 text-primary" />
-                  )}
-                  <span>{shareCopied ? "Share Link Copied!" : "Share Report Link"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCopyOutreach("dm")}
-                  className="inline-flex items-center gap-1 rounded-lg border border-[#262626] bg-black px-2.5 py-1 text-[11px] font-medium text-zinc-200 hover:border-zinc-600 cursor-pointer"
-                >
-                  {copiedOutreach === "dm" ? (
-                    <Check className="size-3 text-emerald-400" />
-                  ) : (
-                    <Copy className="size-3 text-primary" />
-                  )}
-                  <span>{copiedOutreach === "dm" ? "Copied DM!" : "Copy Cold DM"}</span>
-                </button>
+            {/* EXECUTIVE HTML AUDIT REPORT DOWNLOAD & PRIORITY LEAD CAPTURE */}
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/15 p-4 sm:p-5">
+              {leadCaptured ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-emerald-300">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+                    <span>
+                      <strong>Full HTML Audit Report downloaded!</strong> We also registered{" "}
+                      <code className="font-mono text-white">{scanResult.cleanHost}</code> for priority remediation.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onClaimAndProtectDomain(
+                        scanResult.domain,
+                        leadCompany.trim() || suggestOrgFromHost(scanResult.cleanHost),
+                      )
+                    }
+                    className="rounded-lg bg-emerald-400 px-4 py-2 text-xs font-bold text-black hover:bg-emerald-300 transition-colors cursor-pointer shrink-0"
+                  >
+                    Open My Workspace Now →
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleCaptureLead} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-bold text-white flex items-center gap-2 font-mono">
+                      <Mail className="size-4 text-emerald-400" />
+                      <span>
+                        Send Full Executive HTML Audit Report &amp; Drop-In Middleware for{" "}
+                        <code className="text-emerald-300">{scanResult.cleanHost}</code>
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded">
+                      INSTANT DOWNLOAD + AUDIT ARCHIVE
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    <input
+                      type="text"
+                      required
+                      value={leadName}
+                      onChange={(e) => setLeadName(e.target.value)}
+                      placeholder="Your Name"
+                      className="h-10 rounded-lg border border-white/10 bg-black/80 px-3 text-xs text-white outline-none focus:border-emerald-400"
+                    />
+                    <input
+                      type="email"
+                      required
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="Work Email (you@company.com)"
+                      className="h-10 rounded-lg border border-white/10 bg-black/80 px-3 text-xs text-white outline-none focus:border-emerald-400"
+                    />
+                    <input
+                      type="text"
+                      value={leadCompany}
+                      onChange={(e) => setLeadCompany(e.target.value)}
+                      placeholder="Company / App Name"
+                      className="h-10 rounded-lg border border-white/10 bg-black/80 px-3 text-xs text-white outline-none focus:border-emerald-400"
+                    />
+                    <button
+                      type="submit"
+                      className="h-10 rounded-lg bg-emerald-500 px-3 text-xs font-bold text-black hover:bg-emerald-400 transition-colors cursor-pointer"
+                    >
+                      Unlock Full HTML Report
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* HIGH-CONVERTING MONETIZATION CTA BOX */}
+            <div className="rounded-2xl border border-primary/40 bg-gradient-to-r from-primary/15 via-orange-500/10 to-black p-4 sm:p-5">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    <Zap className="size-4 text-primary" />
+                    <span>
+                      Auto-Remediate {scanResult.cleanHost} &amp; Deploy Edge WAF + AI Shield Now
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-300 mt-1 max-w-2xl leading-relaxed">
+                    Get your drop-in Next.js/Express/Cloudflare middleware, block SQLi &amp; prompt
+                    injections, and download your cryptographically signed SOC 2 verification certificate.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onClaimAndProtectDomain(
+                        scanResult.domain,
+                        suggestOrgFromHost(scanResult.cleanHost),
+                      )
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 px-4 py-2.5 text-xs font-black text-white shadow-md hover:opacity-95 transition-all cursor-pointer"
+                  >
+                    <ShieldCheck className="size-4 text-white" />
+                    <span>Protect All in 5 Min</span>
+                    <ArrowRight className="size-3.5" />
+                  </button>
+                  <a
+                    href="#pricing"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/60 px-3.5 py-2.5 text-xs font-bold text-white shadow-md hover:border-white/30 transition-all cursor-pointer"
+                  >
+                    <Mail className="size-3.5" />
+                    <span>Contact Security Team</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Downloadable & Shareable Report + Outreach Tools */}
+              <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                <span className="text-zinc-400">Security Officer &amp; Founder Actions:</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleDownloadAuditTxt}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black px-2.5 py-1 text-[11px] text-zinc-200 hover:border-zinc-500 cursor-pointer"
+                  >
+                    <Download className="size-3 text-primary" />
+                    <span>Audit (.txt)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadBrandedHtmlSecurityReport(scanResult)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black px-2.5 py-1 text-[11px] text-zinc-200 hover:border-zinc-500 cursor-pointer"
+                  >
+                    <FileText className="size-3 text-emerald-400" />
+                    <span>Executive (.html)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareScanLink}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black px-2.5 py-1 text-[11px] text-zinc-200 hover:border-zinc-500 cursor-pointer"
+                  >
+                    {shareCopied ? (
+                      <Check className="size-3 text-emerald-400" />
+                    ) : (
+                      <Share2 className="size-3 text-primary" />
+                    )}
+                    <span>{shareCopied ? "URL Copied" : "Share URL"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyOutreach("dm")}
+                    className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-black px-2.5 py-1 text-[11px] text-zinc-200 hover:border-zinc-500 cursor-pointer"
+                  >
+                    {copiedOutreach === "dm" ? (
+                      <Check className="size-3 text-emerald-400" />
+                    ) : (
+                      <Copy className="size-3 text-primary" />
+                    )}
+                    <span>{copiedOutreach === "dm" ? "Copied DM" : "Copy Cold DM"}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -1889,7 +2098,7 @@ export function LandingPricingSection({
   };
 
   return (
-    <section id="pricing" className="border-t border-[#1F1F1F] bg-[#060606] py-16 lg:py-20">
+    <section id="pricing" className="border-t border-[#1F1F1F] bg-[#060606] py-16 lg:py-20 scroll-mt-24">
       <div id="contact" className="mx-auto max-w-7xl px-4 sm:px-8">
         <div className="grid gap-10 lg:grid-cols-12 items-start">
           {/* Left Column: Direct SparrowX Contact Info & Channels */}
@@ -3356,7 +3565,7 @@ export function ClientOnboardingWizard({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3.5">
         <div>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase text-primary font-semibold">
-            <Sparkles className="size-3.5" />
+            <ShieldCheck className="size-3.5 text-primary" />
             <span>Guided Service Onboarding & Connection Verification</span>
           </div>
           <h3 className="text-base font-bold text-foreground mt-0.5">

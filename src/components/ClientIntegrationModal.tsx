@@ -162,10 +162,10 @@ export function ClientIntegrationModal({
   return (
     <div
       aria-label="Connect Service Command Center"
-      className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-3 sm:p-4 backdrop-blur-md overflow-y-auto"
       role="dialog"
     >
-      <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0f0f12] p-6 shadow-2xl space-y-5 my-8">
+      <div className="relative w-full max-w-3xl rounded-2xl border border-white/10 bg-[#0f0f12] p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 my-4 sm:my-8 max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between border-b border-white/10 pb-4">
           <div>
@@ -216,7 +216,7 @@ export function ClientIntegrationModal({
               </span>
             )}
           </div>
-          <div className="mt-2 flex flex-wrap gap-1.5 rounded-xl border border-white/10 bg-black/40 p-1">
+          <div className="mt-2 flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/40 p-1 overflow-x-auto no-scrollbar sm:flex-wrap">
             {(
               [
                 { id: "nextjs", label: "Next.js Edge" },
@@ -231,7 +231,7 @@ export function ClientIntegrationModal({
                 key={lang.id}
                 type="button"
                 onClick={() => setActiveTab(lang.id)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                   activeTab === lang.id
                     ? "bg-primary text-white shadow-md shadow-primary/25"
                     : "text-muted-foreground hover:text-foreground"

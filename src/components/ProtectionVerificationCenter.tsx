@@ -1078,7 +1078,7 @@ export function ProtectionVerificationCenter({
                   </span>
                   <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-4">
                     <li>Public Ingress WAF on verified root and subdomains.</li>
-                    <li>LLM Guardrails on registered MCP and OpenAI/Anthropic proxies.</li>
+                    <li>LLM Guardrails on registered MCP and AI model proxies.</li>
                     <li>Audit log ingestion from SparrowX Telemetry Mesh and Edge webhooks.</li>
                     <li>Automated probe validation and latency health checks.</li>
                   </ul>

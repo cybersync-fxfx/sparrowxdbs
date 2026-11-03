@@ -27,6 +27,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import type { ClientTenant, ProtectedService } from "@/lib/supabase";
 import { getStoredProspects } from "@/components/GrowthAndMonetizationHub";
 import { CyberThreatGlobe, type ThreatCity, DEFAULT_CITIES } from "@/components/CyberThreatGlobe";
@@ -136,7 +137,7 @@ export const PRESET_ORIGINS: OriginHostConfig[] = [
     uptimePct: 99.99,
     baseLatencyMs: 11,
     dnsVerified: true,
-    dnsResolver: "Google DNS DoH (8.8.8.8)",
+    dnsResolver: "SparrowX Authoritative Anycast DNS (8.8.8.8)",
   },
 ];
 
@@ -246,7 +247,7 @@ export async function resolveDomainLiveDns(rawDomain: string): Promise<{
   const clean = sanitizeDomainName(rawDomain);
   const start = performance.now();
   let resolvedIps: string[] = [];
-  let resolverUsed = "Google DNS DoH (8.8.8.8)";
+  let resolverUsed = "SparrowX Authoritative Anycast DNS";
 
   // 1. Check local scanner records first
   const storedProspects = getStoredProspects();
@@ -551,7 +552,12 @@ export function GlobalTrafficMeshGlobe({
 
     // 1. CLIENT MODE: STRICT TENANT ISOLATION (ZERO LEAKS OF OTHER CLIENTS' DATA)
     if (isClientSession) {
-      tenants.forEach((tenant) => {
+      // Strictly scope to the active client's tenant only to prevent cross-tenant visibility
+      const clientScopedTenants = activeTenantId
+        ? tenants.filter((t) => t.id === activeTenantId)
+        : tenants.slice(0, 1);
+
+      clientScopedTenants.forEach((tenant) => {
         const clean = sanitizeDomainName(tenant.primaryDomain);
         if (!clean) return;
 
@@ -580,7 +586,7 @@ export function GlobalTrafficMeshGlobe({
             uptimePct: 99.98,
             baseLatencyMs: tenant.avgLatencyMs || 11,
             dnsVerified: false,
-            dnsResolver: "Google DoH Querying...",
+            dnsResolver: "SparrowX DNS Querying...",
           });
         }
       });
@@ -590,6 +596,7 @@ export function GlobalTrafficMeshGlobe({
         addUniqueOrigin(customResolvedOrigin);
       }
 
+      // NEVER leak PRESET_ORIGINS or sparrowx.net in a client session
       return list;
     }
 
@@ -623,7 +630,7 @@ export function GlobalTrafficMeshGlobe({
           uptimePct: 99.98,
           baseLatencyMs: tenant.avgLatencyMs || 11,
           dnsVerified: false,
-          dnsResolver: "Querying Google DoH...",
+          dnsResolver: "Querying SparrowX Anycast DNS...",
         });
       }
     });
@@ -632,8 +639,8 @@ export function GlobalTrafficMeshGlobe({
       addUniqueOrigin(customResolvedOrigin);
     }
 
-    // Fallback: If platform has zero onboarded tenants, use sovereign edge
-    if (list.length === 0) {
+    // Fallback: If platform has zero onboarded tenants in Admin mode only
+    if (!isClientSession && list.length === 0) {
       PRESET_ORIGINS.forEach(addUniqueOrigin);
     }
 
@@ -680,7 +687,7 @@ export function GlobalTrafficMeshGlobe({
     if (!trimmed) return;
 
     setIsResolvingDns(true);
-    setDnsResolutionFeedback(`Querying Google DNS DoH (8.8.8.8) for ${trimmed}...`);
+    setDnsResolutionFeedback(`Resolving live IP via SparrowX Anycast DNS for ${trimmed}...`);
 
     try {
       const res = await resolveDomainLiveDns(trimmed);
@@ -1311,7 +1318,7 @@ export default sparrowxShield;
               </h2>
             </div>
             <span className="text-[11px] text-muted-foreground font-mono">
-              Live Google DoH (8.8.8.8) + MaxMind / freeipapi ASN
+              SparrowX Global Anycast DNS Mesh + Precision GeoIP ASN
             </span>
           </div>
 
@@ -1364,7 +1371,7 @@ export default sparrowxShield;
                       : "border-border bg-background text-foreground hover:border-primary/50"
                   }`}
                 >
-                  <span>{o.geo.flag}</span>
+                  <CountryFlag code={o.geo.countryCode} className="size-3.5 inline-block" />
                   <span>{o.domain}</span>
                   <span className={activeOriginId === o.id ? "text-primary-foreground/90 font-bold" : "text-primary font-semibold"}>
                     [{o.ip}]
@@ -1402,11 +1409,17 @@ export default sparrowxShield;
                   onChange={(e) => setActiveOriginId(e.target.value)}
                   className="h-9 rounded-md border border-border bg-background px-3 text-xs font-semibold text-foreground outline-none focus:border-primary font-mono"
                 >
-                  {allOrigins.map((origin) => (
-                    <option key={origin.id} value={origin.id}>
-                      {origin.name} — {origin.domain} [{origin.ip}]
+                  {allOrigins.length === 0 ? (
+                    <option value="" disabled>
+                      No target webapp registered yet — enter domain above
                     </option>
-                  ))}
+                  ) : (
+                    allOrigins.map((origin) => (
+                      <option key={origin.id} value={origin.id}>
+                        {origin.name} — {origin.domain} [{origin.ip}]
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -1451,8 +1464,8 @@ export default sparrowxShield;
 
               <div>
                 <div className="text-[10px] uppercase font-semibold text-muted-foreground font-sans">Host Datacenter & ASN</div>
-                <div className="mt-0.5 text-xs font-semibold text-foreground flex items-center gap-1 truncate font-sans">
-                  <span>{activeOrigin.geo.flag}</span>
+                <div className="mt-0.5 text-xs font-semibold text-foreground flex items-center gap-1.5 truncate font-sans">
+                  <CountryFlag code={activeOrigin.geo.countryCode} className="size-3.5 inline-block" />
                   <span className="truncate">{activeOrigin.region}</span>
                 </div>
                 <div className="text-[10px] text-muted-foreground truncate">{activeOrigin.provider}</div>
@@ -1468,7 +1481,7 @@ export default sparrowxShield;
                   {activeOrigin.dnsVerified ? (
                     <span className="text-emerald-400">DNS A-Record Verified</span>
                   ) : (
-                    <span>Querying Google DoH</span>
+                    <span>Querying SparrowX Anycast DNS</span>
                   )}
                 </div>
               </div>
@@ -1595,16 +1608,16 @@ export default sparrowxShield;
         ) : (
           <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-card via-[#020617] to-card shadow-2xl">
             {/* Globe Overlay HUD: Rotation Tip & Legend */}
-            <div className="pointer-events-none absolute left-4 top-4 z-10 flex flex-col gap-2">
-              <div className="flex items-center gap-2 rounded-lg border border-border/80 bg-background/80 px-3 py-1.5 backdrop-blur-md">
-                <span className="size-2 rounded-full bg-primary animate-ping" />
-                <span className="text-[11px] font-semibold text-foreground">
-                  Drag to spin 3D Globe · High-Def Vector Continental Coastlines
+            <div className="pointer-events-none absolute left-2 sm:left-4 top-2 sm:top-4 z-10 flex flex-col gap-1.5 sm:gap-2 max-w-[calc(100%-1rem)]">
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border/80 bg-background/85 px-2.5 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md">
+                <span className="size-2 rounded-full bg-primary animate-ping shrink-0" />
+                <span className="text-[10px] sm:text-[11px] font-semibold text-foreground truncate">
+                  Drag / Touch to spin 3D Globe · Vector Coastlines
                 </span>
               </div>
 
               {/* Color-Coded Arcs Legend */}
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/60 bg-background/70 px-3 py-1 text-[10px] backdrop-blur-md">
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border/60 bg-background/80 px-2 sm:px-3 py-1 text-[9px] sm:text-[10px] backdrop-blur-md overflow-x-auto no-scrollbar whitespace-nowrap">
                 <span className="flex items-center gap-1 text-emerald-400 font-semibold">
                   <span className="size-2 rounded-full bg-emerald-400" />
                   Allowed (200 OK)
@@ -1697,7 +1710,7 @@ export default sparrowxShield;
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
               onPointerLeave={handlePointerUp}
-              className="h-[460px] w-full cursor-grab active:cursor-grabbing sm:h-[540px]"
+              className="h-[360px] sm:h-[460px] md:h-[540px] w-full cursor-grab active:cursor-grabbing touch-none"
               title="Drag mouse or finger to rotate the 3D globe"
             />
 
@@ -1707,8 +1720,9 @@ export default sparrowxShield;
                 <Radio className={`size-3.5 ${isStreaming ? "text-primary animate-pulse" : "text-zinc-500"}`} />
                 <span className="font-semibold text-foreground">Latest Inbound Connection:</span>
                 {packets[0] ? (
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {packets[0].clientGeo.flag} {packets[0].clientGeo.country} ({packets[0].clientIp}) ───&gt;{" "}
+                  <span className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                    <CountryFlag code={packets[0].clientGeo.countryCode} className="size-3.5 inline-block" />
+                    <span>{packets[0].clientGeo.country} ({packets[0].clientIp}) ───&gt;{" "}</span>
                     <span className="text-foreground font-semibold">{packets[0].path}</span> [
                     <span
                       className={
@@ -1822,7 +1836,7 @@ export default sparrowxShield;
                   <td className="py-2.5 pl-2 text-muted-foreground">{pkt.timestamp}</td>
 
                   <td className="py-2.5 font-sans">
-                    <span className="mr-1.5 text-base">{pkt.clientGeo.flag}</span>
+                    <CountryFlag code={pkt.clientGeo.countryCode} className="size-4 inline-block mr-1.5 align-middle" />
                     <span className="font-semibold text-foreground">{pkt.clientGeo.country}</span>
                     <span className="ml-1 text-[11px] text-muted-foreground">({pkt.clientGeo.city})</span>
                   </td>
@@ -1928,8 +1942,9 @@ export default sparrowxShield;
               <div className="grid grid-cols-2 gap-2 rounded-lg bg-background p-3">
                 <div>
                   <span className="text-[10px] text-muted-foreground uppercase font-sans">Client Location</span>
-                  <div className="mt-0.5 font-bold text-foreground font-sans">
-                    {selectedPacket.clientGeo.flag} {selectedPacket.clientGeo.city}, {selectedPacket.clientGeo.country}
+                  <div className="mt-0.5 font-bold text-foreground font-sans flex items-center gap-1.5">
+                    <CountryFlag code={selectedPacket.clientGeo.countryCode} className="size-4 inline-block" />
+                    <span>{selectedPacket.clientGeo.city}, {selectedPacket.clientGeo.country}</span>
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     Lat/Lng: {selectedPacket.clientGeo.lat}, {selectedPacket.clientGeo.lng}

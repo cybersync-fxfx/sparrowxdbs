@@ -114,6 +114,7 @@ import {
   PortalLoginScreen,
   SERVICE_MODULES,
 } from "@/components/portals/ClientAndAdminPortals";
+import { DashboardSettingsAndConnector } from "@/components/DashboardSettingsAndConnector";
 import {
   analyzePromptInSandbox,
   dispatchIncidentWebhook,
@@ -1235,7 +1236,7 @@ function Dashboard() {
     }
 
     await recordAudit(
-      `SparrowX Gemini AI Brain learned ${learnedCount} new signature(s), auto-blocked ${unblockedIocs.length} indicator(s), and enforced Active Blocking across all services`,
+      `SparrowX AI Brain learned ${learnedCount} new signature(s), auto-blocked ${unblockedIocs.length} indicator(s), and enforced Active Blocking across all services`,
       "Global AI Brain Defense Mesh",
       "Info",
     );
@@ -1250,12 +1251,20 @@ function Dashboard() {
   };
 
   const visibleClientTenants = useMemo(() => {
-    if (authSession.role !== "client") return clientTenants;
+    if (authSession.role === "admin") return clientTenants;
+    if (authSession.role !== "client") return [];
     return clientTenants.filter((t) => {
-      if (authSession.tenantId) {
-        return t.id === authSession.tenantId;
+      if (authSession.tenantId && t.id === authSession.tenantId) {
+        return true;
       }
-      return t.contactEmail.toLowerCase() === authSession.userEmail.toLowerCase();
+      if (t.contactEmail.toLowerCase() === authSession.userEmail.toLowerCase()) {
+        return true;
+      }
+      const domainPart = authSession.userEmail.split("@")[1]?.toLowerCase();
+      if (domainPart && t.primaryDomain.toLowerCase().includes(domainPart)) {
+        return true;
+      }
+      return false;
     });
   }, [clientTenants, authSession]);
 
@@ -1298,9 +1307,9 @@ function Dashboard() {
   }, [protectedServices, visibleClientTenants, authSession]);
 
   const handleNavigate = (navLabel: string) => {
-    if (navLabel === "AI Brain" || navLabel === "Gemini AI Brain") {
+    if (navLabel === "AI Brain" || navLabel === "SparrowX AI Brain" || navLabel === "Gemini AI Brain") {
       if (authSession.role !== "admin") {
-        showToast("Gemini AI Brain is restricted to administrator accounts.", "error");
+        showToast("SparrowX AI Brain is restricted to administrator accounts.", "error");
         setActiveNav("My Services");
         return;
       }
@@ -1606,15 +1615,15 @@ function Dashboard() {
         vulnCount={openVulnCount}
       />
       <SidebarInset className="min-h-svh bg-background">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/95 px-4 backdrop-blur-md sm:px-7">
-          <div className="flex min-w-0 items-center gap-3">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 sm:gap-4 border-b border-border bg-background/95 px-3 sm:px-7 backdrop-blur-md">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <SidebarTrigger
               aria-label="Toggle navigation"
-              className="size-9 border border-border bg-card hover:bg-secondary md:hidden"
+              className="size-9 border border-border bg-card hover:bg-secondary lg:hidden"
             />
             <Button
               aria-label={sidebarOpen ? "Minimize sidebar" : "Expand sidebar"}
-              className="hidden h-8 gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground hover:bg-secondary md:inline-flex"
+              className="hidden h-8 gap-1.5 border-border bg-card px-2.5 text-xs font-medium text-foreground hover:bg-secondary lg:inline-flex"
               onClick={() => setSidebarOpen((prev) => !prev)}
               size="sm"
               title={sidebarOpen ? "Minimize sidebar (Ctrl+B)" : "Expand sidebar (Ctrl+B)"}
@@ -1637,72 +1646,77 @@ function Dashboard() {
               <img src="/sparrowx-logo.png" alt="SparrowX" className="size-5 object-contain" />
             </div>
             <span className="hidden text-muted-foreground/60 sm:block">/</span>
-            <span className="truncate text-sm font-semibold text-foreground">{activeNav}</span>
+            <span className="truncate text-xs sm:text-sm font-semibold text-foreground max-w-[100px] sm:max-w-[200px]">
+              {activeNav}
+            </span>
 
             {/* Operational Status Badge */}
             {criticalOpenCount > 0 ? (
-              <span className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[10px] font-semibold text-destructive animate-pulse">
+              <span className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[10px] font-semibold text-destructive animate-pulse">
                 <AlertTriangle className="size-3" />
                 <span>ALERT: {criticalOpenCount} CRITICAL</span>
               </span>
             ) : (
-              <span className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-success">
+              <span className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-success">
                 <CheckCircle2 className="size-3" />
                 <span>SYSTEMS NOMINAL</span>
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 sm:gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* Top Workspace Switcher (SOC Dashboard vs Client Area vs Admin) */}
             {authSession.role === "admin" ? (
-              <div className="flex items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm">
+              <div className="flex items-center gap-0.5 sm:gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm shrink-0">
                 <button
                   type="button"
                   onClick={() => handleNavigate("Overview")}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
                     portalMode === "soc"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
                   title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
                 >
-                  <ShieldAlert className="size-3.5" />
-                  <span>SOC Command</span>
+                  <ShieldAlert className="size-3.5 shrink-0" />
+                  <span className="hidden sm:inline">SOC Command</span>
+                  <span className="sm:hidden text-[11px]">SOC</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleNavigate("My Services")}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
                     portalMode === "client"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
                   title="Client Portal (Protected Services, Credits, SDKs)"
                 >
-                  <Boxes className="size-3.5" />
-                  <span>Client Area</span>
+                  <Boxes className="size-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Client Area</span>
+                  <span className="sm:hidden text-[11px]">Client</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleNavigate("Client Subscriptions")}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
                     portalMode === "admin"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
                   title="Multi-Tenant Subscription Master"
                 >
-                  <Users className="size-3.5" />
-                  <span>Admin Master</span>
+                  <Users className="size-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Admin Master</span>
+                  <span className="sm:hidden text-[11px]">Admin</span>
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-card/90 px-3 py-1 text-xs shadow-sm">
-                <Boxes className="size-3.5 text-primary" />
-                <span className="font-semibold text-foreground">
+              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border bg-card/90 px-2 sm:px-3 py-1 text-xs shadow-sm shrink-0">
+                <Boxes className="size-3.5 text-primary shrink-0" />
+                <span className="font-semibold text-foreground truncate max-w-[85px] xs:max-w-[140px] sm:max-w-none">
                   {activeClientTenant?.name || "Client"} Dashboard
                 </span>
-                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold">
+                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold shrink-0">
                   {activeClientTenant?.planTier || "Active"}
                 </span>
               </div>
@@ -1894,7 +1908,7 @@ function Dashboard() {
                 </div>
                 <h2 className="text-xl font-bold text-foreground">Access Restricted — Administrator Only</h2>
                 <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  The SparrowX Gemini AI Brain console is restricted to Administrator accounts.
+                  The SparrowX AI Brain console is restricted to Administrator accounts.
                   Please switch to an administrator session to access this module.
                 </p>
                 <Button onClick={() => handleNavigate("My Services")} size="sm">
@@ -2058,7 +2072,7 @@ function Dashboard() {
               onToggleTenantModule={handleToggleTenantModule}
               onUpdateUserProfile={handleUpdateUserProfile}
               onVerifyTenantSdk={handleVerifyTenantSdk}
-              protectedServices={protectedServices}
+              protectedServices={visibleClientServices}
               reports={reports}
               selectedTenantId={selectedTenantId}
               showToast={showToast}
@@ -2185,7 +2199,7 @@ function Dashboard() {
                       className="h-7 text-[11px] gap-1.5 font-semibold"
                       onClick={() => handleNavigate("AI Brain")}
                     >
-                      <Brain className="size-3.5" /> Gemini AI Brain
+                      <Brain className="size-3.5" /> SparrowX AI Brain
                     </Button>
                   )}
                   <Button
@@ -3939,93 +3953,17 @@ function Dashboard() {
           )}
 
           {activeNav === "Settings" && (
-            <>
-              <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-                <div>
-                  <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
-                    <Wrench className="size-3.5" />
-                    Workspace configuration
-                  </div>
-                  <h1 className="text-2xl font-semibold text-foreground sm:text-[28px]">
-                    Security & automation settings
-                  </h1>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Control autonomous containment rules, alerting thresholds, and layout
-                    preferences.
-                  </p>
-                </div>
-              </section>
-
-              <section className="divide-y divide-border border border-border bg-card">
-                <div className="flex items-center justify-between gap-4 p-4 sm:p-5">
-                  <div>
-                    <h2 className="text-sm font-semibold">
-                      Autonomous containment for Critical EDR detections
-                    </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Automatically isolate endpoints when high-confidence ransomware or
-                      unauthorized shell activity is detected.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setAutoContainCritical(!autoContainCritical);
-                      showToast(
-                        `Autonomous containment ${!autoContainCritical ? "enabled" : "disabled"}`,
-                      );
-                    }}
-                    size="sm"
-                    variant={autoContainCritical ? "default" : "outline"}
-                  >
-                    {autoContainCritical ? "Enabled" : "Disabled"}
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 p-4 sm:p-5">
-                  <div>
-                    <h2 className="text-sm font-semibold">
-                      Realtime PagerDuty escalation on Critical incidents
-                    </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Immediately notify the primary on-call engineer when an incident is triaged as
-                      Critical.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setRealtimePagerDuty(!realtimePagerDuty);
-                      showToast(
-                        `PagerDuty escalation ${!realtimePagerDuty ? "enabled" : "disabled"}`,
-                      );
-                    }}
-                    size="sm"
-                    variant={realtimePagerDuty ? "default" : "outline"}
-                  >
-                    {realtimePagerDuty ? "Enabled" : "Disabled"}
-                  </Button>
-                </div>
-
-                <div className="flex items-center justify-between gap-4 p-4 sm:p-5">
-                  <div>
-                    <h2 className="text-sm font-semibold">Hardware WebAuthn MFA enforcement</h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Require FIDO2 security keys for all Security Admin and Incident Responder
-                      actions.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setEnforceStrictMfa(!enforceStrictMfa);
-                      showToast(`Strict MFA ${!enforceStrictMfa ? "enforced" : "relaxed"}`);
-                    }}
-                    size="sm"
-                    variant={enforceStrictMfa ? "default" : "outline"}
-                  >
-                    {enforceStrictMfa ? "Enforced" : "Optional"}
-                  </Button>
-                </div>
-              </section>
-            </>
+            <DashboardSettingsAndConnector
+              tenant={activeClientTenant}
+              onVerifyTenantSdk={handleVerifyTenantSdk}
+              showToast={showToast}
+              autoContainCritical={autoContainCritical}
+              setAutoContainCritical={setAutoContainCritical}
+              realtimePagerDuty={realtimePagerDuty}
+              setRealtimePagerDuty={setRealtimePagerDuty}
+              enforceStrictMfa={enforceStrictMfa}
+              setEnforceStrictMfa={setEnforceStrictMfa}
+            />
           )}
         </main>
 
@@ -4188,7 +4126,7 @@ function Dashboard() {
             role="dialog"
           >
             <form
-              className="w-full max-w-md border border-border bg-card p-5 shadow-2xl"
+              className="w-full max-w-md max-h-[92vh] overflow-y-auto border border-border bg-card p-4 sm:p-5 shadow-2xl"
               onSubmit={handleCreateIncident}
             >
               <div className="flex items-center justify-between border-b border-border pb-3">
@@ -4488,50 +4426,52 @@ function IncidentsSection({
                   </div>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-2 pl-5 sm:justify-end sm:pl-0">
+              <div className="flex flex-wrap items-center justify-between gap-2 pl-5 sm:justify-end sm:pl-0">
                 <span className="whitespace-nowrap text-xs text-muted-foreground">
                   {incident.time}
                 </span>
                 <StatusTag status={incident.status} />
-                <Button
-                  aria-label={`Inspect ${incident.id}`}
-                  className="h-8 px-2.5 text-xs"
-                  onClick={() => onInspect(incident.id)}
-                  size="sm"
-                  variant="ghost"
-                >
-                  <Eye className="size-3.5" /> Details
-                </Button>
-                {incident.status !== "Contained" ? (
+                <div className="flex items-center gap-1.5">
                   <Button
-                    aria-label={`Mark ${incident.id} as contained`}
-                    className="h-8 px-3 text-xs"
-                    onClick={() => onResolve(incident.id)}
+                    aria-label={`Inspect ${incident.id}`}
+                    className="h-8 px-2.5 text-xs"
+                    onClick={() => onInspect(incident.id)}
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                   >
-                    <Check /> Contain
+                    <Eye className="size-3.5" /> Details
                   </Button>
-                ) : (
+                  {incident.status !== "Contained" ? (
+                    <Button
+                      aria-label={`Mark ${incident.id} as contained`}
+                      className="h-8 px-3 text-xs"
+                      onClick={() => onResolve(incident.id)}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Check /> Contain
+                    </Button>
+                  ) : (
+                    <Button
+                      aria-label={`${incident.id} contained`}
+                      className="size-8 text-success"
+                      disabled
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <Check />
+                    </Button>
+                  )}
                   <Button
-                    aria-label={`${incident.id} contained`}
-                    className="size-8 text-success"
-                    disabled
+                    aria-label={`Delete ${incident.id}`}
+                    className="size-8 text-muted-foreground hover:text-destructive"
+                    onClick={() => onDelete(incident.id)}
                     size="icon"
                     variant="ghost"
                   >
-                    <Check />
+                    <Trash2 className="size-3.5" />
                   </Button>
-                )}
-                <Button
-                  aria-label={`Delete ${incident.id}`}
-                  className="size-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => onDelete(incident.id)}
-                  size="icon"
-                  variant="ghost"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
+                </div>
               </div>
             </article>
           ))
@@ -4596,8 +4536,15 @@ function AppSidebar({
   portalMode: "client" | "soc" | "admin";
   activeClientTenant: ClientTenant | null;
 }) {
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
+
+  const handleNavClick = (navKey: string) => {
+    onNavigate(navKey);
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   // Enterprise Cybersecurity SOC Navigation Groups (Section 18 Architecture)
   const socOverviewItems: Array<{
@@ -4729,7 +4676,7 @@ function AppSidebar({
     ...(isAdminSession
       ? [
           {
-            label: "Gemini AI Brain",
+            label: "SparrowX AI Brain",
             icon: Brain,
             count: "AI",
           },
@@ -4756,7 +4703,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
-    ...(isAdminSession ? [{ label: "Gemini AI Brain", icon: Brain, count: "AI" }] : []),
+    ...(isAdminSession ? [{ label: "SparrowX AI Brain", icon: Brain, count: "AI" }] : []),
     { label: "Protection Status & Verification", icon: ShieldCheck },
     { label: "Defense Updates & Intel", icon: Globe2 },
     ...(clientEnabledModules.includes("web_security")
@@ -4782,7 +4729,7 @@ function AppSidebar({
         icon: Users,
         count: tenantCount > 0 ? String(tenantCount) : undefined,
       },
-      { label: "Gemini AI Brain", icon: Brain, count: "AI" },
+      { label: "SparrowX AI Brain", icon: Brain, count: "AI" },
       { label: "Defense Updates & Intel", icon: Globe2 },
       { label: "Performance & Kill-Switch", icon: Activity },
       { label: "Error Monitoring", icon: AlertTriangle },
@@ -4834,7 +4781,7 @@ function AppSidebar({
             onClick={() =>
               isCollapsed
                 ? toggleSidebar()
-                : onNavigate(
+                : handleNavClick(
                     portalMode === "soc"
                       ? "Overview"
                       : isAdminSession
@@ -4923,7 +4870,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -4952,7 +4899,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -4981,7 +4928,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -5010,7 +4957,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -5039,7 +4986,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -5068,7 +5015,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -5097,7 +5044,7 @@ function AppSidebar({
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
                           isActive={isActive}
-                          onClick={() => onNavigate(item.navKey)}
+                          onClick={() => handleNavClick(item.navKey)}
                           tooltip={item.label}
                           className="font-medium"
                         >
@@ -5122,7 +5069,7 @@ function AppSidebar({
                     <SidebarMenuItem key={label}>
                       <SidebarMenuButton
                         isActive={activeNav === label}
-                        onClick={() => onNavigate(label)}
+                        onClick={() => handleNavClick(label)}
                         tooltip={label}
                       >
                         <Icon className="size-4 shrink-0" />
@@ -5141,7 +5088,7 @@ function AppSidebar({
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       isActive={activeNav === "Overview"}
-                      onClick={() => onNavigate("Overview")}
+                      onClick={() => handleNavClick("Overview")}
                       tooltip="Switch to SOC Command"
                     >
                       <ShieldAlert className="size-4 text-primary shrink-0" />
@@ -5162,7 +5109,7 @@ function AppSidebar({
                     <SidebarMenuItem key={label}>
                       <SidebarMenuButton
                         isActive={activeNav === label}
-                        onClick={() => onNavigate(label)}
+                        onClick={() => handleNavClick(label)}
                         tooltip={label}
                       >
                         <Icon className="size-4 shrink-0" />
@@ -5183,7 +5130,7 @@ function AppSidebar({
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         className="font-medium text-primary hover:text-primary"
-                        onClick={() => onNavigate("Overview")}
+                        onClick={() => handleNavClick("Overview")}
                         tooltip="SOC Operations & Live Telemetry"
                       >
                         <ShieldAlert className="size-4 text-primary shrink-0" />
@@ -5207,7 +5154,7 @@ function AppSidebar({
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       className="border border-sidebar-border bg-sidebar-accent/40 font-medium text-primary"
-                      onClick={() => onNavigate("My Services")}
+                      onClick={() => handleNavClick("My Services")}
                       tooltip="Back to Client Area"
                     >
                       <Boxes className="size-4 shrink-0" />
@@ -5218,7 +5165,7 @@ function AppSidebar({
                     <SidebarMenuItem key={label}>
                       <SidebarMenuButton
                         isActive={activeNav === label}
-                        onClick={() => onNavigate(label)}
+                        onClick={() => handleNavClick(label)}
                         tooltip={label}
                       >
                         <Icon className="size-4 shrink-0" />
@@ -5286,7 +5233,7 @@ function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={activeNav === "Troubleshooting & Docs" || activeNav === "Troubleshooting & Error Center"}
-              onClick={() => onNavigate("Troubleshooting & Docs")}
+              onClick={() => handleNavClick("Troubleshooting & Docs")}
               tooltip="Troubleshooting & Error Docs"
             >
               <BookOpen />
@@ -5296,7 +5243,7 @@ function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={activeNav === "Help center"}
-              onClick={() => onNavigate("Help center")}
+              onClick={() => handleNavClick("Help center")}
               tooltip="Help center"
             >
               <CircleHelp />
@@ -5306,7 +5253,7 @@ function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               isActive={activeNav === "Settings"}
-              onClick={() => onNavigate("Settings")}
+              onClick={() => handleNavClick("Settings")}
               tooltip="Settings"
             >
               <Menu />

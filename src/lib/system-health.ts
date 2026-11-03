@@ -276,7 +276,7 @@ export async function runSystemHealthProbe(): Promise<SystemOverallHealth> {
         latencyMs: 18,
         lastChecked: timeStr,
         details: apiKeyStored
-          ? "Gemini AI Brain connected with encrypted key. Prompt sandbox active."
+          ? "SparrowX AI Brain connected with encrypted key. Prompt sandbox active."
           : "Heuristic Prompt Shield & PII Redactor active.",
         uptimePct: 99.8,
       };

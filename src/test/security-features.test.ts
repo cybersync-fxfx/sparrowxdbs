@@ -141,8 +141,8 @@ describe("Advanced Security & AI Guardrail Features", () => {
     });
   });
 
-  describe("SparrowX Gemini AI Brain & Predictive Threat Memory", () => {
-    it("masks the Gemini API key in UI status and harvests telemetry into predictive block rules", () => {
+  describe("SparrowX AI Brain & Predictive Threat Memory", () => {
+    it("masks the AI Brain API key in UI status and harvests telemetry into predictive block rules", () => {
       const keyStatus = getMaskedBrainKeyStatus();
       expect(keyStatus.configured).toBe(true);
       expect(keyStatus.maskedKey).toContain("••••••••");
