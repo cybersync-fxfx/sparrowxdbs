@@ -312,21 +312,21 @@ export function generateEarthDayTexture(width = 2048, height = 1024): THREE.Canv
     ctx.closePath();
 
     if (cont.type === "polar") {
-      ctx.fillStyle = "#cadde8"; // Ice sheet
+      ctx.fillStyle = "#dceaf2"; // Polar ice sheet
     } else {
-      // Natural dark temperate green/brown
+      // Natural high-contrast temperate green/brown terrain
       const landGrad = ctx.createLinearGradient(0, 0, 0, height);
-      landGrad.addColorStop(0.1, "#182c1e");
-      landGrad.addColorStop(0.4, "#243c26");
-      landGrad.addColorStop(0.6, "#223b28");
-      landGrad.addColorStop(0.85, "#1c3222");
+      landGrad.addColorStop(0.08, "#1a3320");
+      landGrad.addColorStop(0.35, "#2d4e30");
+      landGrad.addColorStop(0.55, "#27482b");
+      landGrad.addColorStop(0.85, "#1e3b23");
       ctx.fillStyle = landGrad;
     }
     ctx.fill();
 
-    // High-tech crisp continental boundary line
-    ctx.strokeStyle = "rgba(0, 229, 255, 0.28)";
-    ctx.lineWidth = 1.2;
+    // High-tech crisp continental boundary line with subtle cyan glow
+    ctx.strokeStyle = "rgba(0, 229, 255, 0.48)";
+    ctx.lineWidth = 1.6;
     ctx.stroke();
   });
 

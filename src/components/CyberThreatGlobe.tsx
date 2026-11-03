@@ -148,6 +148,26 @@ interface ImpactPulse {
   color: THREE.Color;
 }
 
+// Helper to create glowing 3D city name labels
+function createTextSprite(text: string, isOrigin = false): THREE.Sprite {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 64;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    ctx.font = "bold 24px monospace";
+    ctx.fillStyle = isOrigin ? "#ff8800" : "#9ef5ff";
+    ctx.shadowColor = isOrigin ? "rgba(255, 120, 0, 0.8)" : "rgba(0, 229, 255, 0.8)";
+    ctx.shadowBlur = 8;
+    ctx.fillText(text, 10, 42);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(16, 4, 1);
+  return sprite;
+}
+
 export function CyberThreatGlobe({
   className = "",
   height = 560,
@@ -586,6 +606,8 @@ export function CyberThreatGlobe({
     cityPinsGroupRef.current = cityPinsGroup;
 
     const pinMeshes: { mesh: THREE.Mesh; city: ThreatCity }[] = [];
+    const cityLabelSprites: { sprite: THREE.Sprite; normal: THREE.Vector3 }[] = [];
+
     cities.forEach((city) => {
       const pos = latLonToVector3(city.lat, city.lon, R + 0.8);
 
@@ -616,6 +638,13 @@ export function CyberThreatGlobe({
       radarMesh.position.copy(pos);
       radarMesh.lookAt(pos.clone().multiplyScalar(2));
       cityPinsGroup.add(radarMesh);
+
+      // Floating 3D City Name Label Sprite
+      const labelSprite = createTextSprite(city.name, isOrigin);
+      const labelPos = pos.clone().add(pos.clone().normalize().multiplyScalar(2.6));
+      labelSprite.position.copy(labelPos);
+      cityPinsGroup.add(labelSprite);
+      cityLabelSprites.push({ sprite: labelSprite, normal: pos.clone().normalize() });
     });
 
     // 6. Groups for Arcs & Impact Shockwaves
@@ -716,6 +745,14 @@ export function CyberThreatGlobe({
         mat.opacity = 0.95 * (1 - age);
       }
 
+      // Dynamic LOD / Horizon Occlusion for City Label Sprites
+      const rot = earthGroup.rotation;
+      cityLabelSprites.forEach(({ sprite, normal }) => {
+        const worldNormal = normal.clone().applyEuler(rot);
+        // Only visible when on the front hemisphere facing camera
+        sprite.visible = worldNormal.z > 0.15;
+      });
+
       // City Hover Raycasting
       raycasterRef.current.setFromCamera(mouseNdcRef.current, camera);
       const intersects = raycasterRef.current.intersectObjects(
@@ -752,7 +789,20 @@ export function CyberThreatGlobe({
       });
     }, 400);
 
-    // Handle Resize
+    // Dynamic ResizeObserver for responsive fluid scaling
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const w = entry.contentRect.width;
+        const h = entry.contentRect.height || (typeof height === "number" ? height : 560);
+        if (w > 0 && h > 0) {
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h, false);
+        }
+      }
+    });
+    resizeObserver.observe(container);
+
     const handleResize = () => {
       if (!container || !renderer || !camera) return;
       const newRect = container.getBoundingClientRect();
@@ -769,7 +819,14 @@ export function CyberThreatGlobe({
     return () => {
       cancelAnimationFrame(animId);
       clearInterval(statsInterval);
+      resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
+
+      // Dispose city label sprites & textures
+      cityLabelSprites.forEach(({ sprite }) => {
+        sprite.material.map?.dispose();
+        sprite.material.dispose();
+      });
 
       // Dispose textures
       earthDayTex.dispose();
