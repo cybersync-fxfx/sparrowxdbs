@@ -349,7 +349,7 @@ export async function applyThreatIntelToDefenseSystem(params: {
         ufwRule: item.ufwRule,
         aiShieldPolicy: item.aiShieldPolicy,
         status: "Auto-Blocking Future Hits",
-        preventedFutureHits: Math.floor(45 + Math.random() * 150),
+        preventedFutureHits: 0,
       };
 
       newPatterns.push(pattern);

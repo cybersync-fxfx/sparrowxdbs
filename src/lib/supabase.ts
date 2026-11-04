@@ -332,10 +332,14 @@ export function computeLiveSnapshot(
   const score = Math.max(0, Math.min(100, 100 - penalty));
 
   const totalProtected = assets.length + protectedServices.length;
-  const blockedTotal =
-    protectedServices.reduce((sum, s) => sum + (Number(s.blockedThreats) || 0), 0) +
-    threatIndicators.filter((t) => t.blocked).length;
-  const totalEventsCount = incidents.length + blockedTotal + threatIndicators.length;
+  // HONEST COUNTING: "blocked" only means attacks actually reported as blocked by a
+  // connected service/connector. Threat-feed IOCs that were merely added to the
+  // blocklist are NOT attacks against any customer target, so they are excluded here.
+  const blockedTotal = protectedServices.reduce(
+    (sum, s) => sum + (Number(s.blockedThreats) || 0),
+    0,
+  );
+  const totalEventsCount = incidents.length + blockedTotal;
 
   const containedCount = incidents.filter((i) => i.status === "Contained").length;
   const containmentRatio =
@@ -355,25 +359,31 @@ export function computeLiveSnapshot(
 
     const recordTimestamp = (timeStr?: string) => {
       if (!timeStr) return;
-      const parsed = Date.parse(timeStr);
-      let eventTime: number;
-      if (!Number.isNaN(parsed)) {
-        eventTime = parsed;
-      } else {
-        // Fallback for non-ISO time formats (e.g. "14:20") to recent window
-        eventTime = now;
+      let parsed = Date.parse(timeStr);
+      // Support "HH:MM" / "HH:MM AM" incident times recorded today
+      if (Number.isNaN(parsed)) {
+        const m = timeStr.trim().match(/^(\d{1,2}):(\d{2})(?:\s*([AaPp])\.?[Mm]\.?)?$/);
+        if (m) {
+          let h = Number(m[1]);
+          const ap = m[3]?.toLowerCase();
+          if (ap === "p" && h < 12) h += 12;
+          if (ap === "a" && h === 12) h = 0;
+          const d = new Date(now);
+          d.setHours(h, Number(m[2]), 0, 0);
+          parsed = d.getTime();
+        }
       }
+      // Only plot events with a real, parseable timestamp — never invent a "now" spike
+      if (Number.isNaN(parsed)) return;
+      const eventTime = parsed;
       const age = now - eventTime;
       if (age >= 0 && age <= rangeMs) {
         const bucketIdx = Math.min(11, Math.max(0, 11 - Math.floor(age / bucketInterval)));
         buckets[bucketIdx] = (buckets[bucketIdx] ?? 0) + 1;
-      } else {
-        buckets[11] = (buckets[11] ?? 0) + 1;
       }
     };
 
     incidents.forEach((i) => recordTimestamp(i.time));
-    threatIndicators.forEach((t) => recordTimestamp(t.lastSeen));
     protectedServices.forEach((s) => {
       if (s.blockedThreats > 0) {
         buckets[11] = (buckets[11] ?? 0) + s.blockedThreats;

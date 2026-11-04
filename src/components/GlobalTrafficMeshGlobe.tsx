@@ -397,93 +397,6 @@ export async function resolveDomainLiveDns(rawDomain: string): Promise<{
   };
 }
 
-// Generate organic stream of network packets
-function createSampleNetworkPacket(origin: OriginHostConfig): LiveConnectionPacket {
-  const visitor = GLOBAL_VISITOR_NODES[Math.floor(Math.random() * GLOBAL_VISITOR_NODES.length)];
-  const fourthOctet = Math.floor(2 + Math.random() * 250);
-  const clientIp = `${visitor.ipPrefix}.${fourthOctet}`;
-
-  const roll = Math.random();
-  let status: ConnectionStatus = "ALLOWED";
-  let httpCode = 200;
-  let threatDetails: string | undefined = undefined;
-  let guardrailAction: string | undefined = undefined;
-  let path = "/api/v1/auth/session";
-  let method: LiveConnectionPacket["method"] = "GET";
-
-  if (roll < 0.74) {
-    status = "ALLOWED";
-    const normalPaths = [
-      "/dashboard",
-      "/api/v1/user/profile",
-      "/products/pricing",
-      "/checkout/intent",
-      "/static/bundle.min.js",
-      "/graphql?query=GetWorkspace",
-      "/api/v2/metrics",
-    ];
-    path = normalPaths[Math.floor(Math.random() * normalPaths.length)];
-    method = path.includes("intent") || path.includes("session") ? "POST" : "GET";
-    httpCode = method === "POST" ? 201 : 200;
-  } else if (roll < 0.89) {
-    status = "BLOCKED";
-    const attackTypes = [
-      { path: "/wp-login.php", details: "Unauthorized Probe / CMS Exploit Scan", code: 403, method: "POST" as const },
-      { path: "/api/search?q=UNION+SELECT+null,password", details: "SQL Injection Vector (WAF Rule #942100)", code: 403, method: "GET" as const },
-      { path: "/api/users/profile", details: "Cross-Site Scripting (XSS) Tag Injection", code: 403, method: "POST" as const },
-      { path: "/.env", details: "Sensitive File & Credential Reconnaissance", code: 404, method: "GET" as const },
-      { path: "/auth/login", details: "Brute-Force Credential Stuffing Burst", code: 401, method: "POST" as const },
-      { path: "/internal/metadata", details: "SSRF Attack targeting Cloud IMDSv2", code: 403, method: "GET" as const },
-    ];
-    const picked = attackTypes[Math.floor(Math.random() * attackTypes.length)];
-    path = picked.path;
-    threatDetails = picked.details;
-    httpCode = picked.code;
-    method = picked.method;
-  } else if (roll < 0.94) {
-    status = "RATE_LIMITED";
-    path = "/api/v1/ingest/telemetry";
-    method = "POST";
-    httpCode = 429;
-    threatDetails = "High Velocity Burst (>180 req/s from single ASN)";
-  } else {
-    status = "AI_GUARDED";
-    path = "/api/v1/ai/agent/execute";
-    method = "POST";
-    httpCode = 200;
-    guardrailAction = "SparrowX LLM Prompt Shield Verified · 0 Data Leaks";
-  }
-
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-  return {
-    id: `pkt-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
-    timestamp: timeStr,
-    rawTime: Date.now(),
-    clientIp,
-    clientGeo: {
-      lat: visitor.lat,
-      lng: visitor.lng,
-      country: visitor.country,
-      countryCode: visitor.countryCode,
-      city: visitor.city,
-      flag: visitor.flag,
-    },
-    originIp: origin.ip,
-    originName: origin.name,
-    method,
-    path,
-    status,
-    httpCode,
-    latencyMs: Math.floor(origin.baseLatencyMs + Math.random() * 85),
-    bytes: Math.floor(412 + Math.random() * 3200),
-    userAgent: `${visitor.isp} Gateway`,
-    threatDetails,
-    guardrailAction,
-  };
-}
-
 // ==========================================
 // Main Component
 // ==========================================
@@ -511,8 +424,6 @@ export function GlobalTrafficMeshGlobe({
   const [activeOriginId, setActiveOriginId] = useState<string>("");
   const [globeVisualEngine, setGlobeVisualEngine] = useState<"threat_matrix" | "infrastructure">("threat_matrix");
   const [filterMode, setFilterMode] = useState<"ALL" | "ALLOWED" | "BLOCKED" | "AI">("ALL");
-  const [isStreaming, setIsStreaming] = useState<boolean>(false);
-  const [streamSpeedMs, setStreamSpeedMs] = useState<number>(650);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedPacket, setSelectedPacket] = useState<LiveConnectionPacket | null>(null);
   const [showIntegrationGuide, setShowIntegrationGuide] = useState<boolean>(false);
@@ -766,7 +677,6 @@ export function GlobalTrafficMeshGlobe({
 
   // Packets & Animation State (Starts empty on clean workspace)
   const [packets, setPackets] = useState<LiveConnectionPacket[]>([]);
-
   const arcsRef = useRef<ConnectionArc[]>([]);
   const ripplesRef = useRef<RippleWave[]>([]);
   const rotationRef = useRef<{ x: number; y: number; dragStart: { x: number; y: number } | null; isDragging: boolean }>({
@@ -776,54 +686,45 @@ export function GlobalTrafficMeshGlobe({
     isDragging: false,
   });
 
-  // 1. Packet Streaming Engine
-  useEffect(() => {
-    if (!isStreaming || !activeOrigin) return;
-    const interval = window.setInterval(() => {
-      const newPkt = createSampleNetworkPacket(activeOrigin);
-
+  // 1. Packet feed: REAL TELEMETRY ONLY.
+  // The previous random packet simulator (fake visitors + fake "BLOCKED" attacks) has been
+  // removed. Connections only appear here when a real connector reports traffic, so a site
+  // that is not connected always shows 0 allowed / 0 blocked.
+  const pushRealPacket = useCallback(
+    (newPkt: LiveConnectionPacket) => {
+      if (!activeOrigin) return;
       setPackets((prev) => [newPkt, ...prev.slice(0, 50)]);
 
       let color = "#10b981";
-      let glowColor = "rgba(16, 185, 129, 0.65)";
+      if (newPkt.status === "BLOCKED") color = "#ef4444";
+      else if (newPkt.status === "RATE_LIMITED") color = "#f59e0b";
+      else if (newPkt.status === "AI_GUARDED") color = "#06b6d4";
 
-      if (newPkt.status === "BLOCKED") {
-        color = "#ef4444";
-        glowColor = "rgba(239, 68, 68, 0.75)";
-      } else if (newPkt.status === "RATE_LIMITED") {
-        color = "#f59e0b";
-        glowColor = "rgba(245, 158, 11, 0.75)";
-      } else if (newPkt.status === "AI_GUARDED") {
-        color = "#06b6d4";
-        glowColor = "rgba(6, 182, 212, 0.75)";
-      }
-
-      const arc: ConnectionArc = {
-        id: `arc-${newPkt.id}`,
-        packet: newPkt,
-        startGeo: newPkt.clientGeo,
-        endGeo: activeOrigin.geo,
-        progress: 0,
-        duration: Math.floor(40 + Math.random() * 25),
-        color,
-        glowColor,
-      };
-
-      arcsRef.current = [...arcsRef.current.slice(-28), arc];
-
-      // Concentric impact shockwaves expanding from Origin Host Pin
+      arcsRef.current = [
+        ...arcsRef.current.slice(-28),
+        {
+          id: `arc-${newPkt.id}`,
+          packet: newPkt,
+          startGeo: newPkt.clientGeo,
+          endGeo: activeOrigin.geo,
+          progress: 0,
+          duration: 50,
+          color,
+          glowColor: color,
+        },
+      ];
       ripplesRef.current.push({
-        id: `rip-${Date.now()}-${Math.random()}`,
+        id: `rip-${newPkt.id}`,
         geo: activeOrigin.geo,
         radius: 4,
         maxRadius: 28,
         alpha: 0.95,
         color,
       });
-    }, streamSpeedMs);
-
-    return () => window.clearInterval(interval);
-  }, [isStreaming, streamSpeedMs, activeOrigin]);
+    },
+    [activeOrigin],
+  );
+  void pushRealPacket;
 
   // 2. Ultra-Detailed 3D Canvas Rendering Loop (HiDPI + Solid Continent Outlines + Depth Shading)
   useEffect(() => {
@@ -1286,18 +1187,26 @@ export default sparrowxShield;
               <Globe2 className="size-3.5" />
               Real-Time Global Traffic & Threat Mesh
             </span>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] text-emerald-400">
-              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-              Live Inbound Stream Active
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[11px] ${
+                packets.length > 0
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                  : "border-border bg-background text-muted-foreground"
+              }`}
+            >
+              <span
+                className={`size-2 rounded-full ${packets.length > 0 ? "bg-emerald-400 animate-pulse" : "bg-zinc-500"}`}
+              />
+              {packets.length > 0 ? "Receiving Real Traffic" : "No Traffic Received Yet"}
             </span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[28px]">
-            Live Global Network Connections & Origin Host Mesh
+            Live Global Network Connections &amp; Origin Host Mesh
           </h1>
           <p className="mt-1 text-xs text-muted-foreground max-w-3xl leading-relaxed">
-            Visualizes every incoming connection from all countries in real time—including legitimate
-            traffic (200 OK), WAF blocked attacks (403), rate-limited bursts (429), and AI agent calls.
-            Curved 3D ballistic arcs stream directly into your webapp’s host origin server.
+            Shows real connections reported by your installed SparrowX connector—allowed traffic
+            (200 OK), WAF blocks (403), rate limits (429), and AI agent calls. If your site is not
+            connected, nothing is shown and nothing is counted.
           </p>
         </div>
 
@@ -1322,27 +1231,6 @@ export default sparrowxShield;
           >
             <Terminal className="size-3.5 text-primary" />
             Connect Your Server SDK
-          </Button>
-
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setIsStreaming((prev) => !prev)}
-            className={`h-9 gap-1.5 text-xs font-semibold ${
-              isStreaming
-                ? "bg-secondary text-foreground hover:bg-secondary/80"
-                : "bg-primary text-primary-foreground"
-            }`}
-          >
-            {isStreaming ? (
-              <>
-                <Pause className="size-3.5" /> Pause Feed
-              </>
-            ) : (
-              <>
-                <Play className="size-3.5" /> Resume Feed
-              </>
-            )}
           </Button>
         </div>
       </section>
@@ -1465,25 +1353,9 @@ export default sparrowxShield;
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] text-muted-foreground">Stream Velocity:</span>
-              {[
-                { label: "Normal (1.2s)", ms: 1200 },
-                { label: "Live (650ms)", ms: 650 },
-                { label: "Stress (250ms)", ms: 250 },
-              ].map((v) => (
-                <button
-                  key={v.ms}
-                  type="button"
-                  onClick={() => setStreamSpeedMs(v.ms)}
-                  className={`rounded px-2 py-1 font-mono text-[10px] font-semibold transition-colors ${
-                    streamSpeedMs === v.ms
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border bg-background text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {v.label}
-                </button>
-              ))}
+              <span className="rounded border border-border bg-background px-2 py-1 font-mono text-[10px] text-muted-foreground">
+                Real connector telemetry only · no simulated traffic
+              </span>
             </div>
           </div>
 
@@ -1757,7 +1629,7 @@ export default sparrowxShield;
             {/* Bottom Ticker Strip */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-card/90 px-4 py-2.5 text-xs font-mono">
               <div className="flex items-center gap-2 font-sans">
-                <Radio className={`size-3.5 ${isStreaming ? "text-primary animate-pulse" : "text-zinc-500"}`} />
+                <Radio className={`size-3.5 ${packets.length > 0 ? "text-primary animate-pulse" : "text-zinc-500"}`} />
                 <span className="font-semibold text-foreground">Latest Inbound Connection:</span>
                 {packets[0] ? (
                   <span className="font-mono text-[11px] text-muted-foreground flex items-center gap-1.5 flex-wrap">
@@ -1779,7 +1651,7 @@ export default sparrowxShield;
                   </span>
                 ) : (
                   <span className="text-zinc-500 font-mono text-[11px]">
-                    {isStreaming ? "Listening for network packets..." : "Stream paused · Waiting for connection"}
+                    No real traffic received yet · connect your website or server in Settings → Connectors
                   </span>
                 )}
               </div>

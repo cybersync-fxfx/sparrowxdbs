@@ -2322,10 +2322,10 @@ function Dashboard() {
                     value={String(protectedServices.length + assets.length)}
                   />
                   <MetricCard
-                    change="Perimeter drops"
-                    footnote="threat blocklist"
+                    change="Threat-feed IOCs"
+                    footnote="IPs on blocklist (not attacks)"
                     icon={<Globe2 />}
-                    label="Blocked threats"
+                    label="Blocklist entries"
                     trend="up"
                     value={String(threatIndicators.filter((i) => i.blocked).length)}
                   />

@@ -179,7 +179,7 @@ const INITIAL_LEARNED_PATTERNS: LearnedThreatPattern[] = [
     ufwRule: `sudo ufw insert 1 deny from 185.220.101.44 to any comment "SPX-MEM-901 AI Brain Auto-Block"`,
     aiShieldPolicy: "N/A (HTTP Edge Layer)",
     status: "Auto-Blocking Future Hits",
-    preventedFutureHits: 142,
+    preventedFutureHits: 0,
   },
   {
     id: "SPX-MEM-902",
@@ -199,7 +199,7 @@ const INITIAL_LEARNED_PATTERNS: LearnedThreatPattern[] = [
     ufwRule: `# Enforced at SparrowX AI Prompt Firewall Layer (SPX-MEM-902)`,
     aiShieldPolicy: `DENY tool_call IF prompt_entropy > 0.82 OR matches(/ignore.*prior.*instructions/i)`,
     status: "Auto-Blocking Future Hits",
-    preventedFutureHits: 89,
+    preventedFutureHits: 0,
   },
   {
     id: "SPX-MEM-903",
@@ -218,7 +218,7 @@ const INITIAL_LEARNED_PATTERNS: LearnedThreatPattern[] = [
     ufwRule: `sudo ufw insert 1 deny from 45.155.205.0/24 to any comment "SPX-MEM-903 AI Brain Subnet Block"`,
     aiShieldPolicy: `THROTTLE token_consumption IF client_ip IN 45.155.205.0/24`,
     status: "Auto-Blocking Future Hits",
-    preventedFutureHits: 318,
+    preventedFutureHits: 0,
   },
 ];
 
@@ -462,7 +462,7 @@ export function harvestTelemetryIntoAiMemory(input: {
         ? `BLOCK prompt IF semantic_similarity("${inc.title}") > 0.78`
         : `ENFORCE strict OWASP + rate-limit on ${inc.source}`,
       status: "Auto-Blocking Future Hits",
-      preventedFutureHits: Math.floor(12 + Math.random() * 45),
+      preventedFutureHits: 0,
     };
     newlyLearned.push(pattern);
   }
@@ -494,7 +494,7 @@ export function harvestTelemetryIntoAiMemory(input: {
         : `# Domain/Hash IOC ${ioc.indicator} blocked at SparrowX DNS & HTTP Edge Filter`,
       aiShieldPolicy: `DENY outbound tool fetch to ${ioc.indicator}`,
       status: "Auto-Blocking Future Hits",
-      preventedFutureHits: Math.floor(18 + Math.random() * 60),
+      preventedFutureHits: 0,
     };
     newlyLearned.push(pattern);
   }
@@ -522,7 +522,7 @@ export function harvestTelemetryIntoAiMemory(input: {
       ufwRule: `# Virtual Patch ${vuln.cve} enforced at SparrowX L7 Edge Proxy`,
       aiShieldPolicy: `SANDBOX code execution touching ${vuln.packageName}`,
       status: "Auto-Blocking Future Hits",
-      preventedFutureHits: Math.floor(8 + Math.random() * 30),
+      preventedFutureHits: 0,
     };
     newlyLearned.push(pattern);
   }
@@ -669,7 +669,7 @@ Based on live correlation across **${digest.totalIncidents} incident(s)**, **${d
 #### 1. Immediate Future-Problem Blockers Learned
 - **Active Memory Signatures Enforced:** \`${learnedPatterns.length}\` adaptive patterns actively filtering inbound traffic.
 - **Unblocked Threat Indicators Flagged:** \`${digest.unblockedIocsCount}\` indicator(s) ready for 1-click perimeter quarantine.
-- **Top Learned Signature (\`${topPattern?.id ?? "SPX-MEM-901"}\`):** ${topPattern?.vectorName ?? "SQLi & Prompt Injection Edge Filter"} — already prevented **${topPattern?.preventedFutureHits ?? 142}** repeat attempts.
+- **Top Learned Signature (\`${topPattern?.id ?? "SPX-MEM-901"}\`):** ${topPattern?.vectorName ?? "SQLi & Prompt Injection Edge Filter"} — actively enforced across edge rules (${topPattern?.preventedFutureHits ?? 0} matches).
 
 #### 2. Generated Zero-Trust Block Rules (Ready to Deploy)
 \`\`\`javascript
@@ -781,7 +781,7 @@ export async function analyzeAndLearnCustomThreatPayload(params: {
     ufwRule: `# L7 Signature [${shortToken}] enforced across SparrowX Edge WAF nodes`,
     aiShieldPolicy: `REJECT input IF contains(${JSON.stringify(shortToken)})`,
     status: "Auto-Blocking Future Hits",
-    preventedFutureHits: 1,
+    preventedFutureHits: 0,
   };
 
   const existing = getLearnedThreatPatterns();

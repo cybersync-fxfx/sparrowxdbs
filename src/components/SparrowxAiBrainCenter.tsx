@@ -1153,7 +1153,7 @@ export function SparrowxAiBrainCenter({
                     </div>
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
                       <CheckCircle2 className="size-3" />
-                      {pat.status} ({pat.preventedFutureHits} blocked)
+                      {pat.status} {pat.preventedFutureHits > 0 ? `(${pat.preventedFutureHits} blocked)` : "(Enforced)"}
                     </span>
                   </div>
 
@@ -1227,7 +1227,7 @@ export function SparrowxAiBrainCenter({
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
                     <CheckCircle2 className="size-3" />
-                    {pat.status} ({pat.preventedFutureHits} blocked)
+                    {pat.status} {pat.preventedFutureHits > 0 ? `(${pat.preventedFutureHits} blocked)` : "(Enforced)"}
                   </span>
                 </div>
 
