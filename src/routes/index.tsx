@@ -2345,7 +2345,7 @@ function Dashboard() {
                       <div>
                         <h2 className="text-base font-semibold">Threat & telemetry activity</h2>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Live security events, IOCs, and blocked threats ({range})
+                          Live telemetry events and blocked attacks ({range})
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
