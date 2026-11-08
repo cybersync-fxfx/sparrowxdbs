@@ -1,8 +1,8 @@
 # ============================================================================
 # SPARROWX FULL-STACK SELF-HOSTED COMPOSE (OVH UBUNTU SERVER)
 # ============================================================================
-# Runs PostgreSQL 16 + PostgREST (/rest/v1/*) + SparrowX UI/API + Nginx (80/443)
-# 100% on your own OVH Ubuntu machine with zero external third-party clouds.
+# All host ports dynamically adapt via .env (HTTP_PORT, HTTPS_PORT,
+# PG_HOST_PORT, PGRST_HOST_PORT, APP_HOST_PORT) so port conflicts never occur.
 # ============================================================================
 
 services:
@@ -18,12 +18,12 @@ services:
       - sparrowx_pgdata:/var/lib/postgresql/data
       - ./ovh/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${PG_HOST_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sparrowx} -d ${POSTGRES_DB:-sparrowx_db}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 15
 
   postgrest:
     image: postgrest/postgrest:v12.2.3
@@ -38,7 +38,7 @@ services:
       PGRST_DB_ANON_ROLE: web_anon
       PGRST_SERVER_PORT: 3001
     ports:
-      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:${PGRST_HOST_PORT:-3001}:3001"
 
   sparrowx:
     build:
@@ -60,11 +60,13 @@ services:
       SPARROWX_NS1: ${SPARROWX_NS1:-ns1.localhost}
       SPARROWX_NS2: ${SPARROWX_NS2:-ns2.localhost}
       SPARROWX_ADMIN_EMAIL: ${SPARROWX_ADMIN_EMAIL:-admin@localhost}
+      SPARROWX_HTTP_PORT: ${HTTP_PORT:-80}
+      SPARROWX_HTTPS_PORT: ${HTTPS_PORT:-443}
       VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY:-}
     volumes:
       - sparrowx_appdata:/app/data
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${APP_HOST_PORT:-3000}:3000"
 
   nginx:
     image: nginx:1.27-alpine
@@ -74,8 +76,8 @@ services:
       - sparrowx
       - postgrest
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./ovh/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./ovh/ssl:/etc/nginx/ssl:ro
