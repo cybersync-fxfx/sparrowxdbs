@@ -4774,6 +4774,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
+    { label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
     ...(isAdminSession ? [{ label: "SparrowX AI Brain", icon: Brain, count: "AI" }] : []),
     { label: "Protection Status & Verification", icon: ShieldCheck },
     { label: "Defense Updates & Intel", icon: Globe2 },
@@ -4800,6 +4801,7 @@ function AppSidebar({
         icon: Users,
         count: tenantCount > 0 ? String(tenantCount) : undefined,
       },
+      { label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
       { label: "SparrowX AI Brain", icon: Brain, count: "AI" },
       { label: "Defense Updates & Intel", icon: Globe2 },
       { label: "Performance & Kill-Switch", icon: Activity },
@@ -4815,8 +4817,10 @@ function AppSidebar({
     ];
 
   const isInClientArea =
-    !isAdminSession &&
+    portalMode === "client" &&
     (activeNav === "My Services" ||
+      activeNav === "Global Traffic Mesh" ||
+      activeNav === "Global Traffic Mesh (Live 3D)" ||
       activeNav === "Protection Status & Verification" ||
       activeNav === "Protection Verification" ||
       activeNav === "Defense Updates" ||
