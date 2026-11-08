@@ -125,12 +125,23 @@ log_ok "Kernel SYN-cookie shield, anti-spoofing, Fail2Ban, and unattended CVE up
 
 # 4. Configure Nginx for both Main Domain and Separate Supabase Studio Domain
 log_info "[Step 3/6] Configuring Nginx reverse proxy for ${SPARROWX_DOMAIN} & ${SPARROWX_STUDIO_DOMAIN}..."
-mkdir -p "${INSTALL_DIR}/ovh" "${INSTALL_DIR}/data/users"
+mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/data/users"
+if [ ! -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ] || [ ! -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
+  openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+    -keyout "${INSTALL_DIR}/ovh/ssl/privkey.pem" \
+    -out "${INSTALL_DIR}/ovh/ssl/fullchain.pem" \
+    -subj "/CN=${SPARROWX_DOMAIN}" >/dev/null 2>&1 || true
+fi
+
 cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 # 1. Main SparrowX Command Center (${SPARROWX_DOMAIN})
 server {
     listen 80 default_server;
-    server_name ${SPARROWX_DOMAIN} _;
+    listen 443 ssl default_server;
+    server_name ${SPARROWX_DOMAIN} www.${SPARROWX_DOMAIN} _;
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 25M;
     server_tokens off;
 
@@ -139,11 +150,10 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location /rest/v1/ {
-        proxy_pass http://postgrest:3001/;
+        proxy_pass http://sparrowx:3000/rest/v1/;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
-        proxy_hide_header Content-Location;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
@@ -165,12 +175,16 @@ server {
 # 2. Separate Dedicated Supabase Studio Admin Dashboard (${SPARROWX_STUDIO_DOMAIN})
 server {
     listen 80;
+    listen 443 ssl;
     server_name ${SPARROWX_STUDIO_DOMAIN};
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 25M;
     server_tokens off;
 
     location /rest/v1/ {
-        proxy_pass http://postgrest:3001/;
+        proxy_pass http://sparrowx:3000/rest/v1/;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         add_header Access-Control-Allow-Origin "*" always;

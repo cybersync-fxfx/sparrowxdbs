@@ -3577,6 +3577,13 @@ export function ClientOnboardingWizard({
       const clean = tenant.primaryDomain.replace(/^https?:\/\//, "").split("/")[0] || "example.com";
       const res = await runLivePublicDomainScan(clean);
       setConnectionAudit(res);
+      if (!res.hasSparrowxVerification) {
+        const missingMsg = `Setup Not Detected on ${clean}: DNS resolved (${res.resolvedIps[0] ?? "OK"}), but no SparrowX SDK middleware beacon or _sparrowx DNS TXT record was found on your domain yet. Deploy the SDK snippet from Step 1 onto your server first.`;
+        setTroubleshootingNote(missingMsg);
+        setActiveStep(4);
+        showToast(missingMsg);
+        return;
+      }
       await onVerifyTenantSdk(tenant);
       setActiveStep(5);
       showToast(
@@ -3588,7 +3595,7 @@ export function ClientOnboardingWizard({
           ? err.message
           : "Connection handshake timed out. Check your endpoint URL or firewall allowlist.";
       setTroubleshootingNote(errMsg);
-      showToast(errMsg, "error");
+      showToast(errMsg);
     } finally {
       setIsVerifyingConnection(false);
     }

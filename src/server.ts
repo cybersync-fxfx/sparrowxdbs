@@ -67,40 +67,51 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
   const match = url.pathname.match(/^\/rest\/v1\/([a-zA-Z0-9_]+)$/);
   if (!match) return null;
   const tableName = match[1];
-
-  // If running alongside self-hosted PostgREST container on OVH Ubuntu, proxy directly to PostgREST
-  const postgrestInternal = process.env.POSTGREST_INTERNAL_URL;
-  if (postgrestInternal) {
-    try {
-      const upstreamUrl = `${postgrestInternal.replace(/\/+$/, "")}/${tableName}${url.search}`;
-      const upstreamRes = await fetch(upstreamUrl, {
-        method: request.method,
-        headers: {
-          "Content-Type": request.headers.get("Content-Type") || "application/json",
-          Accept: request.headers.get("Accept") || "application/json",
-          ...(request.headers.get("Prefer") ? { Prefer: request.headers.get("Prefer")! } : {}),
-        },
-        body:
-          request.method !== "GET" && request.method !== "HEAD"
-            ? await request.clone().text()
-            : undefined,
-      });
-      if (upstreamRes.ok) {
-        const bodyText = await upstreamRes.text();
-        return new Response(bodyText, {
-          status: upstreamRes.status,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
-      }
-    } catch {
-      // Fall through to built-in sovereign table store if PostgREST container is starting up
-    }
-  }
-
   const rows = getTableRows(tableName);
 
+  // If running alongside self-hosted PostgREST container on OVH Ubuntu, sync & merge with PostgREST
+  const postgrestInternal = process.env.POSTGREST_INTERNAL_URL || "http://127.0.0.1:3001";
   if (request.method === "GET") {
-    let result = rows.filter((row) => matchesPostgrestFilters(row, url.searchParams));
+    let combinedRows = [...rows];
+    try {
+      const upstreamUrl = `${postgrestInternal.replace(/\/+$/, "")}/${tableName}`;
+      const upstreamRes = await fetch(upstreamUrl, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
+      if (upstreamRes.ok) {
+        const pgRows = (await upstreamRes.json()) as Array<Record<string, unknown>>;
+        if (Array.isArray(pgRows) && pgRows.length > 0) {
+          const seenKeys = new Set<string>();
+          const merged: Array<Record<string, unknown>> = [];
+          const getKey = (r: Record<string, unknown>) =>
+            tableName === "app_users"
+              ? String(r.email ?? r.id ?? "").trim().toLowerCase()
+              : String(r.id ?? "");
+
+          for (const pgRow of pgRows) {
+            const k = getKey(pgRow);
+            if (k) seenKeys.add(k);
+            merged.push(pgRow);
+          }
+          for (const memRow of rows) {
+            const k = getKey(memRow);
+            if (!k || !seenKeys.has(k)) {
+              if (k) seenKeys.add(k);
+              merged.push(memRow);
+            }
+          }
+          combinedRows = merged;
+        }
+      }
+    } catch {
+      // PostgREST container not reachable; use in-memory + migratedSeedData store
+    }
+
+    let result = combinedRows.filter((row) => matchesPostgrestFilters(row, url.searchParams));
     const orderParam = url.searchParams.get("order");
     if (orderParam) {
       const [col, dir] = orderParam.split(".");
@@ -121,6 +132,26 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
       status: 200,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
+  }
+
+  // Forward write operations (POST / PATCH / DELETE) to PostgREST in background/parallel while updating memory store
+  const clonedBodyText =
+    request.method !== "GET" && request.method !== "HEAD"
+      ? await request.clone().text()
+      : undefined;
+  try {
+    const upstreamUrl = `${postgrestInternal.replace(/\/+$/, "")}/${tableName}${url.search}`;
+    await fetch(upstreamUrl, {
+      method: request.method,
+      headers: {
+        "Content-Type": request.headers.get("Content-Type") || "application/json",
+        Accept: request.headers.get("Accept") || "application/json",
+        ...(request.headers.get("Prefer") ? { Prefer: request.headers.get("Prefer")! } : {}),
+      },
+      body: clonedBodyText,
+    });
+  } catch {
+    // Ignore if PostgREST container is offline; memory store handles it below
   }
 
   if (request.method === "POST") {

@@ -150,9 +150,10 @@ export function ClientIntegrationModal({
   const handleRunDiagnostic = async () => {
     setIsDiagnosing(true);
     try {
+      const targetEndpoint = customEndpoint.trim() || service.endpoint;
       const res = await runAutomatedServiceDiagnostic({
         ...service,
-        endpoint: customEndpoint.trim() || service.endpoint,
+        endpoint: targetEndpoint,
       });
       setDiagnosticResult(res);
       setIsDiagnosing(false);
@@ -167,7 +168,7 @@ export function ClientIntegrationModal({
         .slice(0, 8)}`;
       setVerificationBadgeId(generatedBadge);
 
-      if (res.overallStatus === "healthy") {
+      if (res.handshakeVerified) {
         notifySuccess(
           `Automated diagnostic passed — ${service.name} is verified active (${res.avgLatencyMs}ms RTT)`,
           {
@@ -179,16 +180,11 @@ export function ClientIntegrationModal({
         if (onVerificationComplete) {
           await onVerificationComplete(service.id);
         }
-      } else if (res.overallStatus === "warning") {
-        showToast("Diagnostic check passed with configuration warnings");
-        if (onVerificationComplete) {
-          await onVerificationComplete(service.id);
-        }
       } else {
         notifyError("SDK_HANDSHAKE_FAILED", {
           target: service.name,
           category: "SDK & Diagnostic",
-          customMessage: `Diagnostic check failed for ${service.name}. Network handshake timed out.`,
+          customMessage: `Setup incomplete for ${targetEndpoint}: No SparrowX SDK middleware beacon or _sparrowx DNS TXT record detected yet. Install the SDK snippet above on your server/site first.`,
           retryAction: handleRunDiagnostic,
         });
       }
@@ -205,19 +201,28 @@ export function ClientIntegrationModal({
   const handleSendLiveProbe = async () => {
     setIsSendingProbe(true);
     try {
-      const start = performance.now();
-      if (supabaseUrl) {
-        await fetch(`${supabaseUrl}/rest/v1/client_tenants?id=eq.${service.id}&select=id`, {
-          headers: getSupabaseHeaders(),
+      const targetEndpoint = customEndpoint.trim() || service.endpoint;
+      const res = await runAutomatedServiceDiagnostic({
+        ...service,
+        endpoint: targetEndpoint,
+      });
+      setDiagnosticResult(res);
+
+      if (!res.handshakeVerified) {
+        notifyError("SDK_HANDSHAKE_FAILED", {
+          target: service.name,
+          category: "SDK & Diagnostic",
+          customMessage: `Live beacon check failed for ${targetEndpoint}: SDK middleware or _sparrowx DNS TXT record is not yet installed on your target server. Deploy the snippet above first, then click Verify.`,
+          retryAction: handleSendLiveProbe,
         });
+        return;
       }
-      const latency = Math.max(8, Math.round(performance.now() - start));
 
       await persistAuditLogToBackend({
         id: `AUD-${Date.now().toString().slice(-4)}`,
         actor: "Client Diagnostic Agent",
         role: "Automated Probe",
-        action: `Verified live handshake for ${service.name} (${latency}ms latency)`,
+        action: `Verified live handshake for ${service.name} (${res.avgLatencyMs}ms latency)`,
         target: service.name,
         severity: "Info",
         timestamp: "Just now",
@@ -227,11 +232,11 @@ export function ClientIntegrationModal({
         await onVerificationComplete(service.id);
       }
       notifySuccess(
-        `Verified live handshake: Security beacon emitted for ${service.name} (${latency}ms roundtrip)`,
+        `Verified live handshake: Security beacon confirmed for ${service.name} (${res.avgLatencyMs}ms roundtrip)`,
         {
           category: "SDK & Diagnostic",
           target: service.name,
-          latencyMs: latency,
+          latencyMs: res.avgLatencyMs,
         },
       );
     } catch (err) {
@@ -313,8 +318,14 @@ export function ClientIntegrationModal({
                 <h2 className="text-base sm:text-lg font-bold text-white">
                   Guided Setup · Connect {service.name}
                 </h2>
-                <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-mono text-emerald-400 font-semibold">
-                  AUTONOMOUS ARMOR READY
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold border ${
+                    diagnosticResult?.handshakeVerified
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                  }`}
+                >
+                  {diagnosticResult?.handshakeVerified ? "VERIFIED ACTIVE" : "AWAITING SDK SETUP"}
                 </span>
               </div>
               <p className="text-xs text-zinc-400 font-mono mt-0.5">

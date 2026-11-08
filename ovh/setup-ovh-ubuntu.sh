@@ -477,7 +477,7 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location /rest/v1/ {
-        proxy_pass http://postgrest:3001/;
+        proxy_pass http://sparrowx:3000/rest/v1/;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;

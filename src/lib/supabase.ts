@@ -462,10 +462,16 @@ export const isSupabaseConfigured = Boolean(
 );
 
 export function getSupabaseHeaders(extra?: Record<string, string>): HeadersInit {
-  return {
+  const headers: Record<string, string> = {
     apikey: supabaseAnonKey ?? "",
-    Authorization: `Bearer ${supabaseAnonKey ?? ""}`,
     "Content-Type": "application/json",
+  };
+  // Only attach Authorization Bearer if supabaseAnonKey is a 3-part JWT (PostgREST rejects non-JWT Bearer tokens with 401 PGRST301)
+  if (supabaseAnonKey && supabaseAnonKey.split(".").length === 3) {
+    headers.Authorization = `Bearer ${supabaseAnonKey}`;
+  }
+  return {
+    ...headers,
     ...extra,
   };
 }
@@ -521,8 +527,16 @@ export function hashSecretPassword(password: string): string {
 
 export function verifyPasswordMatch(inputPassword: string, storedPassword: string): boolean {
   if (!inputPassword || !storedPassword) return false;
+  const cleanInput = inputPassword.trim();
+  const cleanStored = storedPassword.trim();
   const hashedInput = hashSecretPassword(inputPassword);
-  return storedPassword === hashedInput || storedPassword === inputPassword;
+  const hashedCleanInput = hashSecretPassword(cleanInput);
+  return (
+    storedPassword === hashedInput ||
+    storedPassword === inputPassword ||
+    cleanStored === hashedCleanInput ||
+    cleanStored === cleanInput
+  );
 }
 
 async function purgeLegacyDemoIncidentsOnce(): Promise<void> {
@@ -1366,86 +1380,145 @@ export async function authenticateAppUserFromBackend(
   password: string,
 ): Promise<{ user: AppUser | null; error?: string }> {
   const normalizedEmail = email.trim().toLowerCase();
+  const candidates: Array<{ user: AppUser; storedPassword: string }> = [];
+
+  const matchesIdentifier = (rawEmail: unknown, rawName?: unknown) => {
+    const cleanEmail = String(rawEmail ?? "").trim().toLowerCase();
+    if (!cleanEmail) return false;
+    if (cleanEmail === normalizedEmail) return true;
+    const emailPrefix = cleanEmail.split("@")[0];
+    if (!normalizedEmail.includes("@") && emailPrefix === normalizedEmail) return true;
+    if (
+      !normalizedEmail.includes("@") &&
+      rawName &&
+      String(rawName).trim().toLowerCase() === normalizedEmail
+    ) {
+      return true;
+    }
+    return false;
+  };
 
   if (isSupabaseConfigured && supabaseUrl) {
+    // 1. Query full app_users table from local REST engine (/rest/v1/app_users?select=*)
     try {
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/app_users?email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
-        {
-          headers: getSupabaseHeaders(),
-          cache: "no-store",
-        },
-      );
+      const response = await fetch(`${supabaseUrl}/rest/v1/app_users?select=*`, {
+        headers: getSupabaseHeaders(),
+        cache: "no-store",
+      });
       if (response.ok) {
         const rows = (await response.json()) as Array<Record<string, unknown>>;
-        const row = rows[0];
-        if (row) {
-          const storedPassword = String(row.password ?? "");
-          if (!verifyPasswordMatch(password, storedPassword)) {
-            return {
-              user: null,
-              error: "Invalid password. Please check your credentials and try again.",
-            };
+        if (Array.isArray(rows)) {
+          for (const row of rows) {
+            if (matchesIdentifier(row.email, row.full_name)) {
+              candidates.push({
+                storedPassword: String(row.password ?? ""),
+                user: {
+                  id: String(row.id ?? ""),
+                  email: String(row.email ?? "").trim().toLowerCase(),
+                  password: "",
+                  fullName: String(row.full_name ?? row.fullName ?? ""),
+                  admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+                  tenantId: row.tenant_id
+                    ? String(row.tenant_id)
+                    : row.tenantId
+                      ? String(row.tenantId)
+                      : null,
+                },
+              });
+            }
           }
-          const authenticatedUser: AppUser = {
-            id: String(row.id ?? ""),
-            email: String(row.email ?? "").toLowerCase(),
-            password: "",
-            fullName: String(row.full_name ?? ""),
-            admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
-            tenantId: row.tenant_id ? String(row.tenant_id) : null,
-          };
-          return { user: authenticatedUser };
         }
       }
     } catch {
-      // Fallback to local migrated seed / cache
+      // Continue to filtered query / local seed fallback
+    }
+
+    // 2. Also support filtered query (?email=ilike.<email>&limit=1) for direct compatibility
+    if (candidates.length === 0) {
+      try {
+        const filteredRes = await fetch(
+          `${supabaseUrl}/rest/v1/app_users?email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
+          {
+            headers: getSupabaseHeaders(),
+            cache: "no-store",
+          },
+        );
+        if (filteredRes.ok) {
+          const rows = (await filteredRes.json()) as Array<Record<string, unknown>>;
+          const row = Array.isArray(rows) ? rows[0] : undefined;
+          if (row) {
+            candidates.push({
+              storedPassword: String(row.password ?? ""),
+              user: {
+                id: String(row.id ?? ""),
+                email: String(row.email ?? "").trim().toLowerCase(),
+                password: "",
+                fullName: String(row.full_name ?? row.fullName ?? ""),
+                admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+                tenantId: row.tenant_id
+                  ? String(row.tenant_id)
+                  : row.tenantId
+                    ? String(row.tenantId)
+                    : null,
+              },
+            });
+          }
+        }
+      } catch {
+        // Fallback to local seed / cache
+      }
     }
   }
 
-  // Check local migrated seed snapshot (100% disconnected from Cloud Supabase)
+  // 3. Check local migrated seed snapshot (100% disconnected from Cloud Supabase)
   const seedUsers = Array.isArray((migratedSeedData as Record<string, unknown>).app_users)
     ? ((migratedSeedData as Record<string, Array<Record<string, unknown>>>).app_users ?? [])
     : [];
-  const seedMatch = seedUsers.find(
-    (u) => String(u.email ?? "").toLowerCase() === normalizedEmail,
-  );
-  if (seedMatch) {
-    const storedPassword = String(seedMatch.password ?? "");
-    if (!verifyPasswordMatch(password, storedPassword)) {
-      return {
-        user: null,
-        error: "Invalid password. Please check your credentials and try again.",
-      };
+  for (const seedMatch of seedUsers) {
+    if (matchesIdentifier(seedMatch.email, seedMatch.full_name)) {
+      candidates.push({
+        storedPassword: String(seedMatch.password ?? ""),
+        user: {
+          id: String(seedMatch.id ?? ""),
+          email: String(seedMatch.email ?? "").trim().toLowerCase(),
+          password: "",
+          fullName: String(seedMatch.full_name ?? ""),
+          admin: String(seedMatch.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+          tenantId: seedMatch.tenant_id ? String(seedMatch.tenant_id) : null,
+        },
+      });
     }
-    return {
-      user: {
-        id: String(seedMatch.id ?? ""),
-        email: String(seedMatch.email ?? "").toLowerCase(),
-        password: "",
-        fullName: String(seedMatch.full_name ?? ""),
-        admin: String(seedMatch.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
-        tenantId: seedMatch.tenant_id ? String(seedMatch.tenant_id) : null,
-      },
-    };
   }
 
+  // 4. Check browser local cache
   const cachedUsers = readLocalCache<AppUser>(STORAGE_KEYS.users);
-  const matched = cachedUsers.find((u) => u.email.toLowerCase() === normalizedEmail);
-  if (!matched) {
+  for (const matched of cachedUsers) {
+    if (matchesIdentifier(matched.email, matched.fullName)) {
+      candidates.push({
+        storedPassword: String(matched.password ?? ""),
+        user: { ...matched, password: "" },
+      });
+    }
+  }
+
+  if (candidates.length === 0) {
     return {
       user: null,
       error:
         "No account found with this email. Please create an account to onboard your organization.",
     };
   }
-  if (!verifyPasswordMatch(password, matched.password)) {
-    return {
-      user: null,
-      error: "Invalid password. Please check your credentials and try again.",
-    };
+
+  for (const candidate of candidates) {
+    if (verifyPasswordMatch(password, candidate.storedPassword)) {
+      return { user: candidate.user };
+    }
   }
-  return { user: { ...matched, password: "" } };
+
+  return {
+    user: null,
+    error: "Invalid password. Please check your credentials and try again.",
+  };
 }
 
 export async function fetchVerificationProofsFromBackend(

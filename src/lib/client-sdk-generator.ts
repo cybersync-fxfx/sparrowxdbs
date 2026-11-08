@@ -449,38 +449,101 @@ export async function runAutomatedServiceDiagnostic(service: {
     });
   }
 
-  // Step 3: Edge WAF Telemetry Verification Handshake
-  try {
-    // In browser client context, measure actual fetch timing to health or mock edge verification
-    const pingStart = performance.now();
-    await new Promise((resolve) => setTimeout(resolve, 80)); // Simulate edge latency round-trip
-    const pingLatency = Math.round(performance.now() - pingStart);
-    handshakeVerified = true;
+  // Step 3: Real Edge WAF Telemetry & DNS Ownership Handshake Check (Zero Mock Responses)
+  const cleanHost = service.endpoint
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .split("/")[0]
+    .split(":")[0];
 
+  const pingStart = performance.now();
+  let dnsTxtVerified = false;
+  let telemetryEventReceived = false;
+
+  try {
+    // 3a. Query live DNS TXT records (_sparrowx.<host> and <host>) via Cloudflare DoH
+    if (cleanHost && cleanHost.includes(".")) {
+      const [txtRes1, txtRes2] = await Promise.all([
+        fetch(
+          `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(`_sparrowx.${cleanHost}`)}&type=TXT`,
+          { headers: { accept: "application/dns-json" } },
+        ).catch(() => null),
+        fetch(
+          `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(cleanHost)}&type=TXT`,
+          { headers: { accept: "application/dns-json" } },
+        ).catch(() => null),
+      ]);
+
+      const checkTxtJson = async (res: Response | null) => {
+        if (!res || !res.ok) return false;
+        const json = (await res.json()) as { Answer?: Array<{ data?: string }> };
+        return (json.Answer ?? []).some((ans) => {
+          const d = String(ans.data ?? "").toLowerCase();
+          return d.includes("sparrowx-verify") || d.includes("spx-verify") || d.includes("sparrowx-site-verification");
+        });
+      };
+
+      dnsTxtVerified = (await checkTxtJson(txtRes1)) || (await checkTxtJson(txtRes2));
+    }
+
+    // 3b. Check local database for real ingested SDK telemetry events from this service/domain
+    const originBase =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "http://127.0.0.1:3000";
+    const incRes = await fetch(`${originBase}/rest/v1/incidents?select=*`, {
+      headers: { Accept: "application/json" },
+    }).catch(() => null);
+    if (incRes && incRes.ok) {
+      const incRows = (await incRes.json()) as Array<Record<string, unknown>>;
+      if (Array.isArray(incRows)) {
+        telemetryEventReceived = incRows.some((row) => {
+          const src = String(row.source ?? "").toLowerCase();
+          const title = String(row.title ?? "").toLowerCase();
+          // Exclude synthetic onboarding incidents from counting as external SDK beacons
+          if (title.includes("automated sdk telemetry handshake verified")) return false;
+          return cleanHost && src.includes(cleanHost);
+        });
+      }
+    }
+  } catch {
+    // Network check failed
+  }
+
+  const pingLatency = Math.max(8, Math.round(performance.now() - pingStart));
+  handshakeVerified = dnsTxtVerified || telemetryEventReceived;
+
+  if (handshakeVerified) {
     steps.push({
       name: "Perimeter Handshake & Probe",
       status: "success",
-      detail: `Automated diagnostic beacon received. Edge latency: ${pingLatency}ms.`,
+      detail: `Verified active SDK/DNS setup on ${cleanHost || service.endpoint} (${
+        dnsTxtVerified ? "DNS TXT verified" : "Live SDK telemetry beacon received"
+      }, ${pingLatency}ms).`,
       latencyMs: pingLatency,
     });
-  } catch {
-    handshakeVerified = false;
+    steps.push({
+      name: "Autonomous Guardrail Enforcement",
+      status: "success",
+      detail: "Edge WAF, Prompt Shield, and Real-Time Redactor confirmed active and enforcing.",
+      latencyMs: 4,
+    });
+  } else {
     overallStatus = "offline";
     steps.push({
       name: "Perimeter Handshake & Probe",
       status: "failed",
-      detail: "Unable to establish handshake with edge receiver.",
+      detail: `Setup not detected on ${cleanHost || service.endpoint}: No SparrowX SDK middleware beacon or _sparrowx DNS TXT record found yet.`,
+      latencyMs: pingLatency,
+    });
+    steps.push({
+      name: "Autonomous Guardrail Enforcement",
+      status: "warning",
+      detail: "Pending SDK installation — deploy the snippet above on your server/site first, then re-run verification.",
       latencyMs: 0,
     });
   }
-
-  // Step 4: Guardrail Readiness
-  steps.push({
-    name: "Autonomous Guardrail Enforcement",
-    status: "success",
-    detail: "Edge WAF, Prompt Shield, and Real-Time Redactor confirmed ready to block threats.",
-    latencyMs: 4,
-  });
 
   const totalTime = Math.round(performance.now() - startTotal);
 

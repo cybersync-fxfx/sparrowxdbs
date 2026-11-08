@@ -303,7 +303,6 @@ export function SovereignDatabaseStudio({
     const key = "spx_ovh_sovereign_key";
     const h: Record<string, string> = {
       apikey: key,
-      Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
     };
     if (prefer) h.Prefer = prefer;

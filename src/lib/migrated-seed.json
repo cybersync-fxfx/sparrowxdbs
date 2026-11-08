@@ -31,12 +31,12 @@
         "web_security"
       ],
       "api_key": "spx_tenant_live_d8a5cffdf7",
-      "sdk_verified": true,
-      "guardrails_active": true,
-      "requests_per_min": 3,
+      "sdk_verified": false,
+      "guardrails_active": false,
+      "requests_per_min": 0,
       "blocked_threats": 0,
-      "avg_latency_ms": 11,
-      "quota_used_pct": 1,
+      "avg_latency_ms": 0,
+      "quota_used_pct": 0,
       "created_at": "2026-10-29T05:04:44.048419+00:00"
     },
     {
@@ -53,12 +53,12 @@
         "cloud_security"
       ],
       "api_key": "spx_tenant_live_0506ab850c",
-      "sdk_verified": true,
-      "guardrails_active": true,
-      "requests_per_min": 5,
+      "sdk_verified": false,
+      "guardrails_active": false,
+      "requests_per_min": 0,
       "blocked_threats": 0,
-      "avg_latency_ms": 11,
-      "quota_used_pct": 1,
+      "avg_latency_ms": 0,
+      "quota_used_pct": 0,
       "created_at": "2026-10-29T17:13:41.082594+00:00"
     },
     {
@@ -74,12 +74,12 @@
         "compliance"
       ],
       "api_key": "spx_tenant_live_777e181370",
-      "sdk_verified": true,
-      "guardrails_active": true,
-      "requests_per_min": 2,
+      "sdk_verified": false,
+      "guardrails_active": false,
+      "requests_per_min": 0,
       "blocked_threats": 0,
-      "avg_latency_ms": 11,
-      "quota_used_pct": 1,
+      "avg_latency_ms": 0,
+      "quota_used_pct": 0,
       "created_at": "2026-10-29T16:26:44.165279+00:00"
     },
     {
@@ -96,12 +96,12 @@
         "compliance"
       ],
       "api_key": "spx_tenant_live_6c87f64ebfb1568b080887ef",
-      "sdk_verified": true,
-      "guardrails_active": true,
-      "requests_per_min": 4,
+      "sdk_verified": false,
+      "guardrails_active": false,
+      "requests_per_min": 0,
       "blocked_threats": 0,
-      "avg_latency_ms": 11,
-      "quota_used_pct": 1,
+      "avg_latency_ms": 0,
+      "quota_used_pct": 0,
       "created_at": "2026-11-01T15:38:46.044426+00:00"
     }
   ],
