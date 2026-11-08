@@ -426,22 +426,29 @@ export function computeLiveSnapshot(
   };
 }
 
+const CLOUD_SUPABASE_URL = "https://yidqdgufjgfyxflgvbqq.supabase.co";
+const CLOUD_SUPABASE_ANON_KEY = "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-";
+
 function resolveSovereignRestBaseUrl(): string {
   const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
   if (envUrl && envUrl.startsWith("http") && !envUrl.includes("your-project-id")) {
     return envUrl.replace(/\/$/, "");
   }
-  if (typeof window !== "undefined" && window.location?.origin && window.location.origin.startsWith("http")) {
+  const selfHostedMode = (import.meta.env.VITE_SOVEREIGN_SELF_HOSTED as string | undefined)?.trim();
+  if (
+    selfHostedMode === "true" &&
+    typeof window !== "undefined" &&
+    window.location?.origin &&
+    window.location.origin.startsWith("http")
+  ) {
     return window.location.origin.replace(/\/$/, "");
   }
-  return "http://127.0.0.1:3000";
+  return CLOUD_SUPABASE_URL;
 }
-
-const DEFAULT_SOVEREIGN_KEY = "spx_ovh_sovereign_key";
 
 export const supabaseUrl = resolveSovereignRestBaseUrl();
 export const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_SOVEREIGN_KEY;
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || CLOUD_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
@@ -1367,30 +1374,46 @@ export async function authenticateAppUserFromBackend(
       );
       if (response.ok) {
         const rows = (await response.json()) as Array<Record<string, unknown>>;
-        const row = rows[0];
-        if (!row) {
-          return {
-            user: null,
-            error:
-              "No account found with this email. Please create an account to onboard your organization.",
-          };
+        let row = rows[0];
+        if (!row && supabaseUrl !== CLOUD_SUPABASE_URL) {
+          try {
+            const cloudRes = await fetch(
+              `${CLOUD_SUPABASE_URL}/rest/v1/app_users?email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
+              {
+                headers: {
+                  apikey: CLOUD_SUPABASE_ANON_KEY,
+                  Authorization: `Bearer ${CLOUD_SUPABASE_ANON_KEY}`,
+                  "Content-Type": "application/json",
+                },
+                cache: "no-store",
+              },
+            );
+            if (cloudRes.ok) {
+              const cloudRows = (await cloudRes.json()) as Array<Record<string, unknown>>;
+              row = cloudRows[0];
+            }
+          } catch {
+            // Ignore cloud fallback error
+          }
         }
-        const storedPassword = String(row.password ?? "");
-        if (!verifyPasswordMatch(password, storedPassword)) {
-          return {
-            user: null,
-            error: "Invalid password. Please check your credentials and try again.",
+        if (row) {
+          const storedPassword = String(row.password ?? "");
+          if (!verifyPasswordMatch(password, storedPassword)) {
+            return {
+              user: null,
+              error: "Invalid password. Please check your credentials and try again.",
+            };
+          }
+          const authenticatedUser: AppUser = {
+            id: String(row.id ?? ""),
+            email: String(row.email ?? "").toLowerCase(),
+            password: "",
+            fullName: String(row.full_name ?? ""),
+            admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+            tenantId: row.tenant_id ? String(row.tenant_id) : null,
           };
+          return { user: authenticatedUser };
         }
-        const authenticatedUser: AppUser = {
-          id: String(row.id ?? ""),
-          email: String(row.email ?? "").toLowerCase(),
-          password: "",
-          fullName: String(row.full_name ?? ""),
-          admin: String(row.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
-          tenantId: row.tenant_id ? String(row.tenant_id) : null,
-        };
-        return { user: authenticatedUser };
       }
     } catch {
       // Fallback to local encrypted cache if offline

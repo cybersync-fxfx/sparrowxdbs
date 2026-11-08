@@ -10,7 +10,8 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-# Build with empty VITE_SUPABASE_URL so browser uses same-origin (/rest/v1/*)
+# Build with VITE_SOVEREIGN_SELF_HOSTED="true" so OVH Docker uses same-origin (/rest/v1/*) with cloud fallback
+ENV VITE_SOVEREIGN_SELF_HOSTED="true"
 ENV VITE_SUPABASE_URL=""
 ENV VITE_SUPABASE_ANON_KEY="spx_ovh_sovereign_key"
 ENV NITRO_PRESET="node-server"

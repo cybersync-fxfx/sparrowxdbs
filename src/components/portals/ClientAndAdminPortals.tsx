@@ -3826,11 +3826,6 @@ export function PortalLoginScreen({
               </p>
             </div>
           </div>
-
-          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-mono font-semibold text-emerald-400 shrink-0">
-            <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            TLS 1.3 VERIFIED
-          </span>
         </div>
 
         {/* SIGN IN FORM */}
@@ -4218,14 +4213,6 @@ export function PortalLoginScreen({
                   </span>
                 </div>
               </button>
-
-              {/* Live SOC Edge Status Pill (Visible on large screens) */}
-              <div className="hidden xl:flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1 text-[11px] font-mono text-zinc-400">
-                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="text-zinc-300 font-medium">SHIELD ACTIVE</span>
-                <span className="text-zinc-600">·</span>
-                <span className="text-emerald-400 font-bold">0.8ms WAF</span>
-              </div>
             </div>
 
             {/* Center Quick Navigation Links (Capsule Cyber Dock) */}
@@ -4478,102 +4465,18 @@ export function PortalLoginScreen({
       {viewStage === "auth" ? (
         <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-8 py-10 lg:py-16">
           <div className="grid gap-10 lg:grid-cols-12 items-center">
-            {/* Left 5 Cols: High-Trust Live SOC Command Telemetry Preview */}
-            <div className="lg:col-span-5 space-y-6">
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-[1.12]">
-                  Step inside your live{" "}
-                  <span className="bg-gradient-to-r from-primary via-orange-400 to-amber-300 bg-clip-text text-transparent">
-                    cyber command center.
-                  </span>
-                </h1>
-                <p className="mt-3 text-xs sm:text-sm text-zinc-300 leading-relaxed">
-                  Every SparrowX workspace connects directly to real-time Edge WAF inspection,
-                  SparrowX AI Brain predictive blocking, DNS/HTTP ownership verification, and live
-                  incident response playbooks.
-                </p>
-              </div>
-
-              {/* Live Subsystem Handshake Status Card */}
-              <div className="rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-4 space-y-3 shadow-xl">
-                <div className="flex items-center justify-between border-b border-[#1A1A1A] pb-2.5">
-                  <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-300">
-                    SparrowX Defense Mesh Status
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold text-emerald-400">
-                    <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                    ALL NODES OPERATIONAL
-                  </span>
-                </div>
-                <div className="space-y-2 text-xs font-mono">
-                  {[
-                    {
-                      sys: "Edge WAF & AST SQLi/XSS Engine",
-                      state: "ACTIVE · <1.4ms",
-                      color: "text-emerald-400",
-                    },
-                    {
-                      sys: "SparrowX AI Brain Predictive Blocker",
-                      state: "ONLINE · LEARNING",
-                      color: "text-primary",
-                    },
-                    {
-                      sys: "DNS TXT & HTTP Ownership Verifier",
-                      state: "READY · CRYPTO-PROVEN",
-                      color: "text-emerald-400",
-                    },
-                  ].map((row) => (
-                    <div
-                      key={row.sys}
-                      className="flex items-center justify-between rounded-lg border border-[#181818] bg-black px-3 py-2"
-                    >
-                      <span className="text-zinc-300 text-[11px] truncate">{row.sys}</span>
-                      <span className={`text-[10px] font-bold shrink-0 ${row.color}`}>
-                        {row.state}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* 3 Architecture Guarantees */}
-              <div className="space-y-2.5">
-                {[
-                  {
-                    icon: Globe2,
-                    title: "Real-Time Attack Interception",
-                    desc: "Stop SQLi, XSS, SSRF, and LLM jailbreaks at the edge before they execute.",
-                  },
-                  {
-                    icon: ShieldCheck,
-                    title: "Cryptographic Ownership & Health Proof",
-                    desc: "Verify your domains via DNS TXT or HTTP challenge files with live probes.",
-                  },
-                  {
-                    icon: Terminal,
-                    title: "1-Click Firewall Blocklist Export",
-                    desc: "Export production Cloudflare, UFW, and iptables drop rules from live incidents.",
-                  },
-                ].map((item) => {
-                  const IconComp = item.icon;
-                  return (
-                    <div
-                      key={item.title}
-                      className="flex items-start gap-3.5 rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3.5 transition-colors hover:border-zinc-700"
-                    >
-                      <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary mt-0.5">
-                        <IconComp className="size-4" />
-                      </span>
-                      <div>
-                        <div className="text-xs font-bold text-white">{item.title}</div>
-                        <div className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
-                          {item.desc}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {/* Left 5 Cols: Clean & Simple Welcome */}
+            <div className="lg:col-span-5 space-y-4">
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-[1.12]">
+                Step inside your{" "}
+                <span className="bg-gradient-to-r from-primary via-orange-400 to-amber-300 bg-clip-text text-transparent">
+                  cyber command center.
+                </span>
+              </h1>
+              <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                Sign in or create your isolated workspace to manage your domains, connectors, and
+                autonomous edge security.
+              </p>
             </div>
 
             {/* Right 7 Cols: Auth Card */}
@@ -4646,10 +4549,9 @@ export function PortalLoginScreen({
                 </div>
               </div>
 
-              {/* Hero Right: Sovereign Tenant Architecture & Live Verification Hub (No fake counters or simulated attacks) */}
+              {/* Hero Right: Clean Sovereign Protection Card */}
               <div id="sovereign-architecture" className="lg:col-span-6">
-                <div className="relative rounded-2xl border border-[#262626] bg-[#0A0A0A] p-5 sm:p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden space-y-4">
-                  {/* Top Status Header */}
+                <div className="relative rounded-2xl border border-[#1F1F1F] bg-black p-5 sm:p-6 shadow-[0_0_50px_rgba(0,0,0,0.9)] overflow-hidden space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1F1F1F] pb-3.5">
                     <div className="flex items-center gap-2.5">
                       <span className="relative flex size-2.5">
@@ -4665,61 +4567,17 @@ export function PortalLoginScreen({
                         </div>
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-400">
-                        100% Real-Time
-                      </span>
-                    </div>
                   </div>
 
-                  {/* 4 Sovereign Defense Capabilities */}
-                  <div className="grid gap-2.5">
-                    <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Database className="size-3.5 text-primary" />
-                        <span className="text-xs font-bold text-white">Dedicated Database Partitions</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed pl-5.5">
-                        Each customer dashboard operates in its own isolated database partition (<code className="text-primary font-mono text-[10px]">spx_db_*</code>). Zero cross-tenant data exposure.
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Globe2 className="size-3.5 text-emerald-400" />
-                        <span className="text-xs font-bold text-white">Single-Line HTML & VPS Connectors</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed pl-5.5">
-                        Drop our single script into your website HTML profile or run the one-line curl agent on your VPS server to connect telemetry in under 60 seconds.
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="size-3.5 text-primary" />
-                        <span className="text-xs font-bold text-white">Authoritative Anycast DNS Verification</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed pl-5.5">
-                        Every domain scan executes authentic live SparrowX Anycast DNS queries, SSL certificate handshakes, and OWASP security header audits without simulated metrics.
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-[#1F1F1F] bg-black/60 p-3 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Brain className="size-3.5 text-emerald-400" />
-                        <span className="text-xs font-bold text-white">SparrowX AI Threat Intelligence Core</span>
-                      </div>
-                      <p className="text-[11px] text-zinc-400 leading-relaxed pl-5.5">
-                        Autonomous edge filtering and AI prompt sanitization powered by SparrowX AI Autonomous Neural Engine with administrator-only access control.
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Onboard your domain or server in seconds with isolated workspace telemetry and
+                    live edge protection.
+                  </p>
 
                   {/* Actions Bar */}
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#1F1F1F]">
                     <a
-                      href="#public-scanner"
+                      href="#free-scanner"
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-300 hover:text-white"
                     >
                       <Search className="size-3.5 text-primary" />
@@ -4927,7 +4785,7 @@ export function PortalLoginScreen({
                   showControls={true}
                   showFeed={true}
                   showStats={true}
-                  className="border-[#1F1F1F] bg-[#02050E]"
+                  className="border-[#1F1F1F] bg-black"
                 />
               </div>
 
