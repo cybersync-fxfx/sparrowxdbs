@@ -212,6 +212,12 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         status: "healthy",
         service: "SparrowX Autonomous Edge Shield",
         version: "2.4.0",
+        domain: process.env.SPARROWX_DOMAIN || url.hostname,
+        publicIp: process.env.SPARROWX_PUBLIC_IP || "127.0.0.1",
+        nameservers: [
+          process.env.SPARROWX_NS1 || `ns1.${url.hostname}`,
+          process.env.SPARROWX_NS2 || `ns2.${url.hostname}`,
+        ],
         edgeNodesOnline: 42,
         avgLatencyMs: 11,
         timestamp: new Date().toISOString(),
