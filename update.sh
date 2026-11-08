@@ -99,8 +99,9 @@ if [ -d "${INSTALL_DIR}/.git" ]; then
 fi
 
 # 3. Auto-Tune OS Security, Kernel Sysctl & Vulnerability Hardening
-log_info "[Step 2/6] Auto-tuning Linux kernel security, SYN flood defense & CVE patching..."
-cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
+if [ ! -f /etc/sysctl.d/99-sparrowx-hardening.conf ]; then
+  log_info "[Step 2/6] Applying first-time Linux kernel security & Fail2Ban hardening..."
+  cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
 # SparrowX Autonomous Kernel Security & High-Throughput Tuning
 net.ipv4.tcp_syncookies = 1
 net.ipv4.conf.all.rp_filter = 1
@@ -113,18 +114,21 @@ net.ipv4.conf.default.send_redirects = 0
 net.core.somaxconn = 65535
 net.ipv4.tcp_max_syn_backlog = 65535
 EOF
-sysctl --system >/dev/null 2>&1 || true
+  sysctl --system >/dev/null 2>&1 || true
 
-if command -v apt-get >/dev/null 2>&1; then
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get install -y -qq unattended-upgrades fail2ban >/dev/null 2>&1 || true
-  systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
-  systemctl enable --now fail2ban >/dev/null 2>&1 || true
+  if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y -qq unattended-upgrades fail2ban >/dev/null 2>&1 || true
+    systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
+    systemctl enable --now fail2ban >/dev/null 2>&1 || true
+  fi
+  log_ok "Kernel SYN-cookie shield, anti-spoofing, Fail2Ban, and unattended CVE upgrades active."
+else
+  log_ok "[Step 2/6] OS kernel hardening & Fail2Ban already installed (skipping)."
 fi
-log_ok "Kernel SYN-cookie shield, anti-spoofing, Fail2Ban, and unattended CVE upgrades active."
 
 # 4. Configure Nginx for both Main Domain and Separate Supabase Studio Domain
-log_info "[Step 3/6] Configuring Nginx reverse proxy for ${SPARROWX_DOMAIN} & ${SPARROWX_STUDIO_DOMAIN}..."
+log_info "[Step 3/6] Verifying Nginx reverse proxy for ${SPARROWX_DOMAIN} & ${SPARROWX_STUDIO_DOMAIN}..."
 mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/data/users"
 if [ ! -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ] || [ ! -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
@@ -203,13 +207,14 @@ server {
 EOF
 log_ok "Nginx configured for both ${SPARROWX_DOMAIN} and ${SPARROWX_STUDIO_DOMAIN}."
 
-# 5. Install Global CLI Tools (`sparrowx`, `sparrowx-db`, `./manage-db.sh`) & Auto-Upgrade Timer
-log_info "[Step 4/6] Installing Terminal Database Studio (manage-db.sh) & Auto-Upgrade Daemon..."
+# 5. Ensure Global CLI Symlinks & Auto-Upgrade Timer exist
 chmod +x "${INSTALL_DIR}/manage-db.sh" "${INSTALL_DIR}/update.sh" 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
 
-cat > /etc/systemd/system/sparrowx-autoupdate.service <<EOF
+if [ ! -f /etc/systemd/system/sparrowx-autoupdate.timer ]; then
+  log_info "[Step 4/6] Installing Auto-Upgrade Daemon (sparrowx-autoupdate.timer)..."
+  cat > /etc/systemd/system/sparrowx-autoupdate.service <<EOF
 [Unit]
 Description=SparrowX Automatic GitHub Sync & Rebuild
 After=network-online.target
@@ -217,10 +222,10 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/bin/bash -c 'git fetch origin main --depth=1 && if [ "\$(git rev-parse HEAD)" != "\$(git rev-parse origin/main)" ]; then git reset --hard origin/main && docker compose -f docker-compose.ovh.yml up --build -d; fi'
+ExecStart=/bin/bash -c 'git fetch origin main --depth=1 && if [ "\$(git rev-parse HEAD)" != "\$(git rev-parse origin/main)" ]; then git reset --hard origin/main && docker compose -f docker-compose.ovh.yml up --build -d --no-deps sparrowx; fi'
 EOF
 
-cat > /etc/systemd/system/sparrowx-autoupdate.timer <<EOF
+  cat > /etc/systemd/system/sparrowx-autoupdate.timer <<EOF
 [Unit]
 Description=Check GitHub every 5 minutes for SparrowX updates
 
@@ -232,15 +237,33 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
-systemctl daemon-reload >/dev/null 2>&1 || true
-systemctl enable --now sparrowx-autoupdate.timer >/dev/null 2>&1 || true
-log_ok "Auto-upgrade timer active (checks GitHub every 5m) and 'sparrowx-db' CLI installed."
-
-# 6. Rebuild & Restart Full-Stack Containers + Shift Cloud Supabase Data to Local DB
-log_info "[Step 5/6] Rebuilding & launching Full-Stack Docker containers..."
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable --now sparrowx-autoupdate.timer >/dev/null 2>&1 || true
+  log_ok "Auto-upgrade timer active and 'sparrowx-db' CLI installed."
 else
+  log_ok "[Step 4/6] CLI tools & auto-upgrade timer already installed (skipping)."
+fi
+
+# 6. Rebuild & Restart Application (Keep Running DB Containers Untouched if Already Up)
+FORCE_DB_INSTALL="false"
+if [ "${1:-}" = "--reinstall-db" ] || [ "${1:-}" = "--force-db" ]; then
+  FORCE_DB_INSTALL="true"
+fi
+
+DB_MARKER_FILE="${INSTALL_DIR}/data/.db_initialized"
+
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^sparrowx-postgres$" && [ "${FORCE_DB_INSTALL}" = "false" ]; then
+    log_info "[Step 5/6] PostgreSQL & PostgREST are already running — rebuilding ONLY the SparrowX web app container..."
+    docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d --no-deps sparrowx
+    docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up -d nginx
+    docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+  else
+    log_info "[Step 5/6] First-time or forced DB startup — launching Full-Stack Docker containers..."
+    docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d
+  fi
+else
+  log_info "[Step 5/6] Rebuilding native SparrowX application..."
   export NODE_OPTIONS="--max-old-space-size=2048"
   export VITE_SOVEREIGN_SELF_HOSTED="true"
   export VITE_SUPABASE_URL=""
@@ -248,9 +271,26 @@ else
   systemctl restart sparrowx-native.service 2>/dev/null || true
 fi
 
-log_info "[Step 6/6] Shifting Cloud Supabase data into Local OVH DB & Per-User Folders..."
-sleep 3
-"${INSTALL_DIR}/manage-db.sh" sync || true
+# 7. Only Seed / Install Database on First Run (or when --reinstall-db is passed)
+EXISTING_USERS_COUNT="0"
+if curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/app_users?select=id&limit=1" 2>/dev/null | grep -q '"id"'; then
+  EXISTING_USERS_COUNT="1"
+fi
+
+if [ -f "${DB_MARKER_FILE}" ] || [ "${EXISTING_USERS_COUNT}" = "1" ]; then
+  if [ "${FORCE_DB_INSTALL}" = "true" ]; then
+    log_info "[Step 6/6] --reinstall-db requested: Re-seeding Local OVH DB..."
+    sleep 2
+    "${INSTALL_DIR}/manage-db.sh" sync && touch "${DB_MARKER_FILE}" || true
+  else
+    touch "${DB_MARKER_FILE}" 2>/dev/null || true
+    log_ok "[Step 6/6] Local PostgreSQL database is already installed and populated — skipping DB installation (use './update.sh --reinstall-db' to force)."
+  fi
+else
+  log_info "[Step 6/6] First-time Database Setup: Seeding Local OVH DB & Per-User Folders..."
+  sleep 3
+  "${INSTALL_DIR}/manage-db.sh" sync && touch "${DB_MARKER_FILE}" || true
+fi
 
 HTTP_SUFFIX=""
 [ "${HTTP_PORT}" != "80" ] && HTTP_SUFFIX=":${HTTP_PORT}"
