@@ -48,24 +48,20 @@ fi
 DETECTED_IP="$(curl -4 -fsS --max-time 4 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")"
 SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP:-${DETECTED_IP}}"
 
-# Ask only if domain or studio domain is not yet configured in .env
-if [ -z "${SPARROWX_DOMAIN:-}" ] && [ -e /dev/tty ]; then
-  read -r -p "1. Enter your main SparrowX domain [default: ${SPARROWX_PUBLIC_IP}]: " IN_DOM </dev/tty || true
-  SPARROWX_DOMAIN="${IN_DOM:-${SPARROWX_PUBLIC_IP}}"
-else
-  SPARROWX_DOMAIN="${SPARROWX_DOMAIN:-${SPARROWX_PUBLIC_IP}}"
+# Auto-detect existing configured domain from .env, DNS zone files, or nginx.conf (ZERO prompts!)
+if [ -z "${SPARROWX_DOMAIN:-}" ]; then
+  EXISTING_ZONE="$(ls -1 "${INSTALL_DIR}"/ovh/dns/db.* /etc/bind/zones/db.* 2>/dev/null | head -n 1 || true)"
+  if [ -n "${EXISTING_ZONE}" ]; then
+    SPARROWX_DOMAIN="$(basename "${EXISTING_ZONE}" | sed 's/^db\.//')"
+  elif [ -f "${INSTALL_DIR}/ovh/nginx.conf" ]; then
+    SPARROWX_DOMAIN="$(awk '/server_name/ {print $2; exit}' "${INSTALL_DIR}/ovh/nginx.conf" | tr -d ';' || true)"
+  fi
 fi
-SPARROWX_DOMAIN="$(echo "${SPARROWX_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
-[ -z "${SPARROWX_DOMAIN}" ] && SPARROWX_DOMAIN="${SPARROWX_PUBLIC_IP}"
+SPARROWX_DOMAIN="$(echo "${SPARROWX_DOMAIN:-sparrowx.net}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+[ -z "${SPARROWX_DOMAIN}" ] || [ "${SPARROWX_DOMAIN}" = "_" ] && SPARROWX_DOMAIN="sparrowx.net"
 
 DEFAULT_STUDIO_DOM="db.${SPARROWX_DOMAIN}"
-if [ -z "${SPARROWX_STUDIO_DOMAIN:-}" ] && [ -e /dev/tty ]; then
-  read -r -p "2. Enter your separate Supabase Studio Admin domain [default: ${DEFAULT_STUDIO_DOM}]: " IN_STD </dev/tty || true
-  SPARROWX_STUDIO_DOMAIN="${IN_STD:-${DEFAULT_STUDIO_DOM}}"
-else
-  SPARROWX_STUDIO_DOMAIN="${SPARROWX_STUDIO_DOMAIN:-${DEFAULT_STUDIO_DOM}}"
-fi
-SPARROWX_STUDIO_DOMAIN="$(echo "${SPARROWX_STUDIO_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+SPARROWX_STUDIO_DOMAIN="$(echo "${SPARROWX_STUDIO_DOMAIN:-${DEFAULT_STUDIO_DOM}}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 if [ -z "${SPARROWX_STUDIO_DOMAIN}" ] || [ "${SPARROWX_STUDIO_DOMAIN}" = "${SPARROWX_DOMAIN}" ]; then
   SPARROWX_STUDIO_DOMAIN="db.${SPARROWX_DOMAIN}"
 fi
