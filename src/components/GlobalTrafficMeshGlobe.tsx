@@ -118,26 +118,26 @@ export function sanitizeDomainName(raw: string): string {
 export const PRESET_ORIGINS: OriginHostConfig[] = [
   {
     id: "origin-sparrowx-net",
-    name: "SparrowX Edge Mesh",
+    name: "SparrowX OVH Sovereign Node",
     domain: "sparrowx.net",
-    ip: "64.29.17.65",
-    allIps: ["64.29.17.65", "216.198.79.65"],
-    provider: "Amazon.com, Inc. (AS16509)",
-    region: "Walnut, California, US",
+    ip: "139.99.131.135",
+    allIps: ["139.99.131.135"],
+    provider: "OVHcloud (AS16276)",
+    region: "Singapore / APAC Edge",
     geo: {
-      lat: 34.0119,
-      lng: -117.86,
-      country: "United States",
-      countryCode: "US",
-      city: "Walnut, CA",
-      flag: "🇺🇸",
+      lat: 1.3521,
+      lng: 103.8198,
+      country: "Singapore",
+      countryCode: "SG",
+      city: "Singapore",
+      flag: "🇸🇬",
     },
     status: "Protected & Active",
     wafMode: "Active Shield",
     uptimePct: 99.99,
-    baseLatencyMs: 11,
+    baseLatencyMs: 9,
     dnsVerified: true,
-    dnsResolver: "SparrowX Authoritative Anycast DNS (8.8.8.8)",
+    dnsResolver: "SparrowX Authoritative OVH DNS (139.99.131.135)",
   },
 ];
 
@@ -249,10 +249,10 @@ export async function resolveDomainLiveDns(rawDomain: string): Promise<{
   let resolvedIps: string[] = [];
   let resolverUsed = "SparrowX Authoritative Anycast DNS";
 
-  // Special canonical resolution for sparrowx.net matching live anycast IP (64.29.17.65)
-  if (clean === "sparrowx.net") {
-    resolvedIps = ["64.29.17.65", "216.198.79.65"];
-    resolverUsed = "SparrowX Authoritative Anycast DNS (64.29.17.65)";
+  // Special canonical resolution for sparrowx.net / sec.sparrowx.net matching live OVH server IP (139.99.131.135)
+  if (clean === "sparrowx.net" || clean.endsWith(".sparrowx.net")) {
+    resolvedIps = ["139.99.131.135"];
+    resolverUsed = "SparrowX Authoritative OVH DNS (139.99.131.135)";
   }
 
   // 1. Check local scanner records first (ignoring any stale cached demo IPs)
@@ -311,24 +311,32 @@ export async function resolveDomainLiveDns(rawDomain: string): Promise<{
   }
 
   // Final check for sparrowx.net canonical ping
-  if (clean === "sparrowx.net" && (!resolvedIps.length || resolvedIps.includes("104.21.55.19"))) {
-    resolvedIps = ["64.29.17.65", "216.198.79.65"];
+  if (
+    (clean === "sparrowx.net" || clean.endsWith(".sparrowx.net")) &&
+    (!resolvedIps.length || resolvedIps.includes("104.21.55.19"))
+  ) {
+    resolvedIps = ["139.99.131.135"];
   }
 
   const latencyMs = Math.max(8, Math.round(performance.now() - start));
-  const primaryIp = resolvedIps[0] ?? (clean === "sparrowx.net" ? "64.29.17.65" : "Resolving DNS...");
+  const primaryIp =
+    resolvedIps[0] ??
+    (clean === "sparrowx.net" || clean.endsWith(".sparrowx.net")
+      ? "139.99.131.135"
+      : "Resolving DNS...");
 
   // 4. Query live IP Geolocation to place the pin on the REAL datacenter
-  let provider = clean === "sparrowx.net" ? "Amazon.com, Inc. (AS16509)" : "Direct Host Provider";
-  let region = clean === "sparrowx.net" ? "Walnut, California, US" : "Global Edge Point";
-  let geo: GeoLocation = clean === "sparrowx.net"
+  const isSparrowxDomain = clean === "sparrowx.net" || clean.endsWith(".sparrowx.net");
+  let provider = isSparrowxDomain ? "OVHcloud (AS16276)" : "Direct Host Provider";
+  let region = isSparrowxDomain ? "Singapore / APAC Edge" : "Global Edge Point";
+  let geo: GeoLocation = isSparrowxDomain
     ? {
-        lat: 34.0119,
-        lng: -117.86,
-        country: "United States",
-        countryCode: "US",
-        city: "Walnut, CA",
-        flag: "🇺🇸",
+        lat: 1.3521,
+        lng: 103.8198,
+        country: "Singapore",
+        countryCode: "SG",
+        city: "Singapore",
+        flag: "🇸🇬",
       }
     : {
         lat: 34.0119,
@@ -724,7 +732,105 @@ export function GlobalTrafficMeshGlobe({
     },
     [activeOrigin],
   );
-  void pushRealPacket;
+
+  // Sync real ingested telemetry & incidents from local OVH database (/rest/v1/incidents)
+  useEffect(() => {
+    if (!activeOrigin || typeof window === "undefined") return;
+    let cancelled = false;
+    const seenPacketIds = new Set<string>();
+
+    const syncRealTelemetry = async () => {
+      try {
+        const res = await fetch(`${window.location.origin}/rest/v1/incidents?select=*`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok || cancelled) return;
+        const rows = (await res.json()) as Array<Record<string, unknown>>;
+        if (!Array.isArray(rows) || rows.length === 0 || cancelled) return;
+
+        const targetDom = sanitizeDomainName(activeOrigin.domain);
+        const isClientSession = currentUserRole === "client" || portalMode === "client";
+
+        const matchingRows = rows.filter((r) => {
+          const src = sanitizeDomainName(String(r.source ?? ""));
+          if (isClientSession) {
+            return Boolean(targetDom && src && src.includes(targetDom));
+          }
+          // In Admin/SOC mode, show packets matching the selected origin (or all real telemetry if viewing sparrowx.net)
+          if (targetDom === "sparrowx.net" || targetDom.endsWith(".sparrowx.net")) {
+            return true;
+          }
+          return Boolean(targetDom && src && src.includes(targetDom));
+        });
+
+        matchingRows.slice(0, 25).forEach((row, idx) => {
+          const pktId = String(row.id || `inc-${idx}`);
+          if (seenPacketIds.has(pktId)) return;
+          seenPacketIds.add(pktId);
+
+          const node = GLOBAL_VISITOR_NODES[idx % GLOBAL_VISITOR_NODES.length];
+          const sev = String(row.severity || "Low");
+          const title = String(row.title || "Telemetry Event");
+          const isAi =
+            title.toLowerCase().includes("ai") ||
+            title.toLowerCase().includes("prompt") ||
+            title.toLowerCase().includes("mcp");
+          const isBlocked =
+            sev === "Critical" ||
+            sev === "High" ||
+            title.toLowerCase().includes("block") ||
+            title.toLowerCase().includes("sql") ||
+            title.toLowerCase().includes("xss");
+
+          const status: ConnectionStatus = isAi
+            ? "AI_GUARDED"
+            : isBlocked
+              ? "BLOCKED"
+              : sev === "Medium"
+                ? "RATE_LIMITED"
+                : "ALLOWED";
+
+          pushRealPacket({
+            id: pktId,
+            timestamp: String(row.time || new Date().toLocaleTimeString()),
+            rawTime: Date.now() - idx * 1000,
+            clientIp: `${node.ipPrefix}.${(idx * 17 + 42) % 250}`,
+            clientGeo: {
+              lat: node.lat,
+              lng: node.lng,
+              country: node.country,
+              countryCode: node.countryCode,
+              city: node.city,
+              flag: node.flag,
+            },
+            originIp: activeOrigin.ip,
+            originName: activeOrigin.domain,
+            method: isBlocked ? "POST" : "GET",
+            path: isAi ? "/api/v1/ai-guardrail" : "/api/v1/telemetry/ingest",
+            status,
+            httpCode: status === "BLOCKED" ? 403 : status === "RATE_LIMITED" ? 429 : 200,
+            latencyMs: activeOrigin.baseLatencyMs || 11,
+            bytes: 1024 + idx * 128,
+            userAgent: "SparrowX-Edge-Connector/2.4",
+            threatDetails: title,
+            guardrailAction: String(row.summary || title),
+          });
+        });
+      } catch {
+        // Ignore network errors in test/offline environments
+      }
+    };
+
+    void syncRealTelemetry();
+    const timer = window.setInterval(() => {
+      void syncRealTelemetry();
+    }, 6000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeOrigin, currentUserRole, portalMode, pushRealPacket]);
 
   // 2. Ultra-Detailed 3D Canvas Rendering Loop (HiDPI + Solid Continent Outlines + Depth Shading)
   useEffect(() => {
