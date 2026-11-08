@@ -40,7 +40,6 @@ import {
   Zap,
 } from "lucide-react";
 import { CyberEmblem, CyberPill } from "@/components/ui/CyberBadge";
-import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
 import { getStoredCreditBalance, saveStoredCreditBalance } from "@/lib/billing-credits";
 import {
   analyzeScanWithGeminiBrain,
@@ -3193,15 +3192,6 @@ export function AdminRevenueAndOutreachEngine({
             quotations, and convert prospects directly into active client tenants.
           </p>
         </div>
-
-        <button
-          type="button"
-          onClick={() => onOpenPaymentModal(500)}
-          className="inline-flex items-center gap-2 rounded-md bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground shadow-sm hover:opacity-95 shrink-0 cursor-pointer"
-        >
-          <QrCode className="size-3.5" />
-          <span>Open UPI / Card Payment Terminal</span>
-        </button>
       </div>
 
       {/* CRM Funnel KPI Bar */}

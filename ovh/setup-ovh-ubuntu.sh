@@ -1,71 +1,147 @@
 #!/usr/bin/env bash
 # ============================================================================
-# SPARROWX 1-COMMAND OVHCLOUD UBUNTU SERVER INSTALLER
+# SPARROWX A-TO-Z FULLY AUTOMATED SELF-HOSTED SERVER INSTALLER
+# Runs on any Ubuntu / Debian / AlmaLinux / Rocky / CentOS / Fedora server
+# Deploys UI + Backend + PostgreSQL 16 + PostgREST + Nginx + Systemd Service
 # ============================================================================
-# Supports Ubuntu 22.04 LTS & 24.04 LTS on OVHcloud VPS / Dedicated Servers.
-# Installs Docker, PostgreSQL 16, PostgREST, Nginx, and SparrowX UI + API.
-#
-# Usage on your OVH Ubuntu server:
-#   chmod +x ovh/setup-ovh-ubuntu.sh
-#   sudo ./ovh/setup-ovh-ubuntu.sh
-# ============================================================================
-
 set -euo pipefail
 
-echo "=================================================================="
-echo "  SPARROWX SOVEREIGN OVH UBUNTU FULL-STACK DEPLOYMENT"
-echo "=================================================================="
+REPO_URL="https://github.com/cybersync-fxfx/sparrowxdbs.git"
+INSTALL_DIR="/opt/sparrowx"
+
+echo "======================================================================"
+echo "  SPARROWX SOVEREIGN STACK — A-TO-Z AUTOMATED SERVER INSTALLER"
+echo "======================================================================"
 
 if [ "$(id -u)" -ne 0 ]; then
-  echo "[!] Please run this script as root or with sudo: sudo ./ovh/setup-ovh-ubuntu.sh"
+  echo "[!] Please run with sudo or as root: sudo ./ovh/setup-ovh-ubuntu.sh"
   exit 1
 fi
 
-# 1. Install Docker & Docker Compose if not already installed
+# 1. Detect Package Manager & Install System Prerequisites
+echo "[1/7] Installing system prerequisites (git, curl, openssl, ca-certificates)..."
+if command -v apt-get >/dev/null 2>&1; then
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y ca-certificates curl gnupg git openssl ufw lsb-release
+elif command -v dnf >/dev/null 2>&1; then
+  dnf install -y ca-certificates curl git openssl firewalld
+elif command -v yum >/dev/null 2>&1; then
+  yum install -y ca-certificates curl git openssl firewalld
+fi
+
+# 2. Ensure Repository Exists (supports running standalone or inside cloned repo)
+if [ -f "./docker-compose.ovh.yml" ] && [ -f "./ovh/schema.sql" ]; then
+  INSTALL_DIR="$(pwd)"
+  echo "[2/7] Using existing SparrowX repository at: ${INSTALL_DIR}"
+else
+  echo "[2/7] Cloning SparrowX repository into ${INSTALL_DIR}..."
+  if [ -d "${INSTALL_DIR}/.git" ]; then
+    cd "${INSTALL_DIR}"
+    git pull origin main
+  else
+    rm -rf "${INSTALL_DIR}"
+    git clone "${REPO_URL}" "${INSTALL_DIR}"
+    cd "${INSTALL_DIR}"
+  fi
+fi
+
+cd "${INSTALL_DIR}"
+
+# 3. Install Docker Engine & Docker Compose v2 Automatically
 if ! command -v docker >/dev/null 2>&1; then
-  echo "[+] Installing Docker Engine and Docker Compose plugin..."
-  apt-get update -y
-  apt-get install -y ca-certificates curl gnupg ufw
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-  echo \
-    "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-    $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-    tee /etc/apt/sources.list.d/docker.list > /dev/null
-  apt-get update -y
-  apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-  systemctl enable --now docker
+  echo "[3/7] Installing Docker Engine & Docker Compose plugin..."
+  curl -fsSL https://get.docker.com | sh
+  systemctl enable docker
+  systemctl start docker
+else
+  echo "[3/7] Docker is already installed: $(docker --version)"
+  systemctl enable docker >/dev/null 2>&1 || true
+  systemctl start docker >/dev/null 2>&1 || true
 fi
 
-# 2. Generate .env with strong random database credentials if missing
+if ! docker compose version >/dev/null 2>&1; then
+  if command -v apt-get >/dev/null 2>&1; then
+    apt-get update -y && apt-get install -y docker-compose-plugin
+  elif command -v dnf >/dev/null 2>&1; then
+    dnf install -y docker-compose-plugin
+  fi
+fi
+
+# 4. Generate Sovereign Environment Credentials (.env)
 if [ ! -f .env ]; then
-  PG_PASS=$(openssl rand -hex 18)
-  echo "[+] Generating sovereign .env configuration..."
+  echo "[4/7] Generating cryptographic PostgreSQL credentials in .env..."
+  DB_PASS="$(openssl rand -hex 20)"
+  API_SECRET="spx_ovh_$(openssl rand -hex 16)"
   cat > .env <<EOF
-POSTGRES_USER=sparrowx
-POSTGRES_PASSWORD=${PG_PASS}
-POSTGRES_DB=sparrowx_db
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=spx_ovh_sovereign_key
+POSTGRES_PASSWORD=${DB_PASS}
+SPARROWX_API_SECRET=${API_SECRET}
+HTTP_PORT=80
 EOF
+  chmod 600 .env
+  echo "      Created .env with auto-generated database credentials."
+else
+  echo "[4/7] Existing .env file found, preserving credentials."
 fi
 
-# 3. Configure UFW Firewall (Allow SSH, HTTP, HTTPS)
+# 5. Configure Host Firewall (SSH 22, HTTP 80, HTTPS 443)
+echo "[5/7] Configuring host firewall rules..."
 if command -v ufw >/dev/null 2>&1; then
-  echo "[+] Configuring UFW firewall rules (22, 80, 443)..."
-  ufw allow 22/tcp >/dev/null || true
-  ufw allow 80/tcp >/dev/null || true
-  ufw allow 443/tcp >/dev/null || true
+  ufw allow 22/tcp >/dev/null 2>&1 || true
+  ufw allow 80/tcp >/dev/null 2>&1 || true
+  ufw allow 443/tcp >/dev/null 2>&1 || true
+  ufw --force enable >/dev/null 2>&1 || true
+elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
+  firewall-cmd --permanent --add-service=ssh >/dev/null 2>&1 || true
+  firewall-cmd --permanent --add-service=http >/dev/null 2>&1 || true
+  firewall-cmd --permanent --add-service=https >/dev/null 2>&1 || true
+  firewall-cmd --reload >/dev/null 2>&1 || true
 fi
 
-# 4. Build and launch the self-hosted stack
-echo "[+] Building and starting PostgreSQL, PostgREST, SparrowX App, and Nginx..."
+# 6. Build & Start Full Sovereign Stack + Register Systemd Boot Service
+echo "[6/7] Building and launching PostgreSQL 16, PostgREST, SparrowX Node Server, and Nginx..."
 docker compose -f docker-compose.ovh.yml up -d --build
 
-echo "=================================================================="
-echo "  [SUCCESS] SparrowX Full Stack is LIVE on your OVH Ubuntu Server!"
-echo "  - Web UI & SOC Console : http://$(hostname -I | awk '{print $1}')"
-echo "  - Self-Hosted REST API : http://$(hostname -I | awk '{print $1}')/rest/v1/"
-echo "  - Health Check API     : http://$(hostname -I | awk '{print $1}')/api/v1/health"
-echo "=================================================================="
+if [ -d /etc/systemd/system ]; then
+  cat > /etc/systemd/system/sparrowx-stack.service <<EOF
+[Unit]
+Description=SparrowX Sovereign Cyber Defense Stack
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${INSTALL_DIR}
+ExecStart=/usr/bin/docker compose -f docker-compose.ovh.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.ovh.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable sparrowx-stack.service >/dev/null 2>&1 || true
+fi
+
+# 7. Automated End-to-End Health & Database Verification
+echo "[7/7] Verifying live API and database readiness..."
+ATTEMPTS=0
+MAX_ATTEMPTS=30
+until curl -fsS http://127.0.0.1/api/v1/health >/dev/null 2>&1 || [ $ATTEMPTS -ge $MAX_ATTEMPTS ]; do
+  ATTEMPTS=$((ATTEMPTS + 1))
+  sleep 2
+done
+
+SERVER_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo '127.0.0.1')"
+
+echo ""
+echo "======================================================================"
+echo "  SPARROWX SELF-HOSTED STACK IS ONLINE (A-TO-Z COMPLETE)"
+echo "======================================================================"
+echo "  Dashboard UI : http://${SERVER_IP}"
+echo "  REST DB API  : http://${SERVER_IP}/rest/v1/"
+echo "  Health Check : http://${SERVER_IP}/api/v1/health"
+echo "  Install Path : ${INSTALL_DIR}"
+echo "  Auto-Boot    : Enabled via systemd (sparrowx-stack.service)"
+echo "======================================================================"

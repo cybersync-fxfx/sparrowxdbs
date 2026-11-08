@@ -1586,76 +1586,12 @@ export function ClientPortalView({
                       </div>
                     </div>
 
-                    {/* Payment Method Selector */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-semibold text-muted-foreground block">
-                        Select Corporate Payment Method
-                      </label>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutPaymentMethod("card")}
-                          className={`rounded-xl border p-3 text-left transition-all ${
-                            checkoutPaymentMethod === "card"
-                              ? "border-primary bg-primary/10 text-foreground font-bold"
-                              : "border-border bg-background text-muted-foreground"
-                          }`}
-                        >
-                          <CreditCard className="size-4 text-primary mb-1" />
-                          <div>Corporate Card</div>
-                          <div className="text-[10px] text-muted-foreground font-normal">Visa / MC / Amex</div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutPaymentMethod("wire")}
-                          className={`rounded-xl border p-3 text-left transition-all ${
-                            checkoutPaymentMethod === "wire"
-                              ? "border-primary bg-primary/10 text-foreground font-bold"
-                              : "border-border bg-background text-muted-foreground"
-                          }`}
-                        >
-                          <Server className="size-4 text-cyan-400 mb-1" />
-                          <div>Bank Wire / ACH</div>
-                          <div className="text-[10px] text-muted-foreground font-normal">Net-30 Invoice Available</div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutPaymentMethod("upi")}
-                          className={`rounded-xl border p-3 text-left transition-all ${
-                            checkoutPaymentMethod === "upi"
-                              ? "border-primary bg-primary/10 text-foreground font-bold"
-                              : "border-border bg-background text-muted-foreground"
-                          }`}
-                        >
-                          <Zap className="size-4 text-amber-400 mb-1" />
-                          <div>Instant UPI Auto-Pay</div>
-                          <div className="text-[10px] text-muted-foreground font-normal">bm.atchuthakrishna@okhdfcbank</div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutPaymentMethod("binance")}
-                          className={`rounded-xl border p-3 text-left transition-all ${
-                            checkoutPaymentMethod === "binance"
-                              ? "border-primary bg-primary/10 text-foreground font-bold"
-                              : "border-border bg-background text-muted-foreground"
-                          }`}
-                        >
-                          <Boxes className="size-4 text-yellow-400 mb-1" />
-                          <div>Binance Pay / USDT</div>
-                          <div className="text-[10px] text-muted-foreground font-normal">Merchant ID: 582910482</div>
-                        </button>
-                      </div>
-                    </div>
-
                     {/* What happens next */}
                     <div className="text-[11px] text-muted-foreground bg-muted/20 border border-border/60 rounded-xl p-3 space-y-1">
                       <div className="font-semibold text-foreground">Immediate Activation SLA:</div>
                       <div>• Domain quota upgrades to {selectedPlanForCheckout.maxDomains === -1 ? "Unlimited" : selectedPlanForCheckout.maxDomains} domains immediately.</div>
                       <div>• Guaranteed {selectedPlanForCheckout.sla} incident response takes effect upon confirmation.</div>
-                      <div>• Cryptographic tax invoice automatically issued to {currentUser?.email || "your billing email"}.</div>
+                      <div>• Provisioned directly on your sovereign server for {currentUser?.email || "your workspace"}.</div>
                     </div>
 
                     {/* Modal Actions */}
@@ -1672,15 +1608,11 @@ export function ClientPortalView({
                         type="button"
                         size="sm"
                         onClick={() => {
-                          const methodName =
-                            checkoutPaymentMethod === "card"
-                              ? "Corporate Card (Auto-Pay)"
-                              : checkoutPaymentMethod === "wire"
-                              ? "Bank Wire / ACH"
-                              : checkoutPaymentMethod === "upi"
-                              ? "UPI (bm.atchuthakrishna@okhdfcbank)"
-                              : "Binance USDT (582910482)";
-                          handleSubscribeToPlan(selectedPlanForCheckout, checkoutBillingCycle, methodName);
+                          handleSubscribeToPlan(
+                            selectedPlanForCheckout,
+                            checkoutBillingCycle,
+                            "Sovereign Self-Hosted Provisioning",
+                          );
                         }}
                         className="bg-primary font-bold text-black hover:opacity-95 shadow-md shadow-primary/25"
                       >
@@ -4659,13 +4591,11 @@ export function PortalLoginScreen({
                 setOrgName(suggestedOrgName);
                 openAuthGateway("signup");
               }}
-              onOpenInstantCheckout={(neededCredits, domain) => {
-                setLandingNeededCredits(neededCredits);
+              onOpenInstantCheckout={(_neededCredits, domain) => {
                 if (domain) {
-                  setPrimaryDomain(`https://${domain}`);
-                  setLandingPaymentLabel(`SparrowX Shield — ${domain}`);
+                  setPrimaryDomain(domain);
                 }
-                setShowLandingPaymentModal(true);
+                openAuthGateway("signup");
               }}
             />
           </section>

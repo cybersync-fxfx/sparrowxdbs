@@ -286,7 +286,10 @@ function readLocalCache<T>(key: string): T[] {
     const raw = window.localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as T[]) : [];
+    if (!Array.isArray(parsed)) return [];
+    return (parsed as Array<Record<string, unknown>>).filter(
+      (item) => !LEGACY_DEMO_IDS.has(String(item?.id ?? "")),
+    ) as unknown as T[];
   } catch {
     return [];
   }
@@ -711,20 +714,27 @@ export async function fetchProtectedServicesFromBackend(): Promise<ProtectedServ
     if (!response.ok) return cached;
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return cached;
-    const mapped: ProtectedService[] = data.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      category: (row.category as ServiceCategory) ?? "Web App & Website",
-      endpoint: String(row.endpoint ?? ""),
-      mode: (row.mode as ProtectionMode) ?? "Active Shield",
-      requests24h: String(row.requests_24h ?? "0"),
-      blockedThreats: Number(row.blocked_threats ?? 0),
-      apiKey: String(row.api_key ?? ""),
-      promptShield: Boolean(row.prompt_shield ?? false),
-      piiRedaction: Boolean(row.pii_redaction ?? true),
-      toolCallFirewall: Boolean(row.tool_call_firewall ?? false),
-      lastHeartbeat: String(row.last_heartbeat ?? "Connected"),
-    }));
+    const mapped: ProtectedService[] = data
+      .filter((row) => !LEGACY_DEMO_IDS.has(String(row.id ?? "")))
+      .map((row) => {
+        const hb = String(row.last_heartbeat ?? "Awaiting Verification");
+        const isConnected = hb !== "Awaiting Verification" && hb !== "Disconnected";
+        return {
+          id: String(row.id ?? ""),
+          tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
+          name: String(row.name ?? ""),
+          category: (row.category as ServiceCategory) ?? "Web App & Website",
+          endpoint: String(row.endpoint ?? ""),
+          mode: (row.mode as ProtectionMode) ?? "Active Shield",
+          requests24h: isConnected ? String(row.requests_24h ?? "0") : "0",
+          blockedThreats: isConnected ? Number(row.blocked_threats ?? 0) : 0,
+          apiKey: String(row.api_key ?? ""),
+          promptShield: Boolean(row.prompt_shield ?? false),
+          piiRedaction: Boolean(row.pii_redaction ?? true),
+          toolCallFirewall: Boolean(row.tool_call_firewall ?? false),
+          lastHeartbeat: hb,
+        };
+      });
     writeLocalCache(STORAGE_KEYS.services, mapped);
     return mapped;
   } catch {
@@ -798,24 +808,27 @@ export async function fetchClientTenantsFromBackend(): Promise<ClientTenant[]> {
     if (!response.ok) return cached;
     const data = (await response.json()) as Array<Record<string, unknown>>;
     if (!Array.isArray(data)) return cached;
-    const mapped: ClientTenant[] = data.map((row) => ({
-      id: String(row.id ?? ""),
-      name: String(row.name ?? ""),
-      contactEmail: String(row.contact_email ?? ""),
-      primaryDomain: String(row.primary_domain ?? ""),
-      planTier: (row.plan_tier as PlanTier) ?? "Growth",
-      status: (row.status as TenantStatus) ?? "Active",
-      enabledModules: Array.isArray(row.enabled_modules)
-        ? (row.enabled_modules as ServiceModuleId[])
-        : ["web_security"],
-      apiKey: String(row.api_key ?? ""),
-      sdkVerified: Boolean(row.sdk_verified ?? false),
-      guardrailsActive: Boolean(row.guardrails_active ?? true),
-      requestsPerMin: Number(row.requests_per_min ?? 0),
-      blockedThreats: Number(row.blocked_threats ?? 0),
-      avgLatencyMs: Number(row.avg_latency_ms ?? 12),
-      quotaUsedPct: Number(row.quota_used_pct ?? 1),
-    }));
+    const mapped: ClientTenant[] = data.map((row) => {
+      const verified = Boolean(row.sdk_verified ?? false);
+      return {
+        id: String(row.id ?? ""),
+        name: String(row.name ?? ""),
+        contactEmail: String(row.contact_email ?? ""),
+        primaryDomain: String(row.primary_domain ?? ""),
+        planTier: (row.plan_tier as PlanTier) ?? "Growth",
+        status: (row.status as TenantStatus) ?? "Active",
+        enabledModules: Array.isArray(row.enabled_modules)
+          ? (row.enabled_modules as ServiceModuleId[])
+          : ["web_security"],
+        apiKey: String(row.api_key ?? ""),
+        sdkVerified: verified,
+        guardrailsActive: Boolean(row.guardrails_active ?? true),
+        requestsPerMin: verified ? Number(row.requests_per_min ?? 0) : 0,
+        blockedThreats: verified ? Number(row.blocked_threats ?? 0) : 0,
+        avgLatencyMs: verified ? Number(row.avg_latency_ms ?? 12) : 0,
+        quotaUsedPct: verified ? Number(row.quota_used_pct ?? 1) : 0,
+      };
+    });
     writeLocalCache(STORAGE_KEYS.tenants, mapped);
     return mapped;
   } catch {
