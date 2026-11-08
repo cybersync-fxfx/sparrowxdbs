@@ -47,7 +47,11 @@ export function generateClientSdkSnippet(
     apiKey: string;
     category?: string;
   },
-  baseUrl = "https://sparrowx.dev",
+  baseUrl = typeof window !== "undefined" &&
+  window.location?.origin &&
+  !window.location.origin.includes("localhost")
+    ? window.location.origin
+    : "https://sparrowx.net",
 ): { filename: string; language: string; code: string; installCmd?: string } {
   const isAi = service.category?.includes("AI") || service.endpoint.startsWith("agent://");
   const maskedKey = maskSecretKey(service.apiKey);

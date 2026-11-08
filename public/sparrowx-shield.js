@@ -23,12 +23,36 @@
   var scriptTag =
     document.currentScript ||
     document.querySelector('script[src*="sparrowx-shield.js"]') ||
+    document.querySelector('script[data-site-id]') ||
+    document.querySelector('script[data-api-key]') ||
     document.querySelector('script[data-spx-key]');
 
-  var apiKey = scriptTag ? scriptTag.getAttribute('data-spx-key') : '';
-  var tenantId = scriptTag ? scriptTag.getAttribute('data-spx-tenant') : '';
-  var domain = scriptTag ? scriptTag.getAttribute('data-spx-domain') : window.location.hostname;
-  var apiEndpoint = scriptTag ? (scriptTag.getAttribute('data-spx-endpoint') || 'https://sparrowx.net/api/v1/verify') : 'https://sparrowx.net/api/v1/verify';
+  var apiKey = scriptTag
+    ? scriptTag.getAttribute('data-api-key') || scriptTag.getAttribute('data-spx-key') || ''
+    : '';
+  var tenantId = scriptTag
+    ? scriptTag.getAttribute('data-site-id') || scriptTag.getAttribute('data-spx-tenant') || ''
+    : '';
+  var rawDomain = scriptTag
+    ? scriptTag.getAttribute('data-endpoint') || scriptTag.getAttribute('data-spx-domain') || window.location.hostname
+    : window.location.hostname;
+  var domain = String(rawDomain || window.location.hostname)
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '');
+
+  var scriptOrigin = 'https://sparrowx.net';
+  try {
+    if (scriptTag && scriptTag.src) {
+      scriptOrigin = new URL(scriptTag.src, window.location.origin).origin;
+    }
+  } catch (e) {
+    scriptOrigin = 'https://sparrowx.net';
+  }
+
+  var apiEndpoint =
+    scriptTag && scriptTag.getAttribute('data-spx-endpoint')
+      ? scriptTag.getAttribute('data-spx-endpoint')
+      : scriptOrigin + '/api/v1/telemetry/ingest';
 
   var SparrowX = {
     version: '2.4.0',
@@ -59,7 +83,13 @@
         var payload = {
           apiKey: self.apiKey,
           tenantId: self.tenantId,
+          service_id: self.tenantId,
           domain: self.domain,
+          source: self.domain,
+          title: 'SDK Live Beacon Verified (' + self.domain + ')',
+          severity: 'Low',
+          status: 'Resolved',
+          summary: 'Autonomous Web Shield active on ' + window.location.href,
           url: window.location.href,
           userAgent: navigator.userAgent,
           timestamp: new Date().toISOString(),
