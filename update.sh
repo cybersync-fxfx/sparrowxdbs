@@ -55,6 +55,8 @@ if [ -z "${SPARROWX_DOMAIN:-}" ] && [ -e /dev/tty ]; then
 else
   SPARROWX_DOMAIN="${SPARROWX_DOMAIN:-${SPARROWX_PUBLIC_IP}}"
 fi
+SPARROWX_DOMAIN="$(echo "${SPARROWX_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+[ -z "${SPARROWX_DOMAIN}" ] && SPARROWX_DOMAIN="${SPARROWX_PUBLIC_IP}"
 
 DEFAULT_STUDIO_DOM="db.${SPARROWX_DOMAIN}"
 if [ -z "${SPARROWX_STUDIO_DOMAIN:-}" ] && [ -e /dev/tty ]; then
@@ -62,6 +64,10 @@ if [ -z "${SPARROWX_STUDIO_DOMAIN:-}" ] && [ -e /dev/tty ]; then
   SPARROWX_STUDIO_DOMAIN="${IN_STD:-${DEFAULT_STUDIO_DOM}}"
 else
   SPARROWX_STUDIO_DOMAIN="${SPARROWX_STUDIO_DOMAIN:-${DEFAULT_STUDIO_DOM}}"
+fi
+SPARROWX_STUDIO_DOMAIN="$(echo "${SPARROWX_STUDIO_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+if [ -z "${SPARROWX_STUDIO_DOMAIN}" ] || [ "${SPARROWX_STUDIO_DOMAIN}" = "${SPARROWX_DOMAIN}" ]; then
+  SPARROWX_STUDIO_DOMAIN="db.${SPARROWX_DOMAIN}"
 fi
 
 HTTP_PORT="${HTTP_PORT:-80}"
@@ -253,14 +259,16 @@ fi
 DB_MARKER_FILE="${INSTALL_DIR}/data/.db_initialized"
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  systemctl stop sparrowx-native.service >/dev/null 2>&1 || true
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^sparrowx-postgres$" && [ "${FORCE_DB_INSTALL}" = "false" ]; then
     log_info "[Step 5/6] PostgreSQL & PostgREST are already running — rebuilding ONLY the SparrowX web app container..."
     docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d --no-deps sparrowx
     docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up -d nginx
-    docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+    docker restart sparrowx-nginx >/dev/null 2>&1 || true
   else
-    log_info "[Step 5/6] First-time or forced DB startup — launching Full-Stack Docker containers..."
+    log_info "[Step 5/6] Launching Full-Stack Docker containers..."
     docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d
+    docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 else
   log_info "[Step 5/6] Rebuilding native SparrowX application..."
@@ -269,6 +277,33 @@ else
   export VITE_SUPABASE_URL=""
   npm install --legacy-peer-deps && npm run build
   systemctl restart sparrowx-native.service 2>/dev/null || true
+fi
+
+# Ensure firewall allows HTTP/HTTPS traffic
+if command -v ufw >/dev/null 2>&1; then
+  ufw allow 80/tcp >/dev/null 2>&1 || true
+  ufw allow 443/tcp >/dev/null 2>&1 || true
+  ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
+  ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
+fi
+
+# Verify HTTP health endpoint responds 200 OK
+log_info "Verifying live HTTP health probe on port ${HTTP_PORT} & ${APP_HOST_PORT}..."
+HEALTH_OK="false"
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -fsS "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+    HEALTH_OK="true"
+    break
+  fi
+  sleep 2
+done
+
+if [ "${HEALTH_OK}" = "true" ]; then
+  log_ok "SparrowX Web Server is healthy and responding (HTTP 200 OK)."
+else
+  log_warn "App container health check took longer than expected; inspecting container logs..."
+  docker logs --tail 20 sparrowx-app 2>&1 || true
+  docker logs --tail 20 sparrowx-nginx 2>&1 || true
 fi
 
 # 7. Only Seed / Install Database on First Run (or when --reinstall-db is passed)

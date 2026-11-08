@@ -10,11 +10,11 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-# Build with VITE_SOVEREIGN_SELF_HOSTED="true" so OVH Docker uses same-origin (/rest/v1/*) with cloud fallback
+# Build with VITE_SOVEREIGN_SELF_HOSTED="true" so OVH Docker uses same-origin (/rest/v1/*)
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 ENV VITE_SOVEREIGN_SELF_HOSTED="true"
 ENV VITE_SUPABASE_URL=""
 ENV VITE_SUPABASE_ANON_KEY="spx_ovh_sovereign_key"
-ENV NITRO_PRESET="node-server"
 
 RUN npm run build
 
@@ -30,11 +30,12 @@ ENV PORT="3000"
 ENV HOST="0.0.0.0"
 ENV SPARROWX_DATA_DIR="/app/data"
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data /app/src/lib
 
 COPY --from=builder /app/.output ./.output
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/ovh ./ovh
+COPY --from=builder /app/src/lib/migrated-seed.json ./src/lib/migrated-seed.json
 
 EXPOSE 3000
 
