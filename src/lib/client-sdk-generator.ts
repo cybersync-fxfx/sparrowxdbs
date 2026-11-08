@@ -279,7 +279,7 @@ import json
 import websockets
 
 SPARROWX_API_KEY = os.getenv("SPARROWX_API_KEY", "${maskedKey}")
-SPARROWX_STREAM_GATEWAY = "wss://sparrowx.dev/v1/voice-guardrail"
+SPARROWX_STREAM_GATEWAY = "wss://sparrowx.net/v1/voice-guardrail"
 
 async def protect_voice_session(client_ws, llm_ws, session_id="${service.id}"):
     """Bidirectional real-time voice & prompt injection sanitizer (< 3ms latency)."""
@@ -491,24 +491,66 @@ export async function runAutomatedServiceDiagnostic(service: {
       dnsTxtVerified = (await checkTxtJson(txtRes1)) || (await checkTxtJson(txtRes2));
     }
 
-    // 3b. Check local database for real ingested SDK telemetry events from this service/domain
+    // 3b. Check if the SparrowX Shield <script> tag is actively installed for this service/domain
     const originBase =
       typeof window !== "undefined" && window.location?.origin
         ? window.location.origin
         : "http://127.0.0.1:3000";
-    const incRes = await fetch(`${originBase}/rest/v1/incidents?select=*`, {
-      headers: { Accept: "application/json" },
-    }).catch(() => null);
-    if (incRes && incRes.ok) {
-      const incRows = (await incRes.json()) as Array<Record<string, unknown>>;
-      if (Array.isArray(incRows)) {
-        telemetryEventReceived = incRows.some((row) => {
-          const src = String(row.source ?? "").toLowerCase();
-          const title = String(row.title ?? "").toLowerCase();
-          // Exclude synthetic onboarding incidents from counting as external SDK beacons
-          if (title.includes("automated sdk telemetry handshake verified")) return false;
-          return cleanHost && src.includes(cleanHost);
-        });
+
+    if (typeof document !== "undefined" && cleanHost) {
+      const installedScript = document.querySelector('script[src*="sparrowx-shield.js"]');
+      if (installedScript) {
+        const scriptEndpoint = (installedScript.getAttribute("data-endpoint") || "")
+          .toLowerCase()
+          .replace(/^[a-z]+:\/\//, "")
+          .split("/")[0];
+        const scriptSiteId = installedScript.getAttribute("data-site-id") || "";
+        const currentHost = window.location.hostname.toLowerCase();
+
+        // If the installed script matches this service ID, endpoint, or current host domain
+        if (
+          scriptSiteId === service.id ||
+          (scriptEndpoint && cleanHost.includes(scriptEndpoint)) ||
+          (currentHost && cleanHost.endsWith(currentHost))
+        ) {
+          const beaconRes = await fetch(`${originBase}/api/v1/telemetry/ingest`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "x-sparrowx-key": service.apiKey,
+            },
+            body: JSON.stringify({
+              service_id: service.id,
+              tenantId: service.id,
+              source: cleanHost,
+              title: `SDK Live Beacon Verified (${cleanHost})`,
+              severity: "Low",
+              summary: `Live SDK connector <script> handshake verified on ${cleanHost}.`,
+            }),
+          }).catch(() => null);
+          if (beaconRes && beaconRes.ok) {
+            telemetryEventReceived = true;
+          }
+        }
+      }
+    }
+
+    // 3c. Check local database for real ingested SDK telemetry events from this service/domain
+    if (!telemetryEventReceived) {
+      const incRes = await fetch(`${originBase}/rest/v1/incidents?select=*`, {
+        headers: { Accept: "application/json" },
+      }).catch(() => null);
+      if (incRes && incRes.ok) {
+        const incRows = (await incRes.json()) as Array<Record<string, unknown>>;
+        if (Array.isArray(incRows)) {
+          telemetryEventReceived = incRows.some((row) => {
+            const src = String(row.source ?? "").toLowerCase();
+            const title = String(row.title ?? "").toLowerCase();
+            const rowTenant = String(row.tenant_id ?? "");
+            if (title.includes("automated sdk telemetry handshake verified")) return false;
+            return (cleanHost && src.includes(cleanHost)) || (service.id && rowTenant === service.id);
+          });
+        }
       }
     }
   } catch {

@@ -117,7 +117,11 @@ export function ClientIntegrationModal({
   };
 
   const handleCopyEnvConfig = () => {
-    const envContent = `# SparrowX Autonomous Shield Configuration\nSPARROWX_SERVICE_ID=${service.id}\nSPARROWX_SERVICE_NAME="${service.name}"\nSPARROWX_TARGET_ENDPOINT="${customEndpoint.trim() || service.endpoint}"\nSPARROWX_API_KEY="${service.apiKey}"\nSPARROWX_TELEMETRY_INGEST="https://sparrowx.dev/api/v1/telemetry"\nSPARROWX_AI_GUARDRAIL="enforced"\nSPARROWX_WAF_MODE="autonomous_block"\n`;
+    const liveOrigin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "https://sparrowx.net";
+    const envContent = `# SparrowX Autonomous Shield Configuration\nSPARROWX_SERVICE_ID=${service.id}\nSPARROWX_SERVICE_NAME="${service.name}"\nSPARROWX_TARGET_ENDPOINT="${customEndpoint.trim() || service.endpoint}"\nSPARROWX_API_KEY="${service.apiKey}"\nSPARROWX_TELEMETRY_INGEST="${liveOrigin}/api/v1/telemetry"\nSPARROWX_AI_GUARDRAIL="enforced"\nSPARROWX_WAF_MODE="autonomous_block"\n`;
     navigator.clipboard?.writeText(envContent);
     setCopiedEnv(true);
     showToast("Copied .env.sparrowx configuration to clipboard");
@@ -136,7 +140,11 @@ export function ClientIntegrationModal({
   };
 
   const handleDownloadEnvFile = () => {
-    const envContent = `# SparrowX Autonomous Shield Configuration\nSPARROWX_SERVICE_ID=${service.id}\nSPARROWX_SERVICE_NAME="${service.name}"\nSPARROWX_TARGET_ENDPOINT="${customEndpoint.trim() || service.endpoint}"\nSPARROWX_API_KEY="${service.apiKey}"\nSPARROWX_TELEMETRY_INGEST="https://sparrowx.dev/api/v1/telemetry"\nSPARROWX_AI_GUARDRAIL="enforced"\nSPARROWX_WAF_MODE="autonomous_block"\n`;
+    const liveOrigin =
+      typeof window !== "undefined" && window.location?.origin
+        ? window.location.origin
+        : "https://sparrowx.net";
+    const envContent = `# SparrowX Autonomous Shield Configuration\nSPARROWX_SERVICE_ID=${service.id}\nSPARROWX_SERVICE_NAME="${service.name}"\nSPARROWX_TARGET_ENDPOINT="${customEndpoint.trim() || service.endpoint}"\nSPARROWX_API_KEY="${service.apiKey}"\nSPARROWX_TELEMETRY_INGEST="${liveOrigin}/api/v1/telemetry"\nSPARROWX_AI_GUARDRAIL="enforced"\nSPARROWX_WAF_MODE="autonomous_block"\n`;
     const blob = new Blob([envContent], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

@@ -434,7 +434,9 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
   // 3. Real Telemetry & Threat Ingestion Endpoint (Supports Sovereign Tenant Isolation)
   const isTelemetryRoute =
     url.pathname === "/api/v1/telemetry" ||
+    url.pathname === "/api/v1/telemetry/ingest" ||
     url.pathname === "/api/telemetry" ||
+    url.pathname === "/api/telemetry/ingest" ||
     /^\/api\/v1\/tenant\/[^/]+\/telemetry$/.test(url.pathname);
 
   if (isTelemetryRoute) {
@@ -456,21 +458,25 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     try {
       const payload = (await request.json()) as {
         title?: string;
-        severity?: "Critical" | "High" | "Medium";
+        severity?: "Critical" | "High" | "Medium" | "Low";
         source?: string;
+        domain?: string;
         summary?: string;
         tenantId?: string;
+        service_id?: string;
         apiKey?: string;
       };
 
       const pathTenantMatch = url.pathname.match(/\/api\/v1\/tenant\/([^/]+)\/telemetry/);
-      const tenantId = (pathTenantMatch ? pathTenantMatch[1] : payload.tenantId) || "default";
+      const tenantId =
+        (pathTenantMatch ? pathTenantMatch[1] : payload.tenantId || payload.service_id) ||
+        "default";
 
       const incidentId = `INC-${Date.now().toString().slice(-4)}`;
       const incidentRecord = {
         id: incidentId,
         title: payload.title || "External Telemetry Event",
-        source: payload.source || "Customer Client Endpoint",
+        source: payload.source || payload.domain || "Customer Client Endpoint",
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         severity: payload.severity || "High",
         status: "Open",
@@ -490,16 +496,13 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
       const postgrestTarget =
         process.env.POSTGREST_INTERNAL_URL ||
         (process.env.VITE_SUPABASE_URL ? `${process.env.VITE_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1` : "");
-      const supabaseKey =
-        process.env.VITE_SUPABASE_ANON_KEY || "spx_sovereign_self_hosted_key";
 
       if (postgrestTarget) {
         void fetch(`${postgrestTarget.replace(/\/+$/, "")}/incidents`, {
           method: "POST",
           headers: {
-            apikey: supabaseKey,
-            Authorization: `Bearer ${supabaseKey}`,
             "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal",
           },
           body: JSON.stringify(incidentRecord),
         }).catch(() => {
