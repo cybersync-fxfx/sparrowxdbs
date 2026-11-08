@@ -360,6 +360,31 @@ export function addTenantDatabaseIp(
   const updatedList = [newRecord, ...existingIps];
   writeTenantIsolatedStorage<TenantDatabaseIpRecord>(tenantId, "ips", updatedList);
 
+  // Sync to sovereign server / PostgREST tenant_ips table asynchronously
+  if (typeof window !== "undefined" && typeof fetch === "function") {
+    void fetch(`/rest/v1/tenant_ips`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify({
+        id: newRecord.id,
+        tenant_id: tenantId,
+        database_name: newRecord.databaseName,
+        table_name: newRecord.tableName,
+        ip_address: newRecord.ipAddress,
+        label: newRecord.label,
+        type: newRecord.type,
+        status: newRecord.status,
+        last_probe_status: newRecord.lastProbeStatus,
+        notes: newRecord.notes || null,
+      }),
+    }).catch(() => {
+      // Offline / local test fallback
+    });
+  }
+
   // Automatically update VPS connector IP if none was configured
   if (!config.connectors.vpsServer.serverIp && (newRecord.type === "server_wan" || newRecord.type === "waf_origin")) {
     config.connectors.vpsServer.serverIp = cleanIp;
@@ -401,6 +426,14 @@ export function removeTenantDatabaseIp(
 
   const filtered = existingIps.filter((i) => i.id !== recordId);
   writeTenantIsolatedStorage<TenantDatabaseIpRecord>(tenantId, "ips", filtered);
+
+  if (typeof window !== "undefined" && typeof fetch === "function") {
+    void fetch(`/rest/v1/tenant_ips?id=eq.${encodeURIComponent(recordId)}`, {
+      method: "DELETE",
+    }).catch(() => {
+      // Offline / local test fallback
+    });
+  }
 
   emitEngineActivity("Database", `Removed IP ${target.ipAddress} from table ${config.ipTableName}`, "info");
   emitEngineToast(`Removed IP ${target.ipAddress} from database`, "warning", "IP Removed");

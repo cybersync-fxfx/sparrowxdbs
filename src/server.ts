@@ -18,12 +18,177 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-// CORS Headers for client SDK integrations
+// CORS Headers for client SDK integrations & self-hosted PostgREST API
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-sparrowx-key",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key",
 };
+
+// Sovereign Built-in Table Store (used when POSTGREST_INTERNAL_URL is not configured or as fast cache)
+const sovereignTableStore = new Map<string, Array<Record<string, unknown>>>();
+
+function getTableRows(tableName: string): Array<Record<string, unknown>> {
+  if (!sovereignTableStore.has(tableName)) {
+    sovereignTableStore.set(tableName, []);
+  }
+  return sovereignTableStore.get(tableName)!;
+}
+
+function matchesPostgrestFilters(row: Record<string, unknown>, searchParams: URLSearchParams): boolean {
+  for (const [key, rawVal] of searchParams.entries()) {
+    if (key === "select" || key === "order" || key === "limit" || key === "offset") continue;
+    const cell = row[key];
+    if (rawVal.startsWith("eq.")) {
+      const target = rawVal.slice(3);
+      if (String(cell ?? "") !== target) return false;
+    } else if (rawVal.startsWith("neq.")) {
+      const target = rawVal.slice(4);
+      if (String(cell ?? "") === target) return false;
+    } else if (rawVal.startsWith("ilike.")) {
+      const target = rawVal.slice(6).toLowerCase();
+      if (String(cell ?? "").toLowerCase() !== target) return false;
+    } else if (rawVal.startsWith("in.(") && rawVal.endsWith(")")) {
+      const list = rawVal
+        .slice(4, -1)
+        .split(",")
+        .map((item) => item.replace(/^"|"$/g, ""));
+      if (!list.includes(String(cell ?? ""))) return false;
+    }
+  }
+  return true;
+}
+
+async function handleSovereignRestApi(request: Request, url: URL): Promise<Response | null> {
+  const match = url.pathname.match(/^\/rest\/v1\/([a-zA-Z0-9_]+)$/);
+  if (!match) return null;
+  const tableName = match[1];
+
+  // If running alongside self-hosted PostgREST container on OVH Ubuntu, proxy directly to PostgREST
+  const postgrestInternal = process.env.POSTGREST_INTERNAL_URL;
+  if (postgrestInternal) {
+    try {
+      const upstreamUrl = `${postgrestInternal.replace(/\/+$/, "")}/${tableName}${url.search}`;
+      const upstreamRes = await fetch(upstreamUrl, {
+        method: request.method,
+        headers: {
+          "Content-Type": request.headers.get("Content-Type") || "application/json",
+          Accept: request.headers.get("Accept") || "application/json",
+          ...(request.headers.get("Prefer") ? { Prefer: request.headers.get("Prefer")! } : {}),
+        },
+        body:
+          request.method !== "GET" && request.method !== "HEAD"
+            ? await request.clone().text()
+            : undefined,
+      });
+      if (upstreamRes.ok) {
+        const bodyText = await upstreamRes.text();
+        return new Response(bodyText, {
+          status: upstreamRes.status,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+    } catch {
+      // Fall through to built-in sovereign table store if PostgREST container is starting up
+    }
+  }
+
+  const rows = getTableRows(tableName);
+
+  if (request.method === "GET") {
+    let result = rows.filter((row) => matchesPostgrestFilters(row, url.searchParams));
+    const orderParam = url.searchParams.get("order");
+    if (orderParam) {
+      const [col, dir] = orderParam.split(".");
+      if (col) {
+        result = [...result].sort((a, b) => {
+          const va = String(a[col] ?? "");
+          const vb = String(b[col] ?? "");
+          return dir === "desc" ? vb.localeCompare(va) : va.localeCompare(vb);
+        });
+      }
+    }
+    const limitParam = url.searchParams.get("limit");
+    if (limitParam) {
+      const n = Number.parseInt(limitParam, 10);
+      if (Number.isFinite(n) && n > 0) result = result.slice(0, n);
+    }
+    return new Response(JSON.stringify(result), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
+  }
+
+  if (request.method === "POST") {
+    try {
+      const payload = (await request.json()) as Record<string, unknown> | Array<Record<string, unknown>>;
+      const incoming = Array.isArray(payload) ? payload : [payload];
+      const inserted: Array<Record<string, unknown>> = [];
+      for (const item of incoming) {
+        const record = {
+          ...item,
+          created_at: item.created_at || new Date().toISOString(),
+        };
+        const recordId = record.id ? String(record.id) : "";
+        if (recordId) {
+          const existingIdx = rows.findIndex((r) => String(r.id ?? "") === recordId);
+          if (existingIdx >= 0) {
+            rows[existingIdx] = { ...rows[existingIdx], ...record };
+            inserted.push(rows[existingIdx]);
+            continue;
+          }
+        }
+        rows.unshift(record);
+        inserted.push(record);
+      }
+      return new Response(JSON.stringify(inserted), {
+        status: 201,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Invalid JSON payload", detail: String(err) }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+  }
+
+  if (request.method === "PATCH") {
+    try {
+      const patch = (await request.json()) as Record<string, unknown>;
+      const updated: Array<Record<string, unknown>> = [];
+      for (let i = 0; i < rows.length; i++) {
+        if (matchesPostgrestFilters(rows[i], url.searchParams)) {
+          rows[i] = { ...rows[i], ...patch };
+          updated.push(rows[i]);
+        }
+      }
+      return new Response(JSON.stringify(updated), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ error: "Invalid PATCH payload", detail: String(err) }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+  }
+
+  if (request.method === "DELETE") {
+    const remaining = rows.filter((row) => !matchesPostgrestFilters(row, url.searchParams));
+    sovereignTableStore.set(tableName, remaining);
+    return new Response(JSON.stringify({ deleted: rows.length - remaining.length }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
+  }
+
+  return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    status: 405,
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+  });
+}
 
 // Real Ingestion & Handshake Endpoints for External Client Services
 async function handleSparrowxApi(request: Request): Promise<Response | null> {
@@ -32,6 +197,12 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
   // Handle CORS preflight
   if (request.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+
+  // 0. Sovereign PostgREST-Compatible Endpoint (/rest/v1/:table)
+  if (url.pathname.startsWith("/rest/v1/")) {
+    const restResponse = await handleSovereignRestApi(request, url);
+    if (restResponse) return restResponse;
   }
 
   // 1. Health Probe
@@ -107,14 +278,19 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     const ipRecordId = tenantIpsMatch[2];
     const dbPartition = `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
     const ipTableName = `${dbPartition}_ips`;
+    const ipRows = getTableRows("tenant_ips");
 
     if (request.method === "GET") {
+      const tenantRecords = ipRows.filter(
+        (r) => String(r.tenantId ?? r.tenant_id ?? "") === tenantId,
+      );
       return new Response(
         JSON.stringify({
           tenantId,
           databaseName: dbPartition,
           tableName: ipTableName,
           status: "online",
+          records: tenantRecords,
           timestamp: new Date().toISOString(),
         }),
         { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
@@ -140,9 +316,13 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         const newRecord = {
           id: `ip_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           tenantId,
+          tenant_id: tenantId,
           databaseName: dbPartition,
+          database_name: dbPartition,
           tableName: ipTableName,
+          table_name: ipTableName,
           ipAddress: cleanIp,
+          ip_address: cleanIp,
           label: body.label?.trim() || "Server Origin Host",
           type: body.type || "server_wan",
           status: "Active",
@@ -151,6 +331,8 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
           lastProbeStatus: "Pending",
           notes: body.notes?.trim() || undefined,
         };
+
+        ipRows.unshift(newRecord);
 
         return new Response(
           JSON.stringify({
@@ -169,6 +351,10 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     }
 
     if (request.method === "DELETE") {
+      if (ipRecordId) {
+        const remaining = ipRows.filter((r) => String(r.id ?? "") !== ipRecordId);
+        sovereignTableStore.set("tenant_ips", remaining);
+      }
       return new Response(
         JSON.stringify({
           success: true,
@@ -254,14 +440,20 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         tenant_id: tenantId,
       };
 
-      // If Supabase is configured in environment, persist asynchronously with tenant isolation
-      const supabaseUrl =
-        process.env.VITE_SUPABASE_URL || "https://yidqdgufjgfyxflgvbqq.supabase.co";
-      const supabaseKey =
-        process.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-";
+      // Persist directly in sovereign server store & self-hosted PostgREST if configured
+      getTableRows("incidents").unshift({
+        ...incidentRecord,
+        created_at: new Date().toISOString(),
+      });
 
-      if (supabaseUrl && supabaseKey) {
-        void fetch(`${supabaseUrl}/rest/v1/incidents`, {
+      const postgrestTarget =
+        process.env.POSTGREST_INTERNAL_URL ||
+        (process.env.VITE_SUPABASE_URL ? `${process.env.VITE_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1` : "");
+      const supabaseKey =
+        process.env.VITE_SUPABASE_ANON_KEY || "spx_sovereign_self_hosted_key";
+
+      if (postgrestTarget) {
+        void fetch(`${postgrestTarget.replace(/\/+$/, "")}/incidents`, {
           method: "POST",
           headers: {
             apikey: supabaseKey,

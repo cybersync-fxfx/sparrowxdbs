@@ -1,0 +1,78 @@
+# ============================================================================
+# SPARROWX FULL-STACK SELF-HOSTED COMPOSE (OVH UBUNTU SERVER)
+# ============================================================================
+# Runs PostgreSQL 16 + PostgREST (/rest/v1/*) + SparrowX UI/API + Nginx
+# 100% on your own OVH Ubuntu machine with zero external third-party clouds.
+# ============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sparrowx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sparrowx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-sparrowx_db}
+    volumes:
+      - sparrowx_pgdata:/var/lib/postgresql/data
+      - ./ovh/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sparrowx} -d ${POSTGRES_DB:-sparrowx_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    container_name: sparrowx-postgrest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-sparrowx}:${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}@postgres:5432/${POSTGRES_DB:-sparrowx_db}
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: web_anon
+      PGRST_SERVER_PORT: 3001
+    ports:
+      - "127.0.0.1:3001:3001"
+
+  sparrowx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sparrowx-app
+    restart: unless-stopped
+    depends_on:
+      - postgrest
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      POSTGREST_INTERNAL_URL: http://postgrest:3001
+      SPARROWX_DB_REST_URL: http://postgrest:3001
+      SPARROWX_DATA_DIR: /app/data
+      VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY:-}
+    volumes:
+      - sparrowx_appdata:/app/data
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sparrowx-nginx
+    restart: unless-stopped
+    depends_on:
+      - sparrowx
+      - postgrest
+    ports:
+      - "80:80"
+    volumes:
+      - ./ovh/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  sparrowx_pgdata:
+  sparrowx_appdata:

@@ -207,7 +207,7 @@ export function CyberThreatGlobe({
     highEvents: 0,
     criticalEvents: 0,
     activeArcs: 0,
-    protectedAssets: 48,
+    protectedAssets: 0,
   });
 
   const cities = useMemo(

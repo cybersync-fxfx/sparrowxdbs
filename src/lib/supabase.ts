@@ -423,14 +423,22 @@ export function computeLiveSnapshot(
   };
 }
 
-const DEFAULT_SUPABASE_URL = "https://yidqdgufjgfyxflgvbqq.supabase.co";
-const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-";
+function resolveSovereignRestBaseUrl(): string {
+  const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
+  if (envUrl && envUrl.startsWith("http") && !envUrl.includes("your-project-id")) {
+    return envUrl.replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined" && window.location?.origin && window.location.origin.startsWith("http")) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+  return "http://127.0.0.1:3000";
+}
 
-export const supabaseUrl = (
-  (import.meta.env.VITE_SUPABASE_URL as string | undefined) || DEFAULT_SUPABASE_URL
-).replace(/\/$/, "");
+const DEFAULT_SOVEREIGN_KEY = "spx_ovh_sovereign_key";
+
+export const supabaseUrl = resolveSovereignRestBaseUrl();
 export const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_SUPABASE_ANON_KEY;
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || DEFAULT_SOVEREIGN_KEY;
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
