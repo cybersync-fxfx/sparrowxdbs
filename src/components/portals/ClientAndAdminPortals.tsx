@@ -3867,9 +3867,6 @@ export function PortalLoginScreen({
                   >
                     Forgot password?
                   </button>
-                  <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline">
-                    • Hashed Credential
-                  </span>
                 </div>
               </div>
               <div className="relative">
@@ -3902,7 +3899,7 @@ export function PortalLoginScreen({
                   <span>Password Reset Protocol</span>
                 </div>
                 <p className="text-[11px] text-zinc-300 leading-relaxed">
-                  To safeguard sovereign workloads, self-service automated password reset is disabled. Please contact your organization administrator or email <strong className="text-primary">security@sparrowx.net</strong> with your organization domain to verify identity and issue a secure temporary sign-in credential.
+                  Contact your organization administrator or email <strong className="text-primary">security@sparrowx.net</strong> to verify identity and issue a temporary sign-in credential.
                 </p>
               </div>
             )}
@@ -3923,21 +3920,6 @@ export function PortalLoginScreen({
               <span>{isSigningIn ? "Authenticating Session..." : "Sign In to Command Center"}</span>
               <ArrowRight className="size-4 shrink-0" />
             </button>
-
-            {/* Security Assurance Bar */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-3">
-              {["Signed Session Token", "SparrowX AI Brain Ready", "Live Edge Telemetry"].map(
-                (badge) => (
-                  <div
-                    key={badge}
-                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[#1C1C1C] bg-black/70 py-1.5 px-2 text-[10px] font-mono text-zinc-400"
-                  >
-                    <CheckCircle2 className="size-3 text-emerald-400 shrink-0" />
-                    <span className="truncate">{badge}</span>
-                  </div>
-                ),
-              )}
-            </div>
 
             <div className="pt-3 border-t border-[#1F1F1F] text-center text-xs text-zinc-400">
               Need protection for a new app or startup?{" "}
@@ -4163,7 +4145,7 @@ export function PortalLoginScreen({
   );
 
   return (
-    <div className="relative min-h-svh w-full bg-black text-white selection:bg-primary/30 selection:text-white overflow-x-hidden font-sans">
+    <div className="relative min-h-svh w-full bg-black text-white selection:bg-primary/30 selection:text-white overflow-x-clip font-sans">
       {/* Subtle Matrix / Tactical Grid Overlay */}
       <div className="pointer-events-none fixed inset-0 vibe-subtle-grid z-0 opacity-45" />
 
@@ -4172,18 +4154,14 @@ export function PortalLoginScreen({
       <div className="pointer-events-none fixed top-1/3 -right-48 size-[440px] rounded-full bg-emerald-500/10 blur-[170px] z-0" />
       <div className="pointer-events-none fixed bottom-0 left-1/3 size-[380px] rounded-full bg-blue-500/10 blur-[160px] z-0" />
 
-      {/* Top Floating Cyber-Dock Navigation Bar */}
-      <header
-        className={`sticky top-0 z-50 w-full transition-all duration-300 ${
-          scrolled ? "py-2 sm:py-2.5" : "py-3 sm:py-4"
-        }`}
-      >
+      {/* Top Fixed Liquid-Glass Cyber-Dock Navigation Bar (Zero Scroll Jitter, Always Follows) */}
+      <header className="fixed top-0 left-0 right-0 z-50 w-full py-3 transform-gpu will-change-transform">
         <div className="mx-auto max-w-7xl px-3 sm:px-6">
           <div
-            className={`relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl md:rounded-full border transition-all duration-300 ${
+            className={`relative flex items-center justify-between gap-3 sm:gap-4 rounded-2xl md:rounded-full border px-4 py-2.5 sm:px-6 backdrop-blur-2xl backdrop-saturate-150 transition-colors duration-300 ${
               scrolled
-                ? "border-primary/30 bg-[#07080C]/90 shadow-[0_12px_40px_rgba(0,0,0,0.85),0_0_20px_rgba(249,115,22,0.12)] backdrop-blur-2xl px-3.5 py-2 sm:px-5"
-                : "border-white/10 bg-[#090A0F]/80 shadow-[0_8px_32px_rgba(0,0,0,0.65)] backdrop-blur-xl px-3.5 py-2.5 sm:px-6"
+                ? "border-white/20 bg-black/55 shadow-[0_16px_48px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.22),0_0_24px_rgba(249,115,22,0.12)]"
+                : "border-white/15 bg-black/40 shadow-[0_12px_36px_rgba(0,0,0,0.75),inset_0_1px_0_rgba(255,255,255,0.18)]"
             }`}
           >
             {/* Ambient Top Hairline Shimmer */}
@@ -4463,7 +4441,7 @@ export function PortalLoginScreen({
 
       {/* STAGE 1: DEDICATED AUTHENTICATION GATEWAY */}
       {viewStage === "auth" ? (
-        <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-8 py-10 lg:py-16">
+        <main className="relative z-10 mx-auto max-w-6xl px-4 sm:px-8 pt-24 pb-12 lg:pt-28 lg:pb-16">
           <div className="grid gap-10 lg:grid-cols-12 items-center">
             {/* Left 5 Cols: Clean & Simple Welcome */}
             <div className="lg:col-span-5 space-y-4">
@@ -4485,9 +4463,9 @@ export function PortalLoginScreen({
         </main>
       ) : (
         /* STAGE 2: EYE-CATCHING ANIMATED CYBER DEFENSE STARTUP LANDING PAGE */
-        <main className="relative z-10">
+        <main className="relative z-10 pt-20 sm:pt-24">
           {/* TOP FIRST: LIVE PUBLIC DOMAIN & API VULNERABILITY SCANNER (FIRST THING VISITORS SEE & USE) */}
-          <section id="free-scanner" className="mx-auto max-w-7xl px-4 sm:px-8 pt-6 pb-2 sm:pt-8 sm:pb-3 scroll-mt-24">
+          <section id="free-scanner" className="mx-auto max-w-7xl px-4 sm:px-8 pt-4 pb-2 sm:pt-6 sm:pb-3 scroll-mt-24">
             <LandingLiveSecurityScanner
               onClaimAndProtectDomain={(domain, suggestedOrgName) => {
                 setPrimaryDomain(domain);
@@ -4504,10 +4482,10 @@ export function PortalLoginScreen({
           </section>
 
           {/* HERO SECTION */}
-          <section className="mx-auto max-w-7xl px-4 sm:px-8 pt-6 pb-14 lg:pt-10 lg:pb-20">
+          <section className="mx-auto max-w-7xl px-4 sm:px-8 pt-6 pb-12 lg:pt-10 lg:pb-16">
             <div className="grid gap-10 lg:grid-cols-12 items-center">
-              {/* Hero Left: Startup Story & High-Impact Value Proposition */}
-              <div className="lg:col-span-6 space-y-6">
+              {/* Hero Left: Concise Value Proposition */}
+              <div className="lg:col-span-6 space-y-5">
                 <h1 className="text-3xl sm:text-5xl lg:text-[52px] font-extrabold tracking-tight text-white leading-[1.08]">
                   The threat world never sleeps.{" "}
                   <span className="bg-gradient-to-r from-primary via-orange-400 to-amber-300 bg-clip-text text-transparent">
@@ -4516,14 +4494,8 @@ export function PortalLoginScreen({
                 </h1>
 
                 <p className="text-sm sm:text-base leading-relaxed text-zinc-300 max-w-xl">
-                  Every minute, automated botnets, zero-day scanners, and AI prompt-injection
-                  payloads hammer modern web apps and startups. Legacy security vendors charge six
-                  figures and hide behind sales calls.{" "}
-                  <strong className="text-white font-semibold">
-                    We built SparrowX as a security startup for the rest of us
-                  </strong>
-                  —giving every developer, founder, and growing team an enterprise-grade autonomous
-                  SOC in 60 seconds.
+                  Autonomous edge WAF, AI prompt guardrails, and dedicated per-tenant database
+                  isolation—deployed in 60 seconds.
                 </p>
 
                 {/* Primary Hero CTAs */}
@@ -4563,7 +4535,7 @@ export function PortalLoginScreen({
                           Sovereign Protection Engine
                         </div>
                         <div className="text-[10px] font-mono text-zinc-400">
-                          Architecture Status: <strong className="text-emerald-400">Isolated & Online</strong>
+                          Status: <strong className="text-emerald-400">Isolated & Online</strong>
                         </div>
                       </div>
                     </div>
@@ -4598,325 +4570,76 @@ export function PortalLoginScreen({
             </div>
           </section>
 
-          {/* CONTINUOUS ANIMATED THREAT TICKER MARQUEE */}
-          <div className="border-y border-[#1F1F1F] bg-[#070707] py-2.5 overflow-hidden">
-            <div className="flex w-max animate-spx-marquee items-center gap-3 text-xs font-sans">
-              {[
-                {
-                  variant: "zap" as CyberEmblemVariant,
-                  title: "SQL Injection Exfiltration",
-                  action: "Blocked at Edge",
-                  actionClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
-                },
-                {
-                  variant: "brain" as CyberEmblemVariant,
-                  title: "LLM System Prompt Extraction",
-                  action: "Sanitized",
-                  actionClass: "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
-                },
-                {
-                  variant: "lock" as CyberEmblemVariant,
-                  title: "DNS & HTTP Ownership Proof",
-                  action: "Cryptographically Verified",
-                  actionClass: "bg-primary/10 text-primary border-primary/25",
-                },
-                {
-                  variant: "siren" as CyberEmblemVariant,
-                  title: "Botnet Credential Stuffing Wave",
-                  action: "ASN Quarantined",
-                  actionClass: "bg-rose-500/10 text-rose-400 border-rose-500/25",
-                },
-                {
-                  variant: "dna" as CyberEmblemVariant,
-                  title: "MITRE ATT&CK TTP Correlation",
-                  action: "Live SIEM Telemetry",
-                  actionClass: "bg-blue-500/10 text-blue-400 border-blue-500/25",
-                },
-                {
-                  variant: "gear" as CyberEmblemVariant,
-                  title: "Cloudflare & iptables Dynamic Export",
-                  action: "1-Click Sync",
-                  actionClass: "bg-zinc-800 text-zinc-300 border-zinc-700",
-                },
-                {
-                  variant: "warning" as CyberEmblemVariant,
-                  title: "SSRF & Metadata Credential Harvest",
-                  action: "Intercepted",
-                  actionClass: "bg-amber-500/10 text-amber-400 border-amber-500/25",
-                },
-                {
-                  variant: "shield" as CyberEmblemVariant,
-                  title: "MCP AI Tool Execution Guardrails",
-                  action: "Zero-Trust Enforced",
-                  actionClass: "bg-purple-500/10 text-purple-400 border-purple-500/25",
-                },
-                // Duplicate items for seamless infinite marquee loop
-                {
-                  variant: "zap" as CyberEmblemVariant,
-                  title: "SQL Injection Exfiltration",
-                  action: "Blocked at Edge",
-                  actionClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
-                },
-                {
-                  variant: "brain" as CyberEmblemVariant,
-                  title: "LLM System Prompt Extraction",
-                  action: "Sanitized",
-                  actionClass: "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
-                },
-                {
-                  variant: "lock" as CyberEmblemVariant,
-                  title: "DNS & HTTP Ownership Proof",
-                  action: "Cryptographically Verified",
-                  actionClass: "bg-primary/10 text-primary border-primary/25",
-                },
-                {
-                  variant: "siren" as CyberEmblemVariant,
-                  title: "Botnet Credential Stuffing Wave",
-                  action: "ASN Quarantined",
-                  actionClass: "bg-rose-500/10 text-rose-400 border-rose-500/25",
-                },
-                {
-                  variant: "dna" as CyberEmblemVariant,
-                  title: "MITRE ATT&CK TTP Correlation",
-                  action: "Live SIEM Telemetry",
-                  actionClass: "bg-blue-500/10 text-blue-400 border-blue-500/25",
-                },
-              ].map((item, index) => (
-                <CyberPill
-                  key={index}
-                  variant={item.variant}
-                  title={item.title}
-                  action={item.action}
-                  actionClass={item.actionClass}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* STARTUP MISSION SECTION: WHAT WE DO, WHY WE EXIST & WORLD THREATS WE STOP */}
-          <section id="startup-mission" className="mx-auto max-w-7xl px-4 sm:px-8 py-16 lg:py-20">
-            <div className="max-w-3xl space-y-3">
-              <h2 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-                What is SparrowX—and why did we build it?
-              </h2>
-              <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-                The moment you launch a website, SaaS product, API, or AI app today, automated
-                hacker scripts and AI botnets start probing it within minutes. Yet traditional
-                cybersecurity companies charge $50,000+ a year and require a full-time security
-                team.{" "}
-                <strong className="text-white">
-                  SparrowX is your autonomous 24/7 cyber defense engine
-                </strong>{" "}
-                that plugs into your app in 60 seconds, blocks real-world attacks before they touch
-                your database or AI credits, and gives you cryptographic proof that your business is
-                safe.
-              </p>
+          {/* LIVE 3D SATELLITE HOST CONNECTION GLOBE & THREATS WE STOP */}
+          <section id="world-threats" className="mx-auto max-w-7xl px-4 sm:px-8 py-12 lg:py-16 border-t border-[#1F1F1F] scroll-mt-24">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="max-w-2xl">
+                <div className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
+                  LIVE SATELLITE HOST TELEMETRY
+                </div>
+                <h2 className="mt-1.5 text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+                  Real-time host connections & threat interception.
+                </h2>
+              </div>
+              <a
+                href="#free-scanner"
+                className="inline-flex items-center gap-2 self-start md:self-auto rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
+              >
+                <Search className="size-3.5" />
+                <span>Scan Your Domain</span>
+              </a>
             </div>
 
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
+            {/* Live Interactive 3D Cyber Threat Globe Interception Engine */}
+            <div className="mt-6">
+              <CyberThreatGlobe
+                height={520}
+                showControls={true}
+                showFeed={true}
+                showStats={true}
+                className="border-[#1F1F1F] bg-black"
+              />
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 {
-                  step: "01 · WHY WE EXIST",
-                  title: "Every Modern App Is a Target on Day One",
-                  desc: "Hackers don't target only big banks anymore. They run automated bots that scan every new domain for exposed APIs, SQL injection holes, leaked env keys, and unprotected AI/LLM endpoints.",
-                  highlight: "24/7 automated attack waves",
+                  code: "OWASP A03 · SQLi",
+                  threat: "SQL Injection & DB Shield",
+                  defense: "Drops malicious UNION/SELECT/DROP payloads at the edge in <2ms.",
                 },
                 {
-                  step: "02 · WHAT WE DO",
-                  title: "An Autonomous SOC & Shield in 5 Lines of Code",
-                  desc: "We combine four enterprise systems into one lightweight platform: an Edge Web Firewall (WAF), an AI Prompt & Token-Drain Shield, a MITRE ATT&CK Threat SIEM, and Automated Compliance Reporting.",
-                  highlight: "Sub-2ms edge interception",
+                  code: "OWASP LLM01 · AI",
+                  threat: "AI Prompt Guardrails",
+                  defense: "Sanitizes prompts and blocks rogue MCP tool execution before LLM runs.",
                 },
                 {
-                  step: "03 · WHY TEAMS TRUST US",
-                  title: "Real Cryptographic Proof—Never Fake Badges",
-                  desc: "We don't just show pretty charts. SparrowX verifies your domain via DNS/HTTP challenges, runs live 7-point diagnostic probes, exports 1-click firewall rules, and issues auditor-ready SOC 2 / ISO certificates.",
-                  highlight: "Verified live protection",
+                  code: "MITRE T1110 · BOTNET",
+                  threat: "Botnet & Brute-Force Defense",
+                  defense: "Detects credential-stuffing bursts and exports 1-click firewall rules.",
                 },
-              ].map((card) => (
+                {
+                  code: "OWASP A10 · SSRF",
+                  threat: "SSRF & Zero-Day Shield",
+                  defense: "Blocks internal metadata probes, dotfile leaks, and unpatched CVE scans.",
+                },
+              ].map((item) => (
                 <div
-                  key={card.step}
-                  className="group rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-6 transition-all hover:border-primary/50 hover:shadow-[0_0_30px_rgba(240,90,40,0.12)]"
+                  key={item.threat}
+                  className="rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-4 flex flex-col justify-between hover:border-zinc-700 transition-all"
                 >
-                  <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-primary">
-                    {card.step}
-                  </div>
-                  <h3 className="mt-2 text-lg font-bold text-white">{card.title}</h3>
-                  <p className="mt-2 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                    {card.desc}
-                  </p>
-                  <div className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-[#262626] bg-black px-2.5 py-1 text-[11px] font-mono text-zinc-300">
-                    <CheckCircle2 className="size-3.5 text-emerald-400" />
-                    <span>{card.highlight}</span>
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-[10px] font-bold uppercase text-amber-400 bg-amber-500/10 border border-amber-500/25 px-2 py-0.5 rounded">
+                        {item.code}
+                      </span>
+                      <ShieldCheck className="size-4 text-emerald-400 shrink-0" />
+                    </div>
+                    <h3 className="mt-2.5 text-sm font-bold text-white">{item.threat}</h3>
+                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">{item.defense}</p>
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* WORLD THREAT MATRIX: THE 8 REAL-WORLD ATTACKS SPARROWX NEUTRALIZES */}
-            <div id="world-threats" className="mt-16 pt-14 border-t border-[#1F1F1F] scroll-mt-24">
-              <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div className="max-w-3xl">
-                  <div className="text-xs font-mono font-bold uppercase tracking-wider text-primary">
-                    GLOBAL THREAT INTELLIGENCE & ACTIVE DEFENSE MATRIX
-                  </div>
-                  <h2 className="mt-2 text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-                    What world threats does SparrowX protect you from?
-                  </h2>
-                  <p className="mt-2 text-xs sm:text-sm text-zinc-400 leading-relaxed">
-                    Whether you run a Next.js SaaS, an e-commerce store, a fintech API, or an AI
-                    agent, here are the exact real-world attacks SparrowX intercepts before they can
-                    damage your business:
-                  </p>
-                </div>
-                <a
-                  href="#free-scanner"
-                  className="inline-flex items-center gap-2 self-start md:self-auto rounded-xl border border-primary/40 bg-primary/10 px-4 py-2.5 text-xs font-bold text-primary hover:bg-primary/20 transition-all"
-                >
-                  <Search className="size-3.5" />
-                  <span>Check If Your Site Is Exposed</span>
-                </a>
-              </div>
-
-              {/* Live Interactive 3D Cyber Threat Globe Interception Engine */}
-              <div className="mt-8">
-                <CyberThreatGlobe
-                  height={500}
-                  showControls={true}
-                  showFeed={true}
-                  showStats={true}
-                  className="border-[#1F1F1F] bg-black"
-                />
-              </div>
-
-              <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                  {
-                    code: "OWASP A03 · SQLi",
-                    threat: "Database Theft & SQL Injection",
-                    danger:
-                      "Attackers inject SQL commands into forms or URLs to dump your entire user table, emails, password hashes, and billing data.",
-                    defense:
-                      "SparrowX Edge WAF parses query ASTs and drops malicious UNION/SELECT/DROP payloads in <2ms.",
-                  },
-                  {
-                    code: "OWASP LLM01 · AI",
-                    threat: "AI Prompt Injection & Jailbreaks",
-                    danger:
-                      "Malicious users trick your AI chatbot into revealing system prompts, leaking other customers' PII, or running rogue MCP tools.",
-                    defense:
-                      "Our AI Guardrail Sandbox sanitizes every prompt and blocks unauthorized tool calls before your LLM executes them.",
-                  },
-                  {
-                    code: "OWASP LLM04 · API",
-                    threat: "AI Token-Drain & Bill Bankruptcy",
-                    danger:
-                      "Automated bot scripts flood your AI model and LLM endpoints overnight, racking up thousands of dollars in API bills.",
-                    defense:
-                      "Autonomous velocity rate-limiting throttles abusive IPs and cuts off token-draining loops immediately.",
-                  },
-                  {
-                    code: "MITRE T1110 · BOTNET",
-                    threat: "Credential Stuffing & Account Takeover",
-                    danger:
-                      "Distributed proxy botnets test millions of leaked passwords against your /login route to hijack customer and admin accounts.",
-                    defense:
-                      "Detects brute-force bursts in real time and exports 1-click blocklists for Cloudflare, UFW, and iptables.",
-                  },
-                  {
-                    code: "OWASP A03 · XSS",
-                    threat: "Cross-Site Scripting & Cookie Theft",
-                    danger:
-                      "Attackers inject hidden JavaScript into inputs or URLs to hijack admin sessions and steal authentication tokens.",
-                    defense:
-                      "Enforces strict Content-Security-Policy (CSP) headers and neutralizes inline script injection at the edge.",
-                  },
-                  {
-                    code: "OWASP A10 · SSRF",
-                    threat: "SSRF & Cloud Key Harvesting",
-                    danger:
-                      "Hackers trick your webhooks or URL fetchers into reading internal cloud metadata (169.254.169.254) to steal AWS/GCP root keys.",
-                    defense:
-                      "Built-in SSRF and DNS-rebinding guards block private RFC 1918 and internal cloud metadata requests.",
-                  },
-                  {
-                    code: "MITRE T1059 · RCE",
-                    threat: "Zero-Day Command Injection & Scanners",
-                    danger:
-                      "Automated vulnerability scanners probe your servers 24/7 for unpatched CVEs, exposed .env files, and shell execution flaws.",
-                    defense:
-                      "Continuous CVE vulnerability tracking, server banner masking, and 1-click host isolation.",
-                  },
-                  {
-                    code: "SOC 2 · ISO 27001",
-                    threat: "Lost Enterprise Deals Due to No Compliance",
-                    danger:
-                      "Enterprise buyers refuse to sign contracts because you cannot prove active security monitoring, audit logs, or data protection.",
-                    defense:
-                      "Generates signed SOC 2 Type II, ISO 27001, and NIST readiness reports + a public Verified Protection Badge.",
-                  },
-                ].map((item) => (
-                  <div
-                    key={item.threat}
-                    className="rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-5 flex flex-col justify-between hover:border-zinc-700 transition-all"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[10px] font-bold uppercase text-red-400 bg-red-500/10 border border-red-500/25 px-2 py-0.5 rounded">
-                          {item.code}
-                        </span>
-                        <ShieldAlert className="size-4 text-red-400 shrink-0" />
-                      </div>
-                      <h3 className="mt-3 text-sm font-bold text-white">{item.threat}</h3>
-                      <p className="mt-1.5 text-xs text-zinc-400 leading-relaxed">
-                        <strong className="text-zinc-300">Without Protection:</strong> {item.danger}
-                      </p>
-                    </div>
-                    <div className="mt-4 pt-3 border-t border-[#1F1F1F] text-xs text-emerald-300/90 leading-relaxed">
-                      <div className="flex items-center gap-1.5 font-semibold text-emerald-400 mb-0.5">
-                        <ShieldCheck className="size-3.5 shrink-0" />
-                        <span>How SparrowX Stops It:</span>
-                      </div>
-                      {item.defense}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* BEFORE VS AFTER SPARROWX COMPARISON BANNER */}
-              <div className="mt-8 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-red-500/25 bg-red-950/10 p-5">
-                  <div className="text-xs font-mono font-bold uppercase text-red-400">
-                    ✗ WITHOUT SPARROWX (EXPOSED STARTUP)
-                  </div>
-                  <ul className="mt-3 space-y-2 text-xs text-zinc-300">
-                    <li>• Origin IP, API routes, and LLM endpoints directly exposed to botnets</li>
-                    <li>• Zero visibility until a customer reports a breach or huge LLM inference bill</li>
-                    <li>• Weeks lost filling out enterprise security &amp; SOC 2 questionnaires</li>
-                    <li>• Legacy security vendors demanding $50,000/yr annual contracts</li>
-                  </ul>
-                </div>
-
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-                  <div className="text-xs font-mono font-bold uppercase text-emerald-400">
-                    ✓ WITH SPARROWX (PROTECTED &amp; VERIFIED IN 60 SECONDS)
-                  </div>
-                  <ul className="mt-3 space-y-2 text-xs text-zinc-200">
-                    <li>
-                      • SQLi, XSS, SSRF, and AI prompt jailbreaks blocked at the edge in &lt;2ms
-                    </li>
-                    <li>
-                      • Real-time SOC Command Center with Slack, Discord &amp; PagerDuty alerts
-                    </li>
-                    <li>
-                      • 1-click Cloudflare, UFW &amp; iptables blocklists + SOC 2 / ISO reports
-                    </li>
-                    <li>
-                      • Cryptographically verified Trust Badge that helps you close bigger deals
-                    </li>
-                  </ul>
-                </div>
-              </div>
             </div>
           </section>
 

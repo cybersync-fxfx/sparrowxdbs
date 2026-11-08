@@ -1391,6 +1391,17 @@ export async function authenticateAppUserFromBackend(
             if (cloudRes.ok) {
               const cloudRows = (await cloudRes.json()) as Array<Record<string, unknown>>;
               row = cloudRows[0];
+              // Automatically shift/persist this account into the local OVH database
+              if (row) {
+                fetch(`${supabaseUrl}/rest/v1/app_users`, {
+                  method: "POST",
+                  headers: {
+                    ...getSupabaseHeaders(),
+                    Prefer: "resolution=merge-duplicates,return=minimal",
+                  },
+                  body: JSON.stringify(row),
+                }).catch(() => {});
+              }
             }
           } catch {
             // Ignore cloud fallback error

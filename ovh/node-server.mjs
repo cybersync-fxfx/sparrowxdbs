@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import serverModule from "../.output/server/index.mjs";
+import { migrateCloudSupabaseToLocal } from "./migrate-from-supabase.mjs";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -23,14 +24,32 @@ const MIME_TYPES = {
 
 const handler = serverModule?.default ?? serverModule;
 
+const SECURITY_HEADERS = {
+  "X-Frame-Options": "SAMEORIGIN",
+  "X-Content-Type-Options": "nosniff",
+  "X-XSS-Protection": "1; mode=block",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+};
+
+const MAX_BODY_BYTES = 25 * 1024 * 1024; // 25 MB hard cap against memory exhaustion
+
 const server = createServer(async (req, res) => {
   try {
     const reqUrl = req.url || "/";
     const pathname = reqUrl.split("?")[0];
 
+    // Block hidden dotfile probes (/.env, /.git, etc.) except .well-known
+    if (pathname.startsWith("/.") && !pathname.startsWith("/.well-known")) {
+      res.writeHead(403, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: "Forbidden: dotfile access denied by SparrowX WAF" }));
+      return;
+    }
+
     // 1. Serve static files from .output/public if they exist
     if (req.method === "GET" || req.method === "HEAD") {
-      const safePath = join(PUBLIC_DIR, pathname.replace(/^\/+/, ""));
+      const safePath = resolve(PUBLIC_DIR, pathname.replace(/^\/+/, ""));
       if (safePath.startsWith(PUBLIC_DIR) && pathname !== "/") {
         try {
           const info = await stat(safePath);
@@ -38,6 +57,7 @@ const server = createServer(async (req, res) => {
             const ext = extname(safePath).toLowerCase();
             const content = await readFile(safePath);
             res.writeHead(200, {
+              ...SECURITY_HEADERS,
               "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
               "Content-Length": content.byteLength,
               "Cache-Control": pathname.startsWith("/assets/")
@@ -59,8 +79,16 @@ const server = createServer(async (req, res) => {
     const fullUrl = `${protocol}://${host}${reqUrl}`;
 
     const chunks = [];
+    let totalBytes = 0;
     for await (const chunk of req) {
-      chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      totalBytes += buf.byteLength;
+      if (totalBytes > MAX_BODY_BYTES) {
+        res.writeHead(413, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+        res.end(JSON.stringify({ error: "Payload Too Large" }));
+        return;
+      }
+      chunks.push(buf);
     }
     const bodyBuffer = Buffer.concat(chunks);
 
@@ -90,7 +118,7 @@ const server = createServer(async (req, res) => {
 
     const webResponse = await handler.fetch(webRequest, process.env, ctx);
 
-    const resHeaders = {};
+    const resHeaders = { ...SECURITY_HEADERS };
     webResponse.headers.forEach((val, key) => {
       resHeaders[key] = val;
     });
@@ -100,7 +128,7 @@ const server = createServer(async (req, res) => {
     res.end(Buffer.from(arrayBuf));
   } catch (err) {
     console.error("[SparrowX OVH Node Server Error]", err);
-    res.writeHead(500, { "Content-Type": "application/json" });
+    res.writeHead(500, { "Content-Type": "application/json", ...SECURITY_HEADERS });
     res.end(JSON.stringify({ error: "Internal Server Error", detail: String(err) }));
   }
 });
@@ -109,4 +137,6 @@ server.listen(PORT, HOST, () => {
   console.log(
     `[SparrowX Sovereign Server] Listening on http://${HOST}:${PORT} (Self-Hosted OVH Mode)`,
   );
+  // Automatically shift/sync existing cloud Supabase records into local OVH DB on boot
+  migrateCloudSupabaseToLocal().catch(() => {});
 });

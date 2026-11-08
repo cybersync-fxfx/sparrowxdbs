@@ -182,7 +182,7 @@ export function CyberThreatGlobe({
   height = 560,
   liveWsUrl = null,
   enableSimulation = true,
-  simIntervalMs = 1600,
+  simIntervalMs = 700,
   maxFeed = 7,
   customCities,
   showControls = true,
@@ -284,18 +284,18 @@ export function CyberThreatGlobe({
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       const hexColor = getSeverityColor(severity);
 
-      // 1. Arc line trail
+      // 1. High-brightness Call-of-Duty tactical arc line trail
       const lineMaterial = new THREE.LineBasicMaterial({
         color: hexColor,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.95,
         blending: THREE.AdditiveBlending,
       });
       const line = new THREE.Line(geometry, lineMaterial);
       arcsGroup.add(line);
 
       // 2. Glowing leading projectile head
-      const headGeom = new THREE.SphereGeometry(0.85, 12, 12);
+      const headGeom = new THREE.SphereGeometry(1.15, 14, 14);
       const headMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
         blending: THREE.AdditiveBlending,
@@ -313,9 +313,9 @@ export function CyberThreatGlobe({
 
       const sparkMat = new THREE.PointsMaterial({
         color: hexColor,
-        size: 2.0,
+        size: 2.8,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.98,
         blending: THREE.AdditiveBlending,
       });
       const sparkPoints = new THREE.Points(sparkGeom, sparkMat);
@@ -447,15 +447,23 @@ export function CyberThreatGlobe({
     rotVelocityRef.current = { x: 0, y: 0 };
   };
 
-  // Threat Loop (runs only when explicit enableSimulation is requested or live events arrive)
+  // Threat Loop (runs initial burst + continuous rapid connection jumps)
   useEffect(() => {
     if (!enableSimulation || !isPlaying || liveWsUrl) return;
+
+    // Immediate Call-of-Duty multi-connection burst on mount
+    const burstTimers = [60, 180, 320, 480].map((delay) =>
+      window.setTimeout(() => triggerAttackEvent(), delay),
+    );
 
     const interval = window.setInterval(() => {
       triggerAttackEvent();
     }, simIntervalMs / speedMultiplier);
 
-    return () => window.clearInterval(interval);
+    return () => {
+      burstTimers.forEach((t) => window.clearTimeout(t));
+      window.clearInterval(interval);
+    };
   }, [enableSimulation, isPlaying, liveWsUrl, simIntervalMs, speedMultiplier, triggerAttackEvent]);
 
   // WebSocket Live Feed Integration
@@ -533,7 +541,7 @@ export function CyberThreatGlobe({
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.15;
+    renderer.toneMappingExposure = 1.55;
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
@@ -549,12 +557,16 @@ export function CyberThreatGlobe({
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    // Lighting (Warm Sunlight off-axis for realistic Day/Night Terminator)
-    const sunLight = new THREE.DirectionalLight(0xfff6ea, 2.2);
-    sunLight.position.set(-350, 160, 180);
+    // High-contrast Call-of-Duty Satellite Lighting
+    const sunLight = new THREE.DirectionalLight(0xfff6ea, 3.4);
+    sunLight.position.set(-320, 180, 220);
     scene.add(sunLight);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.45);
+    const frontFillLight = new THREE.DirectionalLight(0xffe0b2, 1.85);
+    frontFillLight.position.set(220, 90, 260);
+    scene.add(frontFillLight);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
     scene.add(ambientLight);
 
     // Root Earth Pivot Group
@@ -575,35 +587,71 @@ export function CyberThreatGlobe({
     earthNightTex.colorSpace = THREE.SRGBColorSpace;
     cloudTex.colorSpace = THREE.SRGBColorSpace;
 
-    // 1. Earth Surface Mesh with Realistic Specular & Night City Lights
+    // 1. Earth Surface Mesh with High-Brightness Specular & Golden Night City Lights
     const R = 100;
     const earthGeom = new THREE.SphereGeometry(R, 64, 64);
     const earthMat = new THREE.MeshStandardMaterial({
       map: earthDayTex,
       normalMap: earthNormalTex,
-      normalScale: new THREE.Vector2(0.75, 0.75),
+      normalScale: new THREE.Vector2(0.85, 0.85),
       roughnessMap: earthSpecTex,
-      roughness: 0.65,
-      metalness: 0.08,
+      roughness: 0.52,
+      metalness: 0.12,
       emissiveMap: earthNightTex,
-      emissive: new THREE.Color(0xffe8ba),
-      emissiveIntensity: 1.25,
+      emissive: new THREE.Color(0xffb84d),
+      emissiveIntensity: 2.6,
     });
     const earthMesh = new THREE.Mesh(earthGeom, earthMat);
     earthGroup.add(earthMesh);
+
+    // 1b. Call-of-Duty Tactical Satellite Lat/Lon Grid Overlay
+    const gridGeom = new THREE.SphereGeometry(R + 0.18, 36, 20);
+    const gridMat = new THREE.MeshBasicMaterial({
+      color: 0xff9900,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.08,
+      depthWrite: false,
+    });
+    const gridMesh = new THREE.Mesh(gridGeom, gridMat);
+    earthGroup.add(gridMesh);
 
     // 2. Atmospheric Clouds Layer (rotates independently)
     const cloudGeom = new THREE.SphereGeometry(R + 0.65, 64, 64);
     const cloudMat = new THREE.MeshStandardMaterial({
       map: cloudTex,
       transparent: true,
-      opacity: 0.38,
+      opacity: 0.35,
       blending: THREE.NormalBlending,
       depthWrite: false,
     });
     const cloudsMesh = new THREE.Mesh(cloudGeom, cloudMat);
     earthGroup.add(cloudsMesh);
     cloudsMeshRef.current = cloudsMesh;
+
+    // 2b. Permanent Glowing Backbone Mesh Lines Connecting All Hosting Origins
+    const originHubs = cities.filter((c) => c.isOrigin);
+    for (let i = 0; i < originHubs.length; i++) {
+      const a = originHubs[i];
+      const b = originHubs[(i + 1) % originHubs.length];
+      if (!a || !b || a.name === b.name) continue;
+      const vA = latLonToVector3(a.lat, a.lon, R);
+      const vB = latLonToVector3(b.lat, b.lon, R);
+      const backbonePts: THREE.Vector3[] = [];
+      for (let s = 0; s <= 40; s++) {
+        const t = s / 40;
+        const sl = slerpVector3(vA, vB, t);
+        backbonePts.push(sl.multiplyScalar(R + Math.sin(Math.PI * t) * 14));
+      }
+      const bbGeom = new THREE.BufferGeometry().setFromPoints(backbonePts);
+      const bbMat = new THREE.LineBasicMaterial({
+        color: 0xffaa00,
+        transparent: true,
+        opacity: 0.32,
+        blending: THREE.AdditiveBlending,
+      });
+      earthGroup.add(new THREE.Line(bbGeom, bbMat));
+    }
 
     // 3. City Pins & Hosting Origin Beacons Layer
     const cityPinsGroup = new THREE.Group();
@@ -944,6 +992,7 @@ export function CyberThreatGlobe({
 
   const activeHostCity =
     activeEvents[0]?.dst ?? cities.find((c) => c.isOrigin) ?? cities[0];
+  const activeSourceCity = activeEvents[0]?.src ?? cities[cities.length - 1] ?? cities[0];
 
   return (
     <div
@@ -954,6 +1003,28 @@ export function CyberThreatGlobe({
     >
       {/* Pure Black Space Backdrop matching the page */}
       <div className="pointer-events-none absolute inset-0 bg-black" />
+
+      {/* Call-of-Duty Tactical Top-Center Satellite Connection & Host Overlay */}
+      <div className="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-20 hidden lg:flex items-center gap-3 rounded-lg border border-amber-500/30 bg-[#0A0A0A]/90 px-4 py-1.5 text-[11px] backdrop-blur-xl shadow-[0_0_25px_rgba(245,158,11,0.15)]">
+        <span className="flex items-center gap-1.5 text-amber-400 font-bold">
+          <Crosshair className="size-3.5 animate-spin" />
+          <span>SAT-LINK</span>
+        </span>
+        <span className="text-zinc-500">|</span>
+        <span className="text-zinc-300">
+          FROM: <strong className="text-cyan-300">{activeSourceCity?.name}</strong>{" "}
+          <span className="text-zinc-500 text-[10px]">
+            ({activeSourceCity?.lat.toFixed(1)}°, {activeSourceCity?.lon.toFixed(1)}°)
+          </span>
+        </span>
+        <span className="text-amber-400 font-bold">━━━►</span>
+        <span className="text-zinc-300">
+          HOST: <strong className="text-amber-400">{activeHostCity?.name}</strong>{" "}
+          <span className="text-emerald-400 text-[10px]">
+            [{activeHostCity?.hostingHub ?? "OVH Origin Host"}]
+          </span>
+        </span>
+      </div>
 
       {/* 3D WebGL Canvas */}
       <canvas

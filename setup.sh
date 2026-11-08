@@ -230,15 +230,19 @@ echo -e "${C_BOLD}  QUICK 5-QUESTION SERVER, DOMAIN & DNS CONFIGURATION         
 echo -e "  (Press Enter on any question to accept the smart default)           "
 echo -e "${C_BOLD}----------------------------------------------------------------------${C_RESET}"
 
-RAW_DOMAIN="$(ask_prompt "1/5 Enter your primary domain name (e.g. sparrowx.net)" "sparrowx.local")"
+RAW_DOMAIN="$(ask_prompt "1/6 Enter your primary domain name (e.g. sparrowx.net)" "sparrowx.local")"
 SPARROWX_DOMAIN="$(echo "${RAW_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 [ -z "${SPARROWX_DOMAIN}" ] && SPARROWX_DOMAIN="sparrowx.local"
 
-SPARROWX_PUBLIC_IP="$(ask_prompt "2/5 Confirm server public IPv4 for DNS A records" "${DETECTED_IP}")"
+RAW_STUDIO_DOMAIN="$(ask_prompt "2/6 Enter separate Supabase Studio Admin domain" "db.${SPARROWX_DOMAIN}")"
+SPARROWX_STUDIO_DOMAIN="$(echo "${RAW_STUDIO_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+[ -z "${SPARROWX_STUDIO_DOMAIN}" ] && SPARROWX_STUDIO_DOMAIN="db.${SPARROWX_DOMAIN}"
+
+SPARROWX_PUBLIC_IP="$(ask_prompt "3/6 Confirm server public IPv4 for DNS A records" "${DETECTED_IP}")"
 [ -z "${SPARROWX_PUBLIC_IP}" ] && SPARROWX_PUBLIC_IP="${DETECTED_IP}"
 
 DEFAULT_NS="ns1.${SPARROWX_DOMAIN},ns2.${SPARROWX_DOMAIN}"
-RAW_NS="$(ask_prompt "3/5 Enter primary & secondary Nameservers (comma-separated)" "${DEFAULT_NS}")"
+RAW_NS="$(ask_prompt "4/6 Enter primary & secondary Nameservers (comma-separated)" "${DEFAULT_NS}")"
 SPARROWX_NS1="$(echo "${RAW_NS}" | cut -d',' -f1 | tr -d '[:space:]')"
 SPARROWX_NS2="$(echo "${RAW_NS}" | cut -d',' -f2 | tr -d '[:space:]')"
 [ -z "${SPARROWX_NS1}" ] && SPARROWX_NS1="ns1.${SPARROWX_DOMAIN}"
@@ -247,10 +251,10 @@ if [ -z "${SPARROWX_NS2}" ] || [ "${SPARROWX_NS2}" = "${SPARROWX_NS1}" ]; then
 fi
 
 DEFAULT_EMAIL="admin@${SPARROWX_DOMAIN}"
-SPARROWX_ADMIN_EMAIL="$(ask_prompt "4/5 Enter admin email for SSL & security alerts" "${DEFAULT_EMAIL}")"
+SPARROWX_ADMIN_EMAIL="$(ask_prompt "5/6 Enter admin email for SSL & security alerts" "${DEFAULT_EMAIL}")"
 [ -z "${SPARROWX_ADMIN_EMAIL}" ] && SPARROWX_ADMIN_EMAIL="${DEFAULT_EMAIL}"
 
-ENABLE_DNS_SSL="$(ask_prompt "5/5 Auto-configure Authoritative DNS (Bind9) & HTTPS SSL? (yes/no)" "yes")"
+ENABLE_DNS_SSL="$(ask_prompt "6/6 Auto-configure Authoritative DNS (Bind9) & HTTPS SSL? (yes/no)" "yes")"
 ENABLE_DNS_SSL="$(echo "${ENABLE_DNS_SSL}" | tr '[:upper:]' '[:lower:]')"
 
 # ============================================================================
@@ -637,9 +641,14 @@ EOF
 fi
 
 # ============================================================================
-# STEP 10: END-TO-END HEALTH PROBE & FINAL SUMMARY
+# STEP 10: END-TO-END HEALTH PROBE, DB SHIFT & FINAL SUMMARY
 # ============================================================================
-log_info "[Step 9/9] Verifying live HTTP/HTTPS & database endpoints..."
+log_info "[Step 9/9] Verifying live HTTP/HTTPS, shifting Cloud DB to Local OVH DB & installing CLI tools..."
+echo "SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}" >> "${INSTALL_DIR}/.env" 2>/dev/null || true
+chmod +x "${INSTALL_DIR}/manage-db.sh" "${INSTALL_DIR}/update.sh" 2>/dev/null || true
+ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
+ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
+
 ATTEMPTS=0
 while [ "${ATTEMPTS}" -lt 30 ]; do
   if curl -fsS "http://127.0.0.1:${HTTP_PORT}/api/v1/health" >/dev/null 2>&1 || \
@@ -649,6 +658,8 @@ while [ "${ATTEMPTS}" -lt 30 ]; do
   ATTEMPTS=$((ATTEMPTS + 1))
   sleep 2
 done
+
+"${INSTALL_DIR}/manage-db.sh" sync >/dev/null 2>&1 || true
 
 HTTP_SUFFIX=""
 [ "${HTTP_PORT}" != "80" ] && HTTP_SUFFIX=":${HTTP_PORT}"
@@ -661,10 +672,14 @@ echo -e "${C_BOLD}  SPARROWX SELF-HOSTED STACK IS ONLINE & VERIFIED (A-TO-Z COMP
 echo -e "${C_GREEN}======================================================================${C_RESET}"
 echo -e "  • Dashboard (HTTPS) : ${C_BOLD}https://${SPARROWX_DOMAIN}${HTTPS_SUFFIX}${C_RESET}"
 echo -e "  • Dashboard (HTTP)  : ${C_BOLD}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}${C_RESET}"
+echo -e "  • Supabase Studio   : ${C_BOLD}https://${SPARROWX_STUDIO_DOMAIN}${HTTPS_SUFFIX}${C_RESET} (or http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/?studio=1)"
+echo -e "  • Terminal DB TUI   : Run ${C_BOLD}./manage-db.sh${C_RESET} (or ${C_BOLD}sparrowx-db${C_RESET})"
+echo -e "  • Per-User DB Root  : ${INSTALL_DIR}/data/users/<username>/"
 echo -e "  • REST DB API       : ${C_BOLD}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/rest/v1/${C_RESET}"
 echo -e "  • Health Probe      : ${C_BOLD}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/api/v1/health${C_RESET}"
 echo -e "  • Nameserver 1      : ${SPARROWX_NS1} -> ${SPARROWX_PUBLIC_IP} (DNS Port: ${DNS_PORT})"
 echo -e "  • Nameserver 2      : ${SPARROWX_NS2} -> ${SPARROWX_PUBLIC_IP} (DNS Port: ${DNS_PORT})"
 echo -e "  • DNS Zone File     : ${INSTALL_DIR}/ovh/dns/db.${SPARROWX_DOMAIN}"
+echo -e "  • Future 1-Click Up : Run ${C_BOLD}./update.sh${C_RESET} (or ${C_BOLD}sparrowx-update${C_RESET})"
 echo -e "  • Install Log       : ${LOG_FILE}"
 echo -e "${C_GREEN}======================================================================${C_RESET}"

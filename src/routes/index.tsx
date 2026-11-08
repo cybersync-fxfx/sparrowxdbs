@@ -33,6 +33,7 @@ import {
   SparrowxAiBrainCenter,
 } from "@/components/SparrowxAiBrainCenter";
 import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
+import { SovereignDatabaseStudio } from "@/components/SovereignDatabaseStudio";
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -1444,6 +1445,32 @@ function Dashboard() {
     setActiveNav(navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel);
   };
 
+  const isDedicatedStudioUrl =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("db.") ||
+      window.location.hostname.startsWith("studio.") ||
+      window.location.hostname.startsWith("supabase.") ||
+      new URLSearchParams(window.location.search).get("studio") === "1" ||
+      new URLSearchParams(window.location.search).get("studio") === "true");
+
+  if (isDedicatedStudioUrl) {
+    return (
+      <>
+        <SovereignDatabaseStudio
+          isStandaloneDomain={true}
+          onClose={() => {
+            if (typeof window !== "undefined") {
+              const u = new URL(window.location.href);
+              u.searchParams.delete("studio");
+              window.location.href = u.toString();
+            }
+          }}
+        />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
   if (authSession.role === "unauthenticated") {
     return (
       <>
@@ -1586,6 +1613,29 @@ function Dashboard() {
     );
   }
 
+  const isStudioDomainOrParam =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("db.") ||
+      window.location.hostname.startsWith("studio.") ||
+      window.location.hostname.startsWith("supabase.") ||
+      new URLSearchParams(window.location.search).get("studio") === "1" ||
+      new URLSearchParams(window.location.search).get("studio") === "true");
+
+  if (
+    authSession.role === "admin" &&
+    (isStudioDomainOrParam || activeNav === "Supabase Studio")
+  ) {
+    return (
+      <>
+        <SovereignDatabaseStudio
+          isStandaloneDomain={isStudioDomainOrParam}
+          onClose={() => setActiveNav("Overview")}
+        />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
   const userInitials = currentUser?.fullName
     ? currentUser.fullName
         .split(" ")
@@ -1615,7 +1665,7 @@ function Dashboard() {
         vulnCount={openVulnCount}
       />
       <SidebarInset className="min-h-svh bg-background">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 sm:gap-4 border-b border-border bg-background/95 px-3 sm:px-7 backdrop-blur-md">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 sm:gap-4 border-b border-white/10 bg-black/65 px-3 sm:px-7 backdrop-blur-2xl backdrop-saturate-150 shadow-[0_8px_30px_rgba(0,0,0,0.65)] transform-gpu">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <SidebarTrigger
               aria-label="Toggle navigation"
@@ -1699,7 +1749,7 @@ function Dashboard() {
                   type="button"
                   onClick={() => handleNavigate("Client Subscriptions")}
                   className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    portalMode === "admin"
+                    portalMode === "admin" && activeNav !== "Supabase Studio"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
@@ -1708,6 +1758,20 @@ function Dashboard() {
                   <Users className="size-3.5 shrink-0" />
                   <span className="hidden sm:inline">Admin Master</span>
                   <span className="sm:hidden text-[11px]">Admin</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveNav("Supabase Studio")}
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
+                    activeNav === "Supabase Studio"
+                      ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
+                      : "text-[#3ECF8E] hover:bg-[#3ECF8E]/15"
+                  }`}
+                  title="Open Mirrored Supabase Database Studio"
+                >
+                  <Database className="size-3.5 shrink-0" />
+                  <span className="hidden sm:inline">Supabase Studio</span>
+                  <span className="sm:hidden text-[11px]">DB</span>
                 </button>
               </div>
             ) : (
