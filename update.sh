@@ -76,26 +76,29 @@ APP_HOST_PORT="${APP_HOST_PORT:-3000}"
 PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 
-# Ensure SPARROWX_STUDIO_DOMAIN is saved in .env
-if [ -f "${INSTALL_DIR}/.env" ]; then
-  grep -q "^SPARROWX_STUDIO_DOMAIN=" "${INSTALL_DIR}/.env" && \
-    sed -i "s|^SPARROWX_STUDIO_DOMAIN=.*|SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}|" "${INSTALL_DIR}/.env" || \
-    echo "SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}" >> "${INSTALL_DIR}/.env"
-else
-  cat > "${INSTALL_DIR}/.env" <<EOF
-SPARROWX_DOMAIN=${SPARROWX_DOMAIN}
-SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}
-SPARROWX_PUBLIC_IP=${SPARROWX_PUBLIC_IP}
-HTTP_PORT=${HTTP_PORT}
-HTTPS_PORT=${HTTPS_PORT}
-APP_HOST_PORT=${APP_HOST_PORT}
-PGRST_HOST_PORT=${PGRST_HOST_PORT}
-PG_HOST_PORT=${PG_HOST_PORT}
-POSTGRES_USER=sparrowx
-POSTGRES_PASSWORD=sparrowx_ovh_secret_2026
-POSTGRES_DB=sparrowx_db
-EOF
-fi
+# Ensure all required keys are persisted in .env so future runs never re-prompt
+touch "${INSTALL_DIR}/.env"
+ensure_env_key() {
+  local key="$1"
+  local val="$2"
+  if grep -q "^${key}=" "${INSTALL_DIR}/.env" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" "${INSTALL_DIR}/.env"
+  else
+    echo "${key}=${val}" >> "${INSTALL_DIR}/.env"
+  fi
+}
+
+ensure_env_key "SPARROWX_DOMAIN" "${SPARROWX_DOMAIN}"
+ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
+ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
+ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
+ensure_env_key "HTTPS_PORT" "${HTTPS_PORT}"
+ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
+ensure_env_key "PGRST_HOST_PORT" "${PGRST_HOST_PORT}"
+ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+ensure_env_key "POSTGRES_USER" "${POSTGRES_USER:-sparrowx}"
+ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}"
+ensure_env_key "POSTGRES_DB" "${POSTGRES_DB:-sparrowx_db}"
 
 # 2. Pull Latest Code from GitHub
 log_info "[Step 1/6] Pulling latest commits from GitHub (origin/main)..."
