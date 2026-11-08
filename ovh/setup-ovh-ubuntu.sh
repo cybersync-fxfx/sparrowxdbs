@@ -267,10 +267,19 @@ else
     git reset --hard origin/main >/dev/null 2>&1 || true
   else
     rm -rf "${INSTALL_DIR}" 2>/dev/null || true
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+      REPO_URL="https://${GITHUB_TOKEN}@github.com/cybersync-fxfx/sparrowxdbs.git"
+    fi
     if ! git clone "${REPO_URL}" "${INSTALL_DIR}"; then
-      log_warn "Git clone encountered an error; retrying with HTTP/1.1 buffer fix..."
-      git config --global http.postBuffer 524288000 || true
-      git clone --depth 1 "${REPO_URL}" "${INSTALL_DIR}"
+      log_warn "Repository is private on GitHub or requires a Personal Access Token."
+      GH_PAT="$(ask_prompt "Enter GitHub Personal Access Token (PAT) for cybersync-fxfx/sparrowxdbs" "")"
+      if [ -n "${GH_PAT}" ]; then
+        AUTH_REPO_URL="https://${GH_PAT}@github.com/cybersync-fxfx/sparrowxdbs.git"
+        git clone "${AUTH_REPO_URL}" "${INSTALL_DIR}" || git clone --depth 1 "${AUTH_REPO_URL}" "${INSTALL_DIR}"
+      else
+        git config --global http.postBuffer 524288000 || true
+        git clone --depth 1 "${REPO_URL}" "${INSTALL_DIR}"
+      fi
     fi
   fi
 fi
