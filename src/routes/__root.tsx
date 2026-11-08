@@ -130,6 +130,15 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        <script
+          src="/sparrowx-shield.js"
+          data-site-id="TNT-3800"
+          data-api-key="spx_tenant••••••••850c"
+          data-endpoint="https://sec.sparrowx.net"
+          data-auto-block="true"
+          data-anti-bot="active"
+          async
+        />
       </head>
       <body>
         {children}
