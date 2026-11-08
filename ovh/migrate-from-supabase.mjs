@@ -1,21 +1,15 @@
 #!/usr/bin/env node
 /**
- * SPARROWX CLOUD-TO-LOCAL OVH DATABASE MIGRATION ENGINE
+ * SPARROWX SOVEREIGN LOCAL DATABASE SEEDER & PER-USER PARTITION ENGINE
  * ----------------------------------------------------------------------------
- * Automatically shifts all existing data from the cloud Supabase instance into:
+ * Completely disconnected from Cloud Supabase.
+ * Loads the migrated snapshot (`src/lib/migrated-seed.json`) directly into:
  *  1. The local OVH PostgreSQL / PostgREST database (POSTGREST_INTERNAL_URL)
  *  2. The local OVH JSON persistence store (/app/data/sparrowx-ovh-db.json)
- *
- * Safe & idempotent: preserves all local records and upserts missing rows.
+ *  3. Isolated Per-User Database Folders (/app/data/users/<username>/)
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-
-const CLOUD_URL =
-  process.env.SPARROWX_CLOUD_SUPABASE_URL || "https://yidqdgufjgfyxflgvbqq.supabase.co";
-const CLOUD_KEY =
-  process.env.SPARROWX_CLOUD_SUPABASE_KEY ||
-  "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-";
 
 const LOCAL_POSTGREST_URL =
   process.env.POSTGREST_INTERNAL_URL ||
@@ -24,6 +18,7 @@ const LOCAL_POSTGREST_URL =
 
 const DATA_DIR = process.env.SPARROWX_DATA_DIR || resolve(process.cwd(), "data");
 const LOCAL_JSON_PATH = resolve(DATA_DIR, "sparrowx-ovh-db.json");
+const SEED_JSON_PATH = resolve(process.cwd(), "src/lib/migrated-seed.json");
 
 const TABLES = [
   "app_users",
@@ -42,7 +37,7 @@ const TABLES = [
 ];
 
 export async function migrateCloudSupabaseToLocal() {
-  console.log("[SparrowX DB Shift] Starting Cloud -> Local OVH Database synchronization...");
+  console.log("[SparrowX Sovereign DB] Hydrating local OVH PostgreSQL & per-user folders from local seed...");
   let localStore = {};
   try {
     const raw = await readFile(LOCAL_JSON_PATH, "utf-8");
@@ -51,41 +46,35 @@ export async function migrateCloudSupabaseToLocal() {
     localStore = {};
   }
 
-  let totalMigrated = 0;
+  let seedStore = {};
+  try {
+    const rawSeed = await readFile(SEED_JSON_PATH, "utf-8");
+    seedStore = JSON.parse(rawSeed);
+  } catch {
+    seedStore = {};
+  }
+
+  let totalSynced = 0;
 
   for (const table of TABLES) {
-    try {
-      const res = await fetch(`${CLOUD_URL}/rest/v1/${table}?select=*`, {
-        headers: {
-          apikey: CLOUD_KEY,
-          Authorization: `Bearer ${CLOUD_KEY}`,
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(8000),
-      });
-
-      if (!res.ok) continue;
-      const rows = await res.json();
-      if (!Array.isArray(rows) || rows.length === 0) continue;
-
-      // 1. Merge into local JSON store
-      const existing = Array.isArray(localStore[table]) ? localStore[table] : [];
-      const byId = new Map();
-      for (const item of existing) {
-        const key = item.id || item.email;
-        if (key) byId.set(String(key), item);
+    const seedRows = Array.isArray(seedStore[table]) ? seedStore[table] : [];
+    const existing = Array.isArray(localStore[table]) ? localStore[table] : [];
+    const byId = new Map();
+    for (const item of existing) {
+      const key = item.id || item.email;
+      if (key) byId.set(String(key), item);
+    }
+    for (const row of seedRows) {
+      const key = row.id || row.email;
+      if (key && !byId.has(String(key))) {
+        existing.push(row);
+        byId.set(String(key), row);
+        totalSynced++;
       }
-      for (const row of rows) {
-        const key = row.id || row.email;
-        if (key && !byId.has(String(key))) {
-          existing.push(row);
-          byId.set(String(key), row);
-          totalMigrated++;
-        }
-      }
-      localStore[table] = existing;
+    }
+    localStore[table] = existing;
 
-      // 2. Upsert into local PostgREST / PostgreSQL if reachable
+    if (existing.length > 0) {
       try {
         await fetch(`${LOCAL_POSTGREST_URL}/${table}`, {
           method: "POST",
@@ -93,14 +82,12 @@ export async function migrateCloudSupabaseToLocal() {
             "Content-Type": "application/json",
             Prefer: "resolution=merge-duplicates,return=minimal",
           },
-          body: JSON.stringify(rows),
+          body: JSON.stringify(existing),
           signal: AbortSignal.timeout(5000),
         });
       } catch {
-        // PostgREST container may still be initializing or running in native mode; JSON store is already synced
+        // PostgREST container may still be initializing; local JSON store is already synced
       }
-    } catch {
-      // Ignore individual table timeout
     }
   }
 
@@ -109,13 +96,13 @@ export async function migrateCloudSupabaseToLocal() {
     await writeFile(LOCAL_JSON_PATH, JSON.stringify(localStore, null, 2), "utf-8");
     await provisionPerUserDatabaseFolders(localStore);
   } catch (err) {
-    console.warn("[SparrowX DB Shift] Could not write local JSON store:", err);
+    console.warn("[SparrowX Sovereign DB] Could not write local JSON store:", err);
   }
 
   console.log(
-    `[SparrowX DB Shift] Local OVH database ready (${totalMigrated} new records synced to local storage).`,
+    `[SparrowX Sovereign DB] Local OVH database active & 100% disconnected from Cloud (${totalSynced} new records hydrated).`,
   );
-  return totalMigrated;
+  return totalSynced;
 }
 
 export async function provisionPerUserDatabaseFolders(store) {
@@ -177,9 +164,14 @@ export async function provisionPerUserDatabaseFolders(store) {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isDirectRun =
+  process.argv[1] &&
+  (process.argv[1].endsWith("migrate-from-supabase.mjs") ||
+    import.meta.url.endsWith("migrate-from-supabase.mjs"));
+
+if (isDirectRun) {
   migrateCloudSupabaseToLocal().catch((err) => {
-    console.error("[SparrowX DB Shift Error]", err);
+    console.error("[SparrowX Sovereign DB Error]", err);
     process.exit(0);
   });
 }

@@ -2,6 +2,7 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
+import migratedSeedData from "./lib/migrated-seed.json";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -30,7 +31,10 @@ const sovereignTableStore = new Map<string, Array<Record<string, unknown>>>();
 
 function getTableRows(tableName: string): Array<Record<string, unknown>> {
   if (!sovereignTableStore.has(tableName)) {
-    sovereignTableStore.set(tableName, []);
+    const seedTable = (migratedSeedData as Record<string, Array<Record<string, unknown>>>)[
+      tableName
+    ];
+    sovereignTableStore.set(tableName, Array.isArray(seedTable) ? [...seedTable] : []);
   }
   return sovereignTableStore.get(tableName)!;
 }

@@ -1,3 +1,5 @@
+import migratedSeedData from "./migrated-seed.json";
+
 export type Severity = "Critical" | "High" | "Medium";
 export type IncidentStatus = "Investigating" | "Open" | "Contained";
 export type RangeOption = "24 hours" | "7 days" | "30 days";
@@ -426,29 +428,31 @@ export function computeLiveSnapshot(
   };
 }
 
-const CLOUD_SUPABASE_URL = "https://yidqdgufjgfyxflgvbqq.supabase.co";
-const CLOUD_SUPABASE_ANON_KEY = "sb_publishable_cbDXcwqJTmMt3Bb_BtY75w_9dIhf9Y-";
+const SOVEREIGN_LOCAL_ANON_KEY = "spx_ovh_sovereign_key";
 
 function resolveSovereignRestBaseUrl(): string {
   const envUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim();
-  if (envUrl && envUrl.startsWith("http") && !envUrl.includes("your-project-id")) {
+  if (
+    envUrl &&
+    envUrl.startsWith("http") &&
+    !envUrl.includes("your-project-id") &&
+    !envUrl.includes("supabase.co")
+  ) {
     return envUrl.replace(/\/$/, "");
   }
-  const selfHostedMode = (import.meta.env.VITE_SOVEREIGN_SELF_HOSTED as string | undefined)?.trim();
   if (
-    selfHostedMode === "true" &&
     typeof window !== "undefined" &&
     window.location?.origin &&
     window.location.origin.startsWith("http")
   ) {
     return window.location.origin.replace(/\/$/, "");
   }
-  return CLOUD_SUPABASE_URL;
+  return "http://127.0.0.1:3000";
 }
 
 export const supabaseUrl = resolveSovereignRestBaseUrl();
 export const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || CLOUD_SUPABASE_ANON_KEY;
+  (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || SOVEREIGN_LOCAL_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
@@ -1374,39 +1378,7 @@ export async function authenticateAppUserFromBackend(
       );
       if (response.ok) {
         const rows = (await response.json()) as Array<Record<string, unknown>>;
-        let row = rows[0];
-        if (!row && supabaseUrl !== CLOUD_SUPABASE_URL) {
-          try {
-            const cloudRes = await fetch(
-              `${CLOUD_SUPABASE_URL}/rest/v1/app_users?email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
-              {
-                headers: {
-                  apikey: CLOUD_SUPABASE_ANON_KEY,
-                  Authorization: `Bearer ${CLOUD_SUPABASE_ANON_KEY}`,
-                  "Content-Type": "application/json",
-                },
-                cache: "no-store",
-              },
-            );
-            if (cloudRes.ok) {
-              const cloudRows = (await cloudRes.json()) as Array<Record<string, unknown>>;
-              row = cloudRows[0];
-              // Automatically shift/persist this account into the local OVH database
-              if (row) {
-                fetch(`${supabaseUrl}/rest/v1/app_users`, {
-                  method: "POST",
-                  headers: {
-                    ...getSupabaseHeaders(),
-                    Prefer: "resolution=merge-duplicates,return=minimal",
-                  },
-                  body: JSON.stringify(row),
-                }).catch(() => {});
-              }
-            }
-          } catch {
-            // Ignore cloud fallback error
-          }
-        }
+        const row = rows[0];
         if (row) {
           const storedPassword = String(row.password ?? "");
           if (!verifyPasswordMatch(password, storedPassword)) {
@@ -1427,8 +1399,35 @@ export async function authenticateAppUserFromBackend(
         }
       }
     } catch {
-      // Fallback to local encrypted cache if offline
+      // Fallback to local migrated seed / cache
     }
+  }
+
+  // Check local migrated seed snapshot (100% disconnected from Cloud Supabase)
+  const seedUsers = Array.isArray((migratedSeedData as Record<string, unknown>).app_users)
+    ? ((migratedSeedData as Record<string, Array<Record<string, unknown>>>).app_users ?? [])
+    : [];
+  const seedMatch = seedUsers.find(
+    (u) => String(u.email ?? "").toLowerCase() === normalizedEmail,
+  );
+  if (seedMatch) {
+    const storedPassword = String(seedMatch.password ?? "");
+    if (!verifyPasswordMatch(password, storedPassword)) {
+      return {
+        user: null,
+        error: "Invalid password. Please check your credentials and try again.",
+      };
+    }
+    return {
+      user: {
+        id: String(seedMatch.id ?? ""),
+        email: String(seedMatch.email ?? "").toLowerCase(),
+        password: "",
+        fullName: String(seedMatch.full_name ?? ""),
+        admin: String(seedMatch.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+        tenantId: seedMatch.tenant_id ? String(seedMatch.tenant_id) : null,
+      },
+    };
   }
 
   const cachedUsers = readLocalCache<AppUser>(STORAGE_KEYS.users);
