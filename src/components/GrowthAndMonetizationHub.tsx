@@ -3610,20 +3610,20 @@ export function ClientOnboardingWizard({
   ];
 
   return (
-    <section className="rounded-xl border border-primary/30 bg-card p-5 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3.5">
-        <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase text-primary font-semibold">
-            <ShieldCheck className="size-3.5 text-primary" />
-            <span>Guided Service Onboarding & Connection Verification</span>
+    <section className="rounded-2xl border border-primary/30 bg-card p-6 sm:p-8 space-y-6 shadow-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
+        <div className="space-y-1">
+          <div className="inline-flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary font-semibold">
+            <ShieldCheck className="size-4 text-primary" />
+            <span>Guided Service Onboarding &amp; Connection Verification</span>
           </div>
-          <h3 className="text-base font-bold text-foreground mt-0.5">
-            {tenant.name} ({tenant.primaryDomain})
+          <h3 className="text-lg sm:text-xl font-bold text-foreground">
+            {tenant.name} <span className="text-muted-foreground font-mono text-sm">({tenant.primaryDomain})</span>
           </h3>
         </div>
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full px-2.5 py-0.5 text-[11px] font-mono font-bold ${
+            className={`rounded-full px-3.5 py-1 text-xs font-mono font-bold ${
               tenant.sdkVerified
                 ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
                 : "bg-amber-500/15 text-amber-300 border border-amber-500/30"
@@ -3635,7 +3635,7 @@ export function ClientOnboardingWizard({
       </div>
 
       {/* Step Indicator Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
         {steps.map((st) => {
           const isCurrent = activeStep === st.num;
           const isDone = activeStep > st.num || (tenant.sdkVerified && st.num < 5);
@@ -3644,17 +3644,17 @@ export function ClientOnboardingWizard({
               key={st.num}
               type="button"
               onClick={() => setActiveStep(st.num)}
-              className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition-all cursor-pointer ${
+              className={`rounded-xl border px-4 py-3 text-left text-xs font-semibold transition-all cursor-pointer ${
                 isCurrent
-                  ? "border-primary bg-primary/15 text-primary"
+                  ? "border-primary bg-primary/15 text-primary shadow-sm ring-1 ring-primary/30"
                   : isDone
                     ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                    : "border-border bg-background/80 text-muted-foreground hover:text-foreground hover:border-white/20"
               }`}
             >
-              <div className="flex items-center justify-between">
-                <span>{st.label}</span>
-                {isDone && <Check className="size-3.5 text-emerald-400" />}
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate">{st.label}</span>
+                {isDone && <Check className="size-4 shrink-0 text-emerald-400" />}
               </div>
             </button>
           );
@@ -3663,82 +3663,115 @@ export function ClientOnboardingWizard({
 
       {/* Step Content */}
       {activeStep === 1 && (
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3.5 text-xs">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-2.5">
-            <div className="font-semibold text-foreground text-sm flex items-center gap-2">
-              <Globe2 className="size-4 text-primary" />
-              <span>Step 1 · Easy Guided Setup for Website, AI Products &amp; Backend APIs</span>
+        <div className="rounded-2xl border border-border bg-secondary/20 p-6 sm:p-7 space-y-6 text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
+            <div className="space-y-1">
+              <div className="font-bold text-foreground text-base flex items-center gap-2.5">
+                <Globe2 className="size-5 text-primary" />
+                <span>Step 1 · Easy Guided Setup for Website, AI Products &amp; Backend APIs</span>
+              </div>
+              <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+                Target endpoint <code className="text-foreground font-bold px-1.5 py-0.5 rounded bg-background/80">{tenant.primaryDomain}</code> is
+                ready to link to your dashboard with active modules:{" "}
+                <strong className="text-primary">{tenant.enabledModules.join(", ")}</strong>.
+              </p>
             </div>
-            <span className="font-mono text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded font-semibold">
+            <span className="self-start sm:self-auto font-mono text-xs text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1 rounded-lg font-semibold shrink-0">
               Zero Code Rewrite Required
             </span>
           </div>
 
-          <p className="text-muted-foreground leading-relaxed">
-            Target endpoint <code className="text-foreground font-bold">{tenant.primaryDomain}</code> is
-            ready to link to your dashboard with active modules:{" "}
-            <strong className="text-primary">{tenant.enabledModules.join(", ")}</strong>. Choose your integration method below:
-          </p>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+              className="group flex flex-col justify-between rounded-xl border border-white/10 bg-black/50 p-5 text-left hover:border-primary/50 hover:bg-black/70 transition-all cursor-pointer space-y-3 min-h-[140px]"
             >
-              <div className="flex items-center justify-between">
-                <Globe2 className="size-4 text-primary" />
-                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-primary/15 text-primary">1-Line</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="grid size-10 place-items-center rounded-xl border border-primary/30 bg-primary/15 text-primary">
+                    <Globe2 className="size-5" />
+                  </span>
+                  <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full bg-primary/15 text-primary">
+                    1-Line
+                  </span>
+                </div>
+                <div className="font-bold text-white text-sm">Website Drop-In</div>
               </div>
-              <div className="font-bold text-white text-xs">Website Drop-In</div>
-              <p className="text-[10px] text-zinc-400">HTML script tag for WordPress, Shopify, Webflow</p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                HTML script tag for WordPress, Shopify, Webflow &amp; custom sites
+              </p>
             </button>
 
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+              className="group flex flex-col justify-between rounded-xl border border-white/10 bg-black/50 p-5 text-left hover:border-cyan-400/50 hover:bg-black/70 transition-all cursor-pointer space-y-3 min-h-[140px]"
             >
-              <div className="flex items-center justify-between">
-                <Cpu className="size-4 text-cyan-400" />
-                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-cyan-500/15 text-cyan-300">MCP Tool</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="grid size-10 place-items-center rounded-xl border border-cyan-500/30 bg-cyan-500/15 text-cyan-400">
+                    <Cpu className="size-5" />
+                  </span>
+                  <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300">
+                    MCP Tool
+                  </span>
+                </div>
+                <div className="font-bold text-white text-sm">AI Agent &amp; LLM</div>
               </div>
-              <div className="font-bold text-white text-xs">AI Agent &amp; LLM</div>
-              <p className="text-[10px] text-zinc-400">OpenAI, Gemini, Anthropic &amp; MCP tool firewall</p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                OpenAI, Gemini, Anthropic &amp; MCP tool execution firewall
+              </p>
             </button>
 
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+              className="group flex flex-col justify-between rounded-xl border border-white/10 bg-black/50 p-5 text-left hover:border-amber-400/50 hover:bg-black/70 transition-all cursor-pointer space-y-3 min-h-[140px]"
             >
-              <div className="flex items-center justify-between">
-                <Radio className="size-4 text-amber-400" />
-                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/15 text-amber-300">&lt; 3ms</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="grid size-10 place-items-center rounded-xl border border-amber-500/30 bg-amber-500/15 text-amber-400">
+                    <Radio className="size-5" />
+                  </span>
+                  <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300">
+                    &lt; 3ms
+                  </span>
+                </div>
+                <div className="font-bold text-white text-sm">Voice &amp; Multimodal</div>
               </div>
-              <div className="font-bold text-white text-xs">Voice &amp; Multimodal</div>
-              <p className="text-[10px] text-zinc-400">Real-time WebRTC audio &amp; streaming guardrails</p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Real-time WebRTC audio streams &amp; multimodal guardrails
+              </p>
             </button>
 
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="rounded-lg border border-white/10 bg-black/50 p-2.5 text-left hover:border-primary/50 transition-colors cursor-pointer space-y-1"
+              className="group flex flex-col justify-between rounded-xl border border-white/10 bg-black/50 p-5 text-left hover:border-emerald-400/50 hover:bg-black/70 transition-all cursor-pointer space-y-3 min-h-[140px]"
             >
-              <div className="flex items-center justify-between">
-                <Zap className="size-4 text-emerald-400" />
-                <span className="text-[9px] font-mono px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-300">FastAPI/Node</span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="grid size-10 place-items-center rounded-xl border border-emerald-500/30 bg-emerald-500/15 text-emerald-400">
+                    <Zap className="size-5" />
+                  </span>
+                  <span className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300">
+                    FastAPI/Node
+                  </span>
+                </div>
+                <div className="font-bold text-white text-sm">Backend APIs</div>
               </div>
-              <div className="font-bold text-white text-xs">Backend APIs</div>
-              <p className="text-[10px] text-zinc-400">Next.js Edge, Express, Python FastAPI middleware</p>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Next.js Edge, Express, Python FastAPI &amp; ASGI middleware
+              </p>
             </button>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary via-orange-500 to-amber-500 px-4 py-2 font-bold text-white shadow-md hover:scale-[1.01] transition-transform cursor-pointer"
+              className="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-primary via-orange-500 to-amber-500 px-5 py-3 text-xs sm:text-sm font-bold text-white shadow-md hover:scale-[1.01] transition-transform cursor-pointer"
             >
               <Terminal className="size-4" />
               <span>Launch Guided Integration Studio (Website, AI &amp; Cloud Setup)</span>
@@ -3746,7 +3779,7 @@ export function ClientOnboardingWizard({
             <button
               type="button"
               onClick={() => setActiveStep(2)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3.5 py-2 font-semibold text-foreground hover:border-primary cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-xs sm:text-sm font-semibold text-foreground hover:border-primary cursor-pointer"
             >
               <span>Next: Safe Migration Check →</span>
             </button>
@@ -3755,76 +3788,76 @@ export function ClientOnboardingWizard({
       )}
 
       {activeStep === 2 && (
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3 text-xs">
-          <div className="font-semibold text-foreground">
+        <div className="rounded-2xl border border-border bg-secondary/20 p-6 space-y-4 text-xs">
+          <div className="font-bold text-base text-foreground">
             Step 2: Remove or Migrate Old Integrations Safely (Zero-Downtime)
           </div>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
             Before activating strict blocking, confirm old rate-limit proxies or legacy WAF headers
             won&apos;t conflict with SparrowX Edge telemetry:
           </p>
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 cursor-pointer">
+          <div className="space-y-3 pt-1">
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/40 p-3.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={legacyMigrated}
                 onChange={(e) => setLegacyMigrated(e.target.checked)}
-                className="rounded border-border"
+                className="size-4 rounded border-border"
               />
-              <span>
+              <span className="text-xs sm:text-sm text-zinc-200">
                 Safely bypass or remove conflicting legacy WAF / rate-limit middleware on{" "}
-                <code>{tenant.primaryDomain}</code>
+                <code className="text-primary font-bold">{tenant.primaryDomain}</code>
               </span>
             </label>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/40 p-3.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={oldProxyRemoved}
                 onChange={(e) => setOldProxyRemoved(e.target.checked)}
-                className="rounded border-border"
+                className="size-4 rounded border-border"
               />
-              <span>
+              <span className="text-xs sm:text-sm text-zinc-200">
                 Revoke deprecated third-party telemetry keys and enable SparrowX key{" "}
-                <code>{tenant.apiKey.slice(0, 10)}•••</code>
+                <code className="text-primary font-bold">{tenant.apiKey.slice(0, 10)}•••</code>
               </span>
             </label>
           </div>
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={() => setActiveStep(3)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 font-semibold text-primary-foreground cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground cursor-pointer"
             >
-              <span>Confirm Safe Migration & Proceed to Verification →</span>
+              <span>Confirm Safe Migration &amp; Proceed to Verification →</span>
             </button>
           </div>
         </div>
       )}
 
       {activeStep === 3 && (
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3 text-xs">
-          <div className="font-semibold text-foreground">
-            Step 3: Verify Actual Connection & Display Integration Evidence
+        <div className="rounded-2xl border border-border bg-secondary/20 p-6 space-y-4 text-xs">
+          <div className="font-bold text-base text-foreground">
+            Step 3: Verify Actual Connection &amp; Display Integration Evidence
           </div>
-          <p className="text-muted-foreground">
-            Run a live handshake probe against <code>{tenant.primaryDomain}</code> to verify DNS
+          <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
+            Run a live handshake probe against <code className="text-foreground font-bold">{tenant.primaryDomain}</code> to verify DNS
             resolution, TLS transport, and SDK telemetry ingestion.
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3 pt-1">
             <button
               type="button"
               disabled={isVerifyingConnection}
               onClick={() => void handleRunLiveConnectionVerification()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 font-semibold text-primary-foreground hover:opacity-95 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 font-semibold text-primary-foreground hover:opacity-95 cursor-pointer"
             >
               {isVerifyingConnection ? (
                 <>
-                  <RefreshCw className="size-3.5 animate-spin" />
+                  <RefreshCw className="size-4 animate-spin" />
                   <span>Verifying Live Connection...</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck className="size-3.5" />
+                  <ShieldCheck className="size-4" />
                   <span>Verify Actual Connection Now</span>
                 </>
               )}
@@ -3832,36 +3865,36 @@ export function ClientOnboardingWizard({
             <button
               type="button"
               onClick={() => setActiveStep(4)}
-              className="rounded-md border border-border bg-background px-3 py-2 font-semibold text-foreground hover:border-primary cursor-pointer"
+              className="rounded-xl border border-border bg-background px-4 py-2.5 font-semibold text-foreground hover:border-primary cursor-pointer"
             >
-              Troubleshooting & Missing Configs →
+              Troubleshooting &amp; Missing Configs →
             </button>
           </div>
         </div>
       )}
 
       {activeStep === 4 && (
-        <div className="rounded-lg border border-border bg-secondary/20 p-4 space-y-3 text-xs">
-          <div className="font-semibold text-foreground">
-            Step 4: Missing Configurations Guide & Reconnection Troubleshooting
+        <div className="rounded-2xl border border-border bg-secondary/20 p-6 space-y-4 text-xs">
+          <div className="font-bold text-base text-foreground">
+            Step 4: Missing Configurations Guide &amp; Reconnection Troubleshooting
           </div>
           {troubleshootingNote && (
-            <div className="rounded border border-destructive/40 bg-destructive/10 p-2.5 text-destructive">
+            <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-destructive">
               {troubleshootingNote}
             </div>
           )}
-          <div className="grid gap-2 sm:grid-cols-2">
-            <div className="rounded border border-border bg-background p-3">
-              <div className="font-semibold text-foreground">1. SDK Handshake Status</div>
-              <div className="text-muted-foreground mt-0.5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-background p-4 space-y-1">
+              <div className="font-bold text-sm text-foreground">1. SDK Handshake Status</div>
+              <div className="text-muted-foreground leading-relaxed">
                 {tenant.sdkVerified
                   ? "✓ Verified and streaming telemetry."
-                  : "⚠ SDK beacon not yet confirmed. Click 'Reconnect & Verify' below."}
+                  : "⚠ SDK beacon not yet confirmed. Click 'Reconnect & Auto-Verify Setup' below."}
               </div>
             </div>
-            <div className="rounded border border-border bg-background p-3">
-              <div className="font-semibold text-foreground">2. Subscribed Defense Modules</div>
-              <div className="text-muted-foreground mt-0.5">
+            <div className="rounded-xl border border-border bg-background p-4 space-y-1">
+              <div className="font-bold text-sm text-foreground">2. Subscribed Defense Modules</div>
+              <div className="text-muted-foreground leading-relaxed">
                 Active: {tenant.enabledModules.join(", ")} (
                 {tenant.enabledModules.length < 4
                   ? `${4 - tenant.enabledModules.length} additional module(s) available`
@@ -3870,19 +3903,19 @@ export function ClientOnboardingWizard({
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3 pt-1">
             <button
               type="button"
               onClick={() => void handleRunLiveConnectionVerification()}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3.5 py-1.5 font-semibold text-primary-foreground cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground cursor-pointer"
             >
-              <RefreshCw className="size-3.5" />
-              <span>Reconnect & Auto-Verify Setup</span>
+              <RefreshCw className="size-4" />
+              <span>Reconnect &amp; Auto-Verify Setup</span>
             </button>
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="rounded-md border border-border bg-background px-3 py-1.5 font-semibold text-foreground cursor-pointer"
+              className="rounded-xl border border-border bg-background px-4 py-2.5 font-semibold text-foreground cursor-pointer"
             >
               Open SDK Diagnostic Console
             </button>
@@ -3891,17 +3924,17 @@ export function ClientOnboardingWizard({
       )}
 
       {activeStep === 5 && (
-        <div className="rounded-lg border border-emerald-500/40 bg-emerald-950/15 p-4 space-y-3 text-xs">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="font-bold text-emerald-300 flex items-center gap-2 text-sm">
-              <CheckCircle2 className="size-4 text-emerald-400" />
+        <div className="rounded-2xl border border-emerald-500/40 bg-emerald-950/15 p-6 space-y-4 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="font-bold text-emerald-300 flex items-center gap-2 text-base">
+              <CheckCircle2 className="size-5 text-emerald-400" />
               <span>Protection Activation Confirmed — {tenant.name} Is Actively Defended</span>
             </div>
-            <span className="rounded bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-300">
+            <span className="rounded-lg bg-emerald-500/20 px-3 py-1 font-mono text-xs font-bold text-emerald-300">
               Certificate: {badgeId}
             </span>
           </div>
-          <div className="rounded border border-white/10 bg-black/60 p-3 font-mono text-[11px] text-zinc-300 space-y-1">
+          <div className="rounded-xl border border-white/10 bg-black/60 p-4 font-mono text-xs text-zinc-300 space-y-1.5">
             <div>
               Visible Integration Evidence: Target={tenant.primaryDomain} | Status={tenant.status} |
               SDK={tenant.sdkVerified ? "VERIFIED_200_OK" : "ACTIVE"}
@@ -3912,22 +3945,22 @@ export function ClientOnboardingWizard({
               {tenant.enabledModules.join(",")}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3 pt-1">
             <button
               type="button"
               onClick={() => void handleRunLiveConnectionVerification()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-black/50 px-3 py-1.5 font-semibold text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-black/50 px-4 py-2.5 font-semibold text-emerald-300 hover:bg-emerald-500/10 cursor-pointer"
             >
-              <RefreshCw className="size-3.5" />
+              <RefreshCw className="size-4" />
               <span>Re-Verify Live Connection</span>
             </button>
             <button
               type="button"
               onClick={() => onOpenSdkModal(tenant)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 font-semibold text-foreground cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2.5 font-semibold text-foreground cursor-pointer"
             >
-              <Terminal className="size-3.5 text-primary" />
-              <span>View SDK & Middleware</span>
+              <Terminal className="size-4 text-primary" />
+              <span>View SDK &amp; Middleware</span>
             </button>
           </div>
         </div>

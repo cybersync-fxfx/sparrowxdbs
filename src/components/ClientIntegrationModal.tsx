@@ -299,27 +299,27 @@ export function ClientIntegrationModal({
   return (
     <div
       aria-label="Guided Product Integration Studio"
-      className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-3 sm:p-5 backdrop-blur-md overflow-y-auto"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-4 sm:p-6 lg:p-8 backdrop-blur-md overflow-y-auto"
       role="dialog"
     >
-      <div className="relative w-full max-w-4xl rounded-2xl border border-white/15 bg-gradient-to-b from-[#111215] via-[#0c0d10] to-[#08080a] p-4 sm:p-6 shadow-2xl space-y-5 my-4 max-h-[92vh] overflow-y-auto">
+      <div className="relative w-full max-w-5xl rounded-3xl border border-white/15 bg-gradient-to-b from-[#121318] via-[#0c0d11] to-[#08080a] p-6 sm:p-8 lg:p-10 shadow-2xl space-y-8 my-6 max-h-[92vh] overflow-y-auto">
         {/* Top Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3">
-            <span className="grid size-10 place-items-center rounded-xl bg-black/70 border border-white/15 p-1 text-primary shadow-inner shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
+          <div className="flex items-start sm:items-center gap-4">
+            <span className="grid size-12 place-items-center rounded-2xl bg-black/80 border border-white/15 p-2 text-primary shadow-inner shrink-0">
               <img
                 src="/sparrowx-logo.png"
                 alt="SparrowX Logo"
                 className="size-full object-contain"
               />
             </span>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-base sm:text-lg font-bold text-white">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
                   Guided Setup · Connect {service.name}
                 </h2>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold border ${
+                  className={`rounded-full px-3 py-1 text-[11px] font-mono font-semibold border ${
                     diagnosticResult?.handshakeVerified
                       ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                       : "bg-amber-500/10 border-amber-500/30 text-amber-300"
@@ -328,8 +328,9 @@ export function ClientIntegrationModal({
                   {diagnosticResult?.handshakeVerified ? "VERIFIED ACTIVE" : "AWAITING SDK SETUP"}
                 </span>
               </div>
-              <p className="text-xs text-zinc-400 font-mono mt-0.5">
-                Target: <span className="text-zinc-200">{customEndpoint}</span> · Key:{" "}
+              <p className="text-xs sm:text-sm text-zinc-400 font-mono">
+                Target: <span className="text-zinc-200">{customEndpoint}</span>{" "}
+                <span className="mx-1.5 text-zinc-600">·</span> Key:{" "}
                 <code className="text-primary font-bold">{maskSecretKey(service.apiKey)}</code>
               </p>
             </div>
@@ -337,7 +338,7 @@ export function ClientIntegrationModal({
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <Button
               aria-label="Close modal"
-              className="size-8 rounded-lg text-zinc-400 hover:text-white"
+              className="size-9 rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10"
               onClick={onClose}
               size="icon"
               variant="ghost"
@@ -348,17 +349,25 @@ export function ClientIntegrationModal({
         </div>
 
         {/* STEP 1: CHOOSE PRODUCT OR FUTURE-TECH CATEGORY */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-              <span>Step 1 · Choose What You Are Connecting</span>
-            </span>
-            <span className="text-[11px] font-mono text-zinc-400">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <span className="text-xs font-mono font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary/20 text-[11px] text-primary">
+                  1
+                </span>
+                <span>Step 1 · Choose What You Are Connecting</span>
+              </span>
+              <p className="text-xs text-zinc-400 mt-1">
+                Select your application architecture to generate drop-in telemetry and edge protection.
+              </p>
+            </div>
+            <span className="self-start sm:self-auto rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-[11px] font-mono font-medium text-emerald-300">
               Zero code refactoring required
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((cat) => {
               const isSelected = selectedCategory === cat.id;
               const Icon = cat.icon;
@@ -367,30 +376,42 @@ export function ClientIntegrationModal({
                   key={cat.id}
                   type="button"
                   onClick={() => handleSelectCategory(cat.id)}
-                  className={`flex flex-col justify-between rounded-xl border p-3 text-left transition-all cursor-pointer ${
+                  className={`group flex flex-col justify-between rounded-2xl border p-5 text-left transition-all cursor-pointer min-h-[132px] ${
                     isSelected
-                      ? "border-primary bg-primary/15 shadow-lg shadow-primary/20 scale-[1.02]"
-                      : "border-white/10 bg-black/40 hover:border-white/25 hover:bg-black/60"
+                      ? "border-primary bg-gradient-to-br from-primary/20 via-primary/10 to-black/60 shadow-lg shadow-primary/15 ring-1 ring-primary/40"
+                      : "border-white/10 bg-black/50 hover:border-white/25 hover:bg-black/75"
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <Icon
-                        className={`size-4 ${isSelected ? "text-primary" : "text-zinc-400"}`}
-                      />
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-zinc-300">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={`grid size-10 place-items-center rounded-xl border transition-colors ${
+                          isSelected
+                            ? "border-primary/40 bg-primary/20 text-primary"
+                            : "border-white/10 bg-white/5 text-zinc-300 group-hover:text-white"
+                        }`}
+                      >
+                        <Icon className="size-5" />
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full border ${
+                          isSelected
+                            ? "border-primary/40 bg-primary/20 text-primary"
+                            : "border-white/10 bg-white/5 text-zinc-300"
+                        }`}
+                      >
                         {cat.badge}
                       </span>
                     </div>
                     <div
-                      className={`text-xs font-bold mt-2 ${
-                        isSelected ? "text-white" : "text-zinc-200"
+                      className={`text-sm font-bold tracking-tight ${
+                        isSelected ? "text-white" : "text-zinc-100"
                       }`}
                     >
                       {cat.title}
                     </div>
                   </div>
-                  <p className="mt-1 text-[10px] text-zinc-400 leading-tight">
+                  <p className="mt-2.5 text-xs text-zinc-400 leading-relaxed">
                     {cat.description}
                   </p>
                 </button>
@@ -400,20 +421,28 @@ export function ClientIntegrationModal({
         </div>
 
         {/* STEP 2: FRAMEWORK / TARGET TABS & CODE SNIPPET */}
-        <div className="space-y-2.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
-              <span>Step 2 · 1-Click Code &amp; Drop-In Configuration</span>
-            </span>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 sm:p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-mono font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary/20 text-[11px] text-primary">
+                  2
+                </span>
+                <span>Step 2 · 1-Click Code &amp; Drop-In Configuration</span>
+              </span>
+              <p className="text-xs text-zinc-400 mt-1">
+                Copy or download the pre-configured snippet for your target runtime.
+              </p>
+            </div>
             {snippet.installCmd && (
-              <span className="font-mono text-[11px] text-primary bg-primary/10 px-2.5 py-0.5 rounded border border-primary/20">
+              <span className="font-mono text-xs text-primary bg-primary/10 px-3 py-1.5 rounded-lg border border-primary/25">
                 {snippet.installCmd}
               </span>
             )}
           </div>
 
           {/* Framework tabs */}
-          <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-black/60 p-1 overflow-x-auto no-scrollbar sm:flex-wrap">
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/60 p-2 overflow-x-auto no-scrollbar sm:flex-wrap">
             {(
               [
                 { id: "html_script", label: "1-Line HTML Script Tag", category: "website" },
@@ -431,7 +460,7 @@ export function ClientIntegrationModal({
                 key={lang.id}
                 type="button"
                 onClick={() => setActiveTab(lang.id)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                className={`rounded-xl px-3.5 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                   activeTab === lang.id
                     ? "bg-primary text-black font-bold shadow-md shadow-primary/30"
                     : "text-zinc-400 hover:text-white hover:bg-white/5"
@@ -443,75 +472,80 @@ export function ClientIntegrationModal({
           </div>
 
           {/* Target endpoint adjuster input */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-xl border border-white/10 bg-black/50 p-2.5 text-xs">
-            <span className="font-mono text-zinc-400 shrink-0">Target Endpoint / Origin URL:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-2xl border border-white/10 bg-black/50 p-3.5 text-xs">
+            <span className="font-mono text-zinc-300 font-medium shrink-0">
+              Target Endpoint / Origin URL:
+            </span>
             <input
               type="text"
               value={customEndpoint}
               onChange={(e) => setCustomEndpoint(e.target.value)}
               placeholder="https://app.yourdomain.com or agent://mcp-server"
-              className="h-8 flex-1 rounded-lg border border-white/10 bg-black px-3 font-mono text-xs text-white outline-none focus:border-primary"
+              className="h-9 flex-1 rounded-xl border border-white/10 bg-black px-3.5 font-mono text-xs text-white outline-none focus:border-primary"
             />
           </div>
 
           {/* Code Snippet Box */}
-          <div className="relative overflow-hidden rounded-xl border border-white/15 bg-black/90 shadow-inner">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 bg-white/[0.03] px-3.5 py-2 text-xs font-mono text-zinc-400">
+          <div className="relative overflow-hidden rounded-2xl border border-white/15 bg-black/90 shadow-inner">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-mono text-zinc-400">
               <span className="flex items-center gap-2 text-white font-semibold">
-                <Code2 className="size-3.5 text-primary" />
+                <Code2 className="size-4 text-primary" />
                 <span>{snippet.filename}</span>
               </span>
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-mono text-zinc-200 hover:bg-white/20 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-mono text-zinc-200 hover:bg-white/20 transition-colors cursor-pointer"
                 >
-                  {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                  {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
                   <span>{copied ? "Copied Snippet" : "Copy Code"}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadFile}
-                  className="inline-flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 text-[11px] font-mono text-zinc-200 hover:bg-white/20 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-mono text-zinc-200 hover:bg-white/20 transition-colors cursor-pointer"
                 >
-                  <Download className="size-3 text-primary" />
+                  <Download className="size-3.5 text-primary" />
                   <span>Download {snippet.filename}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleCopyEnvConfig}
-                  className="inline-flex items-center gap-1 rounded-md bg-primary/20 border border-primary/40 px-2.5 py-1 text-[11px] font-mono text-primary hover:bg-primary/30 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary/20 border border-primary/40 px-3 py-1.5 text-xs font-mono text-primary hover:bg-primary/30 transition-colors cursor-pointer"
                 >
-                  {copiedEnv ? <Check className="size-3 text-emerald-400" /> : <KeyRound className="size-3" />}
+                  {copiedEnv ? <Check className="size-3.5 text-emerald-400" /> : <KeyRound className="size-3.5" />}
                   <span>{copiedEnv ? "Copied .env" : "Copy .env.sparrowx"}</span>
                 </button>
               </div>
             </div>
-            <pre className="max-h-64 overflow-y-auto p-4 font-mono text-xs text-zinc-200 leading-relaxed select-all">
+            <pre className="max-h-72 overflow-y-auto p-5 font-mono text-xs text-zinc-200 leading-relaxed select-all">
               {snippet.code}
             </pre>
           </div>
         </div>
 
         {/* STEP 3: INTERACTIVE HANDSHAKE & THREAT INTERCEPTION PROBE */}
-        <div className="rounded-xl border border-primary/30 bg-gradient-to-r from-primary/10 via-black/80 to-black p-4 space-y-3.5 shadow-md">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-mono font-bold uppercase tracking-wider text-primary flex items-center gap-2">
+        <div className="rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/10 via-black/80 to-black p-5 sm:p-6 space-y-5 shadow-md">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="text-xs font-mono font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                <span className="inline-flex size-5 items-center justify-center rounded-full bg-primary/20 text-[11px] text-primary">
+                  3
+                </span>
                 <Activity className="size-4 text-primary" />
                 <span>Step 3 · Automated Diagnostic Handshake &amp; Probe</span>
               </div>
-              <p className="mt-0.5 text-xs text-zinc-300">
-                Pings your target endpoint, verifies TLS &amp; API keys, and runs an automated threat interception probe.
+              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+                Verifies DNS TXT ownership, checks live SDK telemetry ingestion, and validates your endpoint handshake.
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 onClick={handleRunDiagnostic}
                 disabled={isDiagnosing}
                 size="sm"
-                className="h-9 gap-2 text-xs bg-gradient-to-r from-primary via-orange-500 to-amber-500 text-white font-bold shadow-md cursor-pointer"
+                className="h-10 px-4 gap-2 text-xs bg-gradient-to-r from-primary via-orange-500 to-amber-500 text-white font-bold shadow-md cursor-pointer rounded-xl"
               >
                 <Radar className={`size-4 ${isDiagnosing ? "animate-spin" : ""}`} />
                 <span>{isDiagnosing ? "Probing Network..." : "Verify Connection & Handshake"}</span>
@@ -521,51 +555,74 @@ export function ClientIntegrationModal({
                 disabled={isSendingProbe}
                 size="sm"
                 variant="outline"
-                className="h-9 gap-1.5 text-xs border-white/20 text-zinc-200 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="h-10 px-4 gap-2 text-xs border-white/20 text-zinc-200 hover:text-white hover:bg-white/10 cursor-pointer rounded-xl"
               >
                 <Send className="size-3.5 text-emerald-400" />
-                <span>{isSendingProbe ? "Transmitting..." : "Send Live Beacon"}</span>
+                <span>{isSendingProbe ? "Checking Telemetry..." : "Send Live Beacon"}</span>
               </Button>
             </div>
           </div>
 
           {/* Diagnostic Step Results Matrix */}
           {diagnosticResult && (
-            <div className="space-y-3 border-t border-primary/20 pt-3">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-medium">
-                <span className="text-white font-bold flex items-center gap-2">
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  <span>Handshake Diagnostic Passed</span>
+            <div className="space-y-4 border-t border-primary/20 pt-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-medium">
+                <span className="text-white font-bold flex items-center gap-2 text-sm">
+                  {diagnosticResult.handshakeVerified ? (
+                    <>
+                      <CheckCircle2 className="size-4 text-emerald-400" />
+                      <span>Handshake Diagnostic Passed</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="size-4 text-amber-400" />
+                      <span>Setup Incomplete — Awaiting SDK Deployment or DNS TXT Proof</span>
+                    </>
+                  )}
                 </span>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-emerald-400 text-xs bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-0.5 rounded">
+                  <span className="font-mono text-emerald-400 text-xs bg-emerald-950/40 border border-emerald-500/30 px-3 py-1 rounded-lg">
                     Average RTT: {diagnosticResult.avgLatencyMs}ms
                   </span>
                   {verificationBadgeId && (
-                    <span className="font-mono text-primary text-xs bg-primary/10 border border-primary/30 px-2.5 py-0.5 rounded font-bold">
+                    <span className="font-mono text-primary text-xs bg-primary/10 border border-primary/30 px-3 py-1 rounded-lg font-bold">
                       SEAL: {verificationBadgeId}
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-3 sm:grid-cols-2">
                 {diagnosticResult.steps.map((step) => (
                   <div
                     key={step.name}
-                    className="flex items-start gap-2.5 rounded-lg border border-white/10 bg-black/60 p-3 text-xs"
+                    className={`flex items-start gap-3 rounded-xl border p-4 text-xs ${
+                      step.status === "failed"
+                        ? "border-red-500/30 bg-red-950/20"
+                        : step.status === "warning"
+                          ? "border-amber-500/30 bg-amber-950/20"
+                          : "border-white/10 bg-black/60"
+                    }`}
                   >
-                    <CheckCircle2 className="size-4 shrink-0 text-emerald-400 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-white flex items-center justify-between">
+                    {step.status === "success" ? (
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-400 mt-0.5" />
+                    ) : (
+                      <AlertTriangle
+                        className={`size-4 shrink-0 mt-0.5 ${
+                          step.status === "failed" ? "text-red-400" : "text-amber-400"
+                        }`}
+                      />
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="font-bold text-white flex items-center justify-between gap-2">
                         <span>{step.name}</span>
                         {step.latencyMs !== undefined && (
-                          <span className="font-mono text-[10px] text-zinc-400">
+                          <span className="font-mono text-[11px] text-zinc-400">
                             {step.latencyMs}ms
                           </span>
                         )}
                       </div>
-                      <p className="mt-0.5 text-[11px] text-zinc-300 leading-snug">
+                      <p className="text-xs text-zinc-300 leading-relaxed">
                         {step.detail}
                       </p>
                     </div>
@@ -573,23 +630,40 @@ export function ClientIntegrationModal({
                 ))}
               </div>
 
-              {/* Verified Success Callout & Action Buttons */}
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="text-xs font-bold text-white flex items-center gap-2">
-                    <ShieldCheck className="size-4 text-emerald-400" />
-                    <span>Product is now Protected &amp; Connected to your Dashboard!</span>
+              {/* Verified / Unverified Status Callout & Action Buttons */}
+              <div
+                className={`rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                  diagnosticResult.handshakeVerified
+                    ? "border-emerald-500/30 bg-emerald-950/20"
+                    : "border-amber-500/30 bg-amber-950/20"
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
+                    {diagnosticResult.handshakeVerified ? (
+                      <>
+                        <ShieldCheck className="size-4 text-emerald-400" />
+                        <span>Product is now Protected &amp; Connected to your Dashboard!</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="size-4 text-amber-400" />
+                        <span>Deploy the Step 2 SDK snippet on your server, then re-verify.</span>
+                      </>
+                    )}
                   </div>
-                  <p className="text-[11px] text-zinc-300">
-                    Live telemetry is transmitting to your edge ledger with under 2ms latency SLA.
+                  <p className="text-xs text-zinc-300">
+                    {diagnosticResult.handshakeVerified
+                      ? "Live telemetry is transmitting to your edge ledger with under 2ms latency SLA."
+                      : "No live telemetry or DNS TXT ownership record has been detected from your target domain yet."}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {onOpenAttackSimulator && (
+                <div className="flex items-center gap-2.5 shrink-0">
+                  {onOpenAttackSimulator && diagnosticResult.handshakeVerified && (
                     <Button
                       onClick={() => onOpenAttackSimulator(service.name)}
                       size="sm"
-                      className="h-8 gap-1.5 text-xs bg-red-600 hover:bg-red-500 text-white font-bold cursor-pointer"
+                      className="h-9 px-3.5 gap-1.5 text-xs bg-red-600 hover:bg-red-500 text-white font-bold cursor-pointer rounded-xl"
                     >
                       <Play className="size-3.5 fill-current" />
                       <span>Launch Threat Simulator</span>
@@ -598,9 +672,15 @@ export function ClientIntegrationModal({
                   <Button
                     onClick={onClose}
                     size="sm"
-                    className="h-8 gap-1.5 text-xs bg-emerald-500 text-black font-bold hover:bg-emerald-400 cursor-pointer"
+                    className={`h-9 px-4 gap-1.5 text-xs font-bold cursor-pointer rounded-xl ${
+                      diagnosticResult.handshakeVerified
+                        ? "bg-emerald-500 text-black hover:bg-emerald-400"
+                        : "bg-white/10 text-white hover:bg-white/20"
+                    }`}
                   >
-                    <span>Done &amp; Open Dashboard</span>
+                    <span>
+                      {diagnosticResult.handshakeVerified ? "Done & Open Dashboard" : "Close Setup"}
+                    </span>
                     <ArrowRight className="size-3.5" />
                   </Button>
                 </div>
@@ -610,10 +690,15 @@ export function ClientIntegrationModal({
         </div>
 
         {/* Footer */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-white/10 pt-3 text-xs text-zinc-400 font-mono">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-white/10 pt-4 text-xs text-zinc-400 font-mono">
           <span>SparrowX Autonomous Integration Studio · Real-Time Telemetry Pipeline</span>
           <div className="flex items-center gap-2">
-            <Button onClick={onClose} size="sm" variant="outline" className="h-8 text-xs cursor-pointer">
+            <Button
+              onClick={onClose}
+              size="sm"
+              variant="outline"
+              className="h-9 px-4 rounded-xl text-xs cursor-pointer"
+            >
               Close
             </Button>
           </div>
