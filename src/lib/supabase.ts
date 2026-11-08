@@ -1521,6 +1521,79 @@ export async function authenticateAppUserFromBackend(
   };
 }
 
+export async function fetchAppUserByEmailFromBackend(email: string): Promise<AppUser | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const normalizeAdminFlag = (val: unknown): "yes" | "no" => {
+    const str = String(val ?? "no").trim().toLowerCase();
+    return str === "yes" || str === "true" || str === "1" ? "yes" : "no";
+  };
+
+  if (isSupabaseConfigured && supabaseUrl) {
+    try {
+      const response = await fetch(
+        `${supabaseUrl}/rest/v1/app_users?email=ilike.${encodeURIComponent(normalizedEmail)}&limit=1`,
+        {
+          headers: getSupabaseHeaders(),
+          cache: "no-store",
+        },
+      );
+      if (response.ok) {
+        const rows = (await response.json()) as Array<Record<string, unknown>>;
+        const row = Array.isArray(rows) ? rows[0] : undefined;
+        if (row && row.email) {
+          return {
+            id: String(row.id ?? ""),
+            email: String(row.email ?? "").trim().toLowerCase(),
+            password: "",
+            fullName: String(row.full_name ?? row.fullName ?? ""),
+            admin: normalizeAdminFlag(row.admin),
+            tenantId: row.tenant_id
+              ? String(row.tenant_id)
+              : row.tenantId
+                ? String(row.tenantId)
+                : null,
+          };
+        }
+      }
+    } catch {
+      // Fall through to seed / local cache
+    }
+  }
+
+  const seedUsers = Array.isArray((migratedSeedData as Record<string, unknown>).app_users)
+    ? ((migratedSeedData as Record<string, Array<Record<string, unknown>>>).app_users ?? [])
+    : [];
+  const seedMatch = seedUsers.find(
+    (u) => String(u.email ?? "").trim().toLowerCase() === normalizedEmail,
+  );
+  if (seedMatch) {
+    return {
+      id: String(seedMatch.id ?? ""),
+      email: String(seedMatch.email ?? "").trim().toLowerCase(),
+      password: "",
+      fullName: String(seedMatch.full_name ?? ""),
+      admin: normalizeAdminFlag(seedMatch.admin),
+      tenantId: seedMatch.tenant_id ? String(seedMatch.tenant_id) : null,
+    };
+  }
+
+  const cachedUsers = readLocalCache<AppUser>(STORAGE_KEYS.users);
+  const cachedMatch = cachedUsers.find(
+    (u) => String(u.email ?? "").trim().toLowerCase() === normalizedEmail,
+  );
+  if (cachedMatch) {
+    return {
+      ...cachedMatch,
+      password: "",
+      admin: normalizeAdminFlag(cachedMatch.admin),
+    };
+  }
+
+  return null;
+}
+
 export async function fetchVerificationProofsFromBackend(
   tenants: ClientTenant[] = [],
   services: ProtectedService[] = [],

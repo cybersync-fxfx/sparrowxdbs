@@ -140,6 +140,7 @@ import {
   computeLiveSnapshot,
   deleteRecordFromBackend,
   fetchAllWorkspaceData,
+  fetchAppUserByEmailFromBackend,
   generateSecureSparrowKey,
   type Incident,
   type IncidentStatus,
@@ -345,6 +346,7 @@ function Dashboard() {
           setSelectedTenantId(storedSession.tenantId);
         }
         setPortalMode("client");
+        setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));
       }
       setCurrentUser({
         id: storedSession.sub,
@@ -353,6 +355,39 @@ function Dashboard() {
         fullName: storedSession.fullName || storedSession.email.split("@")[0] || "Operator",
         admin: storedSession.role === "admin" ? "yes" : "no",
         tenantId: storedSession.tenantId,
+      });
+
+      // Live sync `admin` column ("yes" vs "no") from `app_users` database table
+      void fetchAppUserByEmailFromBackend(storedSession.email).then((dbUser) => {
+        if (!active || !dbUser) return;
+        const isDbAdmin = dbUser.admin === "yes";
+        setCurrentUser(dbUser);
+        issueSignedSessionToken({
+          id: dbUser.id || storedSession.sub,
+          email: dbUser.email,
+          fullName: dbUser.fullName || storedSession.fullName,
+          role: isDbAdmin ? "admin" : "client",
+          tenantId: dbUser.tenantId ?? storedSession.tenantId,
+        });
+        if (isDbAdmin) {
+          setAuthSession({
+            role: "admin",
+            operatorName: dbUser.fullName || storedSession.fullName || "SparrowX Admin",
+            operatorEmail: dbUser.email,
+          });
+          setPortalMode("soc");
+        } else {
+          setAuthSession({
+            role: "client",
+            tenantId: dbUser.tenantId ?? storedSession.tenantId,
+            userEmail: dbUser.email,
+          });
+          if (dbUser.tenantId) {
+            setSelectedTenantId(dbUser.tenantId);
+          }
+          setPortalMode("client");
+          setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));
+        }
       });
     }
 
@@ -5239,7 +5274,7 @@ function AppSidebar({
                   {clientServiceDashboardItems.map(({ label, icon: Icon, count }) => (
                     <SidebarMenuItem key={label}>
                       <SidebarMenuButton
-                        isActive={activeNav === label}
+                        isActive={activeNav === label || (activeNav === "Overview" && label === "Client Overview")}
                         onClick={() => handleNavClick(label)}
                         tooltip={label}
                       >
@@ -5252,6 +5287,29 @@ function AppSidebar({
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
+
+            {isAdminSession && (
+              <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
+                <SidebarGroupLabel>Security Operations</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu className="group-data-[collapsible=icon]:items-center">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        className="font-medium text-primary hover:text-primary"
+                        onClick={() => handleNavClick("Overview")}
+                        tooltip="SOC Operations & Live Telemetry"
+                      >
+                        <ShieldAlert className="size-4 text-primary shrink-0" />
+                        <span className="truncate">SOC Dashboard</span>
+                      </SidebarMenuButton>
+                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
+                        Live
+                      </SidebarMenuBadge>
+                    </SidebarMenuItem>
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )}
           </>
         )}
       </SidebarContent>

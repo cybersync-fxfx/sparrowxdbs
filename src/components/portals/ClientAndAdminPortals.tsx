@@ -1845,7 +1845,7 @@ export async function emitSecurityTelemetry(event: {
       </section>
 
       {/* 1. CLIENT OVERVIEW & GUIDED AUTOMATION */}
-      {activeNav === "Client Overview" && (
+      {(activeNav === "Client Overview" || activeNav === "Overview") && (
         <>
           {/* Guided 3-Step Automation Checklist */}
           <section className="border border-primary/30 bg-card p-5">
