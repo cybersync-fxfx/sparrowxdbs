@@ -49,6 +49,7 @@ import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import { CyberEmblem, CyberPill, type CyberEmblemVariant } from "@/components/ui/CyberBadge";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
+import { ServiceOnboardingWizard } from "@/components/ServiceOnboardingWizard";
 import {
   AdminRevenueAndOutreachEngine,
   ClientOnboardingWizard,
@@ -234,6 +235,7 @@ export function ClientPortalView({
 }) {
   // Add Service Modal / Form state in Client Area
   const [showAddServiceForm, setShowAddServiceForm] = useState(false);
+  const [onboardingWizardTenant, setOnboardingWizardTenant] = useState<ClientTenant | null>(null);
   const [serviceName, setServiceName] = useState("");
   const [primaryDomain, setPrimaryDomain] = useState("");
   const [planTier, setPlanTier] = useState<PlanTier>("Growth");
@@ -522,172 +524,39 @@ export function ClientPortalView({
             )}
 
             {showAddServiceForm && (
-              <form
-                className="border border-primary/40 bg-card p-5 shadow-lg"
-                onSubmit={handleAddServiceSubmit}
-              >
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <div>
-                    <h2 className="text-base font-semibold">Add New Security Service</h2>
-                    <p className="text-xs text-muted-foreground">
-                      Choose the security module(s) for this service. Its dashboard will only
-                      display the options you select here.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => setShowAddServiceForm(false)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-
-                <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <label
-                      className="text-xs font-medium text-muted-foreground"
-                      htmlFor="add-srv-name"
-                    >
-                      Service Name
-                    </label>
-                    <input
-                      className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-                      id="add-srv-name"
-                      onChange={(e) => setServiceName(e.target.value)}
-                      placeholder="e.g. Main Storefront Web WAF"
-                      required
-                      value={serviceName}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="text-xs font-medium text-muted-foreground"
-                      htmlFor="add-srv-domain"
-                    >
-                      Target Domain / Endpoint URI
-                    </label>
-                    <input
-                      className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-                      id="add-srv-domain"
-                      onChange={(e) => setPrimaryDomain(e.target.value)}
-                      placeholder="https://app.yourdomain.com"
-                      required
-                      value={primaryDomain}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="text-xs font-medium text-muted-foreground"
-                      htmlFor="add-srv-plan"
-                    >
-                      Service Plan Tier
-                    </label>
-                    <select
-                      className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-3 text-xs text-foreground outline-none"
-                      id="add-srv-plan"
-                      onChange={(e) => setPlanTier(e.target.value as PlanTier)}
-                      value={planTier}
-                    >
-                      <option value="Starter">Starter ($49/mo · 100k req/mo)</option>
-                      <option value="Growth">Growth ($199/mo · 2.5M req/mo)</option>
-                      <option value="Enterprise">Enterprise ($699/mo · Unlimited)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <span className="text-xs font-medium text-muted-foreground">
-                    Select Service Type / Protection Modules
-                  </span>
-                  <div className="mt-2 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-                    {SERVICE_MODULES.map((mod) => {
-                      const isSelected = selectedModules.includes(mod.id);
-                      return (
-                        <button
-                          className={`flex flex-col justify-between border p-3.5 text-left transition-all ${
-                            isSelected
-                              ? "border-primary bg-primary/10"
-                              : "border-border bg-background hover:border-primary/40"
-                          }`}
-                          key={mod.id}
-                          onClick={() => toggleWizardModule(mod.id)}
-                          type="button"
-                        >
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold text-primary">
-                                {mod.shortLabel}
-                              </span>
-                              {isSelected && <Check className="size-3.5 text-primary" />}
-                            </div>
-                            <div className="mt-1 text-xs font-semibold">{mod.title}</div>
-                            <p className="mt-1 text-[11px] text-muted-foreground">
-                              {mod.description}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {(() => {
+              <ServiceOnboardingWizard
+                onClose={() => {
+                  setShowAddServiceForm(false);
+                  setOnboardingWizardTenant(null);
+                }}
+                onComplete={async (data) => {
                   const plan = getPlanById(activeSubscription.planId);
-                  const isLimitReached = plan.maxDomains !== -1 && tenants.length >= plan.maxDomains;
+                  if (plan.maxDomains !== -1 && tenants.length >= plan.maxDomains) {
+                    showToast(
+                      `Plan domain limit reached (${tenants.length}/${plan.maxDomains}). Upgrade your plan to protect additional domains.`,
+                    );
+                    onNavigate("Billing & Credits");
+                    setShowAddServiceForm(false);
+                    return;
+                  }
 
-                  return (
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border pt-4">
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Active Subscription:</span>
-                        <span className="font-semibold text-primary">
-                          {plan.name} (${activeSubscription.priceUsd}/mo)
-                        </span>
-                        <span className="text-muted-foreground">· Domain Allocation:</span>
-                        <span
-                          className={`font-mono font-bold ${isLimitReached ? "text-amber-400" : "text-emerald-400"}`}
-                        >
-                          {tenants.length} / {plan.maxDomains === -1 ? "Unlimited" : plan.maxDomains} Domains Used
-                        </span>
-                        {isLimitReached && (
-                          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[11px] font-semibold text-amber-400">
-                            Domain Quota Reached
-                          </span>
-                        )}
-                      </div>
+                  await onCreateTenant({
+                    name: data.name,
+                    contactEmail: currentUser?.email ?? "client@company.com",
+                    primaryDomain: data.domain,
+                    planTier: data.planTier,
+                    enabledModules: data.enabledModules,
+                  });
 
-                      <div className="flex items-center gap-2">
-                        <Button
-                          onClick={() => setShowAddServiceForm(false)}
-                          size="sm"
-                          type="button"
-                          variant="ghost"
-                        >
-                          Cancel
-                        </Button>
-                        {isLimitReached ? (
-                          <Button
-                            onClick={() => {
-                              setShowAddServiceForm(false);
-                              onNavigate("Billing & Credits");
-                            }}
-                            size="sm"
-                            type="button"
-                            className="bg-primary text-primary-foreground font-semibold"
-                          >
-                            <ShieldCheck className="size-3.5 mr-1" /> Upgrade Plan to Add More
-                          </Button>
-                        ) : (
-                          <Button size="sm" type="submit" className="bg-primary text-primary-foreground font-semibold">
-                            <Plus className="size-3.5 mr-1" /> Provision & Protect Service
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                  showToast(
+                    `Successfully provisioned ${data.name} under your ${plan.name} subscription! Autonomous shield active.`,
                   );
-                })()}
-              </form>
+                  setShowAddServiceForm(false);
+                  setOnboardingWizardTenant(null);
+                }}
+                showToast={showToast}
+                existingTenant={onboardingWizardTenant ?? undefined}
+              />
             )}
 
             {tenants.length > 0 ? (
@@ -758,12 +627,24 @@ export function ClientPortalView({
                               className="h-6 px-2 text-[10px]"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setIntegrationTenant(srv);
+                                setOnboardingWizardTenant(srv);
+                                setShowAddServiceForm(true);
                               }}
                               size="sm"
                               variant="outline"
                             >
-                              <Terminal className="mr-1 size-2.5" /> Connect SDK
+                              <Sliders className="mr-1 size-2.5" /> Setup Guide &amp; DNS
+                            </Button>
+                            <Button
+                              className="h-6 px-2 text-[10px]"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIntegrationTenant(srv);
+                              }}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              <Terminal className="mr-1 size-2.5" /> SDK / Key
                             </Button>
                             <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
                           </div>
@@ -3737,7 +3618,11 @@ export function PortalLoginScreen({
       badge: "Sub-2ms Edge Inspection",
       icon: Globe2,
       accent: "from-orange-500/20 to-amber-500/10 text-orange-400 border-orange-500/30",
-      snippet: `app.use(sparrowx.waf({ mode: "block", ruleset: "owasp-strict" }));`,
+      capabilities: [
+        "Automated OWASP Top 10 Threat Mitigation",
+        "Sub-2ms Realtime Packet Inspection",
+        "Autonomous Botnet & Scraper Filtering",
+      ],
     },
     {
       id: "ai_shield" as ServiceModuleId,
@@ -3747,7 +3632,11 @@ export function PortalLoginScreen({
       badge: "AI Zero-Trust Sandbox",
       icon: Sparkles,
       accent: "from-purple-500/20 to-primary/10 text-purple-400 border-purple-500/30",
-      snippet: `const safePrompt = await sparrowx.aiShield.inspect(userInput);`,
+      capabilities: [
+        "Real-Time LLM Prompt Injection & Jailbreak Defense",
+        "Sensitive PII & System Secret Redaction",
+        "Zero-Trust Guardrails for Autonomous MCP Tool Calls",
+      ],
     },
     {
       id: "cloud_security" as ServiceModuleId,
@@ -3757,7 +3646,11 @@ export function PortalLoginScreen({
       badge: "1-Click Rule Exporter",
       icon: Server,
       accent: "from-blue-500/20 to-cyan-500/10 text-blue-400 border-blue-500/30",
-      snippet: `sparrowx export-firewall --format=cloudflare --severity=critical`,
+      capabilities: [
+        "Cross-Endpoint Telemetry & Threat Correlation",
+        "Interactive MITRE ATT&CK TTP Mapping",
+        "Instant Export to iptables, UFW & Cloud Edge Rules",
+      ],
     },
     {
       id: "compliance" as ServiceModuleId,
@@ -3767,7 +3660,11 @@ export function PortalLoginScreen({
       badge: "Verified Proof Center",
       icon: FileSearch,
       accent: "from-emerald-500/20 to-teal-500/10 text-emerald-400 border-emerald-500/30",
-      snippet: `TXT _sparrowx-verify.acme.io -> "spx-verify-live-9f8a7c..."`,
+      capabilities: [
+        "Tamper-Proof Cryptographic Ownership Handshake",
+        "Automated Security Health & Diagnostic Probes",
+        "Investor & Enterprise-Ready SOC Compliance Proofs",
+      ],
     },
   ];
 
@@ -4040,7 +3937,7 @@ export function PortalLoginScreen({
                     id="signup-domain"
                     value={primaryDomain}
                     onChange={(e) => setPrimaryDomain(e.target.value)}
-                    placeholder="Domain (https://api.acme.io)"
+                    placeholder="Domain (https://api.yourdomain.com)"
                     className="h-9 w-full rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
                   />
                 </div>
@@ -4690,9 +4587,13 @@ export function PortalLoginScreen({
                         </p>
                       </div>
 
-                      <div className="mt-5 rounded-xl border border-[#1F1F1F] bg-black p-3 font-mono text-xs text-zinc-300 overflow-x-auto">
-                        <span className="text-primary select-none">$ </span>
-                        <code>{mod.snippet}</code>
+                      <div className="mt-5 space-y-2 border-t border-[#1C1C1C] pt-4">
+                        {mod.capabilities.map((cap, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-xs text-zinc-300 font-sans">
+                            <CheckCircle2 className="size-3.5 text-primary shrink-0" />
+                            <span>{cap}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );
