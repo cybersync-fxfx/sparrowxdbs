@@ -57,19 +57,27 @@ export const MAP_DEFAULT_CITIES: ThreatMapCity[] = [
 ];
 
 export interface CyberThreatMatrixMapProps {
+  className?: string;
   height?: number | string;
   customCities?: ThreatMapCity[];
   showControls?: boolean;
   showFeed?: boolean;
   showStats?: boolean;
+  enableSimulation?: boolean;
+  simIntervalMs?: number;
+  maxFeed?: number;
 }
 
 export function CyberThreatMatrixMap({
+  className = "",
   height = 560,
   customCities,
   showControls = true,
   showFeed = true,
   showStats = true,
+  enableSimulation = false,
+  simIntervalMs = 2800,
+  maxFeed = 20,
 }: CyberThreatMatrixMapProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -462,7 +470,7 @@ export function CyberThreatMatrixMap({
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-2xl border border-[#1f242e] bg-[#07070b] shadow-2xl select-none"
+      className={`relative w-full overflow-hidden rounded-2xl border border-[#1f242e] bg-[#07070b] shadow-2xl select-none ${className}`}
       style={{ height }}
     >
       {/* 2D Canvas */}
@@ -533,12 +541,16 @@ export function CyberThreatMatrixMap({
               <span className="font-bold text-white text-sm">{totalCountRef.current}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-zinc-400">BLOCKED (HIGH):</span>
+              <span className="text-zinc-400">HIGH SEVERITY:</span>
               <span className="font-bold text-[#FF354F]">{highCountRef.current}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-zinc-400">CRITICAL / ISOLATED:</span>
+              <span className="text-zinc-400">CRITICAL THREATS:</span>
               <span className="font-bold text-red-500">{criticalCountRef.current}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-zinc-400">ACTIVE ARCS:</span>
+              <span className="font-bold text-cyan-400">{activeEvents.length}</span>
             </div>
             <div className="flex justify-between items-center border-t border-[#1F1F1F] pt-1.5 mt-1">
               <span className="text-zinc-400">ACTIVE ORIGINS:</span>

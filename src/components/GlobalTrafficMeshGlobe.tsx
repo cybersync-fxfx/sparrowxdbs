@@ -1616,124 +1616,24 @@ export default sparrowxShield;
           </div>
         </div>
 
-        {globeVisualEngine === "threat_matrix" ? (
-          <CyberThreatMatrixMap
-            height={560}
-            showControls={true}
-            showFeed={true}
-            showStats={true}
-          />
-        ) : (
-          <section className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-card via-[#020617] to-card shadow-2xl">
-            {/* Globe Overlay HUD: Rotation Tip & Legend */}
-            <div className="pointer-events-none absolute left-2 sm:left-4 top-2 sm:top-4 z-10 flex flex-col gap-1.5 sm:gap-2 max-w-[calc(100%-1rem)]">
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border/80 bg-background/85 px-2.5 sm:px-3 py-1 sm:py-1.5 backdrop-blur-md">
-                <span className="size-2 rounded-full bg-primary animate-ping shrink-0" />
-                <span className="text-[10px] sm:text-[11px] font-semibold text-foreground truncate">
-                  Drag / Touch to spin 3D Globe · Vector Coastlines
-                </span>
-              </div>
-
-              {/* Color-Coded Arcs Legend */}
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border/60 bg-background/80 px-2 sm:px-3 py-1 text-[9px] sm:text-[10px] backdrop-blur-md overflow-x-auto no-scrollbar whitespace-nowrap">
-                <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                  <span className="size-2 rounded-full bg-emerald-400" />
-                  Allowed (200 OK)
-                </span>
-                <span className="text-muted-foreground/40">|</span>
-                <span className="flex items-center gap-1 text-rose-400 font-semibold">
-                  <span className="size-2 rounded-full bg-rose-400" />
-                  Blocked Threat (403)
-                </span>
-                <span className="text-muted-foreground/40">|</span>
-                <span className="flex items-center gap-1 text-amber-400 font-semibold">
-                  <span className="size-2 rounded-full bg-amber-400" />
-                  Rate-Limited (429)
-                </span>
-                <span className="text-muted-foreground/40">|</span>
-                <span className="flex items-center gap-1 text-cyan-400 font-semibold">
-                  <span className="size-2 rounded-full bg-cyan-400" />
-                  AI Prompt Shield
-                </span>
-              </div>
-            </div>
-
-            {/* Origin Target Pin HUD Overlay */}
-            {activeOrigin && (
-              <div className="pointer-events-none absolute right-4 top-4 z-10 hidden sm:flex flex-col items-end gap-1">
-                <div className="rounded-xl border border-primary/40 bg-card/90 p-3 shadow-xl backdrop-blur-md font-mono">
-                  <div className="flex items-center gap-2 text-xs font-bold text-foreground font-sans">
-                    <span className="size-2 rounded-full bg-primary animate-pulse" />
-                    Host: {activeOrigin.name}
-                  </div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">
-                    Real IP: <span className="text-primary font-bold">{activeOrigin.ip}</span>
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    Domain: {sanitizeDomainName(activeOrigin.domain)}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    Datacenter: {activeOrigin.region}
-                  </div>
-                  <div className="mt-1 flex items-center gap-1 text-[10px] text-emerald-400 font-sans">
-                    <CheckCircle2 className="size-3" />
-                    <span>Live Inbound Arcs Terminate Here</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Standby Not-Configured Overlay when no domain or service is integrated */}
-            {!activeOrigin && (
-              <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 p-6 text-center backdrop-blur-[2px]">
-                <div className="pointer-events-auto rounded-2xl border border-border/80 bg-card/95 p-6 shadow-2xl max-w-md">
-                  <div className="mx-auto flex size-12 items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/90 text-zinc-400">
-                    <Globe2 className="size-6 text-zinc-400" />
-                  </div>
-                  <h4 className="mt-3.5 text-sm font-semibold text-foreground">Traffic Mesh Standby · Not Configured</h4>
-                  <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
-                    No active endpoints or domains are connected yet. Enter your public domain above or connect a service in Web &amp; AI Shield to start traffic analysis.
-                  </p>
-                  <div className="mt-4 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const input = document.getElementById("quick-domain-input");
-                        input?.focus();
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
-                    >
-                      <Plus className="size-3.5" />
-                      Add Domain
-                    </button>
-                    {onNavigate && (
-                      <button
-                        type="button"
-                        onClick={() => onNavigate("Web & AI Shield")}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
-                      >
-                        <ShieldCheck className="size-3.5 text-primary" />
-                        Web &amp; AI Shield
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* HTML5 Canvas Element */}
-            <canvas
-              ref={canvasRef}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-              className="h-[360px] sm:h-[460px] md:h-[540px] w-full cursor-grab active:cursor-grabbing touch-none"
-              title="Drag mouse or finger to rotate the 3D globe"
-            />
+        <CyberThreatMatrixMap
+          customCities={threatCities.map((c) => ({
+            name: c.name,
+            lat: c.lat,
+            lon: c.lon,
+            country: c.country || c.name,
+            isOrigin: c.isOrigin,
+            hostingHub: c.hostingHub,
+            threatLevel: c.threatLevel,
+          }))}
+          height={560}
+          showControls={true}
+          showFeed={true}
+          showStats={true}
+        />
 
             {/* Bottom Ticker Strip */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/80 bg-card/90 px-4 py-2.5 text-xs font-mono">
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-border/80 rounded-xl bg-card/90 px-4 py-2.5 text-xs font-mono">
               <div className="flex items-center gap-2 font-sans">
                 <Radio className={`size-3.5 ${packets.length > 0 ? "text-primary animate-pulse" : "text-zinc-500"}`} />
                 <span className="font-semibold text-foreground">Latest Inbound Connection:</span>
@@ -1772,8 +1672,6 @@ export default sparrowxShield;
                 </span>
               </div>
             </div>
-          </section>
-        )}
       </div>
 
       {/* 5. Live Connection Packet Stream Table & Filter Bar */}
