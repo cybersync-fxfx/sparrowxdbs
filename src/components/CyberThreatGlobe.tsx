@@ -181,7 +181,7 @@ export function CyberThreatGlobe({
   className = "",
   height = 560,
   liveWsUrl = null,
-  enableSimulation = true,
+  enableSimulation = false,
   simIntervalMs = 700,
   maxFeed = 7,
   customCities,
@@ -447,21 +447,80 @@ export function CyberThreatGlobe({
     rotVelocityRef.current = { x: 0, y: 0 };
   };
 
-  // Threat Loop (runs initial burst + continuous rapid connection jumps)
+  // Sync live incidents from local PostgREST /rest/v1/incidents
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cancelled = false;
+    const seenEventIds = new Set<string>();
+
+    const pollLiveIncidents = async () => {
+      try {
+        const res = await fetch(`${window.location.origin}/rest/v1/incidents?select=*`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok || cancelled) return;
+        const rows = (await res.json()) as Array<Record<string, unknown>>;
+        if (!Array.isArray(rows) || rows.length === 0 || cancelled) return;
+
+        rows.slice(0, 30).forEach((r, idx) => {
+          const id = String(r.id || `inc-${idx}`);
+          if (seenEventIds.has(id)) return;
+          seenEventIds.add(id);
+
+          const originHubs = cities.filter((c) => c.isOrigin);
+          const dst = originHubs.length > 0 ? originHubs[idx % originHubs.length] : cities[0];
+          const srcPool = cities.filter((c) => !c.isOrigin);
+          const src = srcPool.length > 0 ? srcPool[idx % srcPool.length] : cities[1] || cities[0];
+
+          const sevRaw = String(r.severity || "med").toLowerCase();
+          const severity: "critical" | "high" | "med" | "low" =
+            sevRaw === "critical" ? "critical" : sevRaw === "high" ? "high" : sevRaw === "low" ? "low" : "med";
+
+          const title = String(r.title || "Inbound Telemetry Event");
+          const status = severity === "critical" ? "QUARANTINED" : severity === "high" ? "BLOCKED" : "INTERCEPTED";
+
+          const evt: ThreatEvent = {
+            id,
+            time: String(r.time || new Date().toLocaleTimeString([], { hour12: false })),
+            type: title,
+            severity,
+            src,
+            dst,
+            status,
+          };
+
+          totalCountRef.current++;
+          if (severity === "critical") criticalCountRef.current++;
+          if (severity === "high" || severity === "critical") highCountRef.current++;
+
+          addThreatArc(src, dst, severity);
+          if (!isFeedPaused) {
+            setActiveEvents((prev) => [evt, ...prev.slice(0, maxFeed - 1)]);
+          }
+          onEventIntercepted?.(evt);
+        });
+      } catch {
+        // network / db offline
+      }
+    };
+
+    void pollLiveIncidents();
+    const interval = window.setInterval(pollLiveIncidents, 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [cities, isFeedPaused, maxFeed, addThreatArc, onEventIntercepted]);
+
+  // Threat Loop (only runs when enableSimulation is explicitly true)
   useEffect(() => {
     if (!enableSimulation || !isPlaying || liveWsUrl) return;
-
-    // Immediate Call-of-Duty multi-connection burst on mount
-    const burstTimers = [60, 180, 320, 480].map((delay) =>
-      window.setTimeout(() => triggerAttackEvent(), delay),
-    );
 
     const interval = window.setInterval(() => {
       triggerAttackEvent();
     }, simIntervalMs / speedMultiplier);
 
     return () => {
-      burstTimers.forEach((t) => window.clearTimeout(t));
       window.clearInterval(interval);
     };
   }, [enableSimulation, isPlaying, liveWsUrl, simIntervalMs, speedMultiplier, triggerAttackEvent]);
@@ -1127,11 +1186,11 @@ export function CyberThreatGlobe({
           </div>
 
           <div className="mt-2.5 pt-2 border-t border-[#1F1F1F] flex items-center justify-between text-[9px] text-zinc-400">
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              REAL-TIME CONNECTIONS
+            <span className={`flex items-center gap-1.5 ${stats.activeArcs > 0 || stats.totalEvents > 0 ? "text-emerald-400" : "text-amber-400"}`}>
+              <span className={`size-1.5 rounded-full ${stats.activeArcs > 0 || stats.totalEvents > 0 ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+              {stats.activeArcs > 0 || stats.totalEvents > 0 ? "REAL-TIME CONNECTIONS" : "IDLE · AWAITING TELEMETRY"}
             </span>
-            <span>HOST ONLINE</span>
+            <span>{stats.totalEvents > 0 ? "HOST ONLINE" : "TELEMETRY INACTIVE"}</span>
           </div>
         </div>
       )}
