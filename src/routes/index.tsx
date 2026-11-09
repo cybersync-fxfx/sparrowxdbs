@@ -1625,6 +1625,66 @@ function Dashboard() {
         <>
           <SparrowxMasterLanding
             onOpenLogin={() => setShowAuthLogin(true)}
+            onUserAuthenticated={(user) => {
+              issueSignedSessionToken({
+                id: user.id,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.admin === "yes" ? "admin" : "client",
+                tenantId: user.tenantId,
+              });
+              setCurrentUser(user);
+              if (user.admin === "yes") {
+                setAuthSession({
+                  role: "admin",
+                  operatorName: user.fullName || "SparrowX Admin",
+                  operatorEmail: user.email,
+                });
+                setPortalMode("soc");
+                setActiveNav("Overview");
+                void recordAudit(
+                  `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
+                  "Admin & Subscriptions Portal",
+                  "Info",
+                );
+                emitEngineToast(
+                  `Admin session active (${user.email})`,
+                  "success",
+                  "Admin Authenticated",
+                );
+                emitEngineActivity("Auth", `Admin ${user.email} logged into SOC command`, "success");
+                showToast(`Admin session active (${user.email})`);
+              } else {
+                const matchedTenant =
+                  clientTenants.find(
+                    (t) =>
+                      t.id === user.tenantId ||
+                      t.contactEmail.toLowerCase() === user.email.toLowerCase(),
+                  ) ?? null;
+                if (matchedTenant) {
+                  setSelectedTenantId(matchedTenant.id);
+                }
+                setAuthSession({
+                  role: "client",
+                  tenantId: matchedTenant?.id ?? user.tenantId,
+                  userEmail: user.email,
+                });
+                setPortalMode("client");
+                setActiveNav("My Services");
+                void recordAudit(
+                  `Client user ${user.email} (admin=no) authenticated into Client Area`,
+                  matchedTenant?.name ?? user.email,
+                  "Info",
+                );
+                emitEngineToast(
+                  `Welcome back, ${user.fullName || user.email}`,
+                  "success",
+                  "Authenticated",
+                );
+                emitEngineActivity("Auth", `Client user ${user.email} session restored`, "success");
+                showToast(`Welcome back, ${user.fullName || user.email}`);
+              }
+            }}
             onDirectNav={(target) => {
               if (typeof window === "undefined") return;
               const url = new URL(window.location.href);
