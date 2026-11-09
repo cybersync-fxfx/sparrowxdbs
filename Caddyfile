@@ -6,7 +6,7 @@
 
 # 1. SparrowX Management & DB Studio
 studio.yourdomain.com {
-    reverse_proxy sparrowx-studio:80
+    reverse_proxy sparrowx-studio:3000
 }
 
 # 2. SparrowX DB REST API Gateway (PostgREST)

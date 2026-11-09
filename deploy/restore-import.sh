@@ -1,43 +1,74 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # SPARROWX ONE-CLICK RESTORE & AUTO-CONFIG IMPORTER
-# Auto-detects public VPS IP, writes Nginx/Caddy configs, and launches the stack
+# Auto-detects public VPS IP, resolves root directory, writes configs & starts stack
 # ==============================================================================
 
 set -euo pipefail
 
+# 0. Automatically resolve project root regardless of where the script is called from
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${PWD}/docker-compose.sparrowx.yml" ]; then
+    ROOT_DIR="${PWD}"
+elif [ -f "${SCRIPT_DIR}/../docker-compose.sparrowx.yml" ]; then
+    ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+elif [ -f "${SCRIPT_DIR}/docker-compose.sparrowx.yml" ]; then
+    ROOT_DIR="${SCRIPT_DIR}"
+else
+    ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+fi
+
+cd "${ROOT_DIR}"
+mkdir -p "${ROOT_DIR}/init-scripts" "${ROOT_DIR}/deploy"
+
 echo "=========================================================="
 echo "  SPARROWX DUAL-PLATFORM: AUTOMATED VPS RESTORE & SETUP"
 echo "=========================================================="
+echo "-> Working Directory: ${ROOT_DIR}"
 
 # 1. Automatic Public IP Detection
 echo "-> Detecting server network identity..."
-DETECTED_IP=$(curl -s4 --max-time 5 https://ifconfig.me 2>/dev/null || curl -s4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')
+DETECTED_IP=$(curl -s4 --max-time 5 https://ifconfig.me 2>/dev/null || curl -s4 --max-time 5 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")
 
 if [ -z "${DETECTED_IP}" ]; then
     DETECTED_IP="127.0.0.1"
 fi
 echo "   [✓] Auto-detected Server Public IP: ${DETECTED_IP}"
 
-# 2. Interactive Guided Configuration with Smart Defaults
+# 2. Interactive Guided Configuration with Smart Subdomain Detection
 echo ""
 echo "--- Step 1: Domain & Host Configuration ---"
-read -rp "Enter your primary domain (e.g. example.com) or press [ENTER] for direct IP [${DETECTED_IP}]: " USER_DOMAIN
+echo "You can enter your root domain (e.g. sparrowx.net) OR a specific domain/subdomain (e.g. db.sparrowx.net)."
+read -rp "Enter domain [Press ENTER for direct IP ${DETECTED_IP}]: " USER_DOMAIN
 USER_DOMAIN=${USER_DOMAIN:-$DETECTED_IP}
 
 if [ "${USER_DOMAIN}" = "${DETECTED_IP}" ]; then
-    STUDIO_DOMAIN="${DETECTED_IP}:8080"
-    API_DOMAIN="${DETECTED_IP}:3000"
+    STUDIO_DOMAIN="${DETECTED_IP}"
+    API_DOMAIN="${DETECTED_IP}"
     USE_SSL="n"
-    echo "   -> Operating in Direct IP mode (HTTP)."
+    echo "   -> Operating in Direct IP mode (HTTP port 80 / 3000)."
 else
-    STUDIO_DOMAIN="studio.${USER_DOMAIN}"
-    API_DOMAIN="api.${USER_DOMAIN}"
+    # Check if user typed a subdomain like db.sparrowx.net (has 2 or more dots)
+    DOT_COUNT=$(echo "${USER_DOMAIN}" | tr -cd '.' | wc -c)
+    if [ "${DOT_COUNT}" -ge 2 ]; then
+        # Already a specific domain/subdomain e.g. db.sparrowx.net
+        STUDIO_DOMAIN="${USER_DOMAIN}"
+        PARENT_DOMAIN=$(echo "${USER_DOMAIN}" | cut -d. -f2-)
+        DEFAULT_API="api.${PARENT_DOMAIN}"
+    else
+        STUDIO_DOMAIN="studio.${USER_DOMAIN}"
+        DEFAULT_API="api.${USER_DOMAIN}"
+    fi
+
+    echo "   -> SparrowX Studio URL will be: https://${STUDIO_DOMAIN}"
+    read -rp "Enter API domain [Press ENTER for https://${DEFAULT_API}]: " INPUT_API
+    API_DOMAIN=${INPUT_API:-$DEFAULT_API}
+
     read -rp "Enable automatic HTTPS / SSL via Let's Encrypt? (Y/n, default: Y): " SSL_INPUT
     SSL_INPUT=${SSL_INPUT:-Y}
     if [[ "$SSL_INPUT" =~ ^[Yy]$ ]]; then
         USE_SSL="y"
-        read -rp "Enter admin email for SSL cert expiry alerts: " SSL_EMAIL
+        read -rp "Enter admin email for SSL cert expiry alerts [Optional, press ENTER to skip]: " SSL_EMAIL
     else
         USE_SSL="n"
     fi
@@ -46,7 +77,7 @@ fi
 echo ""
 echo "--- Step 2: Database Master Credentials ---"
 DEFAULT_PW=$(openssl rand -base64 16 2>/dev/null || date +%s | sha256sum | base64 | head -c 20)
-read -rp "Enter master PostgreSQL password [Press ENTER to auto-generate]: " DB_PASSWORD
+read -rp "Enter master PostgreSQL password [Press ENTER for generated '${DEFAULT_PW}']: " DB_PASSWORD
 DB_PASSWORD=${DB_PASSWORD:-$DEFAULT_PW}
 
 DEFAULT_JWT=$(openssl rand -hex 32 2>/dev/null || date +%s | sha256sum | head -c 40)
@@ -65,9 +96,15 @@ else
     echo "   [✓] Docker is already installed."
 fi
 
-# 4. Generate Production .env File
-echo "-> Writing production environment secrets..."
-cat <<EOF > .env
+# Ensure docker compose plugin exists
+if ! docker compose version &> /dev/null && ! command -v docker-compose &> /dev/null; then
+    echo "   -> Installing Docker Compose plugin..."
+    apt-get update -y && apt-get install -y docker-compose-plugin || true
+fi
+
+# 4. Generate Production .env File in Root Directory
+echo "-> Writing production environment secrets to ${ROOT_DIR}/.env..."
+cat <<EOF > "${ROOT_DIR}/.env"
 POSTGRES_DB=sparrowbase
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=${DB_PASSWORD}
@@ -79,16 +116,22 @@ SERVER_IP=${DETECTED_IP}
 EOF
 echo "   [✓] .env generated."
 
-# 5. Automatically Generate Nginx / Caddy Ingress Configuration
+# 5. Automatically Generate Caddyfile Ingress Configuration
 echo "-> Generating edge proxy routing with auto-detected IP..."
 if [ "${USE_SSL}" = "y" ]; then
-    cat <<EOF > Caddyfile
+    if [ -n "${SSL_EMAIL:-}" ]; then
+        EMAIL_BLOCK="    email ${SSL_EMAIL}"
+    else
+        EMAIL_BLOCK=""
+    fi
+
+    cat <<EOF > "${ROOT_DIR}/Caddyfile"
 {
-    email ${SSL_EMAIL:-admin@${USER_DOMAIN}}
+${EMAIL_BLOCK}
 }
 
 ${STUDIO_DOMAIN} {
-    reverse_proxy sparrowx-studio:80
+    reverse_proxy sparrowx-studio:3000
 }
 
 ${API_DOMAIN} {
@@ -101,9 +144,9 @@ ${API_DOMAIN} {
 }
 EOF
 else
-    cat <<EOF > Caddyfile
+    cat <<EOF > "${ROOT_DIR}/Caddyfile"
 :80 {
-    reverse_proxy sparrowx-studio:80
+    reverse_proxy sparrowx-studio:3000
 }
 
 :3000 {
@@ -113,24 +156,32 @@ EOF
 fi
 echo "   [✓] Reverse proxy configuration applied for IP ${DETECTED_IP}."
 
-# 6. Spin up Docker Stack
+# 6. Boot Docker Stack
 echo "-> Booting SparrowX Dual Platform (Security + DBaaS)..."
+COMPOSE_FILE="${ROOT_DIR}/docker-compose.sparrowx.yml"
+
+if [ ! -f "${COMPOSE_FILE}" ]; then
+    echo "   [!] Error: ${COMPOSE_FILE} not found. Please ensure all repository files were extracted."
+    exit 1
+fi
+
 if docker compose version &> /dev/null; then
-    docker compose -f docker-compose.sparrowx.yml up -d
+    docker compose -f "${COMPOSE_FILE}" up -d
 else
-    docker-compose -f docker-compose.sparrowx.yml up -d
+    docker-compose -f "${COMPOSE_FILE}" up -d
 fi
 
 # 7. Restore Database Dump if present
-if [ -f "./data/postgres_dumpall.sql" ]; then
-    echo "-> Restoring previous database state..."
-    echo "   Waiting for PostgreSQL container to become ready..."
-    sleep 8
-    docker exec -i sparrowx_postgres psql -U postgres < "./data/postgres_dumpall.sql" 2>/dev/null || true
+if [ -f "${ROOT_DIR}/data/postgres_dumpall.sql" ]; then
+    echo "-> Restoring database dump..."
+    echo "   Waiting 10s for PostgreSQL container to complete startup..."
+    sleep 10
+    docker exec -i sparrowx_postgres psql -U postgres < "${ROOT_DIR}/data/postgres_dumpall.sql" 2>/dev/null || true
     echo "   [✓] Database restore completed."
 fi
 
 # 8. Success Report
+echo ""
 echo "=========================================================="
 echo "  [SUCCESS] SPARROWX IS NOW LIVE ON THIS SERVER!"
 echo "=========================================================="
@@ -139,16 +190,16 @@ if [ "${USER_DOMAIN}" != "${DETECTED_IP}" ]; then
     echo "  SparrowX Studio:   https://${STUDIO_DOMAIN}"
     echo "  SparrowX DB API:   https://${API_DOMAIN}"
     echo ""
-    echo "-> ACTION REQUIRED: Point your DNS records:"
-    echo "   Type: A    Name: studio    Value: ${DETECTED_IP}"
-    echo "   Type: A    Name: api       Value: ${DETECTED_IP}"
+    echo "-> ACTION REQUIRED: Point your DNS A-records to this IP:"
+    echo "   Type: A    Host/Name: $(echo "${STUDIO_DOMAIN}" | cut -d. -f1)    Value: ${DETECTED_IP}"
+    echo "   Type: A    Host/Name: $(echo "${API_DOMAIN}" | cut -d. -f1)       Value: ${DETECTED_IP}"
 else
-    echo "  SparrowX Studio:   http://${DETECTED_IP}"
+    echo "  SparrowX Studio:   http://${DETECTED_IP}:80"
     echo "  SparrowX DB API:   http://${DETECTED_IP}:3000"
 fi
 echo ""
-echo "  PgBouncer Pooled DB Port: 6543"
-echo "  Direct PostgreSQL Port:   5432"
-echo "  Master User:              postgres"
-echo "  Master Password:          ${DB_PASSWORD}"
+echo "  PgBouncer Pooled Port: 6543 (Use with @supabase/supabase-js, Prisma, Next.js)"
+echo "  Direct Postgres Port:  5432"
+echo "  Master User:           postgres"
+echo "  Master Password:       ${DB_PASSWORD}"
 echo "=========================================================="
