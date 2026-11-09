@@ -1445,9 +1445,7 @@ function Dashboard() {
       navLabel === "Billing & Credits" ||
       navLabel === "Profile Management"
     ) {
-      if (portalMode !== "soc") {
-        setPortalMode("client");
-      }
+      setPortalMode("client");
     } else if (
       navLabel === "Client Overview" ||
       navLabel === "Web & WAF Security" ||

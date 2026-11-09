@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Siren,
+  Sliders,
   Sparkles,
   Terminal,
   Trash2,
