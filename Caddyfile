@@ -1,22 +1,45 @@
-# Caddyfile for SparrowX Dual Platform (Security & SparrowX DB)
+# ==============================================================================
+# SPARROWX ENTERPRISE CADDY CONFIGURATION
+# 1. SparrowX Security Platform: sec.sparrowx.net
+# 2. SparrowX DB Platform:       db.sparrowx.net
+# 3. SparrowX DB API Gateway:    api.sparrowx.net
+# ==============================================================================
 
 {
-    email admin@yourdomain.com
+    email admin@sparrowx.net
 }
 
-# 1. SparrowX DB Landing Page & Management Studio
-db.sparrowx.net, studio.yourdomain.com {
-    reverse_proxy sparrowx-studio:3000
-}
-
-# 2. SparrowX DB REST API Gateway (PostgREST)
-api.sparrowx.net, api.yourdomain.com {
-    # Edge WAF headers
+# 1. SparrowX Security (SOC Dashboard, WAF, Threat Map, Client Area)
+sec.sparrowx.net {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
-        X-Frame-Options "DENY"
+        X-Frame-Options "SAMEORIGIN"
         X-XSS-Protection "1; mode=block"
+    }
+
+    reverse_proxy sparrowx-studio:3000
+}
+
+# 2. SparrowX DB (Database-as-a-Service, Landing Page & DB Studio)
+db.sparrowx.net {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+
+    reverse_proxy sparrowx-studio:3000
+}
+
+# 3. SparrowX DB REST API Gateway (PostgREST)
+api.sparrowx.net {
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Authorization, apikey, Content-Type, Prefer"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
     }
 
     reverse_proxy sparrowx-postgrest:3000

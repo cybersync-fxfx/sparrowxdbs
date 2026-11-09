@@ -1507,32 +1507,6 @@ function Dashboard() {
     setActiveNav(navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel);
   };
 
-  const isDedicatedStudioUrl =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("db.") ||
-      window.location.hostname.startsWith("studio.") ||
-      window.location.hostname.startsWith("supabase.") ||
-      new URLSearchParams(window.location.search).get("studio") === "1" ||
-      new URLSearchParams(window.location.search).get("studio") === "true");
-
-  if (isDedicatedStudioUrl) {
-    return (
-      <>
-        <SovereignDatabaseStudio
-          isStandaloneDomain={true}
-          onClose={() => {
-            if (typeof window !== "undefined") {
-              const u = new URL(window.location.href);
-              u.searchParams.delete("studio");
-              window.location.href = u.toString();
-            }
-          }}
-        />
-        <BackgroundEngineToaster />
-      </>
-    );
-  }
-
   if (authSession.role === "unauthenticated") {
     return (
       <>
@@ -1860,7 +1834,7 @@ function Dashboard() {
           category: "Service",
           badge: tenant.planTier,
           action: () => {
-            setActiveClientTenantId(tenant.id);
+            setSelectedTenantId(tenant.id);
             handleNavigate("Client Overview");
             setSearch("");
             setSearchOpen(false);

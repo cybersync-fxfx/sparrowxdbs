@@ -36,36 +36,76 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
-  console.error(error);
+  console.error("Root Error Boundary caught:", error);
   const router = useRouter();
   useEffect(() => {
     reportSparrowxError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  const errorMessage = error instanceof Error ? error.message : String(error || "Unknown error");
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <div className="max-w-lg w-full text-center space-y-4">
+        <div className="inline-flex size-12 items-center justify-center rounded-xl bg-destructive/10 border border-destructive/20 text-destructive mb-2">
+          <svg className="size-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          Platform Service Initializing
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+        <p className="text-sm text-muted-foreground">
+          The browser encountered an interrupted session state while rendering the dashboard.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+
+        {errorMessage && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left font-mono text-xs text-destructive overflow-x-auto max-h-32">
+            <code>{errorMessage}</code>
+          </div>
+        )}
+
+        <div className="pt-2 flex flex-wrap justify-center gap-2.5">
           <button
+            type="button"
+            onClick={() => {
+              try {
+                if (typeof window !== "undefined") {
+                  window.localStorage.clear();
+                  window.sessionStorage.clear();
+                  window.location.reload();
+                  return;
+                }
+              } catch {
+                // ignore
+              }
+              router.invalidate();
+              reset();
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90 shadow-sm"
+          >
+            Reset Session & Reload
+          </button>
+
+          <button
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Try again
+            Retry
           </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
+        </div>
+
+        <div className="pt-4 flex items-center justify-center gap-4 text-xs font-mono text-muted-foreground border-t border-border">
+          <a href="https://sec.sparrowx.net" className="hover:text-primary transition-colors">
+            sec.sparrowx.net (Security)
+          </a>
+          <span>·</span>
+          <a href="https://db.sparrowx.net" className="hover:text-primary transition-colors">
+            db.sparrowx.net (Database)
           </a>
         </div>
       </div>
