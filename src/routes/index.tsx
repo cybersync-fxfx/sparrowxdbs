@@ -1546,7 +1546,11 @@ function Dashboard() {
       window.location.hostname.startsWith("drop.") ||
       window.location.hostname.startsWith("share.") ||
       new URLSearchParams(window.location.search).get("file") === "1" ||
-      new URLSearchParams(window.location.search).get("drop") === "1");
+      new URLSearchParams(window.location.search).get("drop") === "1" ||
+      new URLSearchParams(window.location.search).has("drop") ||
+      window.location.hash.includes("key=") ||
+      window.location.pathname.startsWith("/drop") ||
+      window.location.pathname.startsWith("/f/"));
 
   const isPasswordDomainOrParam =
     typeof window !== "undefined" &&

@@ -27,6 +27,9 @@ import {
   FileVideo,
   FileAudio,
   Search,
+  ShieldCheck,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 
 interface StagedFile {
@@ -227,10 +230,43 @@ export function SparrowxDropEngine() {
   const [encrypting, setEncrypting] = useState<boolean>(false);
   const [secretKeyHex, setSecretKeyHex] = useState<string>("");
   const [ephemeralShareLink, setEphemeralShareLink] = useState<string>("");
+  const [directShareLink, setDirectShareLink] = useState<string>("");
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [copiedDirectLink, setCopiedDirectLink] = useState<boolean>(false);
   const [ttlSeconds, setTtlSeconds] = useState<number>(15 * 60);
   const [sessionActive, setSessionActive] = useState<boolean>(false);
   const [burnNotice, setBurnNotice] = useState<string | null>(null);
+
+  // Incoming Drop Receiver State (for visitors opening a drop link)
+  const [incomingDrop, setIncomingDrop] = useState<{
+    dropId: string | null;
+    keyHex: string | null;
+    filename: string;
+  } | null>(null);
+  const [decrypting, setDecrypting] = useState<boolean>(false);
+  const [decryptError, setDecryptError] = useState<string | null>(null);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+
+  // Check URL on mount for incoming drop parameters
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashStr = window.location.hash.replace(/^#/, "");
+    const hashParams = new URLSearchParams(hashStr);
+
+    const dropId = searchParams.get("drop") || hashParams.get("drop");
+    const keyHex = hashParams.get("key") || searchParams.get("key");
+    const rawName = searchParams.get("name") || hashParams.get("name");
+
+    if (dropId || keyHex) {
+      setIncomingDrop({
+        dropId: dropId || null,
+        keyHex: keyHex || null,
+        filename: rawName ? decodeURIComponent(rawName) : "encrypted-drop.bin",
+      });
+      setActiveMode("ephemeral");
+    }
+  }, []);
 
   const fileBufferRef = useRef<ArrayBuffer | null>(null);
   const ephemeralInputRef = useRef<HTMLInputElement | null>(null);
@@ -263,25 +299,70 @@ export function SparrowxDropEngine() {
         buffer
       );
 
-      fileBufferRef.current = encrypted;
+      // Combine IV (12 bytes) + Encrypted ciphertext
+      const combined = new Uint8Array(iv.length + encrypted.byteLength);
+      combined.set(iv, 0);
+      combined.set(new Uint8Array(encrypted), iv.length);
+
+      // Base64 encode for RAM storage & relay
+      let binary = "";
+      const len = combined.byteLength;
+      for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(combined[i]);
+      }
+      const base64Ciphertext = btoa(binary);
+
+      const dropId = `spx_drop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+
+      // Post encrypted ciphertext into server RAM (Zero bytes to disk)
+      try {
+        await fetch(`/api/drop/payload/${dropId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: dropId,
+            ciphertext: base64Ciphertext,
+            filename: rawFile.name,
+            type: rawFile.type,
+            size: rawFile.size,
+          }),
+        });
+      } catch (err) {
+        console.warn("[Drop Relay Warning]", err);
+      }
+
+      // Also cache in sessionStorage so same-browser / local tab always succeeds
+      try {
+        sessionStorage.setItem(`spx_drop_${dropId}`, JSON.stringify({
+          ciphertext: base64Ciphertext,
+          filename: rawFile.name,
+          type: rawFile.type,
+          size: rawFile.size,
+        }));
+      } catch {}
+
+      fileBufferRef.current = combined.buffer;
       const staged: StagedFile = {
         name: rawFile.name,
         size: rawFile.size,
         type: rawFile.type || "application/octet-stream",
-        encryptedBytesLength: encrypted.byteLength,
+        encryptedBytesLength: combined.byteLength,
         hash: keyHex.slice(0, 16),
       };
 
       setEphemeralFile(staged);
       setSecretKeyHex(keyHex);
 
-      const isFileDomain = typeof window !== "undefined" && window.location.hostname.includes("file.");
       const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
-      const link = isFileDomain
-        ? `${origin}/#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`
-        : `${origin}/drop#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
+      const isFileDomain = typeof window !== "undefined" && window.location.hostname.includes("file.");
 
-      setEphemeralShareLink(link);
+      // Canonical link on file.sparrowx.net
+      const canonicalLink = `https://file.sparrowx.net/?drop=${dropId}#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
+      // Direct origin link (guaranteed to work immediately on current domain)
+      const currentHostLink = `${origin}/?drop=${dropId}#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
+
+      setEphemeralShareLink(isFileDomain ? canonicalLink : currentHostLink);
+      setDirectShareLink(currentHostLink);
       setSessionActive(true);
       setTtlSeconds(15 * 60);
     } catch (err) {
@@ -289,6 +370,104 @@ export function SparrowxDropEngine() {
       alert("Failed to encrypt file in browser memory: " + String(err));
     } finally {
       setEncrypting(false);
+    }
+  };
+
+  // Receiver decryption & download handler
+  const handleDecryptAndDownloadIncoming = async () => {
+    if (!incomingDrop?.keyHex) {
+      setDecryptError("Decryption key missing from URL hash. Make sure you copy the entire link with #key=...");
+      return;
+    }
+
+    setDecrypting(true);
+    setDecryptError(null);
+
+    try {
+      let base64Ciphertext = "";
+
+      // 1. Fetch from server RAM endpoint
+      if (incomingDrop.dropId) {
+        try {
+          const res = await fetch(`/api/drop/payload/${incomingDrop.dropId}`);
+          if (res.ok) {
+            const data = await res.json();
+            base64Ciphertext = data.ciphertext;
+          }
+        } catch (e) {
+          console.warn("Relay fetch error", e);
+        }
+      }
+
+      // 2. Fallback to local sessionStorage if on same browser
+      if (!base64Ciphertext && incomingDrop.dropId) {
+        try {
+          const cached = sessionStorage.getItem(`spx_drop_${incomingDrop.dropId}`);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            base64Ciphertext = parsed.ciphertext;
+          }
+        } catch {}
+      }
+
+      if (!base64Ciphertext) {
+        throw new Error(
+          "Encrypted drop not found in RAM or the 15-minute TTL has expired. Please request a new drop from the sender."
+        );
+      }
+
+      // Convert base64 to Uint8Array
+      const binary = atob(base64Ciphertext);
+      const combined = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        combined[i] = binary.charCodeAt(i);
+      }
+
+      if (combined.byteLength < 13) {
+        throw new Error("Ciphertext too small or invalid IV");
+      }
+
+      // First 12 bytes is IV, remainder is ciphertext
+      const iv = combined.slice(0, 12);
+      const ciphertext = combined.slice(12);
+
+      // Import key
+      const keyHex = incomingDrop.keyHex.trim();
+      const keyBytes = new Uint8Array(
+        keyHex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16))
+      );
+
+      const cryptoKey = await window.crypto.subtle.importKey(
+        "raw",
+        keyBytes,
+        { name: "AES-GCM" },
+        false,
+        ["decrypt"]
+      );
+
+      const decrypted = await window.crypto.subtle.decrypt(
+        { name: "AES-GCM", iv },
+        cryptoKey,
+        ciphertext
+      );
+
+      // Trigger file download
+      const blob = new Blob([decrypted], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = incomingDrop.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setDownloadSuccess(true);
+    } catch (err: any) {
+      console.error("Decryption failed", err);
+      setDecryptError(err.message || "Failed to decrypt file. Key mismatch or corrupted bytes.");
+    } finally {
+      setDecrypting(false);
     }
   };
 
@@ -438,6 +617,81 @@ export function SparrowxDropEngine() {
 
       {/* Main Workspace */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10 space-y-8">
+        {/* ================================================================= */}
+        {/* INCOMING ENCRYPTED EPHEMERAL DROP RECEIVER CARD */}
+        {/* ================================================================= */}
+        {incomingDrop && (
+          <div className="rounded-2xl border-2 border-emerald-500/40 bg-[#0B0F17] p-6 sm:p-8 shadow-2xl space-y-6 text-center max-w-2xl mx-auto">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono text-emerald-400">
+              <ShieldCheck className="size-4" />
+              <span>Incoming Zero-Disk Encrypted Drop</span>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-2xl font-bold text-white tracking-tight">
+                Encrypted File Ready for Decryption
+              </h2>
+              <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed">
+                This file was encrypted in sender browser RAM with AES-GCM 256-bit. The decryption key was passed strictly via the client URL hash and will decrypt in your local memory.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl bg-[#05070B] border border-zinc-800 flex items-center justify-between text-left font-mono">
+              <div className="flex items-center gap-3 truncate mr-2">
+                <div className="size-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
+                  <FileText className="size-5" />
+                </div>
+                <div className="truncate">
+                  <div className="text-sm font-bold text-white truncate">
+                    {incomingDrop.filename}
+                  </div>
+                  <div className="text-[11px] text-zinc-500">
+                    Key Fingerprint: {incomingDrop.keyHex ? `${incomingDrop.keyHex.slice(0, 16)}...` : "None"}
+                  </div>
+                </div>
+              </div>
+
+              <span className="shrink-0 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold">
+                AES-GCM-256
+              </span>
+            </div>
+
+            {decryptError && (
+              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono text-left flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{decryptError}</span>
+              </div>
+            )}
+
+            {downloadSuccess && (
+              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono text-left flex items-center gap-2">
+                <CheckCircle2 className="size-4 shrink-0" />
+                <span>File decrypted in RAM and saved to your downloads folder!</span>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleDecryptAndDownloadIncoming}
+                disabled={decrypting}
+                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {decrypting ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
+                <span>{decrypting ? "Decrypting in RAM..." : `Decrypt & Download "${incomingDrop.filename}"`}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIncomingDrop(null)}
+                className="w-full sm:w-auto px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Upload Your Own Files
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ================================================================= */}
         {/* MODE 1: PERSISTENT CLOUD STORAGE (MediaFire Style) */}
         {/* ================================================================= */}
@@ -786,38 +1040,84 @@ export function SparrowxDropEngine() {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                    <span>One-Time Ephemeral Link</span>
-                    <span className="text-[11px] font-mono text-zinc-500">Encryption key stored in URL hash only</span>
-                  </label>
+                <div className="space-y-4">
+                  {/* Canonical Link */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-2 rounded-full bg-emerald-400" />
+                        Canonical Domain Link (file.sparrowx.net)
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-500">AES-256 key in #hash</span>
+                    </label>
 
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-[#3ECF8E] truncate">
-                      {ephemeralShareLink}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-[#3ECF8E] truncate">
+                        {ephemeralShareLink}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(ephemeralShareLink);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 2000);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#3ECF8E] text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0"
+                      >
+                        {copiedLink ? (
+                          <>
+                            <Check className="size-3.5" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-3.5" />
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(ephemeralShareLink);
-                        setCopiedLink(true);
-                        setTimeout(() => setCopiedLink(false), 2000);
-                      }}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-[#3ECF8E] text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer"
-                    >
-                      {copiedLink ? (
-                        <>
-                          <Check className="size-3.5" />
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="size-3.5" />
-                          <span>Copy Link</span>
-                        </>
-                      )}
-                    </button>
                   </div>
+
+                  {/* Direct Gateway Link */}
+                  {directShareLink && directShareLink !== ephemeralShareLink && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-cyan-400">
+                          <span className="size-2 rounded-full bg-cyan-400" />
+                          Direct Gateway Link (Works immediately on active host)
+                        </span>
+                        <span className="text-[10px] font-mono text-zinc-500">Zero-configuration fallback</span>
+                      </label>
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-cyan-300 truncate">
+                          {directShareLink}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(directShareLink);
+                            setCopiedDirectLink(true);
+                            setTimeout(() => setCopiedDirectLink(false), 2000);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0"
+                        >
+                          {copiedDirectLink ? (
+                            <>
+                              <Check className="size-3.5" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3.5" />
+                              <span>Copy Link</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between border-t border-[#1E293B] pt-4">

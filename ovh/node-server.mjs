@@ -36,6 +36,24 @@ async function saveStoredFiles(files) {
   await writeFile(STORAGE_INDEX_FILE, JSON.stringify(files, null, 2));
 }
 
+// In-Memory Ephemeral Drop Store (15-min RAM Burn, Zero Disk)
+const ephemeralDropStore = new Map();
+
+function storeEphemeralDrop(id, payload) {
+  const existing = ephemeralDropStore.get(id);
+  if (existing && existing.timer) clearTimeout(existing.timer);
+
+  const timer = setTimeout(() => {
+    ephemeralDropStore.delete(id);
+  }, 15 * 60 * 1000);
+
+  ephemeralDropStore.set(id, {
+    ...payload,
+    expiresAt: Date.now() + 15 * 60 * 1000,
+    timer,
+  });
+}
+
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
@@ -169,6 +187,99 @@ const server = createServer(async (req, res) => {
           // Not a static file on disk, continue to router / API handler
         }
       }
+    }
+
+    // =========================================================================
+    // EPHEMERAL ZERO-DISK DROP RELAY (15-MINUTE RAM CACHE)
+    // =========================================================================
+    // 1. Post encrypted payload into RAM: POST /api/drop/payload/:id or POST /api/drop/payload
+    const dropUploadMatch = pathname.match(/^\/api\/drop\/payload(?:\/([a-zA-Z0-9_-]+))?$/);
+    if (dropUploadMatch && req.method === "POST") {
+      const chunks = [];
+      let totalBytes = 0;
+      for await (const chunk of req) {
+        const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+        totalBytes += buf.byteLength;
+        if (totalBytes > 100 * 1024 * 1024) {
+          res.writeHead(413, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+          res.end(JSON.stringify({ error: "Payload exceeds 100MB RAM limit" }));
+          return;
+        }
+        chunks.push(buf);
+      }
+      const rawBody = Buffer.concat(chunks);
+      try {
+        const parsed = JSON.parse(rawBody.toString("utf-8"));
+        const dropId = dropUploadMatch[1] || parsed.id || `spx_drop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        if (parsed.ciphertext) {
+          storeEphemeralDrop(dropId, {
+            id: dropId,
+            ciphertext: parsed.ciphertext,
+            filename: parsed.filename || "file",
+            type: parsed.type || "application/octet-stream",
+            size: parsed.size || 0,
+          });
+
+          res.writeHead(201, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            ...SECURITY_HEADERS,
+          });
+          res.end(JSON.stringify({ success: true, dropId, expiresAt: Date.now() + 15 * 60 * 1000 }));
+          return;
+        }
+      } catch {
+        // Ignored
+      }
+      res.writeHead(400, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: "Invalid drop payload format" }));
+      return;
+    }
+
+    // 2. Fetch encrypted payload from RAM: GET /api/drop/payload/:id
+    const dropGetMatch = pathname.match(/^\/api\/drop\/payload\/([a-zA-Z0-9_-]+)$/);
+    if (dropGetMatch && (req.method === "GET" || req.method === "HEAD")) {
+      const dropId = dropGetMatch[1];
+      const drop = ephemeralDropStore.get(dropId);
+      if (drop) {
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          ...SECURITY_HEADERS,
+        });
+        res.end(
+          req.method === "HEAD"
+            ? undefined
+            : JSON.stringify({
+                id: drop.id,
+                ciphertext: drop.ciphertext,
+                filename: drop.filename,
+                type: drop.type,
+                size: drop.size,
+                expiresAt: drop.expiresAt,
+              })
+        );
+        return;
+      }
+      res.writeHead(404, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: "Drop expired or not found in RAM" }));
+      return;
+    }
+
+    // 3. Purge drop from RAM immediately: DELETE /api/drop/payload/:id
+    const dropDeleteMatch = pathname.match(/^\/api\/drop\/payload\/([a-zA-Z0-9_-]+)$/);
+    if (dropDeleteMatch && req.method === "DELETE") {
+      const dropId = dropDeleteMatch[1];
+      const drop = ephemeralDropStore.get(dropId);
+      if (drop && drop.timer) clearTimeout(drop.timer);
+      ephemeralDropStore.delete(dropId);
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        ...SECURITY_HEADERS,
+      });
+      res.end(JSON.stringify({ success: true, purgedId: dropId }));
+      return;
     }
 
     // =========================================================================
