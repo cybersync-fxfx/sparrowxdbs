@@ -10,7 +10,19 @@
 }
 
 # ------------------------------------------------------------------------------
-# 1. Primary Canonical HTTPS Endpoint: db.sparrowx.net
+# 1. SparrowX Master Company Portal: sparrowx.net & www.sparrowx.net
+# ------------------------------------------------------------------------------
+https://sparrowx.net, https://www.sparrowx.net {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+    reverse_proxy sparrowx-studio:3000
+}
+
+# ------------------------------------------------------------------------------
+# 2. Primary Canonical Database Endpoint: db.sparrowx.net
 # ------------------------------------------------------------------------------
 https://db.sparrowx.net {
     header {
