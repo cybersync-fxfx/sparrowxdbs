@@ -166,11 +166,9 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
 fi
 
 if docker compose version &> /dev/null; then
-    docker compose -f "${COMPOSE_FILE}" pull || true
-    docker compose -f "${COMPOSE_FILE}" up -d --build
+    docker compose -f "${COMPOSE_FILE}" up -d --build --remove-orphans
 else
-    docker-compose -f "${COMPOSE_FILE}" pull || true
-    docker-compose -f "${COMPOSE_FILE}" up -d --build
+    docker-compose -f "${COMPOSE_FILE}" up -d --build --remove-orphans
 fi
 
 # 7. Restore Database Dump if present

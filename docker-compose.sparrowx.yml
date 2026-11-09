@@ -2,7 +2,7 @@
 # SPARROWX ENTERPRISE INFRASTRUCTURE: DUAL-ENGINE ARCHITECTURE
 # 1. SparrowX Security (Edge WAF, DDoS Mitigation, AI Guardrails)
 # 2. SparrowX DB (Sovereign DBaaS: Postgres 16 + pgvector + PgBouncer + PostgREST)
-# Sized for 64GB RAM / 8 Cores / 2TB NVMe VPS
+# Dynamically adapts to any VPS hardware (1 to 64+ cores, 2GB to 128GB+ RAM)
 # ==============================================================================
 
 networks:
@@ -45,11 +45,6 @@ services:
     networks:
       - sparrowx_edge
       - sparrowx_internal
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 4096M
 
   sparrowx-threat-cache:
     image: redis:7-alpine
@@ -60,11 +55,6 @@ services:
       - sparrowx_redis_data:/data
     networks:
       - sparrowx_internal
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 2048M
 
   # ----------------------------------------------------------------------------
   # PILLAR 2: SPARROWX DB (Sovereign Database-as-a-Service Engine)
@@ -78,33 +68,11 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}
       PGDATA: /var/lib/postgresql/data/pgdata
-    command: >
-      postgres 
-      -c shared_buffers=16GB
-      -c effective_cache_size=40GB
-      -c maintenance_work_mem=2GB
-      -c checkpoint_completion_target=0.9
-      -c wal_buffers=64MB
-      -c default_statistics_target=100
-      -c random_page_cost=1.1
-      -c effective_io_concurrency=200
-      -c work_mem=64MB
-      -c min_wal_size=2GB
-      -c max_wal_size=16GB
-      -c max_worker_processes=8
-      -c max_parallel_workers_per_gather=4
-      -c max_parallel_workers=8
-      -c max_connections=400
     volumes:
       - sparrowx_pgdata:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d:ro
     networks:
       - sparrowx_internal
-    deploy:
-      resources:
-        limits:
-          cpus: '5.0'
-          memory: 40960M
 
   sparrowx-pgbouncer:
     image: edoburu/pgbouncer:latest
@@ -128,11 +96,6 @@ services:
       - sparrowx_internal
     depends_on:
       - sparrowx-postgres
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 2048M
 
   # PostgREST: Generates Instant REST API from Postgres Schemas
   sparrowx-postgrest:
@@ -149,11 +112,6 @@ services:
       - sparrowx_internal
     depends_on:
       - sparrowx-pgbouncer
-    deploy:
-      resources:
-        limits:
-          cpus: '1.5'
-          memory: 3072M
 
   # SparrowX Dashboard & Studio Frontend
   sparrowx-studio:
@@ -167,8 +125,3 @@ services:
       - VITE_SPARROWX_WS_URL=wss://${DOMAIN_API:-api.sparrowx.net}/realtime
     networks:
       - sparrowx_internal
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 2048M
