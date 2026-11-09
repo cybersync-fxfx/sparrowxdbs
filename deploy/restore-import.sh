@@ -36,6 +36,19 @@ fi
 echo "   [✓] Auto-detected Server Public IP: ${DETECTED_IP}"
 
 # 2. Interactive Guided Configuration with Smart Subdomain Detection
+SKIP_PROMPTS=false
+if [ -f "${ROOT_DIR}/.env" ]; then
+    echo ""
+    echo "   [i] Existing configuration found in ${ROOT_DIR}/.env."
+    read -rp "Keep existing configuration and boot stack immediately? (Y/n, default: Y): " KEEP_CONF
+    KEEP_CONF=${KEEP_CONF:-Y}
+    if [[ "$KEEP_CONF" =~ ^[Yy]$ ]]; then
+        echo "   -> Keeping existing configuration. Booting stack..."
+        SKIP_PROMPTS=true
+    fi
+fi
+
+if [ "$SKIP_PROMPTS" = "false" ]; then
 echo ""
 echo "--- Step 1: Domain & Host Configuration ---"
 echo "You can enter your root domain (e.g. sparrowx.net) OR a specific domain/subdomain (e.g. db.sparrowx.net)."
@@ -155,6 +168,7 @@ else
 EOF
 fi
 echo "   [✓] Reverse proxy configuration applied for IP ${DETECTED_IP}."
+fi
 
 # 6. Boot Docker Stack
 echo "-> Booting SparrowX Dual Platform (Security + DBaaS)..."

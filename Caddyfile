@@ -7,30 +7,30 @@
 
 {
     email admin@sparrowx.net
-    auto_https disable_redirects
 }
 
-http://sec.sparrowx.net, https://sec.sparrowx.net {
+# 1. SparrowX Security (SOC Dashboard, WAF, Threat Map, Client Area)
+sec.sparrowx.net {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "SAMEORIGIN"
     }
-
     reverse_proxy sparrowx-studio:3000
 }
 
-http://db.sparrowx.net, https://db.sparrowx.net {
+# 2. SparrowX DB (Database-as-a-Service, Landing Page & DB Studio)
+db.sparrowx.net {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "SAMEORIGIN"
     }
-
     reverse_proxy sparrowx-studio:3000
 }
 
-http://api.sparrowx.net, https://api.sparrowx.net {
+# 3. SparrowX DB REST API Gateway (PostgREST)
+api.sparrowx.net {
     header {
         Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
@@ -38,11 +38,16 @@ http://api.sparrowx.net, https://api.sparrowx.net {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
     }
-
     reverse_proxy sparrowx-postgrest:3000
 }
 
-# Catch-all IP address fallback so visiting http://139.99.131.135 also works instantly
+# 4. HTTP Port 80 Catch-All (Immediate zero-downtime routing for IP and domains)
 :80 {
-    reverse_proxy sparrowx-studio:3000
+    @api host api.sparrowx.net
+    handle @api {
+        reverse_proxy sparrowx-postgrest:3000
+    }
+    handle {
+        reverse_proxy sparrowx-studio:3000
+    }
 }

@@ -117,10 +117,8 @@ echo "[5/6] Rebuilding and Launching Container Fleet..."
 COMPOSE_FILE="${ROOT_DIR}/docker-compose.sparrowx.yml"
 
 if docker compose version &> /dev/null; then
-    docker compose -f "${COMPOSE_FILE}" down --remove-orphans || true
     docker compose -f "${COMPOSE_FILE}" up -d --build --remove-orphans
 else
-    docker-compose -f "${COMPOSE_FILE}" down --remove-orphans || true
     docker-compose -f "${COMPOSE_FILE}" up -d --build --remove-orphans
 fi
 
