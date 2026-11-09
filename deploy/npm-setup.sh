@@ -2,6 +2,7 @@
 # ==============================================================================
 # SPARROWX SETUP FOR NGINX PROXY MANAGER (NPM)
 # Clears old network/port conflicts and boots SparrowX behind NPM
+# Primary Canonical Domain: https://db.sparrowx.net
 # ==============================================================================
 
 set -euo pipefail
@@ -19,6 +20,7 @@ cd "${ROOT_DIR}"
 
 echo "=========================================================="
 echo "  SPARROWX + NGINX PROXY MANAGER (NPM) INTEGRATION"
+echo "  Primary Canonical Domain: https://db.sparrowx.net"
 echo "=========================================================="
 
 # 1. Stop conflicting old containers (Caddy, old app containers)
@@ -38,9 +40,10 @@ done
 echo "-> Reconciling Docker network drivers..."
 docker network rm sparrowx_edge_net sparrowx_internal_net 2>/dev/null || true
 
-# 4. Launch SparrowX Fleet behind NPM (rebuilds studio container with port 80 API routing)
-echo "-> Building and starting SparrowX services for Nginx Proxy Manager..."
-docker compose -f docker-compose.sparrowx.yml up -d --build --remove-orphans
+# 4. Rebuild and launch SparrowX fleet with baked canonical environment
+echo "-> Building and starting SparrowX studio and database fleet..."
+docker compose -f docker-compose.sparrowx.yml build --no-cache sparrowx-studio
+docker compose -f docker-compose.sparrowx.yml up -d --remove-orphans
 
 # 5. Enable Database Extensions
 echo "-> Verifying PostgreSQL & pgvector..."
@@ -59,22 +62,13 @@ curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://127.0.0.1:3001 || e
 
 echo ""
 echo "=========================================================="
-echo "  [SUCCESS] SPARROWX RUNNING ON PORT 80 (MULTI-VPS READY)!"
+echo "  [SUCCESS] SPARROWX RUNNING ON PORT 80 (CANONICAL: db.sparrowx.net)"
 echo "=========================================================="
 echo ""
-echo "In your Nginx Proxy Manager dashboard (on your NPM VPS):"
-echo "All 3 domains can now point to the standard port 80 on your SparrowX VPS:"
+echo "IMPORTANT: In Nginx Proxy Manager, configure db.sparrowx.net and sec.sparrowx.net"
+echo "as TWO SEPARATE PROXY HOSTS (do NOT combine them into one host, or Nginx will redirect):"
 echo ""
-echo "--- PROXY HOST 1 (Security Platform) ---"
-echo "  Domain Names:       sec.sparrowx.net"
-echo "  Scheme:             http"
-echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
-echo "  Forward Port:       80"
-echo "  Websockets Support: ENABLED (checked)"
-echo "  Block Common Expl.: ENABLED (checked)"
-echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
-echo ""
-echo "--- PROXY HOST 2 (Database Platform) ---"
+echo "--- PROXY HOST 1 (PRIMARY CANONICAL DATABASE PLATFORM) ---"
 echo "  Domain Names:       db.sparrowx.net"
 echo "  Scheme:             http"
 echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
@@ -83,10 +77,19 @@ echo "  Websockets Support: ENABLED (checked)"
 echo "  Block Common Expl.: ENABLED (checked)"
 echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
 echo ""
-echo "--- PROXY HOST 3 (REST API Gateway) ---"
+echo "--- PROXY HOST 2 (SECURITY PLATFORM) ---"
+echo "  Domain Names:       sec.sparrowx.net"
+echo "  Scheme:             http"
+echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
+echo "  Forward Port:       80"
+echo "  Websockets Support: ENABLED (checked)"
+echo "  Block Common Expl.: ENABLED (checked)"
+echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
+echo ""
+echo "--- PROXY HOST 3 (REST API GATEWAY) ---"
 echo "  Domain Names:       api.sparrowx.net"
 echo "  Scheme:             http"
 echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
-echo "  Forward Port:       80  <-- Works seamlessly on Port 80!"
+echo "  Forward Port:       80"
 echo "  SSL:                Let's Encrypt (Force SSL)"
 echo "=========================================================="

@@ -141,6 +141,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       {
+        rel: "canonical",
+        href: "https://db.sparrowx.net",
+      },
+      {
         rel: "stylesheet",
         href: appCss,
       },
@@ -174,7 +178,7 @@ function RootShell({ children }: { children: ReactNode }) {
           src="/sparrowx-shield.js"
           data-site-id="TNT-3800"
           data-api-key="spx_tenant••••••••850c"
-          data-endpoint="https://sec.sparrowx.net"
+          data-endpoint="https://db.sparrowx.net"
           data-auto-block="true"
           data-anti-bot="active"
           async

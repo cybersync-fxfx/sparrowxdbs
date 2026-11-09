@@ -10,11 +10,20 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-# Build with VITE_SOVEREIGN_SELF_HOSTED="true" so OVH Docker uses same-origin (/rest/v1/*)
+# Canonical Domain & Primary Environment Configuration
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 ENV VITE_SOVEREIGN_SELF_HOSTED="true"
-ENV VITE_SUPABASE_URL=""
+ENV VITE_APP_URL="https://db.sparrowx.net"
+ENV SITE_URL="https://db.sparrowx.net"
+ENV PUBLIC_URL="https://db.sparrowx.net"
+ENV VITE_SITE_URL="https://db.sparrowx.net"
+ENV VITE_API_URL="https://api.sparrowx.net"
+ENV VITE_SPARROWX_API_URL="https://api.sparrowx.net"
+ENV VITE_SPARROWX_WS_URL="wss://api.sparrowx.net/realtime"
+ENV VITE_SUPABASE_URL="https://api.sparrowx.net"
 ENV VITE_SUPABASE_ANON_KEY="spx_ovh_sovereign_key"
+ENV ADDITIONAL_REDIRECT_URLS="https://db.sparrowx.net/**,https://sec.sparrowx.net/**,https://api.sparrowx.net/**"
+ENV GOTRUE_SITE_URL="https://db.sparrowx.net"
 
 RUN npm run build
 
@@ -28,6 +37,13 @@ WORKDIR /app
 ENV NODE_ENV="production"
 ENV PORT="3000"
 ENV HOST="0.0.0.0"
+ENV VITE_APP_URL="https://db.sparrowx.net"
+ENV SITE_URL="https://db.sparrowx.net"
+ENV PUBLIC_URL="https://db.sparrowx.net"
+ENV VITE_SITE_URL="https://db.sparrowx.net"
+ENV VITE_API_URL="https://api.sparrowx.net"
+ENV VITE_SPARROWX_API_URL="https://api.sparrowx.net"
+ENV VITE_SPARROWX_WS_URL="wss://api.sparrowx.net/realtime"
 ENV SPARROWX_DATA_DIR="/app/data"
 
 RUN mkdir -p /app/data /app/src/lib

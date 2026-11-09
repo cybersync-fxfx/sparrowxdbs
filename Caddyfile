@@ -1,8 +1,8 @@
 # ==============================================================================
 # SPARROWX ENTERPRISE CADDY CONFIGURATION
-# 1. SparrowX Security Platform: sec.sparrowx.net
-# 2. SparrowX DB Platform:       db.sparrowx.net
-# 3. SparrowX DB API Gateway:    api.sparrowx.net
+# 1. SparrowX DB Platform (Primary Canonical): db.sparrowx.net
+# 2. SparrowX Security Platform:               sec.sparrowx.net
+# 3. SparrowX DB API Gateway:                  api.sparrowx.net
 # ==============================================================================
 
 {
@@ -10,7 +10,19 @@
 }
 
 # ------------------------------------------------------------------------------
-# 1. HTTPS Endpoints (ZeroSSL / Let's Encrypt)
+# 1. Primary Canonical HTTPS Endpoint: db.sparrowx.net
+# ------------------------------------------------------------------------------
+https://db.sparrowx.net {
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+    }
+    reverse_proxy sparrowx-studio:3000
+}
+
+# ------------------------------------------------------------------------------
+# 2. Security Platform: sec.sparrowx.net
 # ------------------------------------------------------------------------------
 https://sec.sparrowx.net {
     header {
@@ -21,15 +33,9 @@ https://sec.sparrowx.net {
     reverse_proxy sparrowx-studio:3000
 }
 
-https://db.sparrowx.net {
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-        X-Content-Type-Options "nosniff"
-        X-Frame-Options "SAMEORIGIN"
-    }
-    reverse_proxy sparrowx-studio:3000
-}
-
+# ------------------------------------------------------------------------------
+# 3. REST API Gateway: api.sparrowx.net
+# ------------------------------------------------------------------------------
 https://api.sparrowx.net {
     header {
         Access-Control-Allow-Origin "*"
@@ -42,10 +48,9 @@ https://api.sparrowx.net {
 }
 
 # ------------------------------------------------------------------------------
-# 2. HTTP Port 80 Ingress (Preserves ACME challenges for Caddy, serves HTTP 200)
+# 4. HTTP Port 80 Ingress (Dual-protocol & ACME Challenges)
 # ------------------------------------------------------------------------------
-http://sec.sparrowx.net, http://db.sparrowx.net, http://api.sparrowx.net, :80 {
-    # Exclude ACME challenge path so Caddy internal solver handles it with 200 OK
+http://db.sparrowx.net, http://sec.sparrowx.net, http://api.sparrowx.net, :80 {
     @not_acme not path /.well-known/acme-challenge/*
 
     handle @not_acme {

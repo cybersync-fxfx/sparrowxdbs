@@ -101,7 +101,7 @@ services:
       - sparrowx_net
 
   # ----------------------------------------------------------------------------
-  # 5. SparrowX Web App & API Gateway (Port 80 & 3000 -> sec, db, and api.sparrowx.net)
+  # 5. SparrowX Web App & API Gateway (Port 80 & 3000 -> db, sec, and api.sparrowx.net)
   # ----------------------------------------------------------------------------
   sparrowx-studio:
     build:
@@ -116,11 +116,23 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
+      - VITE_APP_URL=${VITE_APP_URL:-https://db.sparrowx.net}
+      - SITE_URL=${SITE_URL:-https://db.sparrowx.net}
+      - PUBLIC_URL=${PUBLIC_URL:-https://db.sparrowx.net}
+      - APP_URL=${APP_URL:-https://db.sparrowx.net}
+      - VITE_SITE_URL=${VITE_SITE_URL:-https://db.sparrowx.net}
+      - VITE_API_URL=${VITE_API_URL:-https://api.sparrowx.net}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-https://api.sparrowx.net}
+      - VITE_SPARROWX_API_URL=https://${DOMAIN_API:-api.sparrowx.net}
+      - VITE_SPARROWX_WS_URL=wss://${DOMAIN_API:-api.sparrowx.net}/realtime
       - POSTGREST_HOST=sparrowx-postgrest
       - POSTGREST_PORT=3000
       - POSTGREST_INTERNAL_URL=http://sparrowx-postgrest:3000
-      - VITE_SPARROWX_API_URL=https://${DOMAIN_API:-api.sparrowx.net}
-      - VITE_SPARROWX_WS_URL=wss://${DOMAIN_API:-api.sparrowx.net}/realtime
+      - DOMAIN_STUDIO=${DOMAIN_STUDIO:-db.sparrowx.net}
+      - DOMAIN_API=${DOMAIN_API:-api.sparrowx.net}
+      - DOMAIN_SEC=${DOMAIN_SEC:-sec.sparrowx.net}
+      - ADDITIONAL_REDIRECT_URLS=${ADDITIONAL_REDIRECT_URLS:-https://db.sparrowx.net/**,https://sec.sparrowx.net/**}
+      - GOTRUE_SITE_URL=${GOTRUE_SITE_URL:-https://db.sparrowx.net}
     networks:
       - sparrowx_net
     depends_on:
