@@ -157,10 +157,12 @@ export function SparrowxDropEngine() {
           setPersistentFiles((prev) => [json.file, ...prev]);
         }
       } else {
-        // Local simulation fallback
+        const errorText = await res.text().catch(() => "");
+        console.warn("[Storage Upload Server Note]", res.status, errorText);
+        // Client resilient fallback (stores base64Data so recipient in this browser can view and download)
         const fileId = `spx_f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
         const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
-        const newRecord: PersistentFile = {
+        const newRecord: PersistentFile & { base64Data?: string } = {
           id: fileId,
           name: rawFile.name,
           size: rawFile.size,
@@ -168,6 +170,7 @@ export function SparrowxDropEngine() {
           createdAt: new Date().toISOString(),
           downloads: 0,
           url: `${origin}/f/${fileId}`,
+          base64Data,
         };
         setPersistentFiles((prev) => {
           const updated = [newRecord, ...prev];
@@ -175,7 +178,8 @@ export function SparrowxDropEngine() {
           return updated;
         });
       }
-    } catch {
+    } catch (err) {
+      console.warn("[Storage Upload Catch Note]", err);
       const fileId = `spx_f_${Date.now().toString(36)}`;
       const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
       const newRecord: PersistentFile = {
@@ -284,6 +288,22 @@ export function SparrowxDropEngine() {
     if (fileId) {
       setIncomingPersistentId(fileId);
       setPersistentLoading(true);
+
+      const checkLocalFallback = () => {
+        try {
+          const local = localStorage.getItem("sparrowx_persistent_files");
+          if (local) {
+            const parsed: PersistentFile[] = JSON.parse(local);
+            const found = parsed.find((item) => item.id === fileId);
+            if (found) {
+              setPersistentFileInfo(found);
+              return true;
+            }
+          }
+        } catch {}
+        return false;
+      };
+
       fetch(`/api/storage/file/${fileId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
@@ -293,19 +313,40 @@ export function SparrowxDropEngine() {
             fetch("/api/storage/files")
               .then((r) => r.json())
               .then((list: PersistentFile[]) => {
-                const found = list.find((item) => item.id === fileId);
-                if (found) setPersistentFileInfo(found);
+                const found = Array.isArray(list) ? list.find((item) => item.id === fileId) : null;
+                if (found) {
+                  setPersistentFileInfo(found);
+                } else {
+                  checkLocalFallback();
+                }
               })
-              .catch(() => {});
+              .catch(() => {
+                checkLocalFallback();
+              });
           }
         })
-        .catch(() => {})
+        .catch(() => {
+          checkLocalFallback();
+        })
         .finally(() => setPersistentLoading(false));
     }
   }, []);
 
   const handleDownloadPersistentFileDirect = () => {
     if (!incomingPersistentId) return;
+
+    // Direct browser RAM download for client-stored / fallback payloads
+    if (persistentFileInfo && (persistentFileInfo as any).base64Data) {
+      const a = document.createElement("a");
+      a.href = `data:${persistentFileInfo.type || "application/octet-stream"};base64,${(persistentFileInfo as any).base64Data}`;
+      a.download = persistentFileInfo.name || "downloaded-file";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setPersistentDownloadSuccess(true);
+      return;
+    }
+
     const a = document.createElement("a");
     a.href = `/api/storage/download/${incomingPersistentId}`;
     a.download = persistentFileInfo?.name || "downloaded-file";

@@ -373,6 +373,7 @@ const server = createServer(async (req, res) => {
       try {
         const parsed = JSON.parse(rawBody.toString("utf-8"));
         if (parsed.filename && parsed.base64Data) {
+          await mkdir(STORAGE_DIR, { recursive: true }).catch(() => {});
           const fileId = `spx_f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
           const buffer = Buffer.from(parsed.base64Data, "base64");
           await writeFile(resolve(STORAGE_DIR, fileId), buffer);
@@ -401,8 +402,8 @@ const server = createServer(async (req, res) => {
           res.end(JSON.stringify({ success: true, file: record }));
           return;
         }
-      } catch {
-        // Ignored
+      } catch (err) {
+        console.error("[Storage Upload Error]", err);
       }
 
       res.writeHead(400, { "Content-Type": "application/json", ...SECURITY_HEADERS });
