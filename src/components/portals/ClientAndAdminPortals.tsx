@@ -45,6 +45,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { CyberThreatGlobe } from "@/components/CyberThreatGlobe";
+import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import { CyberEmblem, CyberPill, type CyberEmblemVariant } from "@/components/ui/CyberBadge";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
@@ -4590,14 +4591,13 @@ export function PortalLoginScreen({
               </a>
             </div>
 
-            {/* Live Interactive 3D Cyber Threat Globe Interception Engine */}
+            {/* Live Interactive 2D Dot-Matrix Threat Map Interception Engine */}
             <div className="mt-6">
-              <CyberThreatGlobe
+              <CyberThreatMatrixMap
                 height={520}
                 showControls={true}
                 showFeed={true}
                 showStats={true}
-                className="border-[#1F1F1F] bg-black"
               />
             </div>
 

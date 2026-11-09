@@ -31,6 +31,7 @@ import { CountryFlag } from "@/components/ui/CountryFlag";
 import type { ClientTenant, ProtectedService } from "@/lib/supabase";
 import { getStoredProspects } from "@/components/GrowthAndMonetizationHub";
 import { CyberThreatGlobe, type ThreatCity, DEFAULT_CITIES } from "@/components/CyberThreatGlobe";
+import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 
 // ==========================================
 // Types & Telemetry Models
@@ -1573,7 +1574,7 @@ export default sparrowxShield;
         </div>
       </div>
 
-      {/* 4. The 3D Interactive Globe Canvas View */}
+      {/* 4. The 2D Dot-Matrix Threat Map & Infrastructure Mesh View */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-xs">
@@ -1582,12 +1583,12 @@ export default sparrowxShield;
               onClick={() => setGlobeVisualEngine("threat_matrix")}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
                 globeVisualEngine === "threat_matrix"
-                  ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/20 font-bold"
+                  ? "bg-amber-500 text-black shadow-md shadow-amber-500/20 font-bold"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Zap className="size-3.5" />
-              <span>Cyber Threat Matrix (3D Live)</span>
+              <span>Cyber Threat Matrix (Dot-Matrix Map)</span>
             </button>
             <button
               type="button"
@@ -1605,9 +1606,9 @@ export default sparrowxShield;
 
           <div className="text-xs text-muted-foreground font-mono">
             {globeVisualEngine === "threat_matrix" ? (
-              <span className="text-cyan-400 font-semibold flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-cyan-400 animate-ping" />
-                <span>Active Engine: 3D Spherical Slerp Arcs &amp; Threat HUD</span>
+              <span className="text-amber-400 font-semibold flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-amber-400 animate-ping" />
+                <span>Active Engine: 2D Dot-Matrix Equirectangular Grid</span>
               </span>
             ) : (
               <span>Active Engine: Multi-Datacenter Routing Mesh</span>
@@ -1616,8 +1617,7 @@ export default sparrowxShield;
         </div>
 
         {globeVisualEngine === "threat_matrix" ? (
-          <CyberThreatGlobe
-            customCities={threatCities}
+          <CyberThreatMatrixMap
             height={560}
             showControls={true}
             showFeed={true}
