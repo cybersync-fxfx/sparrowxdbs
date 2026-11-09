@@ -9,8 +9,10 @@
     email admin@sparrowx.net
 }
 
-# 1. SparrowX Security (SOC Dashboard, WAF, Threat Map, Client Area)
-sec.sparrowx.net {
+# ------------------------------------------------------------------------------
+# 1. HTTPS Endpoints (ZeroSSL / Let's Encrypt)
+# ------------------------------------------------------------------------------
+https://sec.sparrowx.net {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
@@ -19,8 +21,7 @@ sec.sparrowx.net {
     reverse_proxy sparrowx-studio:3000
 }
 
-# 2. SparrowX DB (Database-as-a-Service, Landing Page & DB Studio)
-db.sparrowx.net {
+https://db.sparrowx.net {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
         X-Content-Type-Options "nosniff"
@@ -29,8 +30,7 @@ db.sparrowx.net {
     reverse_proxy sparrowx-studio:3000
 }
 
-# 3. SparrowX DB REST API Gateway (PostgREST)
-api.sparrowx.net {
+https://api.sparrowx.net {
     header {
         Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
@@ -41,13 +41,20 @@ api.sparrowx.net {
     reverse_proxy sparrowx-postgrest:3000
 }
 
-# 4. HTTP Port 80 Catch-All (Immediate zero-downtime routing for IP and domains)
-:80 {
-    @api host api.sparrowx.net
-    handle @api {
-        reverse_proxy sparrowx-postgrest:3000
-    }
-    handle {
-        reverse_proxy sparrowx-studio:3000
+# ------------------------------------------------------------------------------
+# 2. HTTP Port 80 Ingress (Preserves ACME challenges for Caddy, serves HTTP 200)
+# ------------------------------------------------------------------------------
+http://sec.sparrowx.net, http://db.sparrowx.net, http://api.sparrowx.net, :80 {
+    # Exclude ACME challenge path so Caddy internal solver handles it with 200 OK
+    @not_acme not path /.well-known/acme-challenge/*
+
+    handle @not_acme {
+        @api host api.sparrowx.net
+        handle @api {
+            reverse_proxy sparrowx-postgrest:3000
+        }
+        handle {
+            reverse_proxy sparrowx-studio:3000
+        }
     }
 }
