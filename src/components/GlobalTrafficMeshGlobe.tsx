@@ -1625,8 +1625,9 @@ export default sparrowxShield;
             isOrigin: c.isOrigin,
             hostingHub: c.hostingHub,
             threatLevel: c.threatLevel,
+            ip: c.isOrigin ? (activeOrigin ? activeOrigin.ip : "51.68.21.44") : undefined,
           }))}
-          height={560}
+          height={660}
           showControls={true}
           showFeed={true}
           showStats={true}

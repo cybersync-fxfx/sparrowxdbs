@@ -4594,7 +4594,7 @@ export function PortalLoginScreen({
             {/* Live Interactive 2D Dot-Matrix Threat Map Interception Engine */}
             <div className="mt-6">
               <CyberThreatMatrixMap
-                height={520}
+                height={620}
                 showControls={true}
                 showFeed={true}
                 showStats={true}
