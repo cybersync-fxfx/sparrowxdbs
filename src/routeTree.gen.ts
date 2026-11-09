@@ -15,6 +15,8 @@ import { Route as DropRouteImport } from './routes/drop'
 import { Route as KeysRouteImport } from './routes/keys'
 import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as DocsErrorsRouteImport } from './routes/docs/errors'
+import { Route as FIndexRouteImport } from './routes/f.index'
+import { Route as FIdRouteImport } from './routes/f.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +48,16 @@ const DocsErrorsRoute = DocsErrorsRouteImport.update({
   path: '/docs/errors',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FIndexRoute = FIndexRouteImport.update({
+  id: '/f/',
+  path: '/f/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FIdRoute = FIdRouteImport.update({
+  id: '/f/$id',
+  path: '/f/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +66,8 @@ export interface FileRoutesByFullPath {
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/docs/errors': typeof DocsErrorsRoute
+  '/f/$id': typeof FIdRoute
+  '/f/': typeof FIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +76,8 @@ export interface FileRoutesByTo {
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/docs/errors': typeof DocsErrorsRoute
+  '/f/$id': typeof FIdRoute
+  '/f': typeof FIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,13 +87,40 @@ export interface FileRoutesById {
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/docs/errors': typeof DocsErrorsRoute
+  '/f/$id': typeof FIdRoute
+  '/f/': typeof FIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/db' | '/drop' | '/keys' | '/shield' | '/docs/errors'
+  fullPaths:
+    | '/'
+    | '/db'
+    | '/drop'
+    | '/keys'
+    | '/shield'
+    | '/docs/errors'
+    | '/f/$id'
+    | '/f/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/db' | '/drop' | '/keys' | '/shield' | '/docs/errors'
-  id: '__root__' | '/' | '/db' | '/drop' | '/keys' | '/shield' | '/docs/errors'
+  to:
+    | '/'
+    | '/db'
+    | '/drop'
+    | '/keys'
+    | '/shield'
+    | '/docs/errors'
+    | '/f/$id'
+    | '/f'
+  id:
+    | '__root__'
+    | '/'
+    | '/db'
+    | '/drop'
+    | '/keys'
+    | '/shield'
+    | '/docs/errors'
+    | '/f/$id'
+    | '/f/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -87,6 +130,8 @@ export interface RootRouteChildren {
   KeysRoute: typeof KeysRoute
   ShieldRoute: typeof ShieldRoute
   DocsErrorsRoute: typeof DocsErrorsRoute
+  FIdRoute: typeof FIdRoute
+  FIndexRoute: typeof FIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +178,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocsErrorsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/f/': {
+      id: '/f/'
+      path: '/f'
+      fullPath: '/f/'
+      preLoaderRoute: typeof FIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/f/$id': {
+      id: '/f/$id'
+      path: '/f/$id'
+      fullPath: '/f/$id'
+      preLoaderRoute: typeof FIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -143,6 +202,8 @@ const rootRouteChildren: RootRouteChildren = {
   KeysRoute: KeysRoute,
   ShieldRoute: ShieldRoute,
   DocsErrorsRoute: DocsErrorsRoute,
+  FIdRoute: FIdRoute,
+  FIndexRoute: FIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
