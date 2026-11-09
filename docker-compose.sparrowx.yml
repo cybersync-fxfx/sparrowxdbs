@@ -1,11 +1,9 @@
 # ==============================================================================
 # SPARROWX ENTERPRISE INFRASTRUCTURE: DUAL-ENGINE ARCHITECTURE
 # 1. SparrowX Security (Edge WAF, DDoS Mitigation, AI Guardrails)
-# 2. SparrowX DB (Sovereign DBaaS: Postgres 16 + pgvector + PgBouncer + PostgREST + Auth)
+# 2. SparrowX DB (Sovereign DBaaS: Postgres 16 + pgvector + PgBouncer + PostgREST)
 # Sized for 64GB RAM / 8 Cores / 2TB NVMe VPS
 # ==============================================================================
-
-version: '3.8'
 
 networks:
   sparrowx_edge:
@@ -30,7 +28,7 @@ services:
   # PILLAR 1: SPARROWX SECURITY (Edge Proxy, TLS Termination, WAF, AI Guardrails)
   # ----------------------------------------------------------------------------
   sparrowx-edge-proxy:
-    image: caddy:2.8-alpine
+    image: caddy:2-alpine
     container_name: sparrowx_edge_proxy
     restart: always
     ports:
@@ -38,9 +36,8 @@ services:
       - "443:443"
       - "443:443/udp" # HTTP/3 QUIC
     environment:
-      - DOMAIN_STUDIO=studio.yourdomain.com
-      - DOMAIN_API=api.yourdomain.com
-      - DOMAIN_AUTH=auth.yourdomain.com
+      - DOMAIN_STUDIO=${DOMAIN_STUDIO:-db.sparrowx.net}
+      - DOMAIN_API=${DOMAIN_API:-api.sparrowx.net}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - sparrowx_caddy_data:/data
@@ -110,7 +107,7 @@ services:
           memory: 40960M
 
   sparrowx-pgbouncer:
-    image: edoburu/pgbouncer:v1.22.0
+    image: edoburu/pgbouncer:latest
     container_name: sparrowx_pgbouncer
     restart: always
     ports:
@@ -139,7 +136,7 @@ services:
 
   # PostgREST: Generates Instant REST API from Postgres Schemas
   sparrowx-postgrest:
-    image: postgrest/postgrest:v12.2.0
+    image: postgrest/postgrest:latest
     container_name: sparrowx_postgrest
     restart: always
     environment:
@@ -147,7 +144,7 @@ services:
       PGRST_DB_SCHEMA: ${PGRST_DB_SCHEMA:-public,auth,storage}
       PGRST_DB_ANON_ROLE: ${PGRST_DB_ANON_ROLE:-anon}
       PGRST_JWT_SECRET: ${SPARROWX_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-sparrowx}
-      PGRST_OPENAPI_SERVER_PROXY_URI: https://api.yourdomain.com
+      PGRST_OPENAPI_SERVER_PROXY_URI: https://${DOMAIN_API:-api.sparrowx.net}
     networks:
       - sparrowx_internal
     depends_on:
@@ -166,8 +163,8 @@ services:
     container_name: sparrowx_studio
     restart: always
     environment:
-      - VITE_SPARROWX_API_URL=https://api.yourdomain.com
-      - VITE_SPARROWX_WS_URL=wss://api.yourdomain.com/realtime
+      - VITE_SPARROWX_API_URL=https://${DOMAIN_API:-api.sparrowx.net}
+      - VITE_SPARROWX_WS_URL=wss://${DOMAIN_API:-api.sparrowx.net}/realtime
     networks:
       - sparrowx_internal
     deploy:

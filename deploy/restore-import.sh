@@ -166,9 +166,11 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
 fi
 
 if docker compose version &> /dev/null; then
-    docker compose -f "${COMPOSE_FILE}" up -d
+    docker compose -f "${COMPOSE_FILE}" pull || true
+    docker compose -f "${COMPOSE_FILE}" up -d --build
 else
-    docker-compose -f "${COMPOSE_FILE}" up -d
+    docker-compose -f "${COMPOSE_FILE}" pull || true
+    docker-compose -f "${COMPOSE_FILE}" up -d --build
 fi
 
 # 7. Restore Database Dump if present
