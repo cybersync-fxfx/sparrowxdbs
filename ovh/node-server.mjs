@@ -18,6 +18,8 @@ const MIME_TYPES = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
   ".ico": "image/x-icon",
   ".txt": "text/plain; charset=utf-8",
   ".woff": "font/woff",
@@ -71,15 +73,19 @@ function forwardToPostgrest(req, res, targetPath, fallbackFn) {
   });
 
   proxyReq.on("error", (err) => {
-    console.warn(`[PostgREST Gateway Note] PostgREST (${POSTGREST_HOST}:${POSTGREST_PORT}) not ready: ${err.message}. Falling back to internal engine.`);
+    console.warn(
+      `[PostgREST Gateway Note] PostgREST (${POSTGREST_HOST}:${POSTGREST_PORT}) not ready: ${err.message}. Falling back to internal engine.`,
+    );
     if (fallbackFn) {
       fallbackFn();
     } else if (!res.headersSent) {
       res.writeHead(503, { "Content-Type": "application/json", ...SECURITY_HEADERS });
-      res.end(JSON.stringify({
-        error: "PostgREST Gateway Starting",
-        detail: "PostgREST container is warming up. Please retry in a few seconds."
-      }));
+      res.end(
+        JSON.stringify({
+          error: "PostgREST Gateway Starting",
+          detail: "PostgREST container is warming up. Please retry in a few seconds.",
+        }),
+      );
     }
   });
 
@@ -110,40 +116,42 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // =========================================================================
+    // 1. CRITICAL: SERVE STATIC ASSETS (.css, .js, .png, etc.) FOR ALL DOMAINS
+    // This MUST run before any API proxying, so api.sparrowx.net loads styles & scripts!
+    // =========================================================================
+    if (req.method === "GET" || req.method === "HEAD") {
+      const safePath = resolve(PUBLIC_DIR, pathname.replace(/^\/+/, ""));
+      if (safePath.startsWith(PUBLIC_DIR) && pathname !== "/") {
+        try {
+          const info = await stat(safePath);
+          if (info.isFile()) {
+            const ext = extname(safePath).toLowerCase();
+            const content = await readFile(safePath);
+            res.writeHead(200, {
+              ...SECURITY_HEADERS,
+              "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
+              "Content-Length": content.byteLength,
+              "Cache-Control": pathname.startsWith("/assets/")
+                ? "public, max-age=31536000, immutable"
+                : "public, max-age=3600",
+            });
+            res.end(req.method === "HEAD" ? undefined : content);
+            return;
+          }
+        } catch {
+          // Not a static file on disk, continue to router / API handler
+        }
+      }
+    }
+
     const rawHost = req.headers.host || `${HOST}:${PORT}`;
     const host = rawHost.split(":")[0].toLowerCase();
     const isApiHost = host.startsWith("api.") || host.startsWith("api-");
     const isRestPath = pathname.startsWith("/rest/v1");
 
-    // Unified SSR / internal handler fallback helper
+    // Unified SSR / TanStack Start renderer
     const handleViaAppEngine = async () => {
-      // 1. Serve static files from .output/public if they exist
-      if (req.method === "GET" || req.method === "HEAD") {
-        const safePath = resolve(PUBLIC_DIR, pathname.replace(/^\/+/, ""));
-        if (safePath.startsWith(PUBLIC_DIR) && pathname !== "/") {
-          try {
-            const info = await stat(safePath);
-            if (info.isFile()) {
-              const ext = extname(safePath).toLowerCase();
-              const content = await readFile(safePath);
-              res.writeHead(200, {
-                ...SECURITY_HEADERS,
-                "Content-Type": MIME_TYPES[ext] || "application/octet-stream",
-                "Content-Length": content.byteLength,
-                "Cache-Control": pathname.startsWith("/assets/")
-                  ? "public, max-age=31536000, immutable"
-                  : "public, max-age=3600",
-              });
-              res.end(req.method === "HEAD" ? undefined : content);
-              return;
-            }
-          } catch {
-            // Not a static file, continue to SSR / API handler
-          }
-        }
-      }
-
-      // 2. Construct Web Fetch Request for Nitro / TanStack Start + SparrowX API
       const protocol = req.headers["x-forwarded-proto"] || "http";
       const fullUrl = `${protocol}://${rawHost}${reqUrl}`;
 
@@ -197,13 +205,16 @@ const server = createServer(async (req, res) => {
       res.end(Buffer.from(arrayBuf));
     };
 
-    // 3. Port 80 Unified Routing: Forward api.sparrowx.net or /rest/v1 to PostgREST
-    // Exclude health routes so monitoring gets instant response
-    // If a human visits api.sparrowx.net in a browser (text/html), render the interactive API Gateway Explorer UI
-    const isHealthRoute = pathname === "/health" || pathname === "/api/health" || pathname === "/api/v1/health";
+    // =========================================================================
+    // 2. PostgREST Proxy vs. Web UI Ingress for api.sparrowx.net
+    // =========================================================================
+    const isHealthRoute =
+      pathname === "/health" || pathname === "/api/health" || pathname === "/api/v1/health";
     const acceptsHtml = (req.headers.accept || "").includes("text/html");
-    const isBrowserNavigationToApiHome = isApiHost && acceptsHtml && (pathname === "/" || pathname === "/docs");
+    const isBrowserNavigationToApiHome =
+      isApiHost && acceptsHtml && (pathname === "/" || pathname === "/docs");
 
+    // If it's a programmatic query to PostgREST (/rest/v1 or api domain queries)
     if (!isHealthRoute && !isBrowserNavigationToApiHome && (isApiHost || isRestPath)) {
       let targetPath = reqUrl;
       if (isRestPath) {
@@ -213,7 +224,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // 4. Default: Render SparrowX Security or Sovereign DB platform based on hostname
+    // Default: Render via SSR (SparrowxApiGatewayPortal for api., DB Studio for db., Security for sec.)
     await handleViaAppEngine();
   } catch (err) {
     console.error("[SparrowX Sovereign Server Error]", err);
