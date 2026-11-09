@@ -98,6 +98,8 @@ export function CyberThreatMatrixMap({
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFeedPaused, setIsFeedPaused] = useState(false);
+  const [isStatsCollapsed, setIsStatsCollapsed] = useState(false);
+  const [isFeedCollapsed, setIsFeedCollapsed] = useState(false);
   const [focusedCity, setFocusedCity] = useState<ThreatMapCity | null>(() => {
     return MAP_DEFAULT_CITIES.find((c) => c.name === "Roubaix (OVH Host)") || MAP_DEFAULT_CITIES[0];
   });
@@ -651,128 +653,168 @@ export function CyberThreatMatrixMap({
         </div>
       )}
 
-      {/* TOP-LEFT HUD: Realtime Threat Monitor */}
+      {/* TOP-LEFT HUD: Realtime Threat Monitor (Decongested with Collapse Toggle) */}
       {showStats && (
-        <div className="absolute left-3 sm:left-4 top-3 sm:top-4 z-20 pointer-events-auto rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/92 p-3.5 backdrop-blur-xl shadow-2xl text-xs max-w-[240px]">
-          <div className="flex items-center justify-between border-b border-[#1F1F1F] pb-2 mb-2 font-bold text-white tracking-wider">
-            <div className="flex items-center gap-2">
-              <Radio className="size-3 text-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-extrabold font-mono">REALTIME THREAT MONITOR</span>
-            </div>
-          </div>
-
-          <div className="space-y-1.5 font-mono text-[11px]">
-            <div className="flex justify-between items-center">
-              <span className="text-zinc-400">TOTAL EVENTS:</span>
-              <span className="font-bold text-white text-sm">{totalCountRef.current}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-zinc-400">HIGH SEVERITY:</span>
-              <span className="font-bold text-[#FF354F]">{highCountRef.current}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-zinc-400">CRITICAL THREATS:</span>
-              <span className="font-bold text-red-500">{criticalCountRef.current}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-zinc-400">ACTIVE ARCS:</span>
-              <span className="font-bold text-cyan-400">{activeEvents.length}</span>
-            </div>
-            <div className="flex justify-between items-center border-t border-[#1F1F1F] pt-1.5 mt-1">
-              <span className="text-zinc-400">ACTIVE ORIGINS:</span>
-              <span className="font-bold text-amber-400">
-                {cities.filter((c) => c.isOrigin).length} active hosts
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-2.5 pt-2 border-t border-[#1F1F1F] flex items-center justify-between text-[9px] text-zinc-400 font-mono">
-            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              2D DOT-MATRIX LIVE
-            </span>
-            <span className="text-zinc-400">PERIMETER NOMINAL</span>
-          </div>
-        </div>
-      )}
-
-      {/* TOP-RIGHT FEED: Real-Time Host Connections with IP, Country & PORT */}
-      {showFeed && (
-        <div className="absolute right-3 sm:right-4 top-3 sm:top-4 z-20 w-80 sm:w-96 flex flex-col gap-1.5 pointer-events-none">
-          <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-200 px-3 py-2 flex items-center justify-between bg-[#0A0A0A]/95 rounded-lg border border-[#1F1F1F] backdrop-blur-md shadow-xl">
-            <span className="flex items-center gap-1.5 text-amber-400">
-              <ShieldAlert className="size-3.5 text-amber-400" />
-              <span className="font-bold text-white">REAL-TIME HOST CONNECTIONS</span>
-            </span>
-            <div className="flex items-center gap-2 pointer-events-auto">
+        isStatsCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setIsStatsCollapsed(false)}
+            className="absolute left-3 sm:left-4 top-3 z-20 pointer-events-auto flex items-center gap-2 rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 px-3 py-1.5 text-xs font-mono text-zinc-300 hover:text-white backdrop-blur-md shadow-xl transition-all cursor-pointer"
+          >
+            <Radio className="size-3 text-emerald-400 animate-pulse" />
+            <span className="font-semibold text-white">Threat Monitor</span>
+            <span className="text-[10px] text-zinc-400">({totalCountRef.current} events)</span>
+            <span className="text-[10px] text-amber-400 font-bold ml-1">Expand ▾</span>
+          </button>
+        ) : (
+          <div className="absolute left-3 sm:left-4 top-3 sm:top-4 z-20 pointer-events-auto rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/92 p-3.5 backdrop-blur-xl shadow-2xl text-xs max-w-[240px]">
+            <div className="flex items-center justify-between border-b border-[#1F1F1F] pb-2 mb-2 font-bold text-white tracking-wider">
+              <div className="flex items-center gap-2">
+                <Radio className="size-3 text-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-extrabold font-mono">REALTIME THREAT MONITOR</span>
+              </div>
               <button
                 type="button"
-                onClick={() => setIsFeedPaused(!isFeedPaused)}
-                className="text-[9px] text-zinc-400 hover:text-white transition-colors underline cursor-pointer"
+                onClick={() => setIsStatsCollapsed(true)}
+                className="text-[9px] text-zinc-400 hover:text-white transition-colors cursor-pointer underline"
               >
-                {isFeedPaused ? "Resume" : "Pause"}
+                Hide
               </button>
-              <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+            </div>
+
+            <div className="space-y-1.5 font-mono text-[11px]">
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-400">TOTAL EVENTS:</span>
+                <span className="font-bold text-white text-sm">{totalCountRef.current}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-400">HIGH SEVERITY:</span>
+                <span className="font-bold text-[#FF354F]">{highCountRef.current}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-400">CRITICAL THREATS:</span>
+                <span className="font-bold text-red-500">{criticalCountRef.current}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-400">ACTIVE ARCS:</span>
+                <span className="font-bold text-cyan-400">{activeEvents.length}</span>
+              </div>
+              <div className="flex justify-between items-center border-t border-[#1F1F1F] pt-1.5 mt-1">
+                <span className="text-zinc-400">ACTIVE ORIGINS:</span>
+                <span className="font-bold text-amber-400">
+                  {cities.filter((c) => c.isOrigin).length} active hosts
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-2.5 pt-2 border-t border-[#1F1F1F] flex items-center justify-between text-[9px] text-zinc-400 font-mono">
+              <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                2D DOT-MATRIX LIVE
+              </span>
+              <span className="text-zinc-400">PERIMETER NOMINAL</span>
             </div>
           </div>
+        )
+      )}
 
-          <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto no-scrollbar pointer-events-auto">
-            {activeEvents.length === 0 ? (
-              <div className="rounded-lg border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3 text-[11px] text-zinc-400 backdrop-blur-md space-y-1">
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                  <span className="size-1.5 rounded-full bg-emerald-400" />
-                  <span>Telemetry Feed Active · Listening</span>
-                </div>
-                <p className="text-[10px] leading-relaxed text-zinc-400">
-                  Monitoring live host connections with remote IP, origin country, and destination port.
-                </p>
-              </div>
-            ) : (
-              activeEvents.map((evt) => (
-                <div
-                  key={evt.id}
-                  onClick={() => setFocusedCity(evt.dst)}
-                  className="group cursor-pointer rounded-lg px-3 py-2 text-[11px] font-mono transition-all border border-l-4 border-l-amber-400 bg-[#0A0A0A]/95 text-zinc-200 border-[#1F1F1F] backdrop-blur-xl hover:border-zinc-700 shadow-lg"
+      {/* TOP-RIGHT FEED: Real-Time Host Connections (Decongested with Collapse Toggle) */}
+      {showFeed && (
+        isFeedCollapsed ? (
+          <button
+            type="button"
+            onClick={() => setIsFeedCollapsed(false)}
+            className="absolute right-3 sm:right-4 top-3 z-20 pointer-events-auto flex items-center gap-2 rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/90 px-3 py-1.5 text-xs font-mono text-zinc-300 hover:text-white backdrop-blur-md shadow-xl transition-all cursor-pointer"
+          >
+            <ShieldAlert className="size-3.5 text-amber-400" />
+            <span className="font-semibold text-white">Live Host Feed</span>
+            <span className="text-[10px] text-emerald-400 font-bold">({activeEvents.length})</span>
+            <span className="text-[10px] text-amber-400 font-bold ml-1">Expand ▾</span>
+          </button>
+        ) : (
+          <div className="absolute right-3 sm:right-4 top-3 sm:top-4 z-20 w-80 sm:w-96 flex flex-col gap-1.5 pointer-events-none">
+            <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-200 px-3 py-2 flex items-center justify-between bg-[#0A0A0A]/95 rounded-lg border border-[#1F1F1F] backdrop-blur-md shadow-xl">
+              <span className="flex items-center gap-1.5 text-amber-400">
+                <ShieldAlert className="size-3.5 text-amber-400" />
+                <span className="font-bold text-white">REAL-TIME HOST CONNECTIONS</span>
+              </span>
+              <div className="flex items-center gap-3 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsFeedPaused(!isFeedPaused)}
+                  className="text-[9px] text-zinc-400 hover:text-white transition-colors underline cursor-pointer"
                 >
-                  <div className="flex items-center justify-between text-[9px] text-zinc-400 pb-1 border-b border-zinc-800/80">
-                    <span className="flex items-center gap-1 text-zinc-400">
-                      <span>{evt.time}</span>
-                      <span>·</span>
-                      <CountryFlag code={evt.countryCode || "UN"} className="size-3 inline-block" />
-                      <strong className="text-white">{evt.countryName}</strong>
-                      <span className="text-zinc-500">({evt.srcIp}:{evt.srcPort})</span>
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded font-bold font-mono text-[9px] border bg-amber-500/10 text-amber-300 border-amber-500/40">
-                      PORT {evt.dstPort} / {evt.protocol}
-                    </span>
-                  </div>
+                  {isFeedPaused ? "Resume" : "Pause"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFeedCollapsed(true)}
+                  className="text-[9px] text-zinc-400 hover:text-white transition-colors underline cursor-pointer"
+                >
+                  Hide
+                </button>
+                <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+              </div>
+            </div>
 
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <span className="truncate font-bold text-white text-xs group-hover:text-amber-300 transition-colors">
-                      ➔ HOST: {evt.dst.name} <span className="text-[10px] text-zinc-400 font-normal">[{evt.dstIp}]</span>
-                    </span>
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
-                      evt.status === "BLOCKED"
-                        ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                        : evt.status === "QUARANTINED"
-                          ? "bg-red-500/10 text-red-400 border-red-500/30"
-                          : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                    }`}>
-                      {evt.status}
-                    </span>
+            <div className="flex flex-col gap-1.5 max-h-80 overflow-y-auto no-scrollbar pointer-events-auto">
+              {activeEvents.length === 0 ? (
+                <div className="rounded-lg border border-[#1F1F1F] bg-[#0A0A0A]/90 p-3 text-[11px] text-zinc-400 backdrop-blur-md space-y-1">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                    <span>Telemetry Feed Active · Listening</span>
                   </div>
-
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400 mt-0.5">
-                    <span className="truncate text-zinc-400">{evt.type}</span>
-                    <span className="text-[9px] text-zinc-500">
-                      Edge Transit Nominal
-                    </span>
-                  </div>
+                  <p className="text-[10px] leading-relaxed text-zinc-400">
+                    Monitoring live host connections with remote IP, origin country, and destination port.
+                  </p>
                 </div>
-              ))
-            )}
+              ) : (
+                activeEvents.map((evt) => (
+                  <div
+                    key={evt.id}
+                    onClick={() => setFocusedCity(evt.dst)}
+                    className="group cursor-pointer rounded-lg px-3 py-2 text-[11px] font-mono transition-all border border-l-4 border-l-amber-400 bg-[#0A0A0A]/95 text-zinc-200 border-[#1F1F1F] backdrop-blur-xl hover:border-zinc-700 shadow-lg"
+                  >
+                    <div className="flex items-center justify-between text-[9px] text-zinc-400 pb-1 border-b border-zinc-800/80">
+                      <span className="flex items-center gap-1 text-zinc-400">
+                        <span>{evt.time}</span>
+                        <span>·</span>
+                        <CountryFlag code={evt.countryCode || "UN"} className="size-3 inline-block" />
+                        <strong className="text-white">{evt.countryName}</strong>
+                        <span className="text-zinc-500">({evt.srcIp}:{evt.srcPort})</span>
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded font-bold font-mono text-[9px] border bg-amber-500/10 text-amber-300 border-amber-500/40">
+                        PORT {evt.dstPort} / {evt.protocol}
+                      </span>
+                    </div>
+
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="truncate font-bold text-white text-xs group-hover:text-amber-300 transition-colors">
+                        ➔ HOST: {evt.dst.name} <span className="text-[10px] text-zinc-400 font-normal">[{evt.dstIp}]</span>
+                      </span>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                        evt.status === "BLOCKED"
+                          ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
+                          : evt.status === "QUARANTINED"
+                            ? "bg-red-500/10 text-red-400 border-red-500/30"
+                            : "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                      }`}>
+                        {evt.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-zinc-400 mt-0.5">
+                      <span className="truncate text-zinc-400">{evt.type}</span>
+                      <span className="text-[9px] text-zinc-500">
+                        Edge Transit Nominal
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* BOTTOM ORIGIN SELECTOR BAR */}
