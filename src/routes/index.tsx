@@ -1658,8 +1658,9 @@ function Dashboard() {
       new URLSearchParams(window.location.search).get("db") === "1");
 
   if (
-    authSession.role === "admin" &&
-    (isStudioDomainOrParam || activeNav === "Supabase Studio" || activeNav === "SparrowX DB")
+    isStudioDomainOrParam ||
+    (authSession.role === "admin" &&
+      (activeNav === "Supabase Studio" || activeNav === "SparrowX DB"))
   ) {
     return (
       <>

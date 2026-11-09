@@ -22,6 +22,16 @@ import {
   ShieldCheck,
   Edit3,
   X,
+  Sparkles,
+  Layers,
+  Cpu,
+  HardDrive,
+  ExternalLink,
+  Shield,
+  Zap,
+  ChevronRight,
+  Play,
+  Globe,
 } from "lucide-react";
 
 const LOCAL_SEED_TABLES = migratedSeedData as Record<
@@ -265,6 +275,22 @@ export function SovereignDatabaseStudio({
   onClose,
   isStandaloneDomain = false,
 }: SovereignDatabaseStudioProps) {
+  // Navigation mode: "landing" (default for visitors / public) or "studio" (full database console)
+  const [viewMode, setViewMode] = useState<"landing" | "studio">("landing");
+  const [showNewProjectModal, setShowNewProjectModal] = useState<boolean>(false);
+  const [newProjectName, setNewProjectName] = useState<string>("production-db");
+  const [newProjectRegion, setNewProjectRegion] = useState<string>("OVH Gravelines (EU-West)");
+  const [newProjectEnableVector, setNewProjectEnableVector] = useState<boolean>(true);
+  const [createdProjectCreds, setCreatedProjectCreds] = useState<{
+    id: string;
+    name: string;
+    anonKey: string;
+    serviceKey: string;
+    connectionString: string;
+    pooledString: string;
+  } | null>(null);
+  const [selectedSdkTab, setSelectedSdkTab] = useState<"supabase" | "python" | "prisma" | "curl">("supabase");
+
   const [activeSection, setActiveSection] = useState<
     "tables" | "sql" | "auth" | "api"
   >("tables");
@@ -544,11 +570,522 @@ export function SovereignDatabaseStudio({
     setTimeout(() => setCopiedKey(null), 1800);
   };
 
+  const handleCreateProject = () => {
+    const projId = `prj_${Math.random().toString(36).slice(2, 10)}`;
+    const anon = `spx_anon_${Math.random().toString(36).slice(2, 24)}`;
+    const service = `spx_service_${Math.random().toString(36).slice(2, 28)}`;
+    const pass = Math.random().toString(36).slice(2, 12) + "A1!";
+    setCreatedProjectCreds({
+      id: projId,
+      name: newProjectName,
+      anonKey: anon,
+      serviceKey: service,
+      connectionString: `postgresql://postgres:${pass}@139.99.131.135:5432/${newProjectName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
+      pooledString: `postgresql://postgres:${pass}@139.99.131.135:6543/${newProjectName.toLowerCase().replace(/[^a-z0-9]/g, "_")}?pgbouncer=true`,
+    });
+  };
+
+  if (viewMode === "landing") {
+    return (
+      <div className="min-h-screen w-full bg-[#0E0F12] text-zinc-100 font-sans selection:bg-[#3ECF8E]/30 selection:text-[#3ECF8E]">
+        {/* TOP BAR */}
+        <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-[#0E0F12]/90 backdrop-blur px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="grid size-9 place-items-center rounded-lg bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] shadow-[0_0_15px_rgba(62,207,142,0.2)]">
+              <Database className="size-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold tracking-tight text-white text-base">
+                  SparrowX <span className="text-[#3ECF8E]">DB</span>
+                </span>
+                <span className="rounded bg-[#3ECF8E]/10 border border-[#3ECF8E]/25 px-2 py-0.5 font-mono text-[10px] text-[#3ECF8E] font-semibold">
+                  SOVEREIGN DBaaS
+                </span>
+              </div>
+              <p className="text-[11px] text-zinc-400 font-mono hidden sm:block">
+                PostgreSQL 16 + pgvector · PgBouncer Pooler · Auto REST API
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <div className="hidden lg:flex items-center gap-2 text-xs font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Node: 139.99.131.135</span>
+              <span className="text-zinc-600">|</span>
+              <span className="text-[#3ECF8E]">64GB / 8 Cores / 2TB NVMe</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowNewProjectModal(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-[#3ECF8E]/40 bg-[#3ECF8E]/10 hover:bg-[#3ECF8E]/20 text-[#3ECF8E] px-3 py-1.5 text-xs font-semibold transition-all shadow-sm"
+            >
+              <Plus className="size-3.5" />
+              <span>+ New Project</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewMode("studio")}
+              className="flex items-center gap-1.5 rounded-lg bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-[#11181C] px-3.5 py-1.5 text-xs font-bold transition-all shadow-[0_0_20px_rgba(62,207,142,0.3)] hover:scale-[1.02]"
+            >
+              <Terminal className="size-3.5" />
+              <span>Launch Console</span>
+            </button>
+
+            {onClose && !isStandaloneDomain && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 p-2 text-zinc-400 hover:text-zinc-200 transition-colors"
+                title="Return to Security Dashboard"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* HERO SECTION */}
+        <section className="relative overflow-hidden px-4 sm:px-8 pt-12 pb-16 max-w-7xl mx-auto">
+          <div className="absolute inset-0 bg-gradient-to-b from-[#3ECF8E]/5 via-transparent to-transparent pointer-events-none" />
+
+          <div className="relative text-center max-w-3xl mx-auto space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-medium text-emerald-400">
+              <Sparkles className="size-3.5 animate-spin text-emerald-400" />
+              <span>Dedicated Supabase-Style Platform on Sovereign VPS</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
+              The Sovereign Postgres Platform for{" "}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3ECF8E] to-teal-200">
+                AI & Enterprise Apps
+              </span>
+            </h1>
+
+            <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+              Full PostgreSQL 16 database with native <strong className="text-zinc-200 font-semibold">pgvector</strong> embeddings, 
+              built-in <strong className="text-zinc-200 font-semibold">PgBouncer transaction pooling (5,000+ conns)</strong>, 
+              and auto-generated REST APIs. 100% hosted on your dedicated 64GB NVMe hardware with zero cloud egress markup.
+            </p>
+
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setViewMode("studio")}
+                className="flex items-center gap-2 rounded-lg bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-zinc-950 font-bold px-5 py-2.5 text-sm transition-all shadow-[0_0_25px_rgba(62,207,142,0.35)]"
+              >
+                <Play className="size-4 fill-current" />
+                <span>Open Project Studio</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowNewProjectModal(true)}
+                className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/90 hover:bg-zinc-800 text-zinc-200 font-semibold px-4 py-2.5 text-sm transition-all"
+              >
+                <Plus className="size-4" />
+                <span>Create Database Project</span>
+              </button>
+
+              <a
+                href="#connection-info"
+                className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-[#3ECF8E] px-3 py-2 transition-colors font-mono"
+              >
+                <span>View Connection Strings ↓</span>
+              </a>
+            </div>
+          </div>
+
+          {/* LIVE HARDWARE TELEMETRY BANNER */}
+          <div className="mt-12 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-6 backdrop-blur shadow-xl grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <Cpu className="size-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider">CPU Compute</p>
+                <p className="text-sm font-bold text-white">8 Dedicated Cores</p>
+                <p className="text-[10px] text-emerald-400 font-mono">3.8 GHz Turbo</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                <Layers className="size-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider">Memory RAM</p>
+                <p className="text-sm font-bold text-white">64 GB ECC DDR4</p>
+                <p className="text-[10px] text-teal-400 font-mono">16GB Buffer Pool</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                <HardDrive className="size-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider">NVMe Storage</p>
+                <p className="text-sm font-bold text-white">2.0 TB NVMe</p>
+                <p className="text-[10px] text-cyan-400 font-mono">PCIe 4.0 (7,000 MB/s)</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-[#3ECF8E]/10 text-[#3ECF8E] border border-[#3ECF8E]/20">
+                <Zap className="size-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider">Concurrency</p>
+                <p className="text-sm font-bold text-white">5,000+ Conns</p>
+                <p className="text-[10px] text-[#3ECF8E] font-mono">PgBouncer Active</p>
+              </div>
+            </div>
+          </div>
+
+          {/* INTERACTIVE CONNECTION & SDK SNIPPETS */}
+          <div id="connection-info" className="mt-12 rounded-xl border border-zinc-800 bg-zinc-950/80 p-5 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <KeyRound className="size-4 text-[#3ECF8E]" />
+                  <span>Connect Any External Project</span>
+                </h2>
+                <p className="text-xs text-zinc-400">
+                  Use standard Supabase JS client, Python, Next.js, or direct PostgreSQL ORMs with zero code alterations.
+                </p>
+              </div>
+
+              {/* SDK Tabs */}
+              <div className="flex items-center gap-1 rounded-lg bg-zinc-900 border border-zinc-800 p-1">
+                {(["supabase", "python", "prisma", "curl"] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setSelectedSdkTab(tab)}
+                    className={`rounded-md px-3 py-1 text-xs font-semibold transition-all ${
+                      selectedSdkTab === tab
+                        ? "bg-[#3ECF8E] text-zinc-950 shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {tab === "supabase" ? "@supabase/js" : tab.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Code Snippet Box */}
+            <div className="relative rounded-lg border border-zinc-800/90 bg-[#0A0A0C] p-4 font-mono text-xs text-zinc-300 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  let copyVal = "";
+                  if (selectedSdkTab === "supabase") {
+                    copyVal = `import { createClient } from '@supabase/supabase-js';\nexport const db = createClient('https://api.sparrowx.net', 'spx_live_anon_98234');`;
+                  } else if (selectedSdkTab === "python") {
+                    copyVal = `import psycopg2\nconn = psycopg2.connect("postgresql://postgres:master_pass@139.99.131.135:6543/sparrowbase?sslmode=disable")`;
+                  } else if (selectedSdkTab === "prisma") {
+                    copyVal = `DATABASE_URL="postgresql://postgres:master_pass@139.99.131.135:6543/sparrowbase?pgbouncer=true"\nDIRECT_URL="postgresql://postgres:master_pass@139.99.131.135:5432/sparrowbase"`;
+                  } else {
+                    copyVal = `curl -X GET "https://api.sparrowx.net/rest/v1/app_users?select=*" -H "apikey: spx_live_anon_98234"`;
+                  }
+                  copyText("sdk_code", copyVal);
+                }}
+                className="absolute top-3 right-3 flex items-center gap-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] transition-colors"
+              >
+                {copiedKey === "sdk_code" ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                <span>{copiedKey === "sdk_code" ? "Copied!" : "Copy Code"}</span>
+              </button>
+
+              {selectedSdkTab === "supabase" && (
+                <pre className="space-y-1">
+                  <span className="text-zinc-500">// 1. Install official SDK: npm i @supabase/supabase-js</span>{"\n"}
+                  <span className="text-purple-400">import</span> {"{ createClient }"} <span className="text-purple-400">from</span> <span className="text-emerald-400">'@supabase/supabase-js'</span>;{"\n\n"}
+                  <span className="text-zinc-500">// 2. Connect to your Sovereign SparrowX DB endpoint</span>{"\n"}
+                  <span className="text-purple-400">const</span> supabaseUrl = <span className="text-emerald-400">'https://api.sparrowx.net'</span>;{"\n"}
+                  <span className="text-purple-400">const</span> supabaseAnonKey = <span className="text-emerald-400">'spx_live_anon_key_98234'</span>;{"\n\n"}
+                  <span className="text-purple-400">export const</span> db = createClient(supabaseUrl, supabaseAnonKey);{"\n\n"}
+                  <span className="text-zinc-500">// 3. Query high-speed REST tables directly</span>{"\n"}
+                  <span className="text-purple-400">const</span> {"{ data, error }"} = <span className="text-purple-400">await</span> db.from(<span className="text-emerald-400">'app_users'</span>).select(<span className="text-emerald-400">'*'</span>);
+                </pre>
+              )}
+
+              {selectedSdkTab === "python" && (
+                <pre className="space-y-1">
+                  <span className="text-zinc-500"># Python / AI Agent LangChain Connection</span>{"\n"}
+                  <span className="text-purple-400">import</span> psycopg2{"\n\n"}
+                  conn = psycopg2.connect({"\n"}
+                  {"    "}host=<span className="text-emerald-400">"139.99.131.135"</span>,{"\n"}
+                  {"    "}port=<span className="text-cyan-400">6543</span>, <span className="text-zinc-500"># PgBouncer Connection Pooler</span>{"\n"}
+                  {"    "}dbname=<span className="text-emerald-400">"sparrowbase"</span>,{"\n"}
+                  {"    "}user=<span className="text-emerald-400">"postgres"</span>,{"\n"}
+                  {"    "}password=<span className="text-emerald-400">"YourMasterPassword"</span>{"\n"}
+                  ){"\n\n"}
+                  cur = conn.cursor(){"\n"}
+                  cur.execute(<span className="text-emerald-400">"SELECT * FROM pg_extension WHERE extname = 'vector';"</span>){"\n"}
+                  print(cur.fetchall())
+                </pre>
+              )}
+
+              {selectedSdkTab === "prisma" && (
+                <pre className="space-y-1">
+                  <span className="text-zinc-500">// schema.prisma</span>{"\n"}
+                  datasource db {"{"}{"\n"}
+                  {"  "}provider  = <span className="text-emerald-400">"postgresql"</span>{"\n"}
+                  {"  "}url       = env(<span className="text-emerald-400">"DATABASE_URL"</span>) <span className="text-zinc-500">// Port 6543 (PgBouncer)</span>{"\n"}
+                  {"  "}directUrl = env(<span className="text-emerald-400">"DIRECT_URL"</span>)   <span className="text-zinc-500">// Port 5432 (Migrations)</span>{"\n"}
+                  {"}"}{"\n\n"}
+                  <span className="text-zinc-500"># .env</span>{"\n"}
+                  DATABASE_URL=<span className="text-emerald-400">"postgresql://postgres:pass@139.99.131.135:6543/sparrowbase?pgbouncer=true"</span>{"\n"}
+                  DIRECT_URL=<span className="text-emerald-400">"postgresql://postgres:pass@139.99.131.135:5432/sparrowbase"</span>
+                </pre>
+              )}
+
+              {selectedSdkTab === "curl" && (
+                <pre className="space-y-1">
+                  <span className="text-zinc-500"># Auto-Generated REST API (PostgREST)</span>{"\n"}
+                  curl -X GET <span className="text-emerald-400">"https://api.sparrowx.net/rest/v1/app_users?select=*&limit=10"</span> \{"\n"}
+                  {"  "}-H <span className="text-cyan-400">"apikey: spx_live_anon_key_98234"</span> \{"\n"}
+                  {"  "}-H <span className="text-cyan-400">"Authorization: Bearer spx_live_anon_key_98234"</span>
+                </pre>
+              )}
+            </div>
+
+            {/* Direct Connection Strings summary */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3">
+                <div className="flex items-center justify-between text-zinc-400 mb-1">
+                  <span className="text-[11px] font-bold text-zinc-300">Pooled Connection (Port 6543)</span>
+                  <button
+                    type="button"
+                    onClick={() => copyText("pooler_uri", "postgresql://postgres:[PASSWORD]@139.99.131.135:6543/sparrowbase?pgbouncer=true")}
+                    className="text-zinc-400 hover:text-[#3ECF8E]"
+                  >
+                    {copiedKey === "pooler_uri" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <p className="text-zinc-300 truncate">postgresql://postgres:***@139.99.131.135:6543/sparrowbase</p>
+              </div>
+
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-3">
+                <div className="flex items-center justify-between text-zinc-400 mb-1">
+                  <span className="text-[11px] font-bold text-zinc-300">Direct PostgreSQL (Port 5432)</span>
+                  <button
+                    type="button"
+                    onClick={() => copyText("direct_uri", "postgresql://postgres:[PASSWORD]@139.99.131.135:5432/sparrowbase")}
+                    className="text-zinc-400 hover:text-[#3ECF8E]"
+                  >
+                    {copiedKey === "direct_uri" ? "Copied" : "Copy"}
+                  </button>
+                </div>
+                <p className="text-zinc-300 truncate">postgresql://postgres:***@139.99.131.135:5432/sparrowbase</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 4 CORE ADVANTAGES */}
+          <div className="mt-14 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-2 hover:border-[#3ECF8E]/40 transition-colors">
+              <div className="grid size-9 place-items-center rounded-lg bg-[#3ECF8E]/10 text-[#3ECF8E]">
+                <Sparkles className="size-5" />
+              </div>
+              <h3 className="font-bold text-white text-sm">pgvector for AI Agents</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Store 1536-dim or 3072-dim embeddings for OpenAI, Gemini, and Claude with ultra-fast HNSW indexing.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-2 hover:border-[#3ECF8E]/40 transition-colors">
+              <div className="grid size-9 place-items-center rounded-lg bg-teal-500/10 text-teal-400">
+                <Zap className="size-5" />
+              </div>
+              <h3 className="font-bold text-white text-sm">5,000+ Conns Pooler</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Pre-configured PgBouncer transaction pooling prevents pool exhaustion during serverless Next.js spikes.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-2 hover:border-[#3ECF8E]/40 transition-colors">
+              <div className="grid size-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-400">
+                <Terminal className="size-5" />
+              </div>
+              <h3 className="font-bold text-white text-sm">Auto REST & GraphQL</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Every table automatically gains instant HTTP endpoints with JWT authentication and Row Level Security.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-5 space-y-2 hover:border-[#3ECF8E]/40 transition-colors">
+              <div className="grid size-9 place-items-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                <ShieldCheck className="size-5" />
+              </div>
+              <h3 className="font-bold text-white text-sm">100% Data Sovereignty</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Hosted on dedicated European bare-metal NVMe. No cloud hyperscaler lock-in, zero unexpected usage bills.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* MODAL: CREATE NEW PROJECT */}
+        {showNewProjectModal && (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="w-full max-w-lg rounded-xl border border-zinc-800 bg-[#141519] p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+                <div className="flex items-center gap-2 text-white font-bold text-base">
+                  <Database className="size-4 text-[#3ECF8E]" />
+                  <span>Provision New Database Project</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewProjectModal(false);
+                    setCreatedProjectCreds(null);
+                  }}
+                  className="rounded p-1 text-zinc-400 hover:text-white"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              {!createdProjectCreds ? (
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-semibold text-zinc-300 mb-1">Project Name</label>
+                    <input
+                      type="text"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white outline-none focus:border-[#3ECF8E]"
+                      placeholder="e.g. mobile-app-backend"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-zinc-300 mb-1">Region / Node</label>
+                    <select
+                      value={newProjectRegion}
+                      onChange={(e) => setNewProjectRegion(e.target.value)}
+                      className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-white outline-none focus:border-[#3ECF8E]"
+                    >
+                      <option value="OVH Gravelines (EU-West)">OVH Gravelines (139.99.131.135 - 64GB Node)</option>
+                      <option value="Frankfurt (EU-Central)">Frankfurt Node 2</option>
+                      <option value="US-East (Virginia)">US-East Bare Metal</option>
+                    </select>
+                  </div>
+
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-3 space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer text-zinc-200">
+                      <input
+                        type="checkbox"
+                        checked={newProjectEnableVector}
+                        onChange={(e) => setNewProjectEnableVector(e.target.checked)}
+                        className="rounded border-zinc-700 text-[#3ECF8E] focus:ring-0"
+                      />
+                      <span className="font-semibold">Enable pgvector AI Extensions</span>
+                    </label>
+                    <p className="text-[11px] text-zinc-400 pl-5">
+                      Installs HNSW index support and 1536-dim vector operators for OpenAI/Gemini embeddings.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowNewProjectModal(false)}
+                      className="rounded-lg border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateProject}
+                      className="rounded-lg bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-zinc-950 font-bold px-4 py-1.5"
+                    >
+                      Provision Project
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4 text-xs font-mono">
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="size-4 shrink-0" />
+                    <span>Project "{createdProjectCreds.name}" provisioned successfully!</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <span className="text-zinc-400 text-[11px]">Public `anon` Key:</span>
+                      <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded p-2 text-zinc-200 text-[11px]">
+                        <span className="truncate">{createdProjectCreds.anonKey}</span>
+                        <button type="button" onClick={() => copyText("anon", createdProjectCreds.anonKey)} className="text-[#3ECF8E] text-[10px]">
+                          {copiedKey === "anon" ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-zinc-400 text-[11px]">Secret `service_role` Key:</span>
+                      <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded p-2 text-zinc-200 text-[11px]">
+                        <span className="truncate">{createdProjectCreds.serviceKey}</span>
+                        <button type="button" onClick={() => copyText("service", createdProjectCreds.serviceKey)} className="text-[#3ECF8E] text-[10px]">
+                          {copiedKey === "service" ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-zinc-400 text-[11px]">PgBouncer Pooled URI (Port 6543):</span>
+                      <div className="flex items-center justify-between bg-zinc-900 border border-zinc-800 rounded p-2 text-zinc-200 text-[11px]">
+                        <span className="truncate">{createdProjectCreds.pooledString}</span>
+                        <button type="button" onClick={() => copyText("pooled", createdProjectCreds.pooledString)} className="text-[#3ECF8E] text-[10px]">
+                          {copiedKey === "pooled" ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowNewProjectModal(false);
+                        setCreatedProjectCreds(null);
+                        setViewMode("studio");
+                      }}
+                      className="rounded-lg bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-zinc-950 font-bold px-4 py-1.5"
+                    >
+                      Open in Studio Console →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-svh w-full bg-[#121212] text-[#EDEDED] font-sans flex flex-col select-none">
       {/* SUPABASE STUDIO TOP HEADER BAR */}
       <header className="h-13 border-b border-[#2E2E2E] bg-[#181818] px-4 flex items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setViewMode("landing")}
+            className="flex items-center gap-1.5 rounded-md bg-[#232323] hover:bg-[#2b2b2b] border border-[#383838] px-2.5 py-1 text-xs text-zinc-300 font-medium transition-colors"
+            title="Return to Product Landing Page"
+          >
+            <ArrowLeft className="size-3.5" />
+            <span className="hidden sm:inline">Landing Page</span>
+          </button>
+
           {/* Supabase Emerald Bolt Emblem */}
           <div className="flex items-center gap-2">
             <div className="grid size-7 place-items-center rounded-md bg-[#3ECF8E]/15 border border-[#3ECF8E]/40 text-[#3ECF8E]">
@@ -556,15 +1093,15 @@ export function SovereignDatabaseStudio({
             </div>
             <div className="flex items-center gap-2 text-xs">
               <span className="font-bold tracking-tight text-white">
-                SparrowX <span className="text-[#3ECF8E]">Studio</span>
+                SparrowX <span className="text-[#3ECF8E]">DB Studio</span>
               </span>
               <span className="text-[#505050]">/</span>
               <span className="rounded bg-[#232323] border border-[#333333] px-2 py-0.5 font-mono text-[11px] text-[#3ECF8E]">
-                sparrowx_db
+                sparrowbase
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 px-2 py-0.5 text-[10px] font-mono text-[#3ECF8E]">
                 <span className="size-1.5 rounded-full bg-[#3ECF8E] animate-pulse" />
-                LOCAL OVH ENGINE (100% SOVEREIGN)
+                SOVEREIGN VPS (139.99.131.135)
               </span>
             </div>
           </div>

@@ -4,13 +4,13 @@
     email admin@yourdomain.com
 }
 
-# 1. SparrowX Management & DB Studio
-studio.yourdomain.com {
+# 1. SparrowX DB Landing Page & Management Studio
+db.sparrowx.net, studio.yourdomain.com {
     reverse_proxy sparrowx-studio:3000
 }
 
 # 2. SparrowX DB REST API Gateway (PostgREST)
-api.yourdomain.com {
+api.sparrowx.net, api.yourdomain.com {
     # Edge WAF headers
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
