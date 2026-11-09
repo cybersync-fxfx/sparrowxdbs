@@ -1,5 +1,5 @@
 import { createServer, request as httpRequest } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile, mkdir, unlink } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import serverModule from "../.output/server/index.mjs";
 import { migrateCloudSupabaseToLocal } from "./migrate-from-supabase.mjs";
@@ -9,6 +9,32 @@ const HOST = process.env.HOST || "0.0.0.0";
 const POSTGREST_HOST = process.env.POSTGREST_HOST || "sparrowx-postgrest";
 const POSTGREST_PORT = Number(process.env.POSTGREST_PORT || 3000);
 const PUBLIC_DIR = resolve(process.cwd(), ".output/public");
+const STORAGE_DIR = resolve(process.cwd(), "data/storage");
+const STORAGE_INDEX_FILE = resolve(STORAGE_DIR, "index.json");
+
+// Ensure persistent storage directory and index file exist
+async function ensureStorageDir() {
+  await mkdir(STORAGE_DIR, { recursive: true }).catch(() => {});
+  try {
+    await stat(STORAGE_INDEX_FILE);
+  } catch {
+    await writeFile(STORAGE_INDEX_FILE, JSON.stringify([], null, 2));
+  }
+}
+ensureStorageDir().catch(() => {});
+
+async function getStoredFiles() {
+  try {
+    const raw = await readFile(STORAGE_INDEX_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+async function saveStoredFiles(files) {
+  await writeFile(STORAGE_INDEX_FILE, JSON.stringify(files, null, 2));
+}
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -142,6 +168,124 @@ const server = createServer(async (req, res) => {
         } catch {
           // Not a static file on disk, continue to router / API handler
         }
+      }
+    }
+
+    // =========================================================================
+    // PERSISTENT STORAGE ENGINE (MEDIAFIRE / FILE STORE ON NVME DISK)
+    // =========================================================================
+    // 1. Download file by unique ID: /f/:id or /api/storage/download/:id
+    const downloadMatch = pathname.match(/^\/f\/([a-zA-Z0-9_-]+)/) || pathname.match(/^\/api\/storage\/download\/([a-zA-Z0-9_-]+)/);
+    if (downloadMatch && (req.method === "GET" || req.method === "HEAD")) {
+      const fileId = downloadMatch[1];
+      const files = await getStoredFiles();
+      const item = files.find((f) => f.id === fileId);
+      if (item) {
+        const filePath = resolve(STORAGE_DIR, fileId);
+        try {
+          const content = await readFile(filePath);
+          item.downloads = (item.downloads || 0) + 1;
+          await saveStoredFiles(files);
+
+          res.writeHead(200, {
+            ...SECURITY_HEADERS,
+            "Content-Type": item.type || "application/octet-stream",
+            "Content-Length": content.byteLength,
+            "Content-Disposition": `attachment; filename="${encodeURIComponent(item.name)}"`,
+            "Access-Control-Allow-Origin": "*",
+          });
+          res.end(req.method === "HEAD" ? undefined : content);
+          return;
+        } catch (err) {
+          console.warn("[Storage Download Note]", err.message);
+        }
+      }
+    }
+
+    // 2. List all stored files: GET /api/storage/files
+    if (pathname === "/api/storage/files" && req.method === "GET") {
+      const files = await getStoredFiles();
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        ...SECURITY_HEADERS,
+      });
+      res.end(JSON.stringify(files));
+      return;
+    }
+
+    // 3. Upload file to persistent disk: POST /api/storage/upload
+    if (pathname === "/api/storage/upload" && req.method === "POST") {
+      const chunks = [];
+      let totalBytes = 0;
+      for await (const chunk of req) {
+        const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+        totalBytes += buf.byteLength;
+        if (totalBytes > 100 * 1024 * 1024) {
+          res.writeHead(413, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+          res.end(JSON.stringify({ error: "Payload exceeds 100MB limit" }));
+          return;
+        }
+        chunks.push(buf);
+      }
+      const rawBody = Buffer.concat(chunks);
+
+      try {
+        const parsed = JSON.parse(rawBody.toString("utf-8"));
+        if (parsed.filename && parsed.base64Data) {
+          const fileId = `spx_f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+          const buffer = Buffer.from(parsed.base64Data, "base64");
+          await writeFile(resolve(STORAGE_DIR, fileId), buffer);
+
+          const proto = req.headers["x-forwarded-proto"] || "https";
+          const fileDomain = host.includes("file.") ? host : "file.sparrowx.net";
+          const record = {
+            id: fileId,
+            name: parsed.filename,
+            size: buffer.byteLength,
+            type: parsed.type || "application/octet-stream",
+            createdAt: new Date().toISOString(),
+            downloads: 0,
+            url: `${proto}://${fileDomain}/f/${fileId}`,
+          };
+
+          const files = await getStoredFiles();
+          files.unshift(record);
+          await saveStoredFiles(files);
+
+          res.writeHead(201, {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            ...SECURITY_HEADERS,
+          });
+          res.end(JSON.stringify({ success: true, file: record }));
+          return;
+        }
+      } catch {
+        // Ignored
+      }
+
+      res.writeHead(400, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: "Invalid upload request format" }));
+      return;
+    }
+
+    // 4. Delete file from persistent disk: DELETE /api/storage/files/:id
+    if ((pathname.startsWith("/api/storage/files/") || pathname === "/api/storage/files") && req.method === "DELETE") {
+      const urlObj = new URL(reqUrl, "http://localhost");
+      const fileId = pathname.replace(/^\/api\/storage\/files\/?/, "") || urlObj.searchParams.get("id");
+      if (fileId) {
+        const files = await getStoredFiles();
+        const updated = files.filter((f) => f.id !== fileId);
+        await saveStoredFiles(updated);
+        await unlink(resolve(STORAGE_DIR, fileId)).catch(() => {});
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify({ success: true, deletedId: fileId }));
+        return;
       }
     }
 

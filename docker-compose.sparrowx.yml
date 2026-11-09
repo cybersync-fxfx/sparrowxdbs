@@ -20,6 +20,8 @@ volumes:
     driver: local
   sparrowx_redis_data:
     driver: local
+  sparrowx_file_storage:
+    driver: local
 
 services:
   # ----------------------------------------------------------------------------
@@ -135,6 +137,8 @@ services:
       - DOMAIN_PASSWORD=${DOMAIN_PASSWORD:-password.sparrowx.net}
       - ADDITIONAL_REDIRECT_URLS=${ADDITIONAL_REDIRECT_URLS:-https://db.sparrowx.net/**,https://sec.sparrowx.net/**,https://file.sparrowx.net/**,https://password.sparrowx.net/**,https://passwd.sparrowx.net/**}
       - GOTRUE_SITE_URL=${GOTRUE_SITE_URL:-https://db.sparrowx.net}
+    volumes:
+      - sparrowx_file_storage:/app/data/storage
     networks:
       - sparrowx_net
     depends_on:
