@@ -1651,12 +1651,15 @@ function Dashboard() {
     (window.location.hostname.startsWith("db.") ||
       window.location.hostname.startsWith("studio.") ||
       window.location.hostname.startsWith("supabase.") ||
+      window.location.hostname.startsWith("sparrowbase.") ||
       new URLSearchParams(window.location.search).get("studio") === "1" ||
-      new URLSearchParams(window.location.search).get("studio") === "true");
+      new URLSearchParams(window.location.search).get("studio") === "true" ||
+      new URLSearchParams(window.location.search).get("sparrowbase") === "1" ||
+      new URLSearchParams(window.location.search).get("db") === "1");
 
   if (
     authSession.role === "admin" &&
-    (isStudioDomainOrParam || activeNav === "Supabase Studio")
+    (isStudioDomainOrParam || activeNav === "Supabase Studio" || activeNav === "SparrowX DB")
   ) {
     return (
       <>
@@ -1794,16 +1797,16 @@ function Dashboard() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveNav("Supabase Studio")}
+                  onClick={() => setActiveNav("SparrowX DB")}
                   className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    activeNav === "Supabase Studio"
+                    activeNav === "SparrowX DB" || activeNav === "Supabase Studio"
                       ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
                       : "text-[#3ECF8E] hover:bg-[#3ECF8E]/15"
                   }`}
-                  title="Open Mirrored Supabase Database Studio"
+                  title="Open Sovereign SparrowX DB (DBaaS) Studio"
                 >
                   <Database className="size-3.5 shrink-0" />
-                  <span className="hidden sm:inline">Supabase Studio</span>
+                  <span className="hidden sm:inline">SparrowX DB</span>
                   <span className="sm:hidden text-[11px]">DB</span>
                 </button>
               </div>

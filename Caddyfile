@@ -1,0 +1,23 @@
+# Caddyfile for SparrowX Dual Platform (Security & SparrowX DB)
+
+{
+    email admin@yourdomain.com
+}
+
+# 1. SparrowX Management & DB Studio
+studio.yourdomain.com {
+    reverse_proxy sparrowx-studio:80
+}
+
+# 2. SparrowX DB REST API Gateway (PostgREST)
+api.yourdomain.com {
+    # Edge WAF headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+
+    reverse_proxy sparrowx-postgrest:3000
+}

@@ -1,0 +1,177 @@
+# ==============================================================================
+# SPARROWX ENTERPRISE INFRASTRUCTURE: DUAL-ENGINE ARCHITECTURE
+# 1. SparrowX Security (Edge WAF, DDoS Mitigation, AI Guardrails)
+# 2. SparrowX DB (Sovereign DBaaS: Postgres 16 + pgvector + PgBouncer + PostgREST + Auth)
+# Sized for 64GB RAM / 8 Cores / 2TB NVMe VPS
+# ==============================================================================
+
+version: '3.8'
+
+networks:
+  sparrowx_edge:
+    name: sparrowx_edge_net
+    driver: bridge
+  sparrowx_internal:
+    name: sparrowx_internal_net
+    internal: true
+
+volumes:
+  sparrowx_pgdata:
+    driver: local
+  sparrowx_caddy_data:
+    driver: local
+  sparrowx_caddy_config:
+    driver: local
+  sparrowx_redis_data:
+    driver: local
+
+services:
+  # ----------------------------------------------------------------------------
+  # PILLAR 1: SPARROWX SECURITY (Edge Proxy, TLS Termination, WAF, AI Guardrails)
+  # ----------------------------------------------------------------------------
+  sparrowx-edge-proxy:
+    image: caddy:2.8-alpine
+    container_name: sparrowx_edge_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC
+    environment:
+      - DOMAIN_STUDIO=studio.yourdomain.com
+      - DOMAIN_API=api.yourdomain.com
+      - DOMAIN_AUTH=auth.yourdomain.com
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - sparrowx_caddy_data:/data
+      - sparrowx_caddy_config:/config
+    networks:
+      - sparrowx_edge
+      - sparrowx_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4096M
+
+  sparrowx-threat-cache:
+    image: redis:7-alpine
+    container_name: sparrowx_threat_cache
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${SPARROWX_REDIS_SECRET:-secret_redis_pass_123}
+    volumes:
+      - sparrowx_redis_data:/data
+    networks:
+      - sparrowx_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2048M
+
+  # ----------------------------------------------------------------------------
+  # PILLAR 2: SPARROWX DB (Sovereign Database-as-a-Service Engine)
+  # ----------------------------------------------------------------------------
+  sparrowx-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sparrowx_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sparrowbase}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command: >
+      postgres 
+      -c shared_buffers=16GB
+      -c effective_cache_size=40GB
+      -c maintenance_work_mem=2GB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=64MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=64MB
+      -c min_wal_size=2GB
+      -c max_wal_size=16GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_connections=400
+    volumes:
+      - sparrowx_pgdata:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d:ro
+    networks:
+      - sparrowx_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '5.0'
+          memory: 40960M
+
+  sparrowx-pgbouncer:
+    image: edoburu/pgbouncer:v1.22.0
+    container_name: sparrowx_pgbouncer
+    restart: always
+    ports:
+      - "6543:6543" # External connection pooling port (Supabase compatible)
+    environment:
+      - DB_USER=${POSTGRES_USER:-postgres}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}
+      - DB_HOST=sparrowx-postgres
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-sparrowbase}
+      - POOL_MODE=transaction
+      - MAX_CLIENT_CONN=5000
+      - DEFAULT_POOL_SIZE=80
+      - LISTEN_PORT=6543
+      - AUTH_TYPE=scram-sha-256
+    networks:
+      - sparrowx_edge
+      - sparrowx_internal
+    depends_on:
+      - sparrowx-postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2048M
+
+  # PostgREST: Generates Instant REST API from Postgres Schemas
+  sparrowx-postgrest:
+    image: postgrest/postgrest:v12.2.0
+    container_name: sparrowx_postgrest
+    restart: always
+    environment:
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}@sparrowx-pgbouncer:6543/${POSTGRES_DB:-sparrowbase}
+      PGRST_DB_SCHEMA: ${PGRST_DB_SCHEMA:-public,auth,storage}
+      PGRST_DB_ANON_ROLE: ${PGRST_DB_ANON_ROLE:-anon}
+      PGRST_JWT_SECRET: ${SPARROWX_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-sparrowx}
+      PGRST_OPENAPI_SERVER_PROXY_URI: https://api.yourdomain.com
+    networks:
+      - sparrowx_internal
+    depends_on:
+      - sparrowx-pgbouncer
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 3072M
+
+  # SparrowX Dashboard & Studio Frontend
+  sparrowx-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sparrowx_studio
+    restart: always
+    environment:
+      - VITE_SPARROWX_API_URL=https://api.yourdomain.com
+      - VITE_SPARROWX_WS_URL=wss://api.yourdomain.com/realtime
+    networks:
+      - sparrowx_internal
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2048M
