@@ -646,19 +646,19 @@ export function CyberThreatGlobe({
     earthNightTex.colorSpace = THREE.SRGBColorSpace;
     cloudTex.colorSpace = THREE.SRGBColorSpace;
 
-    // 1. Earth Surface Mesh with High-Brightness Specular & Golden Night City Lights
+    // 1. Earth Surface Mesh with Balanced Specular & Subtle Night City Lights
     const R = 100;
     const earthGeom = new THREE.SphereGeometry(R, 64, 64);
     const earthMat = new THREE.MeshStandardMaterial({
       map: earthDayTex,
       normalMap: earthNormalTex,
-      normalScale: new THREE.Vector2(0.85, 0.85),
+      normalScale: new THREE.Vector2(0.5, 0.5),
       roughnessMap: earthSpecTex,
-      roughness: 0.52,
-      metalness: 0.12,
+      roughness: 0.65,
+      metalness: 0.05,
       emissiveMap: earthNightTex,
-      emissive: new THREE.Color(0xffb84d),
-      emissiveIntensity: 2.6,
+      emissive: new THREE.Color(0xffc266),
+      emissiveIntensity: 0.85,
     });
     const earthMesh = new THREE.Mesh(earthGeom, earthMat);
     earthGroup.add(earthMesh);
@@ -669,18 +669,18 @@ export function CyberThreatGlobe({
       color: 0xff9900,
       wireframe: true,
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.05,
       depthWrite: false,
     });
     const gridMesh = new THREE.Mesh(gridGeom, gridMat);
     earthGroup.add(gridMesh);
 
     // 2. Atmospheric Clouds Layer (rotates independently)
-    const cloudGeom = new THREE.SphereGeometry(R + 0.65, 64, 64);
+    const cloudGeom = new THREE.SphereGeometry(R + 0.5, 64, 64);
     const cloudMat = new THREE.MeshStandardMaterial({
       map: cloudTex,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.22,
       blending: THREE.NormalBlending,
       depthWrite: false,
     });
@@ -725,8 +725,8 @@ export function CyberThreatGlobe({
       const isOrigin = city.isOrigin;
       const normal = pos.clone().normalize();
 
-      // Core illuminated micro-beacon pin
-      const pinGeom = new THREE.SphereGeometry(isOrigin ? 0.9 : 0.6, 16, 16);
+      // Core illuminated micro-beacon pin (flush with surface)
+      const pinGeom = new THREE.SphereGeometry(isOrigin ? 0.65 : 0.45, 16, 16);
       const pinMat = new THREE.MeshBasicMaterial({
         color: isOrigin ? 0xff7700 : 0x00e5ff,
       });
@@ -736,14 +736,14 @@ export function CyberThreatGlobe({
       cityPinsGroup.add(pinMesh);
       pinMeshes.push({ mesh: pinMesh, city });
 
-      // Tactical vertical beacon needle
-      const spikeLen = isOrigin ? 3.2 : 2.2;
-      const spikeGeom = new THREE.CylinderGeometry(0.06, 0.06, spikeLen, 8);
+      // Sleek tactical micro-beacon needle (short & clean)
+      const spikeLen = isOrigin ? 1.4 : 0.9;
+      const spikeGeom = new THREE.CylinderGeometry(0.04, 0.04, spikeLen, 8);
       spikeGeom.translate(0, spikeLen / 2, 0);
       const spikeMat = new THREE.MeshBasicMaterial({
         color: isOrigin ? 0xff9922 : 0x00d4ff,
         transparent: true,
-        opacity: 0.75,
+        opacity: 0.8,
       });
       const spikeMesh = new THREE.Mesh(spikeGeom, spikeMat);
       spikeMesh.position.copy(pos);
@@ -751,7 +751,7 @@ export function CyberThreatGlobe({
       cityPinsGroup.add(spikeMesh);
 
       // Subtle ground radar micro-ring
-      const radarGeom = new THREE.RingGeometry(0.3, isOrigin ? 1.3 : 0.8, 24);
+      const radarGeom = new THREE.RingGeometry(0.2, isOrigin ? 0.8 : 0.5, 24);
       const radarMat = new THREE.MeshBasicMaterial({
         color: isOrigin ? 0xff7700 : 0x00e5ff,
         side: THREE.DoubleSide,
@@ -766,7 +766,7 @@ export function CyberThreatGlobe({
 
       // Floating 3D City Name Label Sprite
       const labelSprite = createTextSprite(city.name, isOrigin);
-      const labelPos = pos.clone().add(normal.clone().multiplyScalar(spikeLen + 1.2));
+      const labelPos = pos.clone().add(normal.clone().multiplyScalar(spikeLen + 0.8));
       labelSprite.position.copy(labelPos);
       cityPinsGroup.add(labelSprite);
       cityLabelSprites.push({ sprite: labelSprite, normal });
