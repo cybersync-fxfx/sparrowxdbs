@@ -34,7 +34,7 @@ import {
 } from "@/components/SparrowxAiBrainCenter";
 import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
 import { SovereignDatabaseStudio } from "@/components/SovereignDatabaseStudio";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   Activity,
@@ -77,6 +77,7 @@ import {
   RefreshCw,
   Search,
   Server,
+  Shield,
   ShieldAlert,
   ShieldCheck,
   Siren,
@@ -84,6 +85,7 @@ import {
   Sparkles,
   Terminal,
   Trash2,
+  Bug,
   Users,
   Wrench,
   X,
@@ -235,6 +237,9 @@ function Dashboard() {
   const [sidebarCollapseMode, setSidebarCollapseMode] = useState<"icon" | "offcanvas">("icon");
   const [incidentFilter, setIncidentFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState<RangeOption>("24 hours");
   const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -320,6 +325,30 @@ function Dashboard() {
       if (refId) setActiveDocRef(refId);
       handleNavigate("Troubleshooting & Docs");
     });
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setSearchOpen(true);
+      } else if (e.key === "Escape") {
+        setSearchOpen(false);
+        searchInputRef.current?.blur();
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
   }, []);
 
   useEffect(() => {
@@ -1673,6 +1702,222 @@ function Dashboard() {
     );
   }
 
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+
+    const results: Array<{
+      id: string;
+      title: string;
+      description: string;
+      category: "Security Module" | "Navigation" | "Incident" | "Service" | "Database";
+      badge: string;
+      action: () => void;
+    }> = [];
+
+    // 1. Core Security & WAF Rules
+    const securityItems = [
+      {
+        title: "Web & WAF Security",
+        description: "Edge reverse proxy, SQL injection filters, OWASP Top 10, rate limiting & DDoS mitigation",
+        category: "Security Module" as const,
+        badge: "WAF Active",
+        keywords: ["waf", "web", "firewall", "shield", "sqli", "sql injection", "xss", "ddos", "proxy", "edge", "rules"],
+        action: () => {
+          handleNavigate("Web & WAF Security");
+          setSearch("");
+          setSearchOpen(false);
+          showToast("Navigated to Web & WAF Security module");
+        },
+      },
+      {
+        title: "AI Agent & LLM Shield",
+        description: "Zero-latency prompt firewall, adversarial jailbreak protection, and MCP tool call defense",
+        category: "Security Module" as const,
+        badge: "AI Guard",
+        keywords: ["ai", "llm", "agent", "prompt", "jailbreak", "mcp", "guardrails", "guard"],
+        action: () => {
+          handleNavigate("AI Agent & LLM Shield");
+          setSearch("");
+          setSearchOpen(false);
+          showToast("Navigated to AI Agent & LLM Shield");
+        },
+      },
+      {
+        title: "Protection Status & Verification",
+        description: "Live health probe, edge DNS verification, latency checks, and inline protection auditing",
+        category: "Security Module" as const,
+        badge: "Verification",
+        keywords: ["verify", "verification", "status", "probe", "dns", "latency", "health", "audit"],
+        action: () => {
+          handleNavigate("Protection Status & Verification");
+          setSearch("");
+          setSearchOpen(false);
+          showToast("Navigated to Protection Status & Verification Center");
+        },
+      },
+      {
+        title: "SparrowX DB (DBaaS)",
+        description: "Sovereign Postgres 16, pgvector embeddings, connection pooler (:6543), and REST APIs",
+        category: "Database" as const,
+        badge: "DBaaS",
+        keywords: ["db", "database", "postgres", "sparrowbase", "supabase", "sql", "pooler", "keys", "vector"],
+        action: () => {
+          handleNavigate("SparrowX DB");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Live Traffic Mesh & Threat Map",
+        description: "Visual attack vectors, live threat arcs, host beacons, and connection streams",
+        category: "Navigation" as const,
+        badge: "Threat Map",
+        keywords: ["map", "globe", "traffic", "mesh", "matrix", "threats", "arcs", "streams", "live"],
+        action: () => {
+          handleNavigate("Live Traffic Mesh");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Client Portal & Services",
+        description: "Service onboarding wizard, DNS CNAME configuration, and active service credentials",
+        category: "Navigation" as const,
+        badge: "Client Area",
+        keywords: ["client", "services", "portal", "onboarding", "dns", "cname", "customer", "my services"],
+        action: () => {
+          handleNavigate("My Services");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "SIEM & Detection Rules",
+        description: "Configured perimeter detection triggers, anomaly heuristics, and automated block rules",
+        category: "Security Module" as const,
+        badge: "SIEM",
+        keywords: ["siem", "rules", "detection", "anomaly", "heuristics", "block rules"],
+        action: () => {
+          handleNavigate("SIEM Rules");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Activity & Operations History",
+        description: "Immutable security audit log, operator access events, and incident resolution history",
+        category: "Navigation" as const,
+        badge: "Audit Log",
+        keywords: ["audit", "logs", "activity", "history", "events", "compliance"],
+        action: () => {
+          handleNavigate("Activity History");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Billing & Credits",
+        description: "Manage subscription plans, top up usage credits, and inspect payment transactions",
+        category: "Navigation" as const,
+        badge: "Finance",
+        keywords: ["billing", "credits", "payment", "invoice", "plan", "subscription", "pricing"],
+        action: () => {
+          handleNavigate("Billing & Credits");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+    ];
+
+    securityItems.forEach((item, idx) => {
+      const matchTitle = item.title.toLowerCase().includes(q);
+      const matchDesc = item.description.toLowerCase().includes(q);
+      const matchKw = item.keywords.some((k) => k.includes(q) || q.includes(k));
+      if (matchTitle || matchDesc || matchKw) {
+        results.push({
+          id: `sec-${idx}`,
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          badge: item.badge,
+          action: item.action,
+        });
+      }
+    });
+
+    // 2. Search Protected Services & Client Tenants
+    clientTenants.forEach((tenant) => {
+      if (
+        tenant.name.toLowerCase().includes(q) ||
+        (tenant.primaryDomain && tenant.primaryDomain.toLowerCase().includes(q)) ||
+        tenant.enabledModules.some((m) => m.toLowerCase().includes(q))
+      ) {
+        results.push({
+          id: `tenant-${tenant.id}`,
+          title: tenant.name,
+          description: `Domain: ${tenant.primaryDomain || "Internal"} · Plan: ${tenant.planTier} · Modules: ${tenant.enabledModules.join(", ")}`,
+          category: "Service",
+          badge: tenant.planTier,
+          action: () => {
+            setActiveClientTenantId(tenant.id);
+            handleNavigate("Client Overview");
+            setSearch("");
+            setSearchOpen(false);
+          },
+        });
+      }
+    });
+
+    // 3. Search Incidents
+    incidents.forEach((inc) => {
+      if (
+        inc.title.toLowerCase().includes(q) ||
+        inc.id.toLowerCase().includes(q) ||
+        inc.source.toLowerCase().includes(q) ||
+        inc.summary.toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `inc-${inc.id}`,
+          title: `${inc.id}: ${inc.title}`,
+          description: `Source: ${inc.source} · Severity: ${inc.severity} · Status: ${inc.status}`,
+          category: "Incident",
+          badge: inc.severity,
+          action: () => {
+            setSelectedIncidentId(inc.id);
+            handleNavigate("Incidents");
+            setSearch("");
+            setSearchOpen(false);
+          },
+        });
+      }
+    });
+
+    // 4. Search Vulnerabilities
+    vulnerabilities.forEach((vuln) => {
+      if (
+        vuln.cve.toLowerCase().includes(q) ||
+        vuln.package.toLowerCase().includes(q) ||
+        vuln.title.toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `vuln-${vuln.id}`,
+          title: `${vuln.cve} in ${vuln.package}`,
+          description: `${vuln.title} · CVSS ${vuln.cvss}`,
+          category: "Security Module",
+          badge: vuln.severity,
+          action: () => {
+            handleNavigate("CVEs & Patch Tracker");
+            setSearch("");
+            setSearchOpen(false);
+          },
+        });
+      }
+    });
+
+    return results.slice(0, 10);
+  }, [search, clientTenants, incidents, vulnerabilities, handleNavigate]);
+
   const userInitials = currentUser?.fullName
     ? currentUser.fullName
         .split(" ")
@@ -1823,14 +2068,22 @@ function Dashboard() {
               </div>
             )}
 
-            {/* Global Search Bar */}
-            <div className="hidden h-8.5 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground lg:flex shadow-xs">
-              <Search className="size-3.5" />
+            {/* Global Search Bar & Command Palette */}
+            <div
+              ref={searchContainerRef}
+              className="relative hidden h-8.5 items-center gap-2 rounded-md border border-border bg-card px-2.5 text-muted-foreground lg:flex shadow-xs"
+            >
+              <Search className="size-3.5 shrink-0" />
               <input
+                ref={searchInputRef}
                 aria-label="Search operational assets, incidents, and threat feeds"
-                className="w-36 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search telemetry..."
+                className="w-44 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                placeholder="Search telemetry, WAF, AI..."
                 type="text"
                 value={search}
               />
@@ -1838,7 +2091,10 @@ function Dashboard() {
                 <button
                   aria-label="Clear search"
                   className="text-xs text-muted-foreground hover:text-foreground"
-                  onClick={() => setSearch("")}
+                  onClick={() => {
+                    setSearch("");
+                    setSearchOpen(false);
+                  }}
                   type="button"
                 >
                   <X className="size-3" />
@@ -1847,6 +2103,69 @@ function Dashboard() {
                 <kbd className="rounded border border-border px-1 py-0.2 font-mono text-[9px] text-muted-foreground">
                   <Command className="inline size-2.5" /> K
                 </kbd>
+              )}
+
+              {/* FLOATING SEARCH PALETTE DROPDOWN */}
+              {searchOpen && search.trim().length > 0 && (
+                <div className="absolute top-10 right-0 z-50 w-[420px] rounded-xl border border-border bg-popover/95 p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-[460px] overflow-y-auto">
+                  <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-mono text-muted-foreground border-b border-border/60 pb-1.5 mb-1.5">
+                    <span>SECURITY SEARCH RESULTS ({searchResults.length})</span>
+                    <span>ESC to close</span>
+                  </div>
+
+                  {searchResults.length > 0 ? (
+                    <div className="space-y-1">
+                      {searchResults.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={item.action}
+                          className="w-full text-left rounded-lg p-2 hover:bg-accent/80 transition-colors flex items-start gap-2.5 group cursor-pointer"
+                        >
+                          <div className="grid size-7 place-items-center rounded-md bg-secondary/80 border border-border/60 text-primary shrink-0 group-hover:border-primary/50 transition-colors">
+                            {item.category === "Security Module" ? (
+                              <ShieldCheck className="size-3.5 text-primary" />
+                            ) : item.category === "Database" ? (
+                              <Database className="size-3.5 text-[#3ECF8E]" />
+                            ) : item.category === "Incident" ? (
+                              <AlertTriangle className="size-3.5 text-destructive" />
+                            ) : (
+                              <Globe2 className="size-3.5 text-sky-400" />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-semibold text-xs text-foreground truncate group-hover:text-primary transition-colors">
+                                {item.title}
+                              </span>
+                              <span
+                                className={`rounded px-1.5 py-0.2 text-[9px] font-mono font-bold shrink-0 ${
+                                  item.badge === "WAF Active" || item.badge === "Critical"
+                                    ? "bg-destructive/15 text-destructive border border-destructive/30"
+                                    : item.badge === "DBaaS"
+                                    ? "bg-[#3ECF8E]/15 text-[#3ECF8E] border border-[#3ECF8E]/30"
+                                    : "bg-primary/10 text-primary border border-primary/20"
+                                }`}
+                              >
+                                {item.badge}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5">
+                              {item.description}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-4 text-center text-xs text-muted-foreground space-y-1.5">
+                      <p className="font-semibold text-foreground">No matches found for "{search}"</p>
+                      <p className="text-[11px]">
+                        Try searching for <span className="font-mono text-primary font-bold">waf</span>, <span className="font-mono text-primary font-bold">ai</span>, <span className="font-mono text-primary font-bold">sqli</span>, <span className="font-mono text-primary font-bold">ddos</span>, or <span className="font-mono text-primary font-bold">db</span>.
+                      </p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
@@ -1981,6 +2300,37 @@ function Dashboard() {
         )}
 
         <main className="mx-auto flex w-full max-w-[1480px] flex-col gap-6 px-4 pt-7 pb-28 sm:px-7 sm:pb-36 lg:px-9">
+          {search.trim().length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2.5 text-xs text-foreground backdrop-blur shadow-sm animate-in fade-in">
+              <div className="flex items-center gap-2">
+                <Search className="size-4 text-primary shrink-0" />
+                <span>
+                  Filtering telemetry by: <strong className="font-mono text-primary font-bold">"{search}"</strong> · {searchResults.length} {searchResults.length === 1 ? "match" : "matches"} found
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {searchResults.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={searchResults[0].action}
+                    className="rounded bg-primary px-2.5 py-1 text-[11px] font-bold text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+                  >
+                    Jump to {searchResults[0].title} →
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("");
+                    setSearchOpen(false);
+                  }}
+                  className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Clear Filter
+                </button>
+              </div>
+            </div>
+          )}
           {(activeNav === "AI Brain" ||
             activeNav === "SparrowX AI Brain" ||
             activeNav === "Defense Updates" ||
