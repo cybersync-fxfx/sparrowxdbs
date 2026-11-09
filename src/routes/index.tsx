@@ -38,6 +38,7 @@ import { SparrowxApiGatewayPortal } from "@/components/SparrowxApiGatewayPortal"
 import { SparrowxDropEngine } from "@/components/SparrowxDropEngine";
 import { SparrowxKeysEngine } from "@/components/SparrowxKeysEngine";
 import { SparrowxShieldEngine } from "@/components/SparrowxShieldEngine";
+import { SparrowxMasterLanding } from "@/components/SparrowxMasterLanding";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -219,6 +220,16 @@ function Dashboard() {
     | { role: "client"; tenantId: string | null; userEmail: string }
     | { role: "admin"; operatorName: string; operatorEmail: string }
   >({ role: "unauthenticated" });
+
+  const [showAuthLogin, setShowAuthLogin] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const params = new URLSearchParams(window.location.search);
+    return (
+      params.get("login") === "1" ||
+      params.get("auth") === "1" ||
+      params.get("signin") === "1"
+    );
+  });
 
   // Internal SparrowX Access Control policies
   const [staffMfaEnforced, setStaffMfaEnforced] = useState(true);
@@ -1550,7 +1561,9 @@ function Dashboard() {
   const isShieldDomainOrParam =
     typeof window !== "undefined" &&
     (window.location.hostname.startsWith("shield.") ||
-      new URLSearchParams(window.location.search).get("shield") === "1");
+      window.location.hostname.startsWith("sec.") ||
+      new URLSearchParams(window.location.search).get("shield") === "1" ||
+      new URLSearchParams(window.location.search).get("sec") === "1");
 
   // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
   if (isStudioDomainOrParam) {
@@ -1605,9 +1618,43 @@ function Dashboard() {
     );
   }
 
+  // 6. Root domain (sparrowx.net / www.sparrowx.net) -> Central Master Landing Page of SparrowX Technologies
   if (authSession.role === "unauthenticated") {
+    if (!showAuthLogin) {
+      return (
+        <>
+          <SparrowxMasterLanding
+            onOpenLogin={() => setShowAuthLogin(true)}
+            onDirectNav={(target) => {
+              if (typeof window === "undefined") return;
+              const url = new URL(window.location.href);
+              if (target === "db") url.searchParams.set("db", "1");
+              else if (target === "file") url.searchParams.set("file", "1");
+              else if (target === "password") url.searchParams.set("password", "1");
+              else if (target === "sec") url.searchParams.set("shield", "1");
+              else if (target === "api") url.searchParams.set("api", "1");
+              window.location.href = url.toString();
+            }}
+          />
+          <BackgroundEngineToaster />
+        </>
+      );
+    }
+
     return (
       <>
+        <div className="bg-[#070D18] border-b border-[#1E293B] px-6 py-2.5 flex items-center justify-between text-xs font-sans">
+          <button
+            type="button"
+            onClick={() => setShowAuthLogin(false)}
+            className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-2 transition-colors"
+          >
+            <span>← Return to SparrowX Technologies Master Landing</span>
+          </button>
+          <span className="text-zinc-500 font-mono text-[11px] hidden sm:inline">
+            SparrowX SOC &amp; Operator Authentication Portal
+          </span>
+        </div>
         <PortalLoginScreen
           backendSource={backendSource}
           onRegisterAndLoginUser={async (input) => {

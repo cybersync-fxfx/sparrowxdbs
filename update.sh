@@ -259,14 +259,26 @@ DB_MARKER_FILE="${INSTALL_DIR}/data/.db_initialized"
 
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
   systemctl stop sparrowx-native.service >/dev/null 2>&1 || true
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^sparrowx-postgres$" && [ "${FORCE_DB_INSTALL}" = "false" ]; then
-    log_info "[Step 5/6] PostgreSQL & PostgREST are already running — rebuilding ONLY the SparrowX web app container..."
-    docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d --no-deps sparrowx
-    docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up -d nginx
-    docker restart sparrowx-nginx >/dev/null 2>&1 || true
+
+  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
+  APP_SERVICE="sparrowx"
+  if [ -f "${INSTALL_DIR}/docker-compose.sparrowx.yml" ]; then
+    COMPOSE_FILE="${INSTALL_DIR}/docker-compose.sparrowx.yml"
+    APP_SERVICE="sparrowx-studio"
+  fi
+
+  IS_PG_RUNNING="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E 'sparrowx[-_]postgres' || true)"
+  if [ -n "${IS_PG_RUNNING}" ] && [ "${FORCE_DB_INSTALL}" = "false" ]; then
+    log_info "[Step 5/6] PostgreSQL & PostgREST are already running — rebuilding ONLY the SparrowX web app container (${APP_SERVICE})..."
+    docker compose -f "${COMPOSE_FILE}" build "${APP_SERVICE}"
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps "${APP_SERVICE}"
+    if grep -q "nginx:" "${COMPOSE_FILE}" 2>/dev/null; then
+      docker compose -f "${COMPOSE_FILE}" up -d nginx
+      docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    fi
   else
-    log_info "[Step 5/6] Launching Full-Stack Docker containers..."
-    docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d
+    log_info "[Step 5/6] Launching Full-Stack Docker containers via ${COMPOSE_FILE}..."
+    docker compose -f "${COMPOSE_FILE}" up --build -d
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 else
@@ -343,11 +355,13 @@ echo -e "  6. ${C_GREEN}Liquid-Glass Fixed Navbar${C_RESET}      : Zero scroll s
 echo -e "  7. ${C_GREEN}Simplified Login & Landing UI${C_RESET}  : Removed clutter badges, 'Hashed Credential', & filler text"
 echo -e "  8. ${C_GREEN}Kernel Security & Auto-Upgrade${C_RESET} : SYN cookies, Fail2Ban, UFW & 5-min GitHub auto-updater"
 echo -e "${C_GREEN}------------------------------------------------------------------------${C_RESET}"
-echo -e "${C_BOLD}How to Access Everything Fully:${C_RESET}"
-echo -e "  • ${C_BOLD}Main Command Center (Web)${C_RESET}      : ${C_CYAN}http://${SPARROWX_DOMAIN}${HTTP_SUFFIX}${C_RESET} (or http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX})"
-echo -e "  • ${C_BOLD}Supabase Web Studio (Domain)${C_RESET}   : ${C_GREEN}http://${SPARROWX_STUDIO_DOMAIN}${HTTP_SUFFIX}${C_RESET}"
-echo -e "  • ${C_BOLD}Supabase Web Studio (Direct)${C_RESET}   : ${C_GREEN}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/?studio=1${C_RESET}"
-echo -e "  • ${C_BOLD}Terminal DB Manager (TUI)${C_RESET}      : Run ${C_YELLOW}./manage-db.sh${C_RESET} (or ${C_YELLOW}sparrowx-db${C_RESET})"
-echo -e "  • ${C_BOLD}Per-User Database Folders${C_RESET}      : ${C_CYAN}${INSTALL_DIR}/data/users/<username>/${C_RESET}"
-echo -e "  • ${C_BOLD}One-Command Future Update${C_RESET}      : Run ${C_YELLOW}./update.sh${C_RESET} (or ${C_YELLOW}sparrowx-update${C_RESET})"
+echo -e "${C_BOLD}How to Access All Dedicated SparrowX Domains:${C_RESET}"
+echo -e "  • ${C_BOLD}Master Company Portal${C_RESET}     : ${C_CYAN}https://${SPARROWX_DOMAIN}${C_RESET} (Central Landing Page)"
+echo -e "  • ${C_BOLD}SparrowX DB Studio${C_RESET}        : ${C_GREEN}https://db.${SPARROWX_DOMAIN}${C_RESET} (PostgreSQL 16 & pgvector BaaS)"
+echo -e "  • ${C_BOLD}SparrowX Files (Storage)${C_RESET}  : ${C_CYAN}https://file.${SPARROWX_DOMAIN}${C_RESET} (NVMe Disk & P2P RAM Drop)"
+echo -e "  • ${C_BOLD}SparrowX Keys (Passwords)${C_RESET} : ${C_YELLOW}https://password.${SPARROWX_DOMAIN}${C_RESET} (100% Offline CSPRNG)"
+echo -e "  • ${C_BOLD}SparrowX Shield (SOC)${C_RESET}     : ${C_BLUE}https://sec.${SPARROWX_DOMAIN}${C_RESET} (Edge WAF & Threat Defense)"
+echo -e "  • ${C_BOLD}SparrowX REST API Gateway${C_RESET} : ${C_GREEN}https://api.${SPARROWX_DOMAIN}${C_RESET} (PostgREST OpenAPI Docs)"
+echo -e "  • ${C_BOLD}Terminal DB Manager (TUI)${C_RESET} : Run ${C_YELLOW}./manage-db.sh${C_RESET} (or ${C_YELLOW}sparrowx-db${C_RESET})"
+echo -e "  • ${C_BOLD}One-Command Future Update${C_RESET} : Run ${C_YELLOW}./update.sh${C_RESET} (or ${C_YELLOW}sparrowx-update${C_RESET})"
 echo -e "${C_GREEN}========================================================================${C_RESET}"

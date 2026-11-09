@@ -135,7 +135,7 @@ services:
       - DOMAIN_SEC=${DOMAIN_SEC:-sec.sparrowx.net}
       - DOMAIN_FILE=${DOMAIN_FILE:-file.sparrowx.net}
       - DOMAIN_PASSWORD=${DOMAIN_PASSWORD:-password.sparrowx.net}
-      - ADDITIONAL_REDIRECT_URLS=${ADDITIONAL_REDIRECT_URLS:-https://db.sparrowx.net/**,https://sec.sparrowx.net/**,https://file.sparrowx.net/**,https://password.sparrowx.net/**,https://passwd.sparrowx.net/**}
+      - ADDITIONAL_REDIRECT_URLS=${ADDITIONAL_REDIRECT_URLS:-https://sparrowx.net/**,https://www.sparrowx.net/**,https://db.sparrowx.net/**,https://sec.sparrowx.net/**,https://file.sparrowx.net/**,https://password.sparrowx.net/**,https://passwd.sparrowx.net/**}
       - GOTRUE_SITE_URL=${GOTRUE_SITE_URL:-https://db.sparrowx.net}
     volumes:
       - sparrowx_file_storage:/app/data/storage
