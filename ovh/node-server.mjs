@@ -285,10 +285,19 @@ const server = createServer(async (req, res) => {
     // =========================================================================
     // PERSISTENT STORAGE ENGINE (MEDIAFIRE / FILE STORE ON NVME DISK)
     // =========================================================================
-    // 1. Download file by unique ID: /f/:id or /api/storage/download/:id
-    const downloadMatch = pathname.match(/^\/f\/([a-zA-Z0-9_-]+)/) || pathname.match(/^\/api\/storage\/download\/([a-zA-Z0-9_-]+)/);
-    if (downloadMatch && (req.method === "GET" || req.method === "HEAD")) {
-      const fileId = downloadMatch[1];
+    // 1. Download file by unique ID: /api/storage/download/:id or /f/:id?download=1
+    const isApiDownload = pathname.match(/^\/api\/storage\/download\/([a-zA-Z0-9_-]+)/);
+    const isDirectF = pathname.match(/^\/f\/([a-zA-Z0-9_-]+)/);
+    const storageUrlObj = new URL(reqUrl, "http://localhost");
+    const wantsRawDownload =
+      isApiDownload ||
+      (isDirectF &&
+        (storageUrlObj.searchParams.has("download") ||
+          storageUrlObj.searchParams.has("raw") ||
+          !req.headers.accept?.includes("text/html")));
+
+    if (wantsRawDownload && (req.method === "GET" || req.method === "HEAD")) {
+      const fileId = (isApiDownload || isDirectF)[1];
       const files = await getStoredFiles();
       const item = files.find((f) => f.id === fileId);
       if (item) {
@@ -313,7 +322,27 @@ const server = createServer(async (req, res) => {
       }
     }
 
-    // 2. List all stored files: GET /api/storage/files
+    // 2. Fetch single file metadata: GET /api/storage/file/:id
+    const singleFileMatch = pathname.match(/^\/api\/storage\/file\/([a-zA-Z0-9_-]+)$/);
+    if (singleFileMatch && (req.method === "GET" || req.method === "HEAD")) {
+      const fileId = singleFileMatch[1];
+      const files = await getStoredFiles();
+      const item = files.find((f) => f.id === fileId);
+      if (item) {
+        res.writeHead(200, {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify(item));
+        return;
+      }
+      res.writeHead(404, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: "File not found" }));
+      return;
+    }
+
+    // 3. List all stored files: GET /api/storage/files
     if (pathname === "/api/storage/files" && req.method === "GET") {
       const files = await getStoredFiles();
       res.writeHead(200, {

@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
+  ArrowRight,
 } from "lucide-react";
 
 interface StagedFile {
@@ -247,13 +248,21 @@ export function SparrowxDropEngine() {
   const [decryptError, setDecryptError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
-  // Check URL on mount for incoming drop parameters
+  // Incoming Persistent File Receiver State (for visitors opening /f/:id or ?f=:id)
+  const [incomingPersistentId, setIncomingPersistentId] = useState<string | null>(null);
+  const [persistentFileInfo, setPersistentFileInfo] = useState<PersistentFile | null>(null);
+  const [persistentLoading, setPersistentLoading] = useState<boolean>(false);
+  const [persistentDownloadSuccess, setPersistentDownloadSuccess] = useState<boolean>(false);
+
+  // Check URL on mount for incoming drop or file parameters
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const pathname = window.location.pathname;
     const searchParams = new URLSearchParams(window.location.search);
     const hashStr = window.location.hash.replace(/^#/, "");
     const hashParams = new URLSearchParams(hashStr);
 
+    // 1. Check for ephemeral drop
     const dropId = searchParams.get("drop") || hashParams.get("drop");
     const keyHex = hashParams.get("key") || searchParams.get("key");
     const rawName = searchParams.get("name") || hashParams.get("name");
@@ -266,7 +275,45 @@ export function SparrowxDropEngine() {
       });
       setActiveMode("ephemeral");
     }
+
+    // 2. Check for persistent file (/f/:id or ?f=:id)
+    const matchF = pathname.match(/^\/f\/([a-zA-Z0-9_-]+)/);
+    const queryF = searchParams.get("f");
+    const fileId = matchF ? matchF[1] : queryF;
+
+    if (fileId) {
+      setIncomingPersistentId(fileId);
+      setPersistentLoading(true);
+      fetch(`/api/storage/file/${fileId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && data.name) {
+            setPersistentFileInfo(data);
+          } else {
+            fetch("/api/storage/files")
+              .then((r) => r.json())
+              .then((list: PersistentFile[]) => {
+                const found = list.find((item) => item.id === fileId);
+                if (found) setPersistentFileInfo(found);
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {})
+        .finally(() => setPersistentLoading(false));
+    }
   }, []);
+
+  const handleDownloadPersistentFileDirect = () => {
+    if (!incomingPersistentId) return;
+    const a = document.createElement("a");
+    a.href = `/api/storage/download/${incomingPersistentId}`;
+    a.download = persistentFileInfo?.name || "downloaded-file";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setPersistentDownloadSuccess(true);
+  };
 
   const fileBufferRef = useRef<ArrayBuffer | null>(null);
   const ephemeralInputRef = useRef<HTMLInputElement | null>(null);
@@ -535,6 +582,21 @@ export function SparrowxDropEngine() {
     return <FileText className="size-4 text-zinc-400" />;
   };
 
+  const getLargeFileIcon = (mimeOrName: string) => {
+    const lower = mimeOrName.toLowerCase();
+    if (lower.includes("image") || lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".svg") || lower.endsWith(".webp") || lower.endsWith(".gif"))
+      return <FileImage className="size-12 text-emerald-400" />;
+    if (lower.includes("video") || lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".mkv") || lower.endsWith(".webm") || lower.endsWith(".avi"))
+      return <FileVideo className="size-12 text-blue-400" />;
+    if (lower.includes("audio") || lower.endsWith(".mp3") || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".flac"))
+      return <FileAudio className="size-12 text-purple-400" />;
+    if (lower.includes("zip") || lower.includes("tar") || lower.endsWith(".gz") || lower.endsWith(".7z") || lower.endsWith(".rar") || lower.endsWith(".iso"))
+      return <FileArchive className="size-12 text-amber-400" />;
+    if (lower.includes("json") || lower.includes("javascript") || lower.endsWith(".ts") || lower.endsWith(".py") || lower.endsWith(".sql") || lower.endsWith(".html") || lower.endsWith(".css") || lower.endsWith(".sh"))
+      return <FileCode className="size-12 text-cyan-400" />;
+    return <FileText className="size-12 text-zinc-300" />;
+  };
+
   // Filtered persistent files
   const filteredPersistentFiles = persistentFiles.filter((f) =>
     f.name.toLowerCase().includes(fileSearchQuery.toLowerCase())
@@ -589,9 +651,13 @@ export function SparrowxDropEngine() {
         <div className="flex items-center gap-1 bg-[#121218] p-1 rounded-xl border border-zinc-800 text-xs font-semibold">
           <button
             type="button"
-            onClick={() => setActiveMode("storage")}
+            onClick={() => {
+              setActiveMode("storage");
+              setIncomingDrop(null);
+              setIncomingPersistentId(null);
+            }}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeMode === "storage"
+              activeMode === "storage" && !incomingDrop && !incomingPersistentId
                 ? "bg-[#3ECF8E] text-zinc-950 font-bold shadow-md"
                 : "text-zinc-400 hover:text-white"
             }`}
@@ -602,9 +668,13 @@ export function SparrowxDropEngine() {
 
           <button
             type="button"
-            onClick={() => setActiveMode("ephemeral")}
+            onClick={() => {
+              setActiveMode("ephemeral");
+              setIncomingDrop(null);
+              setIncomingPersistentId(null);
+            }}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeMode === "ephemeral"
+              activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId
                 ? "bg-[#3ECF8E] text-zinc-950 font-bold shadow-md"
                 : "text-zinc-400 hover:text-white"
             }`}
@@ -618,75 +688,293 @@ export function SparrowxDropEngine() {
       {/* Main Workspace */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10 space-y-8">
         {/* ================================================================= */}
-        {/* INCOMING ENCRYPTED EPHEMERAL DROP RECEIVER CARD */}
+        {/* WELCOMING RECEIVER DOWNLOAD PORTAL (For Incoming Shared Links)   */}
         {/* ================================================================= */}
-        {incomingDrop && (
-          <div className="rounded-2xl border-2 border-emerald-500/40 bg-[#0B0F17] p-6 sm:p-8 shadow-2xl space-y-6 text-center max-w-2xl mx-auto">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono text-emerald-400">
-              <ShieldCheck className="size-4" />
-              <span>Incoming Zero-Disk Encrypted Drop</span>
-            </div>
-
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-white tracking-tight">
-                Encrypted File Ready for Decryption
-              </h2>
-              <p className="text-xs text-zinc-400 max-w-lg mx-auto leading-relaxed">
-                This file was encrypted in sender browser RAM with AES-GCM 256-bit. The decryption key was passed strictly via the client URL hash and will decrypt in your local memory.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-xl bg-[#05070B] border border-zinc-800 flex items-center justify-between text-left font-mono">
-              <div className="flex items-center gap-3 truncate mr-2">
-                <div className="size-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
-                  <FileText className="size-5" />
-                </div>
-                <div className="truncate">
-                  <div className="text-sm font-bold text-white truncate">
-                    {incomingDrop.filename}
-                  </div>
-                  <div className="text-[11px] text-zinc-500">
-                    Key Fingerprint: {incomingDrop.keyHex ? `${incomingDrop.keyHex.slice(0, 16)}...` : "None"}
-                  </div>
-                </div>
-              </div>
-
-              <span className="shrink-0 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold">
-                AES-GCM-256
-              </span>
-            </div>
-
-            {decryptError && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono text-left flex items-center gap-2">
-                <AlertCircle className="size-4 shrink-0" />
-                <span>{decryptError}</span>
+        {(incomingDrop || incomingPersistentId) && (
+          <div className="space-y-8 max-w-3xl mx-auto">
+            {/* 1. Loading State for Persistent File */}
+            {incomingPersistentId && persistentLoading && (
+              <div className="rounded-2xl border border-white/[0.08] bg-[#0B0F17] p-12 text-center space-y-4 shadow-2xl">
+                <RefreshCw className="size-9 text-emerald-400 animate-spin mx-auto" />
+                <h3 className="text-xl font-bold text-white tracking-tight">
+                  Connecting to Sovereign Storage...
+                </h3>
+                <p className="text-xs text-zinc-400 font-mono">
+                  Querying NVMe cluster for file ID: <span className="text-emerald-400">{incomingPersistentId}</span>
+                </p>
               </div>
             )}
 
-            {downloadSuccess && (
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono text-left flex items-center gap-2">
-                <CheckCircle2 className="size-4 shrink-0" />
-                <span>File decrypted in RAM and saved to your downloads folder!</span>
+            {/* 2. File Not Found State for Persistent File */}
+            {incomingPersistentId && !persistentLoading && !persistentFileInfo && (
+              <div className="rounded-2xl border border-amber-500/30 bg-[#0B0F17] p-10 text-center space-y-5 shadow-2xl">
+                <div className="size-14 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 grid place-items-center mx-auto">
+                  <AlertTriangle className="size-7" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-white tracking-tight">
+                    File Not Found or Link Expired
+                  </h3>
+                  <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
+                    The requested file is no longer available on the server. The owner may have deleted it, or the link may be inaccurate.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIncomingPersistentId(null);
+                    if (typeof window !== "undefined" && window.location.pathname.startsWith("/f/")) {
+                      window.history.pushState({}, "", "/");
+                    }
+                  }}
+                  className="px-6 py-3 rounded-xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-bold text-xs cursor-pointer shadow-lg transition-all"
+                >
+                  Go to SparrowX File Vault →
+                </button>
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleDecryptAndDownloadIncoming}
-                disabled={decrypting}
-                className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-bold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-              >
-                {decrypting ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
-                <span>{decrypting ? "Decrypting in RAM..." : `Decrypt & Download "${incomingDrop.filename}"`}</span>
-              </button>
+            {/* 3. Persistent File Welcoming Receiver Card */}
+            {incomingPersistentId && !persistentLoading && persistentFileInfo && (
+              <div className="rounded-3xl border border-white/[0.12] bg-[#0B0F17] p-6 sm:p-10 shadow-2xl space-y-8 relative overflow-hidden">
+                <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-36 bg-emerald-500/10 blur-3xl pointer-events-none" />
 
+                {/* Hero Greeting */}
+                <div className="text-center space-y-3 relative z-10">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-mono text-emerald-400 font-semibold">
+                    <ShieldCheck className="size-4" />
+                    <span>SparrowX Sovereign Vault • Verified Transfer</span>
+                  </div>
+
+                  <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                    You've Received a Shared File
+                  </h1>
+                  <p className="text-xs sm:text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed">
+                    Hosted on dedicated bare-metal NVMe storage. Download directly with zero ads, zero countdown queues, and unthrottled gigabit speeds.
+                  </p>
+                </div>
+
+                {/* File Showcase Box */}
+                <div className="p-6 rounded-2xl bg-[#05070B] border border-white/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10 shadow-inner">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="size-16 rounded-2xl bg-[#0E1420] border border-white/[0.1] grid place-items-center shrink-0 shadow-lg">
+                      {getLargeFileIcon(persistentFileInfo.name)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-lg sm:text-xl font-bold text-white truncate tracking-tight" title={persistentFileInfo.name}>
+                        {persistentFileInfo.name}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-1.5 font-mono text-xs text-zinc-400">
+                        <span className="font-bold text-emerald-400">{formatSize(persistentFileInfo.size)}</span>
+                        <span className="text-zinc-600">•</span>
+                        <span>NVMe High-Speed Storage</span>
+                        <span className="text-zinc-600">•</span>
+                        <span>{new Date(persistentFileInfo.uploadedAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-mono font-semibold">
+                      <Check className="size-3.5" />
+                      SHA-256 Verified
+                    </span>
+                  </div>
+                </div>
+
+                {/* Download Success Banner */}
+                {persistentDownloadSuccess && (
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center gap-3">
+                    <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+                    <div>
+                      <p className="font-bold text-white">Download initiated successfully!</p>
+                      <p className="text-[11px] text-zinc-400">Your download is streaming directly from the server. Check your browser's download shelf.</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Main Action Buttons */}
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 relative z-10">
+                  <button
+                    type="button"
+                    onClick={handleDownloadPersistentFileDirect}
+                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer group"
+                  >
+                    <Download className="size-5 group-hover:translate-y-0.5 transition-transform" />
+                    <span>Download File ({formatSize(persistentFileInfo.size)})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIncomingPersistentId(null);
+                      if (typeof window !== "undefined" && window.location.pathname.startsWith("/f/")) {
+                        window.history.pushState({}, "", "/");
+                      }
+                    }}
+                    className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Upload Your Own Files
+                  </button>
+                </div>
+
+                {/* Direct Link & Origin Fallback */}
+                <div className="p-4 rounded-xl bg-[#05070B] border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+                  <div className="text-zinc-400 flex items-center gap-2 truncate w-full sm:w-auto">
+                    <span className="text-zinc-500 shrink-0">Direct Link:</span>
+                    <span className="text-emerald-400 truncate select-all">
+                      {typeof window !== "undefined" ? `${window.location.origin}/f/${persistentFileInfo.id}` : `/f/${persistentFileInfo.id}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (typeof window !== "undefined") {
+                          navigator.clipboard.writeText(`${window.location.origin}/f/${persistentFileInfo.id}`);
+                          setCopiedPersistentId(persistentFileInfo.id);
+                          setTimeout(() => setCopiedPersistentId(null), 2500);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      {copiedPersistentId === persistentFileInfo.id ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                      <span>{copiedPersistentId === persistentFileInfo.id ? "Copied!" : "Copy Link"}</span>
+                    </button>
+                    <a
+                      href={`http://139.99.131.135:3000/api/storage/download/${persistentFileInfo.id}`}
+                      className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors flex items-center gap-1.5"
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Direct Origin IP Fallback"
+                    >
+                      <ExternalLink className="size-3.5" />
+                      <span>Direct Origin IP</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Trust Guarantees */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-white/[0.06]">
+                  <div className="p-3.5 rounded-xl bg-[#05070B] border border-white/[0.04] space-y-1">
+                    <div className="flex items-center gap-2 text-white text-xs font-semibold">
+                      <Zap className="size-3.5 text-emerald-400" />
+                      <span>Unthrottled Gigabit Pipe</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 leading-normal">
+                      Direct bare-metal NVMe stream with unlimited direct bandwidth.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#05070B] border border-white/[0.04] space-y-1">
+                    <div className="flex items-center gap-2 text-white text-xs font-semibold">
+                      <Shield className="size-3.5 text-emerald-400" />
+                      <span>Zero Adware or Popups</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 leading-normal">
+                      Clean transfer without countdown timers, ad networks, or captchas.
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-[#05070B] border border-white/[0.04] space-y-1">
+                    <div className="flex items-center gap-2 text-white text-xs font-semibold">
+                      <Lock className="size-3.5 text-emerald-400" />
+                      <span>Sovereign Storage</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 leading-normal">
+                      Encrypted at rest on isolated OVH dedicated server NVMe hardware.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. Ephemeral Drop Welcoming Receiver Card */}
+            {incomingDrop && (
+              <div className="rounded-3xl border-2 border-emerald-500/40 bg-[#0B0F17] p-6 sm:p-10 shadow-2xl space-y-8 text-center relative overflow-hidden">
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-mono text-emerald-400 font-semibold">
+                  <ShieldCheck className="size-4" />
+                  <span>Incoming Zero-Disk Encrypted Drop</span>
+                </div>
+
+                <div className="space-y-2">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                    Encrypted File Ready for Decryption
+                  </h2>
+                  <p className="text-xs sm:text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed">
+                    This file was encrypted in sender browser RAM with AES-GCM 256-bit. The decryption key was passed strictly via the client URL hash and will decrypt in your local memory.
+                  </p>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-[#05070B] border border-zinc-800 flex items-center justify-between text-left font-mono shadow-inner">
+                  <div className="flex items-center gap-4 truncate mr-2">
+                    <div className="size-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
+                      {getLargeFileIcon(incomingDrop.filename)}
+                    </div>
+                    <div className="truncate">
+                      <div className="text-base font-bold text-white truncate">
+                        {incomingDrop.filename}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-0.5">
+                        Key Fingerprint: {incomingDrop.keyHex ? `${incomingDrop.keyHex.slice(0, 16)}...` : "None"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="shrink-0 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 text-xs font-bold font-mono">
+                    AES-GCM-256
+                  </span>
+                </div>
+
+                {decryptError && (
+                  <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono text-left flex items-center gap-2">
+                    <AlertCircle className="size-4 shrink-0" />
+                    <span>{decryptError}</span>
+                  </div>
+                )}
+
+                {downloadSuccess && (
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono text-left flex items-center gap-2">
+                    <CheckCircle2 className="size-4 shrink-0" />
+                    <span>File decrypted in RAM and saved to your downloads folder!</span>
+                  </div>
+                )}
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleDecryptAndDownloadIncoming}
+                    disabled={decrypting}
+                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    {decrypting ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
+                    <span>{decrypting ? "Decrypting in RAM..." : `Decrypt & Download "${incomingDrop.filename}"`}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIncomingDrop(null)}
+                    className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    Upload Your Own Files
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Bottom Vault Switcher */}
+            <div className="text-center pt-4">
               <button
                 type="button"
-                onClick={() => setIncomingDrop(null)}
-                className="w-full sm:w-auto px-4 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+                onClick={() => {
+                  setIncomingDrop(null);
+                  setIncomingPersistentId(null);
+                  if (typeof window !== "undefined" && window.location.pathname.startsWith("/f/")) {
+                    window.history.pushState({}, "", "/");
+                  }
+                }}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08] text-xs font-medium transition-all cursor-pointer"
               >
-                Upload Your Own Files
+                <span>Need to host or share files securely? Open Sovereign Storage Vault</span>
+                <ArrowRight className="size-3.5 text-emerald-400" />
               </button>
             </div>
           </div>
@@ -695,7 +983,7 @@ export function SparrowxDropEngine() {
         {/* ================================================================= */}
         {/* MODE 1: PERSISTENT CLOUD STORAGE (MediaFire Style) */}
         {/* ================================================================= */}
-        {activeMode === "storage" && (
+        {activeMode === "storage" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
             {/* Header intro */}
             <div className="text-center space-y-3 max-w-2xl mx-auto">
@@ -930,7 +1218,7 @@ export function SparrowxDropEngine() {
         {/* ================================================================= */}
         {/* MODE 2: EPHEMERAL ZERO-DISK P2P DROP (RAM Burn) */}
         {/* ================================================================= */}
-        {activeMode === "ephemeral" && (
+        {activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
             <div className="text-center space-y-3 max-w-2xl mx-auto">
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-400">
