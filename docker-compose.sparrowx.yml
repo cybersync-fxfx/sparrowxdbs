@@ -101,7 +101,7 @@ services:
       - sparrowx_net
 
   # ----------------------------------------------------------------------------
-  # 5. SparrowX Web App (Port 80 & 3000 -> forwarded to sec.sparrowx.net & db.sparrowx.net)
+  # 5. SparrowX Web App & API Gateway (Port 80 & 3000 -> sec, db, and api.sparrowx.net)
   # ----------------------------------------------------------------------------
   sparrowx-studio:
     build:
@@ -116,7 +116,12 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOST=0.0.0.0
+      - POSTGREST_HOST=sparrowx-postgrest
+      - POSTGREST_PORT=3000
+      - POSTGREST_INTERNAL_URL=http://sparrowx-postgrest:3000
       - VITE_SPARROWX_API_URL=https://${DOMAIN_API:-api.sparrowx.net}
       - VITE_SPARROWX_WS_URL=wss://${DOMAIN_API:-api.sparrowx.net}/realtime
     networks:
       - sparrowx_net
+    depends_on:
+      - sparrowx-postgrest

@@ -34,6 +34,7 @@ import {
 } from "@/components/SparrowxAiBrainCenter";
 import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
 import { SovereignDatabaseStudio } from "@/components/SovereignDatabaseStudio";
+import { SparrowxApiGatewayPortal } from "@/components/SparrowxApiGatewayPortal";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -1507,6 +1508,47 @@ function Dashboard() {
     setActiveNav(navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel);
   };
 
+  // Dedicated Domain Ingress Routing (Priority checks before login/SOC)
+  const isStudioDomainOrParam =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("db.") ||
+      window.location.hostname.startsWith("studio.") ||
+      window.location.hostname.startsWith("supabase.") ||
+      window.location.hostname.startsWith("sparrowbase.") ||
+      new URLSearchParams(window.location.search).get("studio") === "1" ||
+      new URLSearchParams(window.location.search).get("studio") === "true" ||
+      new URLSearchParams(window.location.search).get("sparrowbase") === "1" ||
+      new URLSearchParams(window.location.search).get("db") === "1");
+
+  const isApiDomainOrParam =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("api.") ||
+      window.location.hostname.startsWith("rest.") ||
+      new URLSearchParams(window.location.search).get("api") === "1");
+
+  // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
+  if (isStudioDomainOrParam) {
+    return (
+      <>
+        <SovereignDatabaseStudio
+          isStandaloneDomain={true}
+          onClose={() => setActiveNav("Overview")}
+        />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
+  // 2. If visiting api.sparrowx.net or ?api=1 -> Direct to REST API Gateway Portal & Documentation
+  if (isApiDomainOrParam) {
+    return (
+      <>
+        <SparrowxApiGatewayPortal />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
   if (authSession.role === "unauthenticated") {
     return (
       <>
@@ -1649,26 +1691,14 @@ function Dashboard() {
     );
   }
 
-  const isStudioDomainOrParam =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("db.") ||
-      window.location.hostname.startsWith("studio.") ||
-      window.location.hostname.startsWith("supabase.") ||
-      window.location.hostname.startsWith("sparrowbase.") ||
-      new URLSearchParams(window.location.search).get("studio") === "1" ||
-      new URLSearchParams(window.location.search).get("studio") === "true" ||
-      new URLSearchParams(window.location.search).get("sparrowbase") === "1" ||
-      new URLSearchParams(window.location.search).get("db") === "1");
-
   if (
-    isStudioDomainOrParam ||
-    (authSession.role === "admin" &&
-      (activeNav === "Supabase Studio" || activeNav === "SparrowX DB"))
+    authSession.role === "admin" &&
+    (activeNav === "Supabase Studio" || activeNav === "SparrowX DB")
   ) {
     return (
       <>
         <SovereignDatabaseStudio
-          isStandaloneDomain={isStudioDomainOrParam}
+          isStandaloneDomain={false}
           onClose={() => setActiveNav("Overview")}
         />
         <BackgroundEngineToaster />

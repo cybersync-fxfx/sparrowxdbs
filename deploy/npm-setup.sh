@@ -38,9 +38,9 @@ done
 echo "-> Reconciling Docker network drivers..."
 docker network rm sparrowx_edge_net sparrowx_internal_net 2>/dev/null || true
 
-# 4. Launch SparrowX Fleet behind NPM
-echo "-> Starting SparrowX backend services for Nginx Proxy Manager..."
-docker compose -f docker-compose.sparrowx.yml up -d --remove-orphans
+# 4. Launch SparrowX Fleet behind NPM (rebuilds studio container with port 80 API routing)
+echo "-> Building and starting SparrowX services for Nginx Proxy Manager..."
+docker compose -f docker-compose.sparrowx.yml up -d --build --remove-orphans
 
 # 5. Enable Database Extensions
 echo "-> Verifying PostgreSQL & pgvector..."
@@ -51,27 +51,25 @@ docker exec -i sparrowx_postgres psql -U postgres -d sparrowbase -c "CREATE EXTE
 # 6. Verify local ports
 echo ""
 echo "=== LOCAL PORT VERIFICATION ==="
-echo -n "SparrowX App Engine (Port 80): "
+echo -n "SparrowX Unified Web & API Gateway (Port 80): "
 curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://127.0.0.1:80 || echo "Starting..."
 
-echo -n "SparrowX App Engine (Port 3000): "
-curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://127.0.0.1:3000 || echo "Starting..."
-
-echo -n "PostgREST API Gateway (Port 3001): "
+echo -n "PostgREST Engine Direct (Port 3001): "
 curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://127.0.0.1:3001 || echo "Starting..."
 
 echo ""
 echo "=========================================================="
-echo "  [SUCCESS] SPARROWX IS RUNNING AND READY FOR NPM!"
+echo "  [SUCCESS] SPARROWX RUNNING ON PORT 80 (MULTI-VPS READY)!"
 echo "=========================================================="
 echo ""
-echo "In your Nginx Proxy Manager (on VPS 1):"
+echo "In your Nginx Proxy Manager dashboard (on your NPM VPS):"
+echo "All 3 domains can now point to the standard port 80 on your SparrowX VPS:"
 echo ""
 echo "--- PROXY HOST 1 (Security Platform) ---"
 echo "  Domain Names:       sec.sparrowx.net"
 echo "  Scheme:             http"
 echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
-echo "  Forward Port:       80 (or 3000)"
+echo "  Forward Port:       80"
 echo "  Websockets Support: ENABLED (checked)"
 echo "  Block Common Expl.: ENABLED (checked)"
 echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
@@ -80,7 +78,7 @@ echo "--- PROXY HOST 2 (Database Platform) ---"
 echo "  Domain Names:       db.sparrowx.net"
 echo "  Scheme:             http"
 echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
-echo "  Forward Port:       80 (or 3000)"
+echo "  Forward Port:       80"
 echo "  Websockets Support: ENABLED (checked)"
 echo "  Block Common Expl.: ENABLED (checked)"
 echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
@@ -89,6 +87,6 @@ echo "--- PROXY HOST 3 (REST API Gateway) ---"
 echo "  Domain Names:       api.sparrowx.net"
 echo "  Scheme:             http"
 echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
-echo "  Forward Port:       3001"
+echo "  Forward Port:       80  <-- Works seamlessly on Port 80!"
 echo "  SSL:                Let's Encrypt (Force SSL)"
 echo "=========================================================="
