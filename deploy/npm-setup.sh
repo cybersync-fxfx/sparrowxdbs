@@ -26,11 +26,13 @@ echo "-> Stopping old proxy/app containers that cause port conflicts..."
 docker stop sparrowx_edge_proxy sparrowx-nginx sparrowx-app 2>/dev/null || true
 docker rm sparrowx_edge_proxy sparrowx-nginx sparrowx-app 2>/dev/null || true
 
-# 2. Free port 3000 if held by a non-docker zombie process
-if ss -tulpn "sport = :3000" 2>/dev/null | grep -qv "docker"; then
-    echo "-> Clearing zombie host process on port 3000..."
-    fuser -k 3000/tcp 2>/dev/null || true
-fi
+# 2. Free ports 80, 3000, 3001 if held by non-docker zombie processes
+for p in 80 3000 3001; do
+    if ss -tulpn "sport = :$p" 2>/dev/null | grep -qv "docker"; then
+        echo "-> Clearing zombie host process on port $p..."
+        fuser -k "$p/tcp" 2>/dev/null || true
+    fi
+done
 
 # 3. Clean Docker networks
 echo "-> Reconciling Docker network drivers..."
@@ -49,6 +51,9 @@ docker exec -i sparrowx_postgres psql -U postgres -d sparrowbase -c "CREATE EXTE
 # 6. Verify local ports
 echo ""
 echo "=== LOCAL PORT VERIFICATION ==="
+echo -n "SparrowX App Engine (Port 80): "
+curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://127.0.0.1:80 || echo "Starting..."
+
 echo -n "SparrowX App Engine (Port 3000): "
 curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://127.0.0.1:3000 || echo "Starting..."
 
@@ -60,29 +65,30 @@ echo "=========================================================="
 echo "  [SUCCESS] SPARROWX IS RUNNING AND READY FOR NPM!"
 echo "=========================================================="
 echo ""
-echo "Now, open your Nginx Proxy Manager Admin Dashboard (usually port 81):"
+echo "In your Nginx Proxy Manager (on VPS 1):"
 echo ""
 echo "--- PROXY HOST 1 (Security Platform) ---"
 echo "  Domain Names:       sec.sparrowx.net"
 echo "  Scheme:             http"
-echo "  Forward Hostname:   127.0.0.1 (or 172.17.0.1)"
-echo "  Forward Port:       3000"
+echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
+echo "  Forward Port:       80 (or 3000)"
 echo "  Websockets Support: ENABLED (checked)"
 echo "  Block Common Expl.: ENABLED (checked)"
-echo "  SSL:                Request a new SSL Certificate (Force SSL, HTTP/2 Support)"
+echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
 echo ""
 echo "--- PROXY HOST 2 (Database Platform) ---"
 echo "  Domain Names:       db.sparrowx.net"
 echo "  Scheme:             http"
-echo "  Forward Hostname:   127.0.0.1 (or 172.17.0.1)"
-echo "  Forward Port:       3000"
+echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
+echo "  Forward Port:       80 (or 3000)"
 echo "  Websockets Support: ENABLED (checked)"
-echo "  SSL:                Request a new SSL Certificate (Force SSL, HTTP/2 Support)"
+echo "  Block Common Expl.: ENABLED (checked)"
+echo "  SSL:                Let's Encrypt (Force SSL, HTTP/2 Support)"
 echo ""
 echo "--- PROXY HOST 3 (REST API Gateway) ---"
 echo "  Domain Names:       api.sparrowx.net"
 echo "  Scheme:             http"
-echo "  Forward Hostname:   127.0.0.1 (or 172.17.0.1)"
+echo "  Forward Hostname:   10.10.10.10  (SparrowX VPS Internal IP)"
 echo "  Forward Port:       3001"
-echo "  SSL:                Request a new SSL Certificate (Force SSL)"
+echo "  SSL:                Let's Encrypt (Force SSL)"
 echo "=========================================================="

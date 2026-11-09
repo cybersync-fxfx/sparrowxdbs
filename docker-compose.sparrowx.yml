@@ -1,13 +1,13 @@
 # ==============================================================================
 # SPARROWX ENTERPRISE INFRASTRUCTURE (NGINX PROXY MANAGER OPTIMIZED)
 # ==============================================================================
-# Designed specifically for servers running Nginx Proxy Manager (NPM).
-# NPM manages ports 80 & 443 with automated SSL.
-# SparrowX services expose dedicated internal host ports:
-# - SparrowX Web App / Studio:   127.0.0.1:3000  (for sec.sparrowx.net & db.sparrowx.net)
-# - SparrowX PostgREST REST API: 127.0.0.1:3001  (for api.sparrowx.net)
-# - SparrowX PgBouncer Pooler:   0.0.0.0:6543    (for DB clients / Prisma / Supabase-js)
-# - SparrowX PostgreSQL 16:      127.0.0.1:5432  (Direct DB connection)
+# Multi-VPS & Dedicated Server architecture:
+# - NPM is hosted on external reverse-proxy VPS.
+# - SparrowX is hosted on internal VPS (e.g., 10.10.10.10).
+# - SparrowX Web / Studio:     0.0.0.0:80 & 3000 (sec.sparrowx.net & db.sparrowx.net)
+# - SparrowX PostgREST API:   0.0.0.0:3001      (api.sparrowx.net)
+# - SparrowX PgBouncer:       0.0.0.0:6543      (Postgres Connection Pooler)
+# - SparrowX PostgreSQL:      127.0.0.1:5432    (Internal DB)
 # ==============================================================================
 
 networks:
@@ -75,7 +75,7 @@ services:
     container_name: sparrowx_postgrest
     restart: always
     ports:
-      - "127.0.0.1:3001:3000"
+      - "3001:3000"
     environment:
       PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-SparrowxMasterSecretPass2026!}@sparrowx-pgbouncer:6543/${POSTGRES_DB:-sparrowbase}
       PGRST_DB_SCHEMA: ${PGRST_DB_SCHEMA:-public,auth,storage}
@@ -101,7 +101,7 @@ services:
       - sparrowx_net
 
   # ----------------------------------------------------------------------------
-  # 5. SparrowX Web App (Port 3000 -> forwarded to sec.sparrowx.net & db.sparrowx.net)
+  # 5. SparrowX Web App (Port 80 & 3000 -> forwarded to sec.sparrowx.net & db.sparrowx.net)
   # ----------------------------------------------------------------------------
   sparrowx-studio:
     build:
@@ -110,7 +110,8 @@ services:
     container_name: sparrowx_studio
     restart: always
     ports:
-      - "127.0.0.1:3000:3000"
+      - "80:3000"
+      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
