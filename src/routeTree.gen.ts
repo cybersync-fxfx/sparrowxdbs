@@ -10,11 +10,35 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as DbRouteImport } from './routes/db'
+import { Route as DropRouteImport } from './routes/drop'
+import { Route as KeysRouteImport } from './routes/keys'
+import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as DocsErrorsRouteImport } from './routes/docs/errors'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DbRoute = DbRouteImport.update({
+  id: '/db',
+  path: '/db',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DropRoute = DropRouteImport.update({
+  id: '/drop',
+  path: '/drop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KeysRoute = KeysRouteImport.update({
+  id: '/keys',
+  path: '/keys',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShieldRoute = ShieldRouteImport.update({
+  id: '/shield',
+  path: '/shield',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsErrorsRoute = DocsErrorsRouteImport.update({
@@ -25,27 +49,43 @@ const DocsErrorsRoute = DocsErrorsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/db': typeof DbRoute
+  '/drop': typeof DropRoute
+  '/keys': typeof KeysRoute
+  '/shield': typeof ShieldRoute
   '/docs/errors': typeof DocsErrorsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/db': typeof DbRoute
+  '/drop': typeof DropRoute
+  '/keys': typeof KeysRoute
+  '/shield': typeof ShieldRoute
   '/docs/errors': typeof DocsErrorsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/db': typeof DbRoute
+  '/drop': typeof DropRoute
+  '/keys': typeof KeysRoute
+  '/shield': typeof ShieldRoute
   '/docs/errors': typeof DocsErrorsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/docs/errors'
+  fullPaths: '/' | '/db' | '/drop' | '/keys' | '/shield' | '/docs/errors'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/docs/errors'
-  id: '__root__' | '/' | '/docs/errors'
+  to: '/' | '/db' | '/drop' | '/keys' | '/shield' | '/docs/errors'
+  id: '__root__' | '/' | '/db' | '/drop' | '/keys' | '/shield' | '/docs/errors'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DbRoute: typeof DbRoute
+  DropRoute: typeof DropRoute
+  KeysRoute: typeof KeysRoute
+  ShieldRoute: typeof ShieldRoute
   DocsErrorsRoute: typeof DocsErrorsRoute
 }
 
@@ -56,6 +96,34 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/db': {
+      id: '/db'
+      path: '/db'
+      fullPath: '/db'
+      preLoaderRoute: typeof DbRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/drop': {
+      id: '/drop'
+      path: '/drop'
+      fullPath: '/drop'
+      preLoaderRoute: typeof DropRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/keys': {
+      id: '/keys'
+      path: '/keys'
+      fullPath: '/keys'
+      preLoaderRoute: typeof KeysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shield': {
+      id: '/shield'
+      path: '/shield'
+      fullPath: '/shield'
+      preLoaderRoute: typeof ShieldRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/errors': {
@@ -70,6 +138,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DbRoute: DbRoute,
+  DropRoute: DropRoute,
+  KeysRoute: KeysRoute,
+  ShieldRoute: ShieldRoute,
   DocsErrorsRoute: DocsErrorsRoute,
 }
 export const routeTree = rootRouteImport

@@ -4154,6 +4154,44 @@ export function PortalLoginScreen({
                 >
                   Onboarding
                 </a>
+
+                <div className="h-4 w-px bg-white/20 mx-1" />
+
+                <a
+                  href="/db"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-[#3ECF8E] hover:bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 transition-all"
+                  title="SparrowX DB - Sovereign BaaS Console"
+                >
+                  <Database className="size-3" />
+                  <span>/db</span>
+                </a>
+
+                <a
+                  href="/shield"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-cyan-400 hover:bg-cyan-500/10 border border-cyan-500/20 transition-all"
+                  title="SparrowX Shield - Edge WAF & Threat Cache"
+                >
+                  <Shield className="size-3" />
+                  <span>/shield</span>
+                </a>
+
+                <a
+                  href="/drop"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
+                  title="SparrowX Drop - Ephemeral Zero-Disk Share"
+                >
+                  <LockKeyhole className="size-3" />
+                  <span>/drop</span>
+                </a>
+
+                <a
+                  href="/keys"
+                  className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-purple-400 hover:bg-purple-500/10 border border-purple-500/20 transition-all"
+                  title="SparrowX Keys - 100% Offline Cryptographic Engine"
+                >
+                  <KeyRound className="size-3" />
+                  <span>/keys</span>
+                </a>
               </nav>
             )}
 
