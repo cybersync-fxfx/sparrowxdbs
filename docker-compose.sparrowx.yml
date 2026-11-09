@@ -1,66 +1,29 @@
 # ==============================================================================
-# SPARROWX ENTERPRISE INFRASTRUCTURE: DUAL-ENGINE ARCHITECTURE
-# 1. SparrowX Security (Edge WAF, DDoS Mitigation, AI Guardrails)
-# 2. SparrowX DB (Sovereign DBaaS: Postgres 16 + pgvector + PgBouncer + PostgREST)
-# Dynamically adapts to any VPS hardware (1 to 64+ cores, 2GB to 128GB+ RAM)
+# SPARROWX ENTERPRISE INFRASTRUCTURE (NGINX PROXY MANAGER OPTIMIZED)
+# ==============================================================================
+# Designed specifically for servers running Nginx Proxy Manager (NPM).
+# NPM manages ports 80 & 443 with automated SSL.
+# SparrowX services expose dedicated internal host ports:
+# - SparrowX Web App / Studio:   127.0.0.1:3000  (for sec.sparrowx.net & db.sparrowx.net)
+# - SparrowX PostgREST REST API: 127.0.0.1:3001  (for api.sparrowx.net)
+# - SparrowX PgBouncer Pooler:   0.0.0.0:6543    (for DB clients / Prisma / Supabase-js)
+# - SparrowX PostgreSQL 16:      127.0.0.1:5432  (Direct DB connection)
 # ==============================================================================
 
 networks:
-  sparrowx_edge:
-    name: sparrowx_edge_net
+  sparrowx_net:
+    name: sparrowx_net
     driver: bridge
-  sparrowx_internal:
-    name: sparrowx_internal_net
-    internal: true
 
 volumes:
   sparrowx_pgdata:
-    driver: local
-  sparrowx_caddy_data:
-    driver: local
-  sparrowx_caddy_config:
     driver: local
   sparrowx_redis_data:
     driver: local
 
 services:
   # ----------------------------------------------------------------------------
-  # PILLAR 1: SPARROWX SECURITY (Edge Proxy, TLS Termination, WAF, AI Guardrails)
-  # ----------------------------------------------------------------------------
-  sparrowx-edge-proxy:
-    image: caddy:2-alpine
-    container_name: sparrowx_edge_proxy
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3 QUIC
-    environment:
-      - DOMAIN_STUDIO=${DOMAIN_STUDIO:-db.sparrowx.net}
-      - DOMAIN_SEC=${DOMAIN_SEC:-sec.sparrowx.net}
-      - DOMAIN_API=${DOMAIN_API:-api.sparrowx.net}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - sparrowx_caddy_data:/data
-      - sparrowx_caddy_config:/config
-    networks:
-      - sparrowx_edge
-      - sparrowx_internal
-    depends_on:
-      - sparrowx-studio
-
-  sparrowx-threat-cache:
-    image: redis:7-alpine
-    container_name: sparrowx_threat_cache
-    restart: always
-    command: redis-server --appendonly yes --requirepass ${SPARROWX_REDIS_SECRET:-secret_redis_pass_123}
-    volumes:
-      - sparrowx_redis_data:/data
-    networks:
-      - sparrowx_internal
-
-  # ----------------------------------------------------------------------------
-  # PILLAR 2: SPARROWX DB (Sovereign Database-as-a-Service Engine)
+  # 1. SparrowX PostgreSQL 16 with pgvector AI extension
   # ----------------------------------------------------------------------------
   sparrowx-postgres:
     image: pgvector/pgvector:pg16
@@ -69,7 +32,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sparrowbase}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SparrowxMasterSecretPass2026!}
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - sparrowx_pgdata:/var/lib/postgresql/data
@@ -77,17 +40,20 @@ services:
     ports:
       - "127.0.0.1:5432:5432"
     networks:
-      - sparrowx_internal
+      - sparrowx_net
 
+  # ----------------------------------------------------------------------------
+  # 2. PgBouncer Connection Pooler (Port 6543)
+  # ----------------------------------------------------------------------------
   sparrowx-pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: sparrowx_pgbouncer
     restart: always
     ports:
-      - "6543:6543" # External connection pooling port (Supabase compatible)
+      - "6543:6543"
     environment:
       - DB_USER=${POSTGRES_USER:-postgres}
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-SparrowxMasterSecretPass2026!}
       - DB_HOST=sparrowx-postgres
       - DB_PORT=5432
       - DB_NAME=${POSTGRES_DB:-sparrowbase}
@@ -97,12 +63,13 @@ services:
       - LISTEN_PORT=6543
       - AUTH_TYPE=scram-sha-256
     networks:
-      - sparrowx_edge
-      - sparrowx_internal
+      - sparrowx_net
     depends_on:
       - sparrowx-postgres
 
-  # PostgREST: Generates Instant REST API from Postgres Schemas
+  # ----------------------------------------------------------------------------
+  # 3. PostgREST REST API Gateway (Port 3001 -> forwarded to api.sparrowx.net)
+  # ----------------------------------------------------------------------------
   sparrowx-postgrest:
     image: postgrest/postgrest:latest
     container_name: sparrowx_postgrest
@@ -110,18 +77,32 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     environment:
-      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-SuperSecretMasterPassword2026!}@sparrowx-pgbouncer:6543/${POSTGRES_DB:-sparrowbase}
+      PGRST_DB_URI: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-SparrowxMasterSecretPass2026!}@sparrowx-pgbouncer:6543/${POSTGRES_DB:-sparrowbase}
       PGRST_DB_SCHEMA: ${PGRST_DB_SCHEMA:-public,auth,storage}
       PGRST_DB_ANON_ROLE: ${PGRST_DB_ANON_ROLE:-anon}
       PGRST_JWT_SECRET: ${SPARROWX_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-sparrowx}
       PGRST_OPENAPI_SERVER_PROXY_URI: https://${DOMAIN_API:-api.sparrowx.net}
     networks:
-      - sparrowx_edge
-      - sparrowx_internal
+      - sparrowx_net
     depends_on:
       - sparrowx-pgbouncer
 
-  # SparrowX Dashboard & Studio Frontend (Serves sec.sparrowx.net & db.sparrowx.net)
+  # ----------------------------------------------------------------------------
+  # 4. Redis Threat Cache
+  # ----------------------------------------------------------------------------
+  sparrowx-threat-cache:
+    image: redis:7-alpine
+    container_name: sparrowx_threat_cache
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${SPARROWX_REDIS_SECRET:-secret_redis_pass_123}
+    volumes:
+      - sparrowx_redis_data:/data
+    networks:
+      - sparrowx_net
+
+  # ----------------------------------------------------------------------------
+  # 5. SparrowX Web App (Port 3000 -> forwarded to sec.sparrowx.net & db.sparrowx.net)
+  # ----------------------------------------------------------------------------
   sparrowx-studio:
     build:
       context: .
@@ -137,5 +118,4 @@ services:
       - VITE_SPARROWX_API_URL=https://${DOMAIN_API:-api.sparrowx.net}
       - VITE_SPARROWX_WS_URL=wss://${DOMAIN_API:-api.sparrowx.net}/realtime
     networks:
-      - sparrowx_edge
-      - sparrowx_internal
+      - sparrowx_net
