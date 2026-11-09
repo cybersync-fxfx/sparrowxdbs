@@ -35,6 +35,9 @@ import {
 import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
 import { SovereignDatabaseStudio } from "@/components/SovereignDatabaseStudio";
 import { SparrowxApiGatewayPortal } from "@/components/SparrowxApiGatewayPortal";
+import { SparrowxDropEngine } from "@/components/SparrowxDropEngine";
+import { SparrowxKeysEngine } from "@/components/SparrowxKeysEngine";
+import { SparrowxShieldEngine } from "@/components/SparrowxShieldEngine";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -1526,6 +1529,29 @@ function Dashboard() {
       window.location.hostname.startsWith("rest.") ||
       new URLSearchParams(window.location.search).get("api") === "1");
 
+  const isFileDomainOrParam =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("file.") ||
+      window.location.hostname.startsWith("drop.") ||
+      window.location.hostname.startsWith("share.") ||
+      new URLSearchParams(window.location.search).get("file") === "1" ||
+      new URLSearchParams(window.location.search).get("drop") === "1");
+
+  const isPasswordDomainOrParam =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("password.") ||
+      window.location.hostname.startsWith("passwd.") ||
+      window.location.hostname.startsWith("pass.") ||
+      window.location.hostname.startsWith("keys.") ||
+      new URLSearchParams(window.location.search).get("password") === "1" ||
+      new URLSearchParams(window.location.search).get("passwd") === "1" ||
+      new URLSearchParams(window.location.search).get("keys") === "1");
+
+  const isShieldDomainOrParam =
+    typeof window !== "undefined" &&
+    (window.location.hostname.startsWith("shield.") ||
+      new URLSearchParams(window.location.search).get("shield") === "1");
+
   // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
   if (isStudioDomainOrParam) {
     return (
@@ -1544,6 +1570,36 @@ function Dashboard() {
     return (
       <>
         <SparrowxApiGatewayPortal />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
+  // 3. If visiting file.sparrowx.net or ?file=1 -> Direct to SparrowX Drop Ephemeral File Sharing
+  if (isFileDomainOrParam) {
+    return (
+      <>
+        <SparrowxDropEngine />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
+  // 4. If visiting password.sparrowx.net or passwd.sparrowx.net -> Direct to SparrowX Keys Cryptographic Engine
+  if (isPasswordDomainOrParam) {
+    return (
+      <>
+        <SparrowxKeysEngine />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
+  // 5. If visiting shield.sparrowx.net or ?shield=1 -> Direct to SparrowX Shield Edge Defense
+  if (isShieldDomainOrParam) {
+    return (
+      <>
+        <SparrowxShieldEngine />
         <BackgroundEngineToaster />
       </>
     );

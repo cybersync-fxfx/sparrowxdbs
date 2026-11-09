@@ -87,8 +87,11 @@ export function SparrowxDropEngine() {
 
       setFile(staged);
       setSecretKeyHex(keyHex);
-      const origin = typeof window !== "undefined" ? window.location.origin : "https://sparrowx.net";
-      const link = `${origin}/drop#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
+      const isFileDomain = typeof window !== "undefined" && window.location.hostname.includes("file.");
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
+      const link = isFileDomain
+        ? `${origin}/#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`
+        : `${origin}/drop#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
       setShareLink(link);
       setSessionActive(true);
       setTtlSeconds(15 * 60);
