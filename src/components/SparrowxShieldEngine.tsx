@@ -25,6 +25,7 @@ import {
   Cpu,
   Target,
   ExternalLink,
+  User,
 } from "lucide-react";
 import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
@@ -35,7 +36,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { authenticateAppUserFromBackend } from "@/lib/supabase";
+import { authenticateAppUserFromBackend, type AppUser } from "@/lib/supabase";
+import { issueSignedSessionToken } from "@/lib/advanced-features";
+
+export interface SparrowxShieldEngineProps {
+  currentUser?: AppUser | null;
+  onUserAuthenticated?: (user: AppUser) => void;
+  onOpenClientArea?: () => void;
+}
 
 interface InspectionResult {
   domain: string;
@@ -55,7 +63,11 @@ interface InspectionResult {
   };
 }
 
-export function SparrowxShieldEngine() {
+export function SparrowxShieldEngine({
+  currentUser,
+  onUserAuthenticated,
+  onOpenClientArea,
+}: SparrowxShieldEngineProps = {}) {
   const [targetDomain, setTargetDomain] = useState<string>("sparrowx.net");
   const [inspecting, setInspecting] = useState<boolean>(false);
   const [socModalOpen, setSocModalOpen] = useState<boolean>(false);
@@ -214,14 +226,31 @@ export function SparrowxShieldEngine() {
               <span>TACTICAL RADAR ACTIVE</span>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setSocModalOpen(true)}
-              className="px-4 py-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
-            >
-              <Lock className="size-3.5" />
-              <span>Operator Sign In</span>
-            </button>
+            {currentUser ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenClientArea) {
+                    onOpenClientArea();
+                  } else {
+                    window.location.href = "/";
+                  }
+                }}
+                className="px-4 py-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
+              >
+                <User className="size-3.5" />
+                <span>Open Client Area ({currentUser.fullName || currentUser.email}) →</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setSocModalOpen(true)}
+                className="px-4 py-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
+              >
+                <Lock className="size-3.5" />
+                <span>Sign In to Client Area</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -653,9 +682,20 @@ export function SparrowxShieldEngine() {
                 const res = await authenticateAppUserFromBackend(authEmail.trim(), authPassword);
                 if (res.user) {
                   setSocModalOpen(false);
-                  window.location.href = "/?shield=1";
+                  issueSignedSessionToken({
+                    id: res.user.id,
+                    email: res.user.email,
+                    fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
+                    role: res.user.admin === "yes" ? "admin" : "client",
+                    tenantId: res.user.tenantId,
+                  });
+                  if (onUserAuthenticated) {
+                    onUserAuthenticated(res.user);
+                  } else {
+                    window.location.href = "/";
+                  }
                 } else {
-                  setAuthError(res.error || "Invalid operator credentials.");
+                  setAuthError(res.error || "Invalid sign-in credentials.");
                 }
               } catch {
                 setAuthError("Auth gateway offline.");

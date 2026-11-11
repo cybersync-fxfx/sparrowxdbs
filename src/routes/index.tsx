@@ -1522,6 +1522,76 @@ function Dashboard() {
     setActiveNav(navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel);
   };
 
+  // Unified Session Authenticator for all Subdomains & Master Landing
+  const handleUserAuthenticated = (user: AppUser) => {
+    issueSignedSessionToken({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName || user.email.split("@")[0] || "Operator",
+      role: user.admin === "yes" ? "admin" : "client",
+      tenantId: user.tenantId,
+    });
+    setCurrentUser(user);
+
+    // Strip standalone subdomain query flags (?db=1, ?shield=1, ?sec=1, etc.) so user isn't trapped
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("db");
+      url.searchParams.delete("shield");
+      url.searchParams.delete("sec");
+      url.searchParams.delete("file");
+      url.searchParams.delete("drop");
+      url.searchParams.delete("password");
+      url.searchParams.delete("keys");
+      url.searchParams.delete("api");
+      url.searchParams.delete("studio");
+      window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
+    }
+
+    if (user.admin === "yes") {
+      setAuthSession({
+        role: "admin",
+        operatorName: user.fullName || "SparrowX Admin",
+        operatorEmail: user.email,
+      });
+      setPortalMode("soc");
+      setActiveNav("Overview");
+      void recordAudit(
+        `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
+        "Admin & Subscriptions Portal",
+        "Info",
+      );
+      emitEngineToast(`Admin session active (${user.email})`, "success", "Admin Authenticated");
+      emitEngineActivity("Auth", `Admin ${user.email} logged into SOC command`, "success");
+      showToast(`Admin session active (${user.email})`);
+    } else {
+      const matchedTenant =
+        clientTenants.find(
+          (t) =>
+            t.id === user.tenantId ||
+            t.contactEmail.toLowerCase() === user.email.toLowerCase(),
+        ) ?? null;
+      if (matchedTenant) {
+        setSelectedTenantId(matchedTenant.id);
+      }
+      setAuthSession({
+        role: "client",
+        tenantId: matchedTenant?.id ?? user.tenantId,
+        userEmail: user.email,
+      });
+      setPortalMode("client");
+      setActiveNav("My Services");
+      void recordAudit(
+        `Client user ${user.email} (admin=no) authenticated into Client Area`,
+        matchedTenant?.name ?? user.email,
+        "Info",
+      );
+      emitEngineToast(`Welcome back, ${user.fullName || user.email}`, "success", "Authenticated");
+      emitEngineActivity("Auth", `Client user ${user.email} session restored`, "success");
+      showToast(`Welcome back, ${user.fullName || user.email}`);
+    }
+  };
+
   // Dedicated Domain Ingress Routing (Priority checks before login/SOC)
   const isStudioDomainOrParam =
     typeof window !== "undefined" &&
@@ -1569,126 +1639,75 @@ function Dashboard() {
       new URLSearchParams(window.location.search).get("shield") === "1" ||
       new URLSearchParams(window.location.search).get("sec") === "1");
 
-  // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
-  if (isStudioDomainOrParam) {
-    return (
-      <>
-        <SovereignDatabaseStudio
-          isStandaloneDomain={true}
-          onClose={() => setActiveNav("Overview")}
-        />
-        <BackgroundEngineToaster />
-      </>
-    );
-  }
-
-  // 2. If visiting api.sparrowx.net or ?api=1 -> Direct to REST API Gateway Portal & Documentation
-  if (isApiDomainOrParam) {
-    return (
-      <>
-        <SparrowxApiGatewayPortal />
-        <BackgroundEngineToaster />
-      </>
-    );
-  }
-
-  // 3. If visiting file.sparrowx.net or ?file=1 -> Direct to SparrowX Drop Ephemeral File Sharing
-  if (isFileDomainOrParam) {
-    return (
-      <>
-        <SparrowxDropEngine />
-        <BackgroundEngineToaster />
-      </>
-    );
-  }
-
-  // 4. If visiting password.sparrowx.net or passwd.sparrowx.net -> Direct to SparrowX Keys Cryptographic Engine
-  if (isPasswordDomainOrParam) {
-    return (
-      <>
-        <SparrowxKeysEngine />
-        <BackgroundEngineToaster />
-      </>
-    );
-  }
-
-  // 5. If visiting shield.sparrowx.net or ?shield=1 -> Direct to SparrowX Shield Edge Defense
-  if (isShieldDomainOrParam) {
-    return (
-      <>
-        <SparrowxShieldEngine />
-        <BackgroundEngineToaster />
-      </>
-    );
-  }
-
-  // 6. Root domain (sparrowx.net / www.sparrowx.net) -> Central Master Landing Page of SparrowX Technologies
+  // UN-AUTHENTICATED INGRESS & SUBDOMAIN ROUTING
   if (authSession.role === "unauthenticated") {
+    // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
+    if (isStudioDomainOrParam) {
+      return (
+        <>
+          <SovereignDatabaseStudio
+            isStandaloneDomain={true}
+            currentUser={currentUser}
+            onUserAuthenticated={handleUserAuthenticated}
+            onOpenClientArea={() => setShowAuthLogin(true)}
+            onClose={() => setActiveNav("Overview")}
+          />
+          <BackgroundEngineToaster />
+        </>
+      );
+    }
+
+    // 2. If visiting api.sparrowx.net or ?api=1 -> Direct to REST API Gateway Portal & Documentation
+    if (isApiDomainOrParam) {
+      return (
+        <>
+          <SparrowxApiGatewayPortal />
+          <BackgroundEngineToaster />
+        </>
+      );
+    }
+
+    // 3. If visiting file.sparrowx.net or ?file=1 -> Direct to SparrowX Drop Ephemeral File Sharing
+    if (isFileDomainOrParam) {
+      return (
+        <>
+          <SparrowxDropEngine />
+          <BackgroundEngineToaster />
+        </>
+      );
+    }
+
+    // 4. If visiting password.sparrowx.net or passwd.sparrowx.net -> Direct to SparrowX Keys Cryptographic Engine
+    if (isPasswordDomainOrParam) {
+      return (
+        <>
+          <SparrowxKeysEngine />
+          <BackgroundEngineToaster />
+        </>
+      );
+    }
+
+    // 5. If visiting shield.sparrowx.net or ?shield=1 -> Direct to SparrowX Shield Edge Defense
+    if (isShieldDomainOrParam) {
+      return (
+        <>
+          <SparrowxShieldEngine
+            currentUser={currentUser}
+            onUserAuthenticated={handleUserAuthenticated}
+            onOpenClientArea={() => setShowAuthLogin(true)}
+          />
+          <BackgroundEngineToaster />
+        </>
+      );
+    }
+
+    // 6. Root domain (sparrowx.net / www.sparrowx.net) -> Central Master Landing Page of SparrowX Technologies
     if (!showAuthLogin) {
       return (
         <>
           <SparrowxMasterLanding
             onOpenLogin={() => setShowAuthLogin(true)}
-            onUserAuthenticated={(user) => {
-              issueSignedSessionToken({
-                id: user.id,
-                email: user.email,
-                fullName: user.fullName,
-                role: user.admin === "yes" ? "admin" : "client",
-                tenantId: user.tenantId,
-              });
-              setCurrentUser(user);
-              if (user.admin === "yes") {
-                setAuthSession({
-                  role: "admin",
-                  operatorName: user.fullName || "SparrowX Admin",
-                  operatorEmail: user.email,
-                });
-                setPortalMode("soc");
-                setActiveNav("Overview");
-                void recordAudit(
-                  `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
-                  "Admin & Subscriptions Portal",
-                  "Info",
-                );
-                emitEngineToast(
-                  `Admin session active (${user.email})`,
-                  "success",
-                  "Admin Authenticated",
-                );
-                emitEngineActivity("Auth", `Admin ${user.email} logged into SOC command`, "success");
-                showToast(`Admin session active (${user.email})`);
-              } else {
-                const matchedTenant =
-                  clientTenants.find(
-                    (t) =>
-                      t.id === user.tenantId ||
-                      t.contactEmail.toLowerCase() === user.email.toLowerCase(),
-                  ) ?? null;
-                if (matchedTenant) {
-                  setSelectedTenantId(matchedTenant.id);
-                }
-                setAuthSession({
-                  role: "client",
-                  tenantId: matchedTenant?.id ?? user.tenantId,
-                  userEmail: user.email,
-                });
-                setPortalMode("client");
-                setActiveNav("My Services");
-                void recordAudit(
-                  `Client user ${user.email} (admin=no) authenticated into Client Area`,
-                  matchedTenant?.name ?? user.email,
-                  "Info",
-                );
-                emitEngineToast(
-                  `Welcome back, ${user.fullName || user.email}`,
-                  "success",
-                  "Authenticated",
-                );
-                emitEngineActivity("Auth", `Client user ${user.email} session restored`, "success");
-                showToast(`Welcome back, ${user.fullName || user.email}`);
-              }
-            }}
+            onUserAuthenticated={handleUserAuthenticated}
             onDirectNav={(target) => {
               if (typeof window === "undefined") return;
               const url = new URL(window.location.href);
@@ -1791,66 +1810,7 @@ function Dashboard() {
             showToast(`Welcome ${createdUser.fullName} — Client Area ready`);
             return {};
           }}
-          onUserAuthenticated={(user) => {
-            issueSignedSessionToken({
-              id: user.id,
-              email: user.email,
-              fullName: user.fullName,
-              role: user.admin === "yes" ? "admin" : "client",
-              tenantId: user.tenantId,
-            });
-            setCurrentUser(user);
-            if (user.admin === "yes") {
-              setAuthSession({
-                role: "admin",
-                operatorName: user.fullName || "SparrowX Admin",
-                operatorEmail: user.email,
-              });
-              setPortalMode("soc");
-              setActiveNav("Overview");
-              void recordAudit(
-                `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
-                "Admin & Subscriptions Portal",
-                "Info",
-              );
-              emitEngineToast(
-                `Admin session active (${user.email})`,
-                "success",
-                "Admin Authenticated",
-              );
-              emitEngineActivity("Auth", `Admin ${user.email} logged into SOC command`, "success");
-              showToast(`Admin session active (${user.email})`);
-            } else {
-              const matchedTenant =
-                clientTenants.find(
-                  (t) =>
-                    t.id === user.tenantId ||
-                    t.contactEmail.toLowerCase() === user.email.toLowerCase(),
-                ) ?? null;
-              if (matchedTenant) {
-                setSelectedTenantId(matchedTenant.id);
-              }
-              setAuthSession({
-                role: "client",
-                tenantId: matchedTenant?.id ?? user.tenantId,
-                userEmail: user.email,
-              });
-              setPortalMode("client");
-              setActiveNav("My Services");
-              void recordAudit(
-                `Client user ${user.email} (admin=no) authenticated into Client Area`,
-                matchedTenant?.name ?? user.email,
-                "Info",
-              );
-              emitEngineToast(
-                `Welcome back, ${user.fullName || user.email}`,
-                "success",
-                "Authenticated",
-              );
-              emitEngineActivity("Auth", `Client user ${user.email} session restored`, "success");
-              showToast(`Welcome back, ${user.fullName || user.email}`);
-            }
-          }}
+          onUserAuthenticated={handleUserAuthenticated}
           tenants={clientTenants}
         />
         <BackgroundEngineToaster />
@@ -1859,14 +1819,40 @@ function Dashboard() {
   }
 
   if (
-    authSession.role === "admin" &&
-    (activeNav === "Supabase Studio" || activeNav === "SparrowX DB")
+    activeNav === "Supabase Studio" ||
+    activeNav === "SparrowX DB" ||
+    activeNav === "Database Studio"
   ) {
     return (
       <>
         <SovereignDatabaseStudio
           isStandaloneDomain={false}
-          onClose={() => setActiveNav("Overview")}
+          currentUser={currentUser}
+          onUserAuthenticated={handleUserAuthenticated}
+          onOpenClientArea={() => {
+            setActiveNav(authSession.role === "admin" ? "Overview" : "My Services");
+            setPortalMode(authSession.role === "admin" ? "soc" : "client");
+          }}
+          onClose={() => {
+            setActiveNav(authSession.role === "admin" ? "Overview" : "My Services");
+            setPortalMode(authSession.role === "admin" ? "soc" : "client");
+          }}
+        />
+        <BackgroundEngineToaster />
+      </>
+    );
+  }
+
+  if (activeNav === "SparrowX Shield" || activeNav === "Shield Edge Defense") {
+    return (
+      <>
+        <SparrowxShieldEngine
+          currentUser={currentUser}
+          onUserAuthenticated={handleUserAuthenticated}
+          onOpenClientArea={() => {
+            setActiveNav(authSession.role === "admin" ? "Overview" : "My Services");
+            setPortalMode(authSession.role === "admin" ? "soc" : "client");
+          }}
         />
         <BackgroundEngineToaster />
       </>
@@ -2228,14 +2214,42 @@ function Dashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border bg-card/90 px-2 sm:px-3 py-1 text-xs shadow-sm shrink-0">
-                <Boxes className="size-3.5 text-primary shrink-0" />
-                <span className="font-semibold text-foreground truncate max-w-[85px] xs:max-w-[140px] sm:max-w-none">
-                  {activeClientTenant?.name || "Client"} Dashboard
-                </span>
-                <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold shrink-0">
-                  {activeClientTenant?.planTier || "Active"}
-                </span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border bg-card/90 px-2 sm:px-3 py-1 text-xs shadow-sm shrink-0">
+                  <Boxes className="size-3.5 text-primary shrink-0" />
+                  <span className="font-semibold text-foreground truncate max-w-[85px] xs:max-w-[140px] sm:max-w-none">
+                    {activeClientTenant?.name || "Client"} Dashboard
+                  </span>
+                  <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold shrink-0">
+                    {activeClientTenant?.planTier || "Active"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveNav("SparrowX DB")}
+                  className={`hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    activeNav === "SparrowX DB" || activeNav === "Supabase Studio"
+                      ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
+                      : "text-[#3ECF8E] border border-[#3ECF8E]/30 hover:bg-[#3ECF8E]/15"
+                  }`}
+                  title="Open SparrowX DB Studio"
+                >
+                  <Database className="size-3.5 shrink-0" />
+                  <span>SparrowX DB</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveNav("SparrowX Shield")}
+                  className={`hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
+                    activeNav === "SparrowX Shield"
+                      ? "bg-[#FF6B00] text-black shadow-sm"
+                      : "text-[#FF6B00] border border-[#FF6B00]/30 hover:bg-[#FF6B00]/15"
+                  }`}
+                  title="Open SparrowX Shield WAF"
+                >
+                  <Shield className="size-3.5 shrink-0" />
+                  <span>Shield</span>
+                </button>
               </div>
             )}
 
@@ -5274,6 +5288,18 @@ function AppSidebar({
       icon: Boxes,
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
+    {
+      label: "SparrowX DB Studio",
+      navKey: "SparrowX DB",
+      icon: Database,
+      count: "v16",
+    },
+    {
+      label: "SparrowX Shield WAF",
+      navKey: "SparrowX Shield",
+      icon: Shield,
+      count: "Active",
+    },
     { label: "Subscriptions & Due Dates", navKey: "Subscriptions & Due Dates", icon: CreditCard },
     { label: "Billing & Credits", navKey: "Billing & Credits", icon: Coins },
     { label: "Reports & Compliance", navKey: "Reports", icon: FileText },
@@ -5296,6 +5322,16 @@ function AppSidebar({
       label: "My Services",
       icon: Boxes,
       count: tenantCount > 0 ? String(tenantCount) : undefined,
+    },
+    {
+      label: "SparrowX DB",
+      icon: Database,
+      count: "v16",
+    },
+    {
+      label: "SparrowX Shield",
+      icon: Shield,
+      count: "WAF",
     },
     {
       label: "Global Traffic Mesh",

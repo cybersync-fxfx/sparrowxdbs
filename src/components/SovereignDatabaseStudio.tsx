@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import migratedSeedData from "../lib/migrated-seed.json";
 import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
-import { authenticateAppUserFromBackend } from "@/lib/supabase";
+import { authenticateAppUserFromBackend, type AppUser } from "@/lib/supabase";
+import { issueSignedSessionToken } from "@/lib/advanced-features";
 import {
   Database,
   Table2,
@@ -435,11 +436,17 @@ USING (id = current_setting('request.jwt.claim.sub', true));`,
 interface SovereignDatabaseStudioProps {
   onClose?: () => void;
   isStandaloneDomain?: boolean;
+  currentUser?: AppUser | null;
+  onUserAuthenticated?: (user: AppUser) => void;
+  onOpenClientArea?: () => void;
 }
 
 export function SovereignDatabaseStudio({
   onClose,
   isStandaloneDomain = false,
+  currentUser,
+  onUserAuthenticated,
+  onOpenClientArea,
 }: SovereignDatabaseStudioProps) {
   // Navigation mode: "landing" (default for visitors / public) or "studio" (full database console)
   const [viewMode, setViewMode] = useState<"landing" | "studio">("landing");
@@ -1137,7 +1144,19 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onOpenClientArea) onOpenClientArea();
+                    else window.location.href = "/";
+                  }}
+                  className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>← Client Area</span>
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setViewMode("studio")}
@@ -1214,12 +1233,23 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                   try {
                     const res = await authenticateAppUserFromBackend(landingAuthEmail.trim(), landingAuthPassword);
                     if (res.user) {
-                      setViewMode("studio");
+                      issueSignedSessionToken({
+                        id: res.user.id,
+                        email: res.user.email,
+                        fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
+                        role: res.user.admin === "yes" ? "admin" : "client",
+                        tenantId: res.user.tenantId,
+                      });
+                      if (onUserAuthenticated) {
+                        onUserAuthenticated(res.user);
+                      } else {
+                        window.location.href = "/";
+                      }
                     } else {
-                      setViewMode("studio");
+                      setLandingAuthError(res.error || "Invalid database account credentials.");
                     }
                   } catch {
-                    setViewMode("studio");
+                    setLandingAuthError("Database authentication service offline.");
                   } finally {
                     setLandingAuthLoading(false);
                   }
@@ -1604,6 +1634,19 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           >
             <Activity className={`size-3.5 text-[#3ECF8E] ${pingStatus.testing ? "animate-spin" : ""}`} />
             <span className="font-mono text-[11px]">{pingStatus.postgrest ? `${pingStatus.postgrest}ms` : "Ping"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenClientArea) onOpenClientArea();
+              else window.location.href = "/";
+            }}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[#3ECF8E]/40 bg-[#3ECF8E]/15 px-3 py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-[#3ECF8E]/25 transition-colors cursor-pointer"
+            title="Open SparrowX Client Area & Services"
+          >
+            <Boxes className="size-3.5" />
+            <span className="font-semibold">Client Area</span>
           </button>
 
           <button
