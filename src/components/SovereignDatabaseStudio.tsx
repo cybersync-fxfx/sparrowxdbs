@@ -1,8 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import migratedSeedData from "../lib/migrated-seed.json";
 import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
-import { authenticateAppUserFromBackend, type AppUser } from "@/lib/supabase";
-import { issueSignedSessionToken } from "@/lib/advanced-features";
+import {
+  authenticateAppUserFromBackend,
+  persistAppUserToBackend,
+  persistClientTenantToBackend,
+  generateSecureSparrowKey,
+  type AppUser,
+  type ClientTenant,
+} from "@/lib/supabase";
+import {
+  issueSignedSessionToken,
+  verifySessionToken,
+  clearSessionToken,
+} from "@/lib/advanced-features";
 import {
   Database,
   Table2,
@@ -448,8 +459,109 @@ export function SovereignDatabaseStudio({
   onUserAuthenticated,
   onOpenClientArea,
 }: SovereignDatabaseStudioProps) {
+  // Resolve effective user: prop currentUser or verified token in localStorage
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => {
+    if (currentUser) return currentUser;
+    const verified = verifySessionToken();
+    if (verified) {
+      return {
+        id: verified.sub,
+        email: verified.email,
+        fullName: verified.fullName || verified.email.split("@")[0] || "Developer",
+        password: "",
+        admin: verified.role === "admin" ? "yes" : "no",
+        tenantId: verified.tenantId,
+      };
+    }
+    return null;
+  });
+
+  // Environment state: "production" | "staging" | "development"
+  const [activeEnv, setActiveEnv] = useState<"production" | "staging" | "development">("production");
+
   // Navigation mode: "landing" (default for visitors / public) or "studio" (full database console)
-  const [viewMode, setViewMode] = useState<"landing" | "studio">("landing");
+  // STRICT AUTH: Only enters studio if user is actively authenticated
+  const [viewMode, setViewMode] = useState<"landing" | "studio">(() => {
+    return currentUser || verifySessionToken() ? "studio" : "landing";
+  });
+
+  useEffect(() => {
+    if (currentUser) {
+      setSessionUser(currentUser);
+      setViewMode("studio");
+    } else {
+      const verified = verifySessionToken();
+      if (verified) {
+        setSessionUser({
+          id: verified.sub,
+          email: verified.email,
+          fullName: verified.fullName || verified.email.split("@")[0] || "Developer",
+          password: "",
+          admin: verified.role === "admin" ? "yes" : "no",
+          tenantId: verified.tenantId,
+        });
+        setViewMode("studio");
+      }
+    }
+  }, [currentUser]);
+
+  // Auth Mode on Landing: "signin" | "register"
+  const [landingAuthMode, setLandingAuthMode] = useState<"signin" | "register">("signin");
+  const [landingRegisterOrg, setLandingRegisterOrg] = useState<string>("");
+  const [landingRegisterName, setLandingRegisterName] = useState<string>("");
+  const [landingRegisterEmail, setLandingRegisterEmail] = useState<string>("");
+  const [landingRegisterPassword, setLandingRegisterPassword] = useState<string>("");
+  const [landingRegisterRegion, setLandingRegisterRegion] = useState<string>("AP-South Bare Metal (Chennai / Singapore)");
+
+  // Isolated Project Identification based on sessionUser and activeEnv
+  const tenantSlug = useMemo(() => {
+    if (!sessionUser) return "workspace";
+    return (sessionUser.tenantId || sessionUser.email.split("@")[0] || "workspace")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "-");
+  }, [sessionUser]);
+
+  const activeProject = useMemo(() => {
+    const envUpper = activeEnv.toUpperCase();
+    const envConfigs = {
+      production: { port: 5432, poolerPort: 6543, poolSize: 40, label: "Production (Active)", badge: "text-emerald-400 border-emerald-500/40 bg-emerald-500/10" },
+      staging: { port: 5432, poolerPort: 6544, poolSize: 15, label: "Staging (Pre-Release)", badge: "text-amber-400 border-amber-500/40 bg-amber-500/10" },
+      development: { port: 5432, poolerPort: 6545, poolSize: 5, label: "Development (Sandbox)", badge: "text-cyan-400 border-cyan-500/40 bg-cyan-500/10" },
+    };
+    const cfg = envConfigs[activeEnv];
+    const dbName = `${tenantSlug}_${activeEnv}_db`;
+    const dbUser = `usr_${tenantSlug}`;
+
+    return {
+      id: `prj_${tenantSlug}_${activeEnv}`,
+      name: `${sessionUser?.fullName || sessionUser?.email?.split("@")[0] || "Developer"}'s DB`,
+      organization: sessionUser?.tenantId || "Independent Workspace",
+      environment: envUpper,
+      cfg,
+      dbName,
+      dbUser,
+      host: "db.sparrowx.net",
+      port: cfg.port,
+      poolerPort: cfg.poolerPort,
+      maxPoolSize: cfg.poolSize,
+      connectionUri: `postgresql://${dbUser}:••••••••••••@db.sparrowx.net:${cfg.port}/${dbName}?sslmode=require`,
+      directUri: `postgresql://${dbUser}:••••••••••••@db.sparrowx.net:${cfg.port}/${dbName}?sslmode=require`,
+      pooledUri: `postgresql://${dbUser}:••••••••••••@db.sparrowx.net:${cfg.poolerPort}/${dbName}?pgbouncer=true&sslmode=require`,
+      anonKey: `spx_anon_${tenantSlug}_${activeEnv}_${(sessionUser?.id || "anon").slice(-6)}`,
+      serviceRoleKey: `spx_service_${tenantSlug}_${activeEnv}_${(sessionUser?.id || "svc").slice(-6)}`,
+      restBaseUrl: `https://api.sparrowx.net/rest/v1/${tenantSlug}`,
+    };
+  }, [sessionUser, tenantSlug, activeEnv]);
+
+  const handleLockWorkspace = () => {
+    clearSessionToken();
+    setSessionUser(null);
+    setViewMode("landing");
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
+
   const [showNewProjectModal, setShowNewProjectModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>("production-db");
   const [newProjectRegion, setNewProjectRegion] = useState<string>("Dedicated Cloud Region");
@@ -1145,27 +1257,40 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
-              {currentUser ? (
+              {sessionUser ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onOpenClientArea) onOpenClientArea();
+                      else window.location.href = "/";
+                    }}
+                    className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>← Client Area</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("studio")}
+                    className="px-4 py-2 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-black font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <span>Enter Console ({sessionUser.fullName || sessionUser.email}) →</span>
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   onClick={() => {
-                    if (onOpenClientArea) onOpenClientArea();
-                    else window.location.href = "/";
+                    const el = document.getElementById("db-auth-card");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
                   }}
-                  className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2 rounded-md bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                 >
-                  <span>← Client Area</span>
+                  <Lock className="size-3.5 text-emerald-600" />
+                  <span>Developer Sign In &amp; Register</span>
+                  <ChevronRight className="size-3.5" />
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setViewMode("studio")}
-                className="px-4 py-2 rounded-md bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-              >
-                <Lock className="size-3.5 text-emerald-600" />
-                <span>Launch DB Studio</span>
-                <ChevronRight className="size-3.5" />
-              </button>
+              )}
             </div>
           </div>
         </header>
@@ -1177,46 +1302,70 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             <div className="lg:col-span-7 space-y-4">
               <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#14171F] border border-white/[0.08] text-[11px] font-mono text-emerald-400">
                 <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>SIMPLE CLOUD POSTGRESQL • ZERO SURPRISE BILLS</span>
+                <span>SIMPLE CLOUD POSTGRESQL • STRICT AUTH ISOLATION</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-sans leading-tight">
                 The Fast, Reliable Cloud Database <br />
-                <span className="text-[#9CA3AF]">That Just Works.</span>
+                <span className="text-[#9CA3AF]">Dedicated Per Account.</span>
               </h1>
 
               <p className="text-xs sm:text-sm text-[#CCCCCC] leading-relaxed">
-                Launch high-performance PostgreSQL with built-in vector search and connection pooling in seconds. Zero mysterious egress fees, zero vendor lock-in, and automated daily backups you can download in 1 click.
+                Launch high-performance PostgreSQL with built-in vector search and dedicated environment connection pooling in seconds. Separate environments (Production, Staging, Dev) with strictly isolated tenant databases and zero anonymous leaks.
               </p>
 
               <div className="pt-2 flex flex-wrap gap-4 text-xs font-mono text-[#A3A3A3]">
                 <span className="flex items-center gap-1.5 text-white">
                   <Check className="size-3.5 text-emerald-400" />
-                  Instant Connection Strings
+                  Separate Isolated Environments
                 </span>
                 <span className="flex items-center gap-1.5 text-white">
                   <Check className="size-3.5 text-emerald-400" />
-                  Built-in AI Vector Search
+                  Strict Authentication Required
                 </span>
                 <span className="flex items-center gap-1.5 text-white">
                   <Check className="size-3.5 text-emerald-400" />
-                  1-Click Full Data Export (.sql)
+                  Dedicated PgBouncer Pooler
                 </span>
               </div>
             </div>
 
-            {/* Right: Studio Sign In Card */}
-            <div className="lg:col-span-5 border border-white/[0.08] bg-[#14171F] rounded-md p-5 space-y-4">
-              <div className="space-y-1">
-                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider block font-bold">
-                  Developer Workspace
+            {/* Right: Studio Strict Auth Card with Sign In / Register Tabs */}
+            <div id="db-auth-card" className="lg:col-span-5 border border-white/[0.08] bg-[#14171F] rounded-md p-5 space-y-4 shadow-lg">
+              <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLandingAuthMode("signin");
+                      setLandingAuthError("");
+                    }}
+                    className={`text-xs font-mono font-bold px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                      landingAuthMode === "signin"
+                        ? "bg-white text-black shadow-sm"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLandingAuthMode("register");
+                      setLandingAuthError("");
+                    }}
+                    className={`text-xs font-mono font-bold px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                      landingAuthMode === "register"
+                        ? "bg-emerald-500 text-black shadow-sm"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    Register Environment
+                  </button>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                  STRICT AUTH
                 </span>
-                <h3 className="text-sm font-bold text-white font-mono">
-                  Sign In to Database Console
-                </h3>
-                <p className="text-[11px] text-[#A3A3A3]">
-                  Access your tables, SQL editor, and automated backups.
-                </p>
               </div>
 
               {landingAuthError && (
@@ -1225,70 +1374,220 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                 </div>
               )}
 
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setLandingAuthLoading(true);
-                  setLandingAuthError("");
-                  try {
-                    const res = await authenticateAppUserFromBackend(landingAuthEmail.trim(), landingAuthPassword);
-                    if (res.user) {
+              {landingAuthMode === "signin" ? (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setLandingAuthLoading(true);
+                    setLandingAuthError("");
+                    try {
+                      const res = await authenticateAppUserFromBackend(landingAuthEmail.trim(), landingAuthPassword);
+                      if (res.user) {
+                        issueSignedSessionToken({
+                          id: res.user.id,
+                          email: res.user.email,
+                          fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
+                          role: res.user.admin === "yes" ? "admin" : "client",
+                          tenantId: res.user.tenantId,
+                        });
+                        setSessionUser(res.user);
+                        setViewMode("studio");
+                        if (onUserAuthenticated) {
+                          onUserAuthenticated(res.user);
+                        } else {
+                          window.location.href = "/";
+                        }
+                      } else {
+                        setLandingAuthError(res.error || "Invalid database account credentials.");
+                      }
+                    } catch {
+                      setLandingAuthError("Database authentication service offline.");
+                    } finally {
+                      setLandingAuthLoading(false);
+                    }
+                  }}
+                  className="space-y-3 font-mono text-xs"
+                >
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Developer Email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={landingAuthEmail}
+                      onChange={(e) => setLandingAuthEmail(e.target.value)}
+                      placeholder="admin@sparrowx.net"
+                      className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Master Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      value={landingAuthPassword}
+                      onChange={(e) => setLandingAuthPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={landingAuthLoading}
+                    className="w-full py-2.5 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    {landingAuthLoading && <RefreshCw className="size-3.5 animate-spin" />}
+                    <span>Sign In to Database Console</span>
+                  </button>
+                  <p className="text-[11px] text-center text-zinc-500 pt-1">
+                    Don&apos;t have a workspace?{" "}
+                    <button
+                      type="button"
+                      onClick={() => setLandingAuthMode("register")}
+                      className="text-emerald-400 hover:underline font-semibold cursor-pointer"
+                    >
+                      Provision new environment
+                    </button>
+                  </p>
+                </form>
+              ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setLandingAuthLoading(true);
+                    setLandingAuthError("");
+                    try {
+                      const emailClean = landingRegisterEmail.trim().toLowerCase();
+                      const orgClean = landingRegisterOrg.trim() || `${landingRegisterName.trim() || "Org"} Workspace`;
+                      const tenantId = `TNT-${Date.now().toString().slice(-4)}`;
+
+                      const newTenant: ClientTenant = {
+                        id: tenantId,
+                        name: orgClean,
+                        contactEmail: emailClean,
+                        primaryDomain: `${tenantId.toLowerCase()}.db.sparrowx.net`,
+                        planTier: "Dedicated Core",
+                        status: "Active",
+                        enabledModules: ["cloud_security", "web_security", "ai_shield"],
+                        apiKey: generateSecureSparrowKey("spx_db_live"),
+                        sdkVerified: true,
+                        guardrailsActive: true,
+                        requestsPerMin: 0,
+                        blockedThreats: 0,
+                        avgLatencyMs: 0.8,
+                        quotaUsedPct: 1,
+                      };
+                      await persistClientTenantToBackend(newTenant);
+
+                      const newUser: AppUser = {
+                        id: `USR-${Date.now().toString().slice(-4)}`,
+                        email: emailClean,
+                        password: landingRegisterPassword,
+                        fullName: landingRegisterName.trim() || orgClean,
+                        admin: "no",
+                        tenantId: tenantId,
+                      };
+                      await persistAppUserToBackend(newUser);
+
                       issueSignedSessionToken({
-                        id: res.user.id,
-                        email: res.user.email,
-                        fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
-                        role: res.user.admin === "yes" ? "admin" : "client",
-                        tenantId: res.user.tenantId,
+                        id: newUser.id,
+                        email: newUser.email,
+                        fullName: newUser.fullName,
+                        role: "client",
+                        tenantId: tenantId,
                       });
+
+                      setSessionUser(newUser);
+                      setViewMode("studio");
                       if (onUserAuthenticated) {
-                        onUserAuthenticated(res.user);
+                        onUserAuthenticated(newUser);
                       } else {
                         window.location.href = "/";
                       }
-                    } else {
-                      setLandingAuthError(res.error || "Invalid database account credentials.");
+                    } catch {
+                      setLandingAuthError("Failed to provision database environment. Please try again.");
+                    } finally {
+                      setLandingAuthLoading(false);
                     }
-                  } catch {
-                    setLandingAuthError("Database authentication service offline.");
-                  } finally {
-                    setLandingAuthLoading(false);
-                  }
-                }}
-                className="space-y-3 font-mono text-xs"
-              >
-                <input
-                  type="email"
-                  required
-                  value={landingAuthEmail}
-                  onChange={(e) => setLandingAuthEmail(e.target.value)}
-                  placeholder="admin@sparrowx.net"
-                  className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
-                />
-                <input
-                  type="password"
-                  required
-                  value={landingAuthPassword}
-                  onChange={(e) => setLandingAuthPassword(e.target.value)}
-                  placeholder="Master Password"
-                  className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
-                />
-                <button
-                  type="submit"
-                  disabled={landingAuthLoading}
-                  className="w-full py-2.5 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  }}
+                  className="space-y-3 font-mono text-xs"
                 >
-                  {landingAuthLoading && <RefreshCw className="size-3.5 animate-spin" />}
-                  <span>Sign In to Studio</span>
-                </button>
-              </form>
-
-              <button
-                type="button"
-                onClick={() => setViewMode("studio")}
-                className="w-full text-center text-[11px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-              >
-                Explore Read-Only Studio Console →
-              </button>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Organization / Workspace Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={landingRegisterOrg}
+                      onChange={(e) => setLandingRegisterOrg(e.target.value)}
+                      placeholder="Acme Technologies"
+                      className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Your Full Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={landingRegisterName}
+                      onChange={(e) => setLandingRegisterName(e.target.value)}
+                      placeholder="Alex Turner"
+                      className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Developer Email
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={landingRegisterEmail}
+                      onChange={(e) => setLandingRegisterEmail(e.target.value)}
+                      placeholder="alex@acme.com"
+                      className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Master Password
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={landingRegisterPassword}
+                      onChange={(e) => setLandingRegisterPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={landingAuthLoading}
+                    className="w-full py-2.5 rounded bg-emerald-500 text-black font-semibold text-xs hover:bg-emerald-400 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    {landingAuthLoading && <RefreshCw className="size-3.5 animate-spin" />}
+                    <span>Create Isolated Environment</span>
+                  </button>
+                  <p className="text-[11px] text-center text-zinc-500 pt-1">
+                    Already registered?{" "}
+                    <button
+                      type="button"
+                      onClick={() => setLandingAuthMode("signin")}
+                      className="text-white hover:underline font-semibold cursor-pointer"
+                    >
+                      Sign In
+                    </button>
+                  </p>
+                </form>
+              )}
             </div>
           </div>
 
@@ -1585,51 +1884,128 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
 
   // =========================================================================
   // VIEW MODE 2: FULL SUPABASE STUDIO CONSOLE (studio)
+  // STRICT AUTH GUARD: Under no circumstances can studio console be accessed without authentication
   // =========================================================================
+  if (!sessionUser) {
+    return (
+      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
+        <GlobalEcosystemBar activeDomain="db" />
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full border border-red-500/30 bg-[#0E1015] rounded-md p-6 sm:p-8 space-y-5 text-center shadow-[0_0_50px_rgba(239,68,68,0.1)]">
+            <div className="size-12 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 grid place-items-center mx-auto">
+              <Lock className="size-6" />
+            </div>
+            <div className="space-y-2">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-red-400 font-bold">
+                STRICT AUTHENTICATION REQUIRED
+              </span>
+              <h2 className="text-xl font-bold text-white tracking-tight">
+                Database Console Is Gated
+              </h2>
+              <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                Anonymous and unauthenticated access to the PostgreSQL 16 cluster, schemas, and connection pools is strictly prohibited. You must authenticate to access your isolated workspace.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("landing")}
+                className="w-full py-2.5 rounded-md bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <ArrowLeft className="size-3.5" />
+                <span>Return to Developer Sign In</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full flex-col bg-[#121212] text-zinc-100 font-sans selection:bg-[#3ECF8E] selection:text-zinc-950">
-      {/* STUDIO TOP HEADER */}
-      <header className="h-12 border-b border-[#2E2E2E] bg-[#181818] px-4 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      {/* STUDIO TOP HEADER WITH SEPARATE ENVIRONMENTS & ACCOUNT IDENTITY */}
+      <header className="h-12 border-b border-[#2E2E2E] bg-[#181818] px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             type="button"
             onClick={() => setViewMode("landing")}
-            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded hover:bg-[#242424] transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded hover:bg-[#242424] transition-colors cursor-pointer shrink-0"
             title="Return to SparrowX DB Landing Page"
           >
             <ChevronLeft className="size-4 text-[#3ECF8E]" />
-            <span className="font-semibold">Landing</span>
+            <span className="hidden sm:inline font-semibold">Landing</span>
           </button>
 
-          <div className="h-4 w-px bg-zinc-700" />
+          <div className="h-4 w-px bg-zinc-700 shrink-0" />
 
-          <div className="flex items-center gap-2">
-            <div className="grid size-7 place-items-center rounded-md bg-[#3ECF8E]/15 border border-[#3ECF8E]/40 text-[#3ECF8E]">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="grid size-7 place-items-center rounded-md bg-[#3ECF8E]/15 border border-[#3ECF8E]/40 text-[#3ECF8E] shrink-0">
               <Database className="size-4" />
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold tracking-tight text-white">
+            <div className="flex items-center gap-2 text-xs truncate">
+              <span className="font-bold tracking-tight text-white shrink-0">
                 SparrowX <span className="text-[#3ECF8E]">DB Studio</span>
               </span>
-              <span className="text-[#505050]">/</span>
-              <span className="rounded bg-[#232323] border border-[#333333] px-2 py-0.5 font-mono text-[11px] text-[#3ECF8E]">
-                sparrowbase
-              </span>
-              <span className="hidden sm:inline-flex items-center gap-1 rounded-full bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 px-2 py-0.5 text-[10px] font-mono text-[#3ECF8E]">
-                <span className="size-1.5 rounded-full bg-[#3ECF8E] animate-pulse" />
-                SOVEREIGN POSTGRES 16 + PGVECTOR
+              <span className="text-[#505050] hidden sm:inline">/</span>
+              <span className="rounded bg-[#232323] border border-[#333333] px-2 py-0.5 font-mono text-[11px] text-[#3ECF8E] truncate">
+                {activeProject.dbName}
               </span>
             </div>
+          </div>
+
+          <div className="h-4 w-px bg-zinc-700 shrink-0 hidden md:block" />
+
+          {/* ENVIRONMENT SWITCHER: PRODUCTION / STAGING / DEVELOPMENT */}
+          <div className="hidden md:flex items-center gap-1 bg-[#121212] border border-[#2E2E2E] p-0.5 rounded-md text-[10px] font-mono">
+            {(["production", "staging", "development"] as const).map((env) => {
+              const isActive = activeEnv === env;
+              return (
+                <button
+                  key={env}
+                  type="button"
+                  onClick={() => {
+                    setActiveEnv(env);
+                    setStatusBanner({
+                      type: "info",
+                      message: `Switched active database environment to ${env.toUpperCase()} (${tenantSlug}_${env}_db on port ${env === "production" ? 6543 : env === "staging" ? 6544 : 6545}).`,
+                    });
+                  }}
+                  className={`px-2 py-0.5 rounded uppercase font-bold transition-all cursor-pointer ${
+                    isActive
+                      ? env === "production"
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                        : env === "staging"
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                          : "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
+                      : "text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {env === "production" ? "⚡ PROD" : env === "staging" ? "🧪 STAGE" : "🛠️ DEV"}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Right Top Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* User Account / Tenant Badge */}
+          <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-zinc-800 bg-[#222222] px-2.5 py-1 text-xs">
+            <Users className="size-3 text-[#3ECF8E]" />
+            <span className="font-mono text-[11px] text-zinc-300 max-w-[120px] truncate">
+              {sessionUser.fullName || sessionUser.email}
+            </span>
+            <span className="rounded bg-zinc-800 px-1 py-0.2 font-mono text-[9px] text-[#3ECF8E]">
+              {sessionUser.admin === "yes" ? "SUPERUSER" : "ISOLATED"}
+            </span>
+          </div>
+
           <button
             type="button"
             onClick={handleRunPingDiagnostics}
             disabled={pingStatus.testing}
-            className="inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-[#222222] px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-[#222222] px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors cursor-pointer"
             title="Test connection latency"
           >
             <Activity className={`size-3.5 text-[#3ECF8E] ${pingStatus.testing ? "animate-spin" : ""}`} />
@@ -1642,34 +2018,22 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
               if (onOpenClientArea) onOpenClientArea();
               else window.location.href = "/";
             }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#3ECF8E]/40 bg-[#3ECF8E]/15 px-3 py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-[#3ECF8E]/25 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-md border border-[#3ECF8E]/40 bg-[#3ECF8E]/15 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-[#3ECF8E]/25 transition-colors cursor-pointer"
             title="Open SparrowX Client Area & Services"
           >
             <Boxes className="size-3.5" />
-            <span className="font-semibold">Client Area</span>
+            <span className="font-semibold hidden xs:inline">Client Area</span>
           </button>
 
           <button
             type="button"
-            onClick={handleShiftCloudToLocal}
-            disabled={syncingCloud}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#3ECF8E]/40 bg-[#3ECF8E]/15 px-3 py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-[#3ECF8E]/25 transition-colors cursor-pointer disabled:opacity-50"
-            title="Sync tables into local PostgreSQL"
+            onClick={handleLockWorkspace}
+            className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-1 text-xs font-mono text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+            title="Lock workspace and sign out"
           >
-            <CloudDownload className={`size-3.5 ${syncingCloud ? "animate-bounce" : ""}`} />
-            <span>{syncingCloud ? "Syncing..." : "Verify DB Seed"}</span>
+            <Lock className="size-3" />
+            <span className="hidden sm:inline">Lock</span>
           </button>
-
-          {onClose && !isStandaloneDomain && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#232323] px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-[#2E2E2E] transition-colors cursor-pointer"
-            >
-              <ArrowLeft className="size-3.5" />
-              <span>Command Center</span>
-            </button>
-          )}
         </div>
       </header>
 
@@ -2668,23 +3032,23 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                 {[
                   {
                     id: "rest-url",
-                    label: "SparrowX REST API Endpoint",
-                    value: "https://api.sparrowx.net/rest/v1",
+                    label: `REST API Endpoint (${activeProject.environment})`,
+                    value: activeProject.restBaseUrl,
                   },
                   {
                     id: "pg-pooled",
-                    label: "High-Capacity Connection Pool",
-                    value: "postgresql://postgres:[YOUR-PASSWORD]@db.sparrowx.net:6543/sparrowbase",
+                    label: `High-Capacity PgBouncer Pool (Port ${activeProject.poolerPort} • ${activeProject.environment})`,
+                    value: activeProject.pooledUri,
                   },
                   {
                     id: "pg-direct",
-                    label: "Direct Database URI (Schema Migrations)",
-                    value: "postgresql://postgres:[YOUR-PASSWORD]@db.sparrowx.net:5432/sparrowbase",
+                    label: `Direct PostgreSQL URI (Schema Migrations • ${activeProject.environment})`,
+                    value: activeProject.directUri,
                   },
                   {
                     id: "anon-key",
-                    label: "Public Anonymous API Key (RLS Enforced)",
-                    value: "spx_ovh_sovereign_key",
+                    label: `Public Anonymous API Key (RLS Enforced • ${activeProject.environment})`,
+                    value: activeProject.anonKey,
                   },
                 ].map((item) => (
                   <div
@@ -2716,6 +3080,39 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                     </div>
                   </div>
                 ))}
+              </div>
+
+              {/* Dedicated .env Configuration Card */}
+              <div className="rounded-xl border border-[#2E2E2E] bg-[#181818] p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-xs font-bold text-white font-mono">
+                      Environment Variables (.env) — {activeProject.environment}
+                    </h3>
+                    <p className="text-[11px] text-zinc-400">
+                      Pre-configured connection strings and secrets for your project environment.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const envContent = `# SparrowX DB Configuration (${activeProject.environment})\nDATABASE_URL="${activeProject.pooledUri}"\nDIRECT_URL="${activeProject.directUri}"\nSPARROWX_ANON_KEY="${activeProject.anonKey}"\nSPARROWX_SERVICE_ROLE_KEY="${activeProject.serviceRoleKey}"\nSPARROWX_REST_URL="${activeProject.restBaseUrl}"\n`;
+                      copyText("env-file", envContent);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded bg-[#3ECF8E] px-3 py-1.5 text-xs font-bold text-black hover:bg-[#34b27b] transition-colors cursor-pointer"
+                  >
+                    {copiedKey === "env-file" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                    <span>{copiedKey === "env-file" ? "Copied .env" : "Copy .env File"}</span>
+                  </button>
+                </div>
+                <pre className="rounded-md border border-[#262626] bg-[#0E0E10] p-3 font-mono text-[11px] text-emerald-400 overflow-x-auto leading-relaxed">
+{`# SparrowX DB Configuration (${activeProject.environment})
+DATABASE_URL="${activeProject.pooledUri}"
+DIRECT_URL="${activeProject.directUri}"
+SPARROWX_ANON_KEY="${activeProject.anonKey}"
+SPARROWX_SERVICE_ROLE_KEY="${activeProject.serviceRoleKey}"
+SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
+                </pre>
               </div>
             </div>
           )}

@@ -34,7 +34,12 @@ export const Route = createFileRoute("/db")({
 function SparrowxDbRoute() {
   return (
     <>
-      <SovereignDatabaseStudio isStandaloneDomain={true} />
+      <SovereignDatabaseStudio
+        isStandaloneDomain={true}
+        onOpenClientArea={() => {
+          window.location.href = "/";
+        }}
+      />
       <BackgroundEngineToaster />
     </>
   );
