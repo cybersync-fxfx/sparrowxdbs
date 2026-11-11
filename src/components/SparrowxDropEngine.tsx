@@ -706,8 +706,8 @@ export function SparrowxDropEngine() {
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* TOP MODE SWITCHER (THE CORE UX HOOK) */}
         {(!incomingDrop && !incomingPersistentId) && (
-          <div className="flex justify-center">
-            <div className="inline-flex p-1 rounded-md border border-white/[0.08] bg-[#0E1015] shadow-sm">
+          <div className="flex justify-center w-full">
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row p-1 rounded-md border border-white/[0.08] bg-[#0E1015] shadow-sm gap-1">
               <button
                 type="button"
                 onClick={() => {
@@ -715,14 +715,15 @@ export function SparrowxDropEngine() {
                   setIncomingDrop(null);
                   setIncomingPersistentId(null);
                 }}
-                className={`px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center gap-2 cursor-pointer ${
+                className={`w-full sm:w-auto min-h-[40px] px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   activeMode === "ephemeral"
                     ? "bg-white text-black font-semibold shadow-sm"
                     : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
                 }`}
               >
-                <Zap className="size-3.5 text-emerald-500 fill-current" />
-                <span>⚡ EPHEMERAL RAM DROP (NO LOGIN • ZERO DISK)</span>
+                <Zap className="size-3.5 text-emerald-500 fill-current shrink-0" />
+                <span className="hidden sm:inline">⚡ EPHEMERAL RAM DROP (NO LOGIN • ZERO DISK)</span>
+                <span className="inline sm:hidden">⚡ RAM DROP (NO LOGIN)</span>
               </button>
 
               <button
@@ -732,14 +733,15 @@ export function SparrowxDropEngine() {
                   setIncomingDrop(null);
                   setIncomingPersistentId(null);
                 }}
-                className={`px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center gap-2 cursor-pointer ${
+                className={`w-full sm:w-auto min-h-[40px] px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 cursor-pointer ${
                   activeMode === "storage"
                     ? "bg-white text-black font-semibold shadow-sm"
                     : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
                 }`}
               >
-                <Lock className="size-3.5 text-amber-500" />
-                <span>🔒 PERSISTENT CLOUD VAULT (10 GB FREE • LOGIN)</span>
+                <Lock className="size-3.5 text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">🔒 PERSISTENT CLOUD VAULT (10 GB FREE • LOGIN)</span>
+                <span className="inline sm:hidden">🔒 10GB CLOUD VAULT (LOGIN)</span>
               </button>
             </div>
           </div>
@@ -1566,8 +1568,8 @@ export function SparrowxDropEngine() {
                       <span className="text-[10px] font-mono text-zinc-500">AES-256 key in #hash</span>
                     </label>
 
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-[#3ECF8E] truncate">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-[#3ECF8E] truncate select-all">
                         {ephemeralShareLink}
                       </div>
                       <button
@@ -1577,7 +1579,7 @@ export function SparrowxDropEngine() {
                           setCopiedLink(true);
                           setTimeout(() => setCopiedLink(false), 2000);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-[#3ECF8E] text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#3ECF8E] text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0 min-h-[40px] sm:min-h-0"
                       >
                         {copiedLink ? (
                           <>
@@ -1605,8 +1607,8 @@ export function SparrowxDropEngine() {
                         <span className="text-[10px] font-mono text-zinc-500">Zero-configuration fallback</span>
                       </label>
 
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-cyan-300 truncate">
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-cyan-300 truncate select-all">
                           {directShareLink}
                         </div>
                         <button
@@ -1616,7 +1618,7 @@ export function SparrowxDropEngine() {
                             setCopiedDirectLink(true);
                             setTimeout(() => setCopiedDirectLink(false), 2000);
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0 min-h-[40px] sm:min-h-0"
                         >
                           {copiedDirectLink ? (
                             <>

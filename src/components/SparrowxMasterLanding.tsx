@@ -19,6 +19,8 @@ import {
   Layers,
   Check,
   ChevronDown,
+  Menu,
+  X,
 } from "lucide-react";
 import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 import {
@@ -158,6 +160,7 @@ export function SparrowxMasterLanding({
   const [operatorModalOpen, setOperatorModalOpen] = useState(false);
   const [vpsCurrency, setVpsCurrency] = useState<"INR" | "USD">("INR");
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const vpsPlans = [
     {
@@ -375,11 +378,11 @@ export function SparrowxMasterLanding({
           </nav>
 
           {/* Right Action Bar */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setOperatorModalOpen(true)}
-              className="px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#94A3B8] hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
+              className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#94A3B8] hover:text-white transition-all items-center gap-1.5 cursor-pointer"
             >
               <Lock className="size-3 text-sky-400" />
               <span>Workspace Sign-In</span>
@@ -388,44 +391,188 @@ export function SparrowxMasterLanding({
             <button
               type="button"
               onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-              className="px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.25)] font-mono"
+              className="px-3 sm:px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.25)] font-mono min-h-[36px] sm:min-h-0"
             >
               <span>Launch Studio</span>
               <ArrowUpRight className="size-3.5" />
             </button>
+
+            {/* Mobile Hamburger Menu Button */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
+              className="md:hidden size-9 rounded-md bg-[#111A30] border border-sky-500/30 text-white flex items-center justify-center cursor-pointer min-h-[36px] min-w-[36px]"
+            >
+              {mobileMenuOpen ? <X className="size-5 text-sky-400" /> : <Menu className="size-5 text-white" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div className="md:hidden mt-3 pt-3 border-t border-sky-500/20 space-y-4 max-h-[calc(100vh-80px)] overflow-y-auto no-scrollbar pb-6 animate-in slide-in-from-top duration-200">
+            <div className="space-y-1">
+              <span className="text-[10px] font-mono text-sky-400 uppercase tracking-wider font-bold block px-1">
+                SparrowX Cloud Products
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLaunch("db", "https://db.sparrowx.net", "db");
+                }}
+                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-emerald-500/10 border border-emerald-500/30 grid place-items-center text-emerald-400 shrink-0">
+                  <Database className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Cloud DB</div>
+                  <div className="text-[10px] text-[#94A3B8] truncate">Managed PostgreSQL &amp; Vector Studio</div>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-400 shrink-0">db.sparrowx.net</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLaunch("file", "https://file.sparrowx.net", "file");
+                }}
+                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-sky-500/10 border border-sky-500/30 grid place-items-center text-sky-400 shrink-0">
+                  <FileUp className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Files</div>
+                  <div className="text-[10px] text-[#94A3B8] truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
+                </div>
+                <span className="text-[10px] font-mono text-sky-400 shrink-0">file.sparrowx.net</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLaunch("password", "https://password.sparrowx.net", "password");
+                }}
+                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-amber-500/10 border border-amber-500/30 grid place-items-center text-amber-400 shrink-0">
+                  <KeyRound className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Keys (Free)</div>
+                  <div className="text-[10px] text-[#94A3B8] truncate">Offline Cryptographic Generator (No Login)</div>
+                </div>
+                <span className="text-[10px] font-mono text-amber-400 shrink-0">password.sparrowx.net</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLaunch("sec", "https://sec.sparrowx.net", "shield");
+                }}
+                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-orange-500/10 border border-orange-500/30 grid place-items-center text-orange-400 shrink-0">
+                  <Shield className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Shield</div>
+                  <div className="text-[10px] text-[#94A3B8] truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
+                </div>
+                <span className="text-[10px] font-mono text-orange-400 shrink-0">sec.sparrowx.net</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLaunch("api", "https://api.sparrowx.net", "api");
+                }}
+                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-indigo-500/10 border border-indigo-500/30 grid place-items-center text-indigo-400 shrink-0">
+                  <Terminal className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX API Gateway</div>
+                  <div className="text-[10px] text-[#94A3B8] truncate">Instant REST API with cURL &amp; SDKs</div>
+                </div>
+                <span className="text-[10px] font-mono text-indigo-400 shrink-0">api.sparrowx.net</span>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-sky-500/15 flex flex-col gap-2 font-mono text-xs">
+              <a
+                href="#story"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2.5 rounded bg-[#111A30] text-[#94A3B8] hover:text-white flex items-center justify-between"
+              >
+                <span>Read Our Story</span>
+                <ArrowRight className="size-3.5 text-sky-400" />
+              </a>
+
+              <a
+                href="#vps"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2.5 rounded bg-[#111A30] text-[#94A3B8] hover:text-white flex items-center justify-between"
+              >
+                <span>Cloud VPS Pricing</span>
+                <ArrowRight className="size-3.5 text-sky-400" />
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setOperatorModalOpen(true);
+                }}
+                className="w-full min-h-[44px] rounded bg-[#111A30] border border-sky-500/30 text-white font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Lock className="size-3.5 text-sky-400" />
+                <span>Workspace Sign-In</span>
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* SECTION 2: EMOTIONAL STARTUP HERO */}
-      <section className="border-b border-sky-500/15 bg-gradient-to-b from-[#090E1D] via-[#070A12] to-[#070A12] px-4 sm:px-6 py-12 sm:py-20 relative overflow-hidden">
+      <section className="border-b border-sky-500/15 bg-gradient-to-b from-[#090E1D] via-[#070A12] to-[#070A12] px-4 sm:px-6 py-10 sm:py-20 relative overflow-hidden">
         {/* Soft Blue Ambient Glow */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-sky-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
           {/* Left Column: Human, Emotional Pitch */}
-          <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0E172A] border border-sky-500/30 text-xs font-mono text-sky-300">
-              <span className="size-2 rounded-full bg-sky-400 animate-pulse" />
+          <div className="lg:col-span-7 space-y-5 sm:space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0E172A] border border-sky-500/30 text-[11px] sm:text-xs font-mono text-sky-300">
+              <span className="size-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
               <span>PASSIONATE INDEPENDENT STARTUP • ZERO CORPORATE JARGON</span>
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans text-balance">
               Simple, Honest Cloud Tools <br />
               <span className="text-sky-400">Built for Real Builders.</span>
             </h1>
 
-            <p className="text-sm sm:text-base text-[#94A3B8] max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-base text-[#94A3B8] max-w-2xl leading-relaxed">
               We&apos;re a small, independent developer team building fast cloud databases, instant encrypted file sharing, hardware-grade offline passwords, and automated DDoS defense.
               No surprise bills, no shady telemetry, and no forced logins for simple utilities.
             </p>
 
-            {/* Core Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            {/* Core Action Buttons (Mobile-friendly stacked row) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => handleLaunch("file", "https://file.sparrowx.net", "file")}
-                className="px-5 py-2.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.3)] font-mono"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.3)] font-mono"
               >
                 <FileUp className="size-4" />
                 <span>Instant File Drop (No Login)</span>
@@ -434,7 +581,7 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => handleLaunch("password", "https://password.sparrowx.net", "password")}
-                className="px-5 py-2.5 rounded bg-[#111A30] border border-sky-500/30 hover:border-sky-500/60 text-white font-mono text-xs transition-all flex items-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-[#111A30] border border-sky-500/30 hover:border-sky-500/60 text-white font-mono text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <KeyRound className="size-4 text-sky-400" />
                 <span>Offline Keys (No Login)</span>
@@ -443,7 +590,7 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                className="px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#94A3B8] hover:text-white font-mono text-xs transition-colors flex items-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#94A3B8] hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Database className="size-4 text-emerald-400" />
                 <span>Postgres Studio</span>

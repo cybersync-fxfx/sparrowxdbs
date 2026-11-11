@@ -98,8 +98,8 @@ export function CyberThreatMatrixMap({
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isFeedPaused, setIsFeedPaused] = useState(false);
-  const [isStatsCollapsed, setIsStatsCollapsed] = useState(false);
-  const [isFeedCollapsed, setIsFeedCollapsed] = useState(false);
+  const [isStatsCollapsed, setIsStatsCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  const [isFeedCollapsed, setIsFeedCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [focusedCity, setFocusedCity] = useState<ThreatMapCity | null>(() => {
     return MAP_DEFAULT_CITIES.find((c) => c.name === "Roubaix (OVH Host)") || MAP_DEFAULT_CITIES[0];
   });
@@ -732,7 +732,7 @@ export function CyberThreatMatrixMap({
             <span className="text-[10px] text-amber-400 font-bold ml-1">Expand ▾</span>
           </button>
         ) : (
-          <div className="absolute right-3 sm:right-4 top-3 sm:top-4 z-20 w-80 sm:w-96 flex flex-col gap-1.5 pointer-events-none">
+          <div className="absolute right-3 sm:right-4 top-3 sm:top-4 z-20 w-[calc(100vw-24px)] sm:w-80 md:w-96 max-w-sm flex flex-col gap-1.5 pointer-events-none">
             <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-200 px-3 py-2 flex items-center justify-between bg-[#0A0A0A]/95 rounded-lg border border-[#1F1F1F] backdrop-blur-md shadow-xl">
               <span className="flex items-center gap-1.5 text-amber-400">
                 <ShieldAlert className="size-3.5 text-amber-400" />
@@ -819,9 +819,9 @@ export function CyberThreatMatrixMap({
 
       {/* BOTTOM ORIGIN SELECTOR BAR */}
       <div className="absolute bottom-3 left-3 sm:left-4 right-3 sm:right-4 z-20 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#1F1F1F] bg-[#0A0A0A]/92 px-3.5 py-2 backdrop-blur-xl shadow-2xl text-xs">
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar touch-pan-x py-0.5 max-w-full">
           <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider shrink-0 flex items-center gap-1.5">
-            <Target className="size-3 text-amber-400" /> Focus Host Location:
+            <Target className="size-3 text-amber-400" /> Focus Host:
           </span>
           {cities
             .filter((c) => c.isOrigin)

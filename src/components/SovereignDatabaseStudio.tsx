@@ -1697,8 +1697,9 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
         </aside>
 
         {/* SECONDARY SIDEBAR: SCHEMA TABLES LIST */}
+        {/* SECONDARY SIDEBAR: SCHEMA TABLES LIST (Hidden on small mobile screens to maximize table space) */}
         {(activeSection === "tables" || activeSection === "auth") && (
-          <aside className="w-60 border-r border-[#2E2E2E] bg-[#161616] flex flex-col shrink-0">
+          <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#161616] flex-col shrink-0">
             <div className="p-3 border-b border-[#2E2E2E] flex items-center justify-between">
               <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                 schema: public ({studioTables.length})
@@ -1777,13 +1778,29 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           {(activeSection === "tables" || activeSection === "auth") && (
             <>
               {/* TOP ACTION BAR */}
-              <div className="border-b border-[#2E2E2E] bg-[#181818] px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+              <div className="border-b border-[#2E2E2E] bg-[#181818] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-white font-mono">
                     <Table2 className="size-4 text-[#3ECF8E]" />
-                    <span>{selectedTable}</span>
+                    <span className="hidden md:inline">{selectedTable}</span>
+                    {/* Mobile Table Selector Dropdown */}
+                    <select
+                      value={selectedTable}
+                      onChange={(e) => {
+                        setSelectedTable(e.target.value);
+                        setCurrentPage(1);
+                        setSearchFilter("");
+                      }}
+                      className="md:hidden bg-[#121212] border border-[#2E2E2E] rounded px-2 py-1 text-xs text-white font-mono max-w-[140px] truncate"
+                    >
+                      {studioTables.map((t) => (
+                        <option key={t.name} value={t.name}>
+                          {t.label} ({tableCounts[t.name] ?? "-"})
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <span className="text-zinc-600">|</span>
+                  <span className="text-zinc-600 hidden sm:inline">|</span>
                   <span className="text-xs text-zinc-400 truncate max-w-md hidden sm:inline">
                     {activeTableMeta.description}
                   </span>

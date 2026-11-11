@@ -317,11 +317,11 @@ export function SparrowxKeysEngine() {
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
         {/* TOP SEGMENTED INDUSTRIAL SWITCH (MODE MATRIX) */}
         <div className="border border-white/[0.08] bg-[#0E1015] p-1.5 rounded-md flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-          <div className="flex items-center gap-1 w-full sm:w-auto">
+          <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto no-scrollbar touch-pan-x py-0.5">
             <button
               type="button"
               onClick={() => setMode("password")}
-              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`flex-1 sm:flex-initial min-h-[38px] px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
                 mode === "password"
                   ? "bg-white text-black font-semibold shadow-sm"
                   : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
@@ -332,7 +332,7 @@ export function SparrowxKeysEngine() {
             <button
               type="button"
               onClick={() => setMode("diceware")}
-              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`flex-1 sm:flex-initial min-h-[38px] px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
                 mode === "diceware"
                   ? "bg-white text-black font-semibold shadow-sm"
                   : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
@@ -343,7 +343,7 @@ export function SparrowxKeysEngine() {
             <button
               type="button"
               onClick={() => setMode("developer")}
-              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+              className={`flex-1 sm:flex-initial min-h-[38px] px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
                 mode === "developer"
                   ? "bg-white text-black font-semibold shadow-sm"
                   : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
@@ -391,16 +391,16 @@ export function SparrowxKeysEngine() {
             </div>
           </div>
 
-          {/* Main Output Box */}
-          <div className="p-6 sm:p-8 bg-[#08090C] min-h-[140px] flex items-center justify-between gap-4">
+          {/* Main Output Box (Stacks cleanly on mobile) */}
+          <div className="p-4 sm:p-8 bg-[#08090C] min-h-[140px] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar py-2">
               {mode === "password" && (
-                <div className="text-2xl sm:text-3xl lg:text-4xl font-mono tracking-wider break-all select-all">
+                <div className="text-xl sm:text-3xl lg:text-4xl font-mono tracking-wider break-all select-all">
                   {renderHighlightedString(masterPassword)}
                 </div>
               )}
               {mode === "diceware" && (
-                <div className="text-2xl sm:text-3xl font-mono tracking-wide break-words select-all text-white">
+                <div className="text-xl sm:text-3xl font-mono tracking-wide break-words select-all text-white">
                   {renderHighlightedString(passphrase)}
                 </div>
               )}
@@ -418,8 +418,8 @@ export function SparrowxKeysEngine() {
               )}
             </div>
 
-            {/* Readout Action Cluster */}
-            <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0">
+            {/* Readout Action Cluster (Touch-friendly 44px targets) */}
+            <div className="flex flex-row items-center gap-2 shrink-0 w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -431,7 +431,7 @@ export function SparrowxKeysEngine() {
                       : postgresUriKey;
                   handleCopy(targetText, "main");
                 }}
-                className="px-4 py-2.5 rounded-sm bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+                className="flex-1 sm:flex-initial min-h-[44px] px-5 py-2.5 rounded-sm bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
               >
                 {copiedId === "main" ? (
                   <>
@@ -453,7 +453,7 @@ export function SparrowxKeysEngine() {
                   else if (mode === "diceware") generatePassphrase();
                   else generateDevSecrets();
                 }}
-                className="size-9 rounded-sm border border-white/[0.08] bg-[#14171F] hover:bg-white/[0.08] text-white grid place-items-center transition-colors cursor-pointer"
+                className="size-11 sm:size-9 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 rounded-sm border border-white/[0.08] bg-[#14171F] hover:bg-white/[0.08] text-white grid place-items-center transition-colors cursor-pointer"
                 title="Regenerate (Spacebar)"
               >
                 <RefreshCw className="size-4 text-[#9CA3AF]" />
@@ -526,39 +526,39 @@ export function SparrowxKeysEngine() {
               <div className="p-5 space-y-2 text-xs font-mono">
                 <span className="text-[#9CA3AF] uppercase text-[10px] block mb-2">Character Matrix</span>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white min-h-[40px] px-2.5 py-1 rounded bg-[#14171F]/60 border border-white/[0.04] active:bg-white/[0.06]">
                     <input
                       type="checkbox"
                       checked={useUpper}
                       onChange={(e) => setUseUpper(e.target.checked)}
-                      className="accent-emerald-500 rounded-sm"
+                      className="accent-emerald-500 rounded-sm size-4"
                     />
                     <span>A-Z Upper</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white min-h-[40px] px-2.5 py-1 rounded bg-[#14171F]/60 border border-white/[0.04] active:bg-white/[0.06]">
                     <input
                       type="checkbox"
                       checked={useLower}
                       onChange={(e) => setUseLower(e.target.checked)}
-                      className="accent-emerald-500 rounded-sm"
+                      className="accent-emerald-500 rounded-sm size-4"
                     />
                     <span>a-z Lower</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white min-h-[40px] px-2.5 py-1 rounded bg-[#14171F]/60 border border-white/[0.04] active:bg-white/[0.06]">
                     <input
                       type="checkbox"
                       checked={useNumbers}
                       onChange={(e) => setUseNumbers(e.target.checked)}
-                      className="accent-emerald-500 rounded-sm"
+                      className="accent-emerald-500 rounded-sm size-4"
                     />
                     <span>0-9 Digits</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white min-h-[40px] px-2.5 py-1 rounded bg-[#14171F]/60 border border-white/[0.04] active:bg-white/[0.06]">
                     <input
                       type="checkbox"
                       checked={useSymbols}
                       onChange={(e) => setUseSymbols(e.target.checked)}
-                      className="accent-emerald-500 rounded-sm"
+                      className="accent-emerald-500 rounded-sm size-4"
                     />
                     <span>!@# Symbols</span>
                   </label>

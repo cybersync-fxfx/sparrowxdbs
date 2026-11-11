@@ -320,11 +320,11 @@ print(response.json())`;
               </button>
             </div>
 
-            {/* URL Parameter Editor */}
-            <div className="p-5 border-b border-white/[0.08] bg-[#08090C] space-y-2 font-mono text-xs">
+            {/* URL Parameter Editor (Mobile-friendly stacked input) */}
+            <div className="p-4 sm:p-5 border-b border-white/[0.08] bg-[#08090C] space-y-2 font-mono text-xs">
               <label className="text-[10px] text-[#64748B] uppercase block">PostgREST Query Parameters:</label>
-              <div className="flex items-center rounded border border-white/10 bg-[#14171F] px-3 py-2">
-                <span className="text-emerald-400 shrink-0 select-none text-[11px]">
+              <div className="flex flex-col sm:flex-row sm:items-center rounded border border-white/10 bg-[#14171F] px-3 py-2 gap-1.5 sm:gap-0">
+                <span className="text-emerald-400 shrink-0 select-none text-[11px] truncate max-w-full">
                   {apiBaseUrl}{selectedEndpoint.path}?
                 </span>
                 <input
@@ -332,7 +332,7 @@ print(response.json())`;
                   value={customParams}
                   onChange={(e) => setCustomParams(e.target.value)}
                   placeholder="select=*&limit=10"
-                  className="bg-transparent text-white focus:outline-none flex-1 ml-1 text-xs"
+                  className="bg-transparent text-white focus:outline-none flex-1 sm:ml-1 text-xs min-w-0"
                 />
               </div>
             </div>

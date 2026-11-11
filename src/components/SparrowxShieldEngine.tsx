@@ -297,9 +297,9 @@ export function SparrowxShieldEngine() {
             </div>
           </div>
 
-          <div className="p-2 sm:p-4 bg-[#07080A]">
+          <div className="p-1.5 sm:p-4 bg-[#07080A]">
             <CyberThreatMatrixMap
-              height={560}
+              height={typeof window !== "undefined" && window.innerWidth < 640 ? 320 : 560}
               enableSimulation={true}
               simIntervalMs={1800}
               showControls={true}
@@ -321,24 +321,24 @@ export function SparrowxShieldEngine() {
             <span className="text-[10px] text-[#A3A3A3]">Test whether your server IP is exposed to attackers</span>
           </div>
 
-          <div className="p-6 space-y-5 bg-[#07080A]">
+          <div className="p-4 sm:p-6 space-y-5 bg-[#07080A]">
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
-                <Globe className="size-4 text-[#666666] absolute left-3.5 top-3" />
+                <Globe className="size-4 text-[#666666] absolute left-3.5 top-3.5 sm:top-3" />
                 <input
                   type="text"
                   placeholder="Enter domain to audit (e.g. yourstartup.com, sparrowx.net)..."
                   value={targetDomain}
                   onChange={(e) => setTargetDomain(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && runSecurityInspection()}
-                  className="w-full h-10 rounded-md border border-[#FF6B00]/30 bg-[#12141A] pl-10 pr-4 text-xs font-mono text-white placeholder-[#666666] outline-none focus:border-[#FF6B00]"
+                  className="w-full h-11 sm:h-10 rounded-md border border-[#FF6B00]/30 bg-[#12141A] pl-10 pr-4 text-xs font-mono text-white placeholder-[#666666] outline-none focus:border-[#FF6B00]"
                 />
               </div>
               <button
                 type="button"
                 onClick={runSecurityInspection}
                 disabled={inspecting}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold px-6 h-10 text-xs transition-all cursor-pointer disabled:opacity-50 shrink-0 shadow-[0_0_15px_rgba(255,107,0,0.25)]"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold px-6 h-11 sm:h-10 min-h-[44px] sm:min-h-0 text-xs transition-all cursor-pointer disabled:opacity-50 shrink-0 shadow-[0_0_15px_rgba(255,107,0,0.25)] font-mono"
               >
                 <RefreshCw className={`size-3.5 ${inspecting ? "animate-spin" : ""}`} />
                 <span>{inspecting ? "Auditing Domain..." : "Audit Domain Now"}</span>
