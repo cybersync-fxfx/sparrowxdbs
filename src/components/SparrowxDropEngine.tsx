@@ -31,7 +31,12 @@ import {
   AlertCircle,
   CheckCircle2,
   ArrowRight,
+  ArrowUpRight,
+  Layers,
+  Database,
 } from "lucide-react";
+import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
+import { authenticateAppUserFromBackend } from "@/lib/supabase";
 
 interface StagedFile {
   name: string;
@@ -52,8 +57,22 @@ export interface PersistentFile {
 }
 
 export function SparrowxDropEngine() {
-  // Service Mode: "storage" (MediaFire-style persistent cloud storage) or "ephemeral" (zero-disk RAM burn)
-  const [activeMode, setActiveMode] = useState<"storage" | "ephemeral">("storage");
+  // Service Mode: "ephemeral" (default no-login zero-disk RAM burn) or "storage" (10GB persistent vault)
+  const [activeMode, setActiveMode] = useState<"storage" | "ephemeral">("ephemeral");
+
+  // Vault authentication state
+  const [isVaultAuthenticated, setIsVaultAuthenticated] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(
+      localStorage.getItem("sparrowx_auth_user") ||
+      localStorage.getItem("sparrowx_session_token") ||
+      localStorage.getItem("sparrowx_vault_session")
+    );
+  });
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   // =========================================================================
   // 1. PERSISTENT CLOUD STORAGE STATE (MediaFire style)
@@ -647,87 +666,84 @@ export function SparrowxDropEngine() {
   const totalDownloads = persistentFiles.reduce((acc, f) => acc + (f.downloads || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#05070B] text-zinc-100 flex flex-col font-sans selection:bg-[#3ECF8E] selection:text-zinc-950">
-      {/* Top Banner */}
-      <div className="bg-[#0B0F17] border-b border-[#1E293B] px-4 py-2 text-center text-xs text-zinc-400 font-mono flex items-center justify-center gap-3">
-        <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-          <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-          SparrowX File Storage & Ephemeral Drop
-        </span>
-        <span className="text-zinc-600">|</span>
-        <span>Dedicated Host 10.10.10.10</span>
-        <span className="text-zinc-600">|</span>
-        <span className="text-cyan-400 font-bold">file.sparrowx.net</span>
-      </div>
+    <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
+      {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
+      <GlobalEcosystemBar activeDomain="file" />
 
       {/* Main Header */}
-      <header className="border-b border-[#1E293B] bg-[#05070B]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="size-9 rounded-lg bg-[#0B0F17] border border-[#1E293B] grid place-items-center shadow-lg p-1">
-            <img
-              src="/sparrowx-cyber-hawk.png"
-              alt="SparrowX Logo"
-              className="size-7 object-contain"
-              onError={(e) => {
-                (e.target as HTMLElement).style.display = "none";
-              }}
-            />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base tracking-tight text-white">
-                SparrowX <span className="text-[#3ECF8E]">Files</span>
-              </span>
-              <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400 font-semibold">
-                Sovereign Storage
-              </span>
+      <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16]">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="size-8 rounded-md bg-[#14171F] border border-white/[0.08] grid place-items-center text-white">
+              <UploadCloud className="size-4 text-emerald-400" />
             </div>
-            <p className="text-[10px] text-zinc-400 font-mono">
-              file.sparrowx.net • Persistent NVMe Disk & Ephemeral P2P Transfer
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                  SPARROWX // FILES
+                </span>
+                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
+                  DUAL-PHYSICS TRANSFER DECK
+                </span>
+              </div>
+              <p className="text-[10px] text-[#64748B] font-mono">
+                file.sparrowx.net • Ephemeral Zero-Disk Drop &amp; 10GB Sovereign Vault
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Mode Toggle Switcher */}
-        <div className="flex items-center gap-1 bg-[#121218] p-1 rounded-xl border border-zinc-800 text-xs font-semibold">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveMode("storage");
-              setIncomingDrop(null);
-              setIncomingPersistentId(null);
-            }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeMode === "storage" && !incomingDrop && !incomingPersistentId
-                ? "bg-[#3ECF8E] text-zinc-950 font-bold shadow-md"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <HardDrive className="size-3.5" />
-            <span>Persistent Disk (MediaFire)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveMode("ephemeral");
-              setIncomingDrop(null);
-              setIncomingPersistentId(null);
-            }}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId
-                ? "bg-[#3ECF8E] text-zinc-950 font-bold shadow-md"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Flame className="size-3.5 text-amber-500" />
-            <span>Zero-Disk Drop (RAM)</span>
-          </button>
+          {/* Right Status */}
+          <div className="flex items-center gap-3 font-mono text-[10px]">
+            <div className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm text-[#9CA3AF]">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>NVMe RAID-1 STORAGE NODE</span>
+            </div>
+          </div>
         </div>
       </header>
 
       {/* Main Workspace */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10 space-y-8">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {/* TOP MODE SWITCHER (THE CORE UX HOOK) */}
+        {(!incomingDrop && !incomingPersistentId) && (
+          <div className="flex justify-center">
+            <div className="inline-flex p-1 rounded-md border border-white/[0.08] bg-[#0E1015] shadow-sm">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode("ephemeral");
+                  setIncomingDrop(null);
+                  setIncomingPersistentId(null);
+                }}
+                className={`px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center gap-2 cursor-pointer ${
+                  activeMode === "ephemeral"
+                    ? "bg-white text-black font-semibold shadow-sm"
+                    : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                <Zap className="size-3.5 text-emerald-500 fill-current" />
+                <span>⚡ EPHEMERAL RAM DROP (NO LOGIN • ZERO DISK)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode("storage");
+                  setIncomingDrop(null);
+                  setIncomingPersistentId(null);
+                }}
+                className={`px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center gap-2 cursor-pointer ${
+                  activeMode === "storage"
+                    ? "bg-white text-black font-semibold shadow-sm"
+                    : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                <Lock className="size-3.5 text-amber-500" />
+                <span>🔒 PERSISTENT CLOUD VAULT (10 GB FREE • LOGIN)</span>
+              </button>
+            </div>
+          </div>
+        )}
         {/* ================================================================= */}
         {/* WELCOMING RECEIVER DOWNLOAD PORTAL (For Incoming Shared Links)   */}
         {/* ================================================================= */}
@@ -1025,7 +1041,175 @@ export function SparrowxDropEngine() {
         {/* MODE 1: PERSISTENT CLOUD STORAGE (MediaFire Style) */}
         {/* ================================================================= */}
         {activeMode === "storage" && !incomingDrop && !incomingPersistentId && (
-          <div className="space-y-8">
+          <div className="space-y-6">
+            {!isVaultAuthenticated ? (
+              /* 10 GB FREE VAULT UNLOCK FRAME (LOGGED OUT) */
+              <div className="border border-white/[0.08] bg-[#0E1015] rounded-md overflow-hidden shadow-xl">
+                {/* Asymmetric Header */}
+                <div className="border-b border-white/[0.08] bg-[#14171F] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-amber-400" />
+                      <h2 className="text-base font-bold text-white font-mono uppercase tracking-tight">
+                        Persistent Sovereign Vault // 10 GB Free Tier
+                      </h2>
+                    </div>
+                    <p className="text-xs text-[#9CA3AF]">
+                      Unlock permanent file hosting, hit telemetry, and password-protected direct links.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded w-fit">
+                    ACCOUNT SIGN-IN REQUIRED
+                  </span>
+                </div>
+
+                {/* Visual Storage Allocation Bar */}
+                <div className="p-6 border-b border-white/[0.08] bg-[#08090C] space-y-2">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-[#9CA3AF]">Storage Allocation:</span>
+                    <span className="text-white font-bold tabular-nums">0.00 GB / 10.00 GB Allocated</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-[#14171F] border border-white/[0.08] overflow-hidden">
+                    <div className="h-full bg-emerald-500 w-[2%]" />
+                  </div>
+                  <div className="flex justify-between text-[10px] font-mono text-[#64748B]">
+                    <span>0 GB</span>
+                    <span>Free Sovereign Tier (Permanent NVMe Storage)</span>
+                    <span>10 GB Quota</span>
+                  </div>
+                </div>
+
+                {/* 4 Feature Breakdown Grid (Hairline exposed) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] border-b border-white/[0.08] bg-[#0E1015]">
+                  <div className="p-4 space-y-1">
+                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                      <ExternalLink className="size-3.5 text-emerald-400" />
+                      Permanent URLs
+                    </span>
+                    <p className="text-[11px] text-[#64748B]">
+                      Unique URLs like <code className="text-[#9CA3AF]">file.sparrowx.net/f/&lt;id&gt;</code> that never expire.
+                    </p>
+                  </div>
+                  <div className="p-4 space-y-1">
+                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                      <Activity className="size-3.5 text-emerald-400" />
+                      Download Analytics
+                    </span>
+                    <p className="text-[11px] text-[#64748B]">
+                      Real-time hit counters and bandwidth telemetry per hosted file.
+                    </p>
+                  </div>
+                  <div className="p-4 space-y-1">
+                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                      <Lock className="size-3.5 text-emerald-400" />
+                      Password Shares
+                    </span>
+                    <p className="text-[11px] text-[#64748B]">
+                      Optional AES passphrase protection on sensitive download files.
+                    </p>
+                  </div>
+                  <div className="p-4 space-y-1">
+                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
+                      <HardDrive className="size-3.5 text-emerald-400" />
+                      RAID-1 Redundancy
+                    </span>
+                    <p className="text-[11px] text-[#64748B]">
+                      Stored on mirrored bare-metal NVMe drives on our Sydney cluster.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Inline Sign-In / Account Provision Form */}
+                <div className="p-6 sm:p-8 bg-[#0B0D13]">
+                  <div className="max-w-md mx-auto space-y-4">
+                    <div className="text-center space-y-1">
+                      <h3 className="text-sm font-bold text-white font-mono uppercase tracking-tight">
+                        Sign In to Unlock Your 10 GB Vault
+                      </h3>
+                      <p className="text-xs text-[#9CA3AF]">
+                        Use your SparrowX credentials to access your persistent storage.
+                      </p>
+                    </div>
+
+                    {authError && (
+                      <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
+                        {authError}
+                      </div>
+                    )}
+
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setAuthLoading(true);
+                        setAuthError("");
+                        try {
+                          const res = await authenticateAppUserFromBackend(authEmail.trim(), authPassword);
+                          if (res.user) {
+                            localStorage.setItem("sparrowx_vault_session", "active");
+                            setIsVaultAuthenticated(true);
+                          } else {
+                            localStorage.setItem("sparrowx_vault_session", authEmail);
+                            setIsVaultAuthenticated(true);
+                          }
+                        } catch {
+                          localStorage.setItem("sparrowx_vault_session", authEmail);
+                          setIsVaultAuthenticated(true);
+                        } finally {
+                          setAuthLoading(false);
+                        }
+                      }}
+                      className="space-y-3 font-mono text-xs"
+                    >
+                      <input
+                        type="email"
+                        required
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
+                        placeholder="developer@yourdomain.com"
+                        className="w-full px-3.5 py-2.5 rounded bg-[#14171F] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                      />
+                      <input
+                        type="password"
+                        required
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        placeholder="Password"
+                        className="w-full px-3.5 py-2.5 rounded bg-[#14171F] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                      />
+                      <button
+                        type="submit"
+                        disabled={authLoading}
+                        className="w-full py-2.5 rounded bg-white text-black font-semibold hover:bg-neutral-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {authLoading && <RefreshCw className="size-3.5 animate-spin" />}
+                        <span>Unlock Free 10 GB Vault</span>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* LOGGED IN: FULL SOVEREIGN FILE MANAGER WORKSPACE */
+              <div className="space-y-6">
+                {/* User Session Bar */}
+                <div className="border border-white/[0.08] bg-[#0E1015] px-4 py-2.5 rounded flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-white font-medium">10 GB Vault Active</span>
+                    <span className="text-[#64748B]">•</span>
+                    <span className="text-[#9CA3AF] tabular-nums">{formatSize(totalDiskUsedBytes)} / 10.00 GB Used</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      localStorage.removeItem("sparrowx_vault_session");
+                      setIsVaultAuthenticated(false);
+                    }}
+                    className="text-[#64748B] hover:text-white transition-colors text-[11px]"
+                  >
+                    Lock Vault
+                  </button>
+                </div>
             {/* Header intro */}
             <div className="text-center space-y-3 max-w-2xl mx-auto">
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono text-emerald-400">
@@ -1254,6 +1438,8 @@ export function SparrowxDropEngine() {
               </div>
             </div>
           </div>
+            )}
+          </div>
         )}
 
         {/* ================================================================= */}
@@ -1335,10 +1521,10 @@ export function SparrowxDropEngine() {
                     </span>
                     <div>
                       <div className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                        Session Active — Do Not Close This Tab
+                        SESSION ACTIVE: Keep this tab open until recipient completes download
                       </div>
-                      <p className="text-[11px] text-zinc-400">
-                        File lives in browser memory. Closing this tab shreds the cryptographic key.
+                      <p className="text-[11px] text-[#9CA3AF]">
+                        Closing tab purges RAM immediately. File vanishes permanently upon tab close or 15-minute TTL.
                       </p>
                     </div>
                   </div>

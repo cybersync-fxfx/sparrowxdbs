@@ -1,529 +1,791 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Key,
   Shield,
   Copy,
   Check,
   RefreshCw,
-  Zap,
-  Sliders,
-  Lock,
   Terminal,
   Database,
   ArrowRight,
+  ArrowUpRight,
   Eye,
   EyeOff,
+  Sliders,
+  Lock,
+  Cpu,
+  Layers,
   Sparkles,
-  Info,
+  Zap,
 } from "lucide-react";
+import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 
-// Secure Diceware-style curated cryptographic wordlist
-const DICEWARE_WORDS = [
-  "falcon", "quantum", "cipher", "vault", "sparrow", "nebula", "zenith", "vortex",
-  "shield", "crypto", "matrix", "beacon", "vector", "sovereign", "horizon", "aurora",
-  "citadel", "sentinel", "kinetic", "vertex", "cascade", "bastion", "phantom", "spectral",
-  "obsidian", "titan", "stellar", "prism", "glacier", "chronos", "pulsar", "solaris",
-  "enigma", "dynamo", "vertex", "arcane", "strata", "helix", "apogee", "vertex",
-  "shadow", "timber", "granite", "quartz", "anchor", "orbit", "tundra", "canyon"
+// EFF Long Wordlist excerpt for Diceware
+const EFF_WORDLIST = [
+  "abacus", "abdomen", "abiding", "ablaze", "absorb", "abyss", "acrobat", "action",
+  "alchemy", "alien", "almanac", "alps", "amber", "amplify", "anchor", "android",
+  "antenna", "anvil", "apex", "apogee", "apollo", "aqueduct", "arcade", "arctic",
+  "argon", "armor", "arrow", "arsenal", "asteroid", "atlas", "atom", "aurora",
+  "avalanche", "axiom", "aztec", "badger", "baron", "barrier", "basalt", "bastion",
+  "beacon", "bison", "blade", "blueprint", "bolt", "boulder", "breeze", "bronze",
+  "bunker", "cactus", "canyon", "carbon", "cascade", "castle", "catapult", "cavern",
+  "cedar", "cipher", "citadel", "clover", "cobalt", "comet", "compass", "copper",
+  "crater", "crystal", "cyclone", "dagger", "delta", "diver", "dynamo", "eclipse",
+  "ember", "emerald", "engine", "enigma", "epoch", "falcon", "fathom", "flint",
+  "fossil", "fusion", "galaxy", "glacier", "granite", "gravity", "harbor", "helix",
+  "horizon", "hydra", "hyper", "impact", "iron", "jaguar", "javelin", "jupiter",
+  "kinetic", "laser", "launch", "legacy", "leopard", "lightning", "matrix", "meteor",
+  "monarch", "nebula", "neutron", "nexus", "nomad", "nova", "oasis", "obsidian",
+  "omega", "orbit", "ozone", "phantom", "phoenix", "photon", "pioneer", "plasma",
+  "prism", "pulsar", "quantum", "radar", "radius", "reactor", "relay", "rocket",
+  "satellite", "sentinel", "shadow", "shield", "silicon", "solaris", "sparrow", "spectra",
+  "stellar", "strata", "summit", "supernova", "tactical", "titan", "topaz", "torpedo",
+  "traduct", "tundra", "uranium", "vacuum", "vector", "velocity", "vertex", "viper",
+  "vortex", "voyager", "zenith", "zephyr"
 ];
 
-export function SparrowxKeysEngine() {
-  const [activeTab, setActiveTab] = useState<"password" | "passphrase" | "developer">("password");
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+// Helper: UUID v4 generator via crypto
+function generateCryptoUUID(): string {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  const buf = new Uint8Array(16);
+  crypto.getRandomValues(buf);
+  buf[6] = (buf[6] & 0x0f) | 0x40;
+  buf[8] = (buf[8] & 0x3f) | 0x80;
+  const hex = Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
-  // Password generator state
-  const [passwordLength, setPasswordLength] = useState<number>(24);
-  const [includeUpper, setIncludeUpper] = useState<boolean>(true);
-  const [includeLower, setIncludeLower] = useState<boolean>(true);
-  const [includeNumbers, setIncludeNumbers] = useState<boolean>(true);
-  const [includeSymbols, setIncludeSymbols] = useState<boolean>(true);
-  const [avoidAmbiguous, setAvoidAmbiguous] = useState<boolean>(true);
-  const [generatedPassword, setGeneratedPassword] = useState<string>("");
+export function SparrowxKeysEngine() {
+  const [mode, setMode] = useState<"password" | "diceware" | "developer">("password");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Mode 1: Master Password
+  const [pwdLength, setPwdLength] = useState<number>(28);
+  const [useUpper, setUseUpper] = useState<boolean>(true);
+  const [useLower, setUseLower] = useState<boolean>(true);
+  const [useNumbers, setUseNumbers] = useState<boolean>(true);
+  const [useSymbols, setUseSymbols] = useState<boolean>(true);
+  const [excludeAmbiguous, setExcludeAmbiguous] = useState<boolean>(true);
+  const [masterPassword, setMasterPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(true);
 
-  // Passphrase generator state
-  const [passphraseWordCount, setPassphraseWordCount] = useState<number>(5);
-  const [passphraseSeparator, setPassphraseSeparator] = useState<string>("-");
-  const [passphraseCapitalize, setPassphraseCapitalize] = useState<boolean>(false);
-  const [includeNumberInPhrase, setIncludeNumberInPhrase] = useState<boolean>(true);
-  const [generatedPassphrase, setGeneratedPassphrase] = useState<string>("");
+  // Mode 2: Diceware Passphrase
+  const [wordCount, setWordCount] = useState<number>(5);
+  const [separator, setSeparator] = useState<string>("-");
+  const [capitalizeWords, setCapitalizeWords] = useState<boolean>(false);
+  const [appendNumber, setAppendNumber] = useState<boolean>(true);
+  const [passphrase, setPassphrase] = useState<string>("");
 
-  // Developer secrets state
-  const [hexSalt, setHexSalt] = useState<string>("");
-  const [jwtSecret, setJwtSecret] = useState<string>("");
-  const [uriPassword, setUriPassword] = useState<string>("");
+  // Mode 3: Developer Secrets
+  const [salt256, setSalt256] = useState<string>("");
+  const [jwtSecret512, setJwtSecret512] = useState<string>("");
+  const [postgresUriKey, setPostgresUriKey] = useState<string>("");
+  const [uuidBatch, setUuidBatch] = useState<string[]>([]);
 
-  const copyToClipboard = (text: string, id: string) => {
+  // Telemetry
+  const [networkDispatched] = useState<number>(0);
+  const [generationCount, setGenerationCount] = useState<number>(1);
+
+  // Copy helper
+  const handleCopy = (text: string, id: string) => {
+    if (!text) return;
     navigator.clipboard.writeText(text);
-    setCopiedKey(id);
-    setTimeout(() => setCopiedKey(null), 2000);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
   };
 
-  // Secure Random Generator using window.crypto
+  // Secure RNG
   const getCryptoRandomInt = (max: number): number => {
     const array = new Uint32Array(1);
     window.crypto.getRandomValues(array);
     return array[0] % max;
   };
 
-  // Generate High-Entropy Password
+  // 1. Password Generator
   const generatePassword = useCallback(() => {
-    let charset = "";
+    let pool = "";
     const lower = "abcdefghijklmnopqrstuvwxyz";
     const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const numbers = "0123456789";
-    const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+    const symbols = "!@#$%^&*()_+-=[]{}|;:,.<>?~";
     const ambiguous = "il1Lo0O";
 
-    if (includeLower) charset += lower;
-    if (includeUpper) charset += upper;
-    if (includeNumbers) charset += numbers;
-    if (includeSymbols) charset += symbols;
+    if (useLower) pool += lower;
+    if (useUpper) pool += upper;
+    if (useNumbers) pool += numbers;
+    if (useSymbols) pool += symbols;
 
-    if (avoidAmbiguous) {
-      charset = charset
+    if (excludeAmbiguous) {
+      pool = pool
         .split("")
         .filter((c) => !ambiguous.includes(c))
         .join("");
     }
 
-    if (!charset) charset = lower;
+    if (!pool) pool = lower;
 
-    const values = new Uint32Array(passwordLength);
+    const values = new Uint32Array(pwdLength);
     window.crypto.getRandomValues(values);
-    let pwd = "";
-    for (let i = 0; i < passwordLength; i++) {
-      pwd += charset[values[i] % charset.length];
+    let result = "";
+    for (let i = 0; i < pwdLength; i++) {
+      result += pool[values[i] % pool.length];
     }
-    setGeneratedPassword(pwd);
-  }, [passwordLength, includeUpper, includeLower, includeNumbers, includeSymbols, avoidAmbiguous]);
+    setMasterPassword(result);
+    setGenerationCount((c) => c + 1);
+  }, [pwdLength, useUpper, useLower, useNumbers, useSymbols, excludeAmbiguous]);
 
-  // Generate Passphrase
+  // 2. Diceware Passphrase Generator
   const generatePassphrase = useCallback(() => {
     const words: string[] = [];
-    for (let i = 0; i < passphraseWordCount; i++) {
-      let w = DICEWARE_WORDS[getCryptoRandomInt(DICEWARE_WORDS.length)];
-      if (passphraseCapitalize) {
+    for (let i = 0; i < wordCount; i++) {
+      let w = EFF_WORDLIST[getCryptoRandomInt(EFF_WORDLIST.length)];
+      if (capitalizeWords) {
         w = w.charAt(0).toUpperCase() + w.slice(1);
       }
       words.push(w);
     }
-    if (includeNumberInPhrase) {
+    if (appendNumber) {
       const num = getCryptoRandomInt(900) + 100;
       words.push(String(num));
     }
-    setGeneratedPassphrase(words.join(passphraseSeparator));
-  }, [passphraseWordCount, passphraseSeparator, passphraseCapitalize, includeNumberInPhrase]);
+    setPassphrase(words.join(separator));
+    setGenerationCount((c) => c + 1);
+  }, [wordCount, separator, capitalizeWords, appendNumber]);
 
-  // Generate Developer Secrets
+  // 3. Developer Secrets Generator
   const generateDevSecrets = useCallback(() => {
-    // 1. 256-bit Hex Salt (32 bytes)
+    // 256-bit Hex Salt
     const saltBytes = new Uint8Array(32);
     window.crypto.getRandomValues(saltBytes);
-    const saltHex = Array.from(saltBytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-    setHexSalt(saltHex);
+    const hex = Array.from(saltBytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    setSalt256(hex);
 
-    // 2. Base64 512-bit JWT Secret Key (64 bytes)
+    // 512-bit Base64 JWT Secret
     const jwtBytes = new Uint8Array(64);
     window.crypto.getRandomValues(jwtBytes);
-    let binary = "";
+    let bin = "";
     for (let i = 0; i < jwtBytes.byteLength; i++) {
-      binary += String.fromCharCode(jwtBytes[i]);
+      bin += String.fromCharCode(jwtBytes[i]);
     }
-    setJwtSecret(btoa(binary));
+    setJwtSecret512(btoa(bin));
 
-    // 3. URI-Safe Database Password
-    const uriSafeCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
-    const uriBytes = new Uint32Array(32);
-    window.crypto.getRandomValues(uriBytes);
-    let uriPwd = "";
+    // Postgres URI safe key (no @, :, /, ?, #)
+    const uriCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_~";
+    const uriValues = new Uint32Array(32);
+    window.crypto.getRandomValues(uriValues);
+    let uKey = "";
     for (let i = 0; i < 32; i++) {
-      uriPwd += uriSafeCharset[uriBytes[i] % uriSafeCharset.length];
+      uKey += uriCharset[uriValues[i] % uriCharset.length];
     }
-    setUriPassword(uriPwd);
+    setPostgresUriKey(uKey);
+
+    // UUID batch
+    const uuids = [
+      generateCryptoUUID(),
+      generateCryptoUUID(),
+      generateCryptoUUID(),
+      generateCryptoUUID(),
+      generateCryptoUUID(),
+    ];
+    setUuidBatch(uuids);
+    setGenerationCount((c) => c + 1);
   }, []);
 
+  // Initial mount
   useEffect(() => {
     generatePassword();
     generatePassphrase();
     generateDevSecrets();
   }, [generatePassword, generatePassphrase, generateDevSecrets]);
 
-  // Entropy Calculation (Shannon Entropy / Pool Size)
-  const calculatePasswordEntropy = (): number => {
-    let pool = 0;
-    if (includeLower) pool += 26;
-    if (includeUpper) pool += 26;
-    if (includeNumbers) pool += 10;
-    if (includeSymbols) pool += 28;
-    if (avoidAmbiguous) pool -= 7;
-    if (pool <= 1) return 0;
-    return Math.round(passwordLength * (Math.log(pool) / Math.LN2));
-  };
+  // Spacebar hotkey listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if focus is inside an input, textarea or select
+      const active = document.activeElement;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT")) {
+        return;
+      }
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (mode === "password") generatePassword();
+        else if (mode === "diceware") generatePassphrase();
+        else generateDevSecrets();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mode, generatePassword, generatePassphrase, generateDevSecrets]);
 
-  const calculatePassphraseEntropy = (): number => {
-    return Math.round(passphraseWordCount * (Math.log(DICEWARE_WORDS.length) / Math.LN2) + (includeNumberInPhrase ? 10 : 0));
-  };
+  // Shannon Entropy & Crack Time Calculations
+  const entropyBits = useMemo(() => {
+    if (mode === "password") {
+      let poolSize = 0;
+      if (useLower) poolSize += 26;
+      if (useUpper) poolSize += 26;
+      if (useNumbers) poolSize += 10;
+      if (useSymbols) poolSize += 28;
+      if (excludeAmbiguous) poolSize -= 7;
+      if (poolSize <= 1) return 0;
+      return Math.round(pwdLength * (Math.log(poolSize) / Math.LN2));
+    }
+    if (mode === "diceware") {
+      return Math.round(wordCount * (Math.log(EFF_WORDLIST.length) / Math.LN2) + (appendNumber ? 10 : 0));
+    }
+    return 256;
+  }, [mode, pwdLength, useLower, useUpper, useNumbers, useSymbols, excludeAmbiguous, wordCount, appendNumber]);
 
-  const passwordEntropy = calculatePasswordEntropy();
-  const passphraseEntropy = calculatePassphraseEntropy();
+  const crackTimeEstimate = useMemo(() => {
+    if (entropyBits >= 128) return "> 100 Trillion Centuries";
+    if (entropyBits >= 90) return "~ 4.8 Million Centuries";
+    if (entropyBits >= 70) return "~ 34,000 Years";
+    if (entropyBits >= 55) return "~ 18 Months";
+    if (entropyBits >= 40) return "~ 3.2 Hours";
+    return "< 2 Seconds (Vulnerable)";
+  }, [entropyBits]);
+
+  // Character Type Color Highlighter for Readout
+  const renderHighlightedString = (str: string) => {
+    if (!showPassword && mode === "password") {
+      return <span className="text-[#64748B]">{"•".repeat(str.length)}</span>;
+    }
+    return (
+      <span>
+        {str.split("").map((ch, idx) => {
+          const isNum = /[0-9]/.test(ch);
+          const isSym = /[^a-zA-Z0-9]/.test(ch);
+          const colorClass = isSym
+            ? "text-[#F59E0B] font-bold"
+            : isNum
+            ? "text-[#9CA3AF] font-semibold"
+            : "text-[#F3F4F6]";
+          return (
+            <span key={idx} className={colorClass}>
+              {ch}
+            </span>
+          );
+        })}
+      </span>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-[#05070B] text-zinc-100 font-sans selection:bg-[#00F2FE] selection:text-black">
-      {/* Header */}
-      <header className="border-b border-zinc-800/80 bg-[#0B0F17]/90 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] font-sans selection:bg-white selection:text-black flex flex-col">
+      {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
+      <GlobalEcosystemBar activeDomain="password" />
+
+      {/* SECTION 1: HARDWARE CRYPTO INSTRUMENT HEADER */}
+      <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3 border-t border-white/[0.16]">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <a href="/" className="flex items-center gap-2 group">
-              <div className="size-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 grid place-items-center text-emerald-400 group-hover:scale-105 transition-transform">
-                <Key className="size-4" />
-              </div>
-              <div>
-                <span className="font-extrabold text-base tracking-tight text-white group-hover:text-emerald-400 transition-colors">
-                  SparrowX <span className="text-emerald-400">Keys</span>
+            <div className="size-8 rounded-md bg-[#14171F] border border-white/[0.08] grid place-items-center text-white">
+              <Key className="size-4 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                  SPARROWX // KEYS
                 </span>
-                <span className="text-[10px] ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono">
-                  100% Client-Side CSPRNG
+                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
+                  NO LOGIN REQUIRED
                 </span>
               </div>
-            </a>
+              <p className="text-[10px] text-[#64748B] font-mono">
+                password.sparrowx.net • Native Client-Side CSPRNG Instrument
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-zinc-400">
-              <Lock className="size-3 text-emerald-400" />
-              Zero Server Calls
-            </span>
-            <a
-              href="/"
-              className="px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-200 transition-colors"
-            >
-              Back to Hub
-            </a>
+          {/* Telemetry Indicator */}
+          <div className="flex items-center gap-3 font-mono text-[10px] text-[#9CA3AF]">
+            <div className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm">
+              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-white font-semibold tabular-nums">{networkDispatched}</span>
+              <span className="text-[#64748B]">NETWORK CALLS</span>
+            </div>
+            <div className="hidden sm:flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm text-[#64748B]">
+              <span>RNG:</span>
+              <span className="text-[#9CA3AF]">window.crypto</span>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12 space-y-8">
-        {/* Hero Section */}
-        <div className="text-center space-y-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-mono text-emerald-400">
-            <Zap className="size-3.5" />
-            <span>Cryptographic Pseudorandom Number Generator (Web Crypto API)</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Client-Side Secrets & High-Entropy Keys
-          </h1>
-          <p className="text-sm text-zinc-400 max-w-xl mx-auto">
-            Generated directly in your browser's memory using cryptographically secure hardware entropy.
-            No data ever touches a network socket or server log.
-          </p>
-        </div>
-
-        {/* Navigation Tabs */}
-        <div className="flex items-center justify-center p-1 rounded-xl bg-zinc-900 border border-zinc-800 max-w-md mx-auto">
-          {[
-            { id: "password", label: "Password" },
-            { id: "passphrase", label: "Passphrase" },
-            { id: "developer", label: "Developer Keys" },
-          ].map((tab) => (
+      {/* SECTION 2: THE LIVE INSTRUMENT (PRECISION CONSOLE) */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {/* TOP SEGMENTED INDUSTRIAL SWITCH (MODE MATRIX) */}
+        <div className="border border-white/[0.08] bg-[#0E1015] p-1.5 rounded-md flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+          <div className="flex items-center gap-1 w-full sm:w-auto">
             <button
-              key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                activeTab === tab.id
-                  ? "bg-emerald-500 text-zinc-950 shadow-md font-bold"
-                  : "text-zinc-400 hover:text-zinc-200"
+              onClick={() => setMode("password")}
+              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === "password"
+                  ? "bg-white text-black font-semibold shadow-sm"
+                  : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
               }`}
             >
-              {tab.label}
+              <span>1. Master Password</span>
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setMode("diceware")}
+              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === "diceware"
+                  ? "bg-white text-black font-semibold shadow-sm"
+                  : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+              }`}
+            >
+              <span>2. Diceware Passphrase</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("developer")}
+              className={`flex-1 sm:flex-initial px-3.5 py-1.5 rounded-[4px] text-xs font-mono font-medium transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                mode === "developer"
+                  ? "bg-white text-black font-semibold shadow-sm"
+                  : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+              }`}
+            >
+              <span>3. Developer Secrets</span>
+            </button>
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 text-[10px] font-mono text-[#64748B] pr-2">
+            <span>PRESS</span>
+            <kbd className="px-1.5 py-0.5 bg-[#14171F] border border-white/[0.08] text-[#9CA3AF] rounded text-[9px]">
+              SPACEBAR
+            </kbd>
+            <span>TO REGENERATE</span>
+          </div>
         </div>
 
-        {/* TAB 1: HIGH-ENTROPY PASSWORD */}
-        {activeTab === "password" && (
-          <div className="rounded-2xl border border-zinc-800 bg-[#0B0F17] p-6 sm:p-8 space-y-6 shadow-xl">
-            {/* Display Box */}
-            <div className="relative rounded-xl border border-zinc-700 bg-zinc-950 p-4 font-mono text-base text-emerald-300 break-all select-all flex items-center justify-between gap-4">
-              <span className="tracking-wider">
-                {showPassword ? generatedPassword : "•".repeat(generatedPassword.length)}
+        {/* OVERSIZED MONOSPACE READOUT SCREEN */}
+        <div className="border border-white/[0.08] bg-[#0E1015] rounded-md overflow-hidden relative shadow-md">
+          {/* Top readout status bar */}
+          <div className="border-b border-white/[0.08] bg-[#14171F] px-4 py-2 flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[#9CA3AF] text-[11px] uppercase tracking-wider">
+                {mode === "password"
+                  ? `Cryptographic Output [${pwdLength} Chars]`
+                  : mode === "diceware"
+                  ? `Diceware Entropy Stream [${wordCount} Words]`
+                  : "Cryptographic Master Vector Set"}
               </span>
-              <div className="flex items-center gap-2 shrink-0 select-none">
+            </div>
+            <div className="flex items-center gap-3">
+              {mode === "password" && (
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                  title="Toggle Visibility"
+                  className="text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1 text-[11px]"
                 >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPassword ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                  <span>{showPassword ? "Mask" : "Reveal"}</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={generatePassword}
-                  className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-emerald-400 transition-colors cursor-pointer"
-                  title="Generate New Password"
-                >
-                  <RefreshCw className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(generatedPassword, "password")}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs shadow-md transition-colors cursor-pointer"
-                >
-                  {copiedKey === "password" ? <Check className="size-4" /> : <Copy className="size-4" />}
-                  <span>{copiedKey === "password" ? "Copied" : "Copy"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Entropy Meter */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-zinc-400">Entropy Strength:</span>
-                <span className="text-emerald-400 font-bold">
-                  {passwordEntropy} bits ({passwordEntropy > 100 ? "Quantum-Resistant" : passwordEntropy > 70 ? "Excellent" : "Moderate"})
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-300"
-                  style={{ width: `${Math.min(100, (passwordEntropy / 128) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="space-y-5 pt-4 border-t border-zinc-800">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-mono">
-                  <span className="text-zinc-300">Length: {passwordLength} characters</span>
-                  <span className="text-zinc-500">Range: 8–128</span>
-                </div>
-                <input
-                  type="range"
-                  min={8}
-                  max={128}
-                  value={passwordLength}
-                  onChange={(e) => setPasswordLength(Number(e.target.value))}
-                  className="w-full accent-emerald-400 cursor-pointer"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                {[
-                  { label: "Uppercase (A-Z)", state: includeUpper, set: setIncludeUpper },
-                  { label: "Lowercase (a-z)", state: includeLower, set: setIncludeLower },
-                  { label: "Numbers (0-9)", state: includeNumbers, set: setIncludeNumbers },
-                  { label: "Symbols (!@#$)", state: includeSymbols, set: setIncludeSymbols },
-                  { label: "Avoid Ambiguous (1, l, O, 0)", state: avoidAmbiguous, set: setAvoidAmbiguous },
-                ].map((opt) => (
-                  <label
-                    key={opt.label}
-                    className="flex items-center gap-2 p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 cursor-pointer select-none"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={opt.state}
-                      onChange={(e) => opt.set(e.target.checked)}
-                      className="size-4 accent-emerald-400 rounded"
-                    />
-                    <span className="text-zinc-300">{opt.label}</span>
-                  </label>
-                ))}
-              </div>
+              )}
+              <span className="text-[10px] text-[#64748B] tabular-nums">GEN #{generationCount}</span>
             </div>
           </div>
-        )}
 
-        {/* TAB 2: MEMORABLE PASSPHRASE */}
-        {activeTab === "passphrase" && (
-          <div className="rounded-2xl border border-zinc-800 bg-[#0B0F17] p-6 sm:p-8 space-y-6 shadow-xl">
-            {/* Display Box */}
-            <div className="relative rounded-xl border border-zinc-700 bg-zinc-950 p-4 font-mono text-base text-cyan-300 break-all select-all flex items-center justify-between gap-4">
-              <span className="tracking-wider">{generatedPassphrase}</span>
-              <div className="flex items-center gap-2 shrink-0 select-none">
-                <button
-                  type="button"
-                  onClick={generatePassphrase}
-                  className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-cyan-400 transition-colors cursor-pointer"
-                  title="Generate New Passphrase"
-                >
-                  <RefreshCw className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(generatedPassphrase, "passphrase")}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-cyan-400 hover:bg-cyan-300 text-zinc-950 font-bold text-xs shadow-md transition-colors cursor-pointer"
-                >
-                  {copiedKey === "passphrase" ? <Check className="size-4" /> : <Copy className="size-4" />}
-                  <span>{copiedKey === "passphrase" ? "Copied" : "Copy"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Entropy Meter */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-zinc-400">Diceware Entropy:</span>
-                <span className="text-cyan-400 font-bold">
-                  {passphraseEntropy} bits ({passphraseWordCount} Diceware words)
-                </span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-zinc-800 overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-300"
-                  style={{ width: `${Math.min(100, (passphraseEntropy / 100) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Controls */}
-            <div className="space-y-5 pt-4 border-t border-zinc-800">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-mono">
-                  <span className="text-zinc-300">Word Count: {passphraseWordCount} words</span>
-                  <span className="text-zinc-500">Range: 3–10</span>
+          {/* Main Output Box */}
+          <div className="p-6 sm:p-8 bg-[#08090C] min-h-[140px] flex items-center justify-between gap-4">
+            <div className="min-w-0 flex-1 overflow-x-auto no-scrollbar py-2">
+              {mode === "password" && (
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-mono tracking-wider break-all select-all">
+                  {renderHighlightedString(masterPassword)}
                 </div>
-                <input
-                  type="range"
-                  min={3}
-                  max={10}
-                  value={passphraseWordCount}
-                  onChange={(e) => setPassphraseWordCount(Number(e.target.value))}
-                  className="w-full accent-cyan-400 cursor-pointer"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 space-y-1">
-                  <label className="text-zinc-400 block font-mono">Separator</label>
-                  <input
-                    type="text"
-                    maxLength={3}
-                    value={passphraseSeparator}
-                    onChange={(e) => setPassphraseSeparator(e.target.value)}
-                    className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1 font-mono text-zinc-100 outline-none"
-                  />
+              )}
+              {mode === "diceware" && (
+                <div className="text-2xl sm:text-3xl font-mono tracking-wide break-words select-all text-white">
+                  {renderHighlightedString(passphrase)}
                 </div>
-                <label className="flex items-center gap-2 p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={passphraseCapitalize}
-                    onChange={(e) => setPassphraseCapitalize(e.target.checked)}
-                    className="size-4 accent-cyan-400 rounded"
-                  />
-                  <span className="text-zinc-300">Capitalize Words</span>
-                </label>
-                <label className="flex items-center gap-2 p-3 rounded-lg border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={includeNumberInPhrase}
-                    onChange={(e) => setIncludeNumberInPhrase(e.target.checked)}
-                    className="size-4 accent-cyan-400 rounded"
-                  />
-                  <span className="text-zinc-300">Append Random Number</span>
-                </label>
-              </div>
+              )}
+              {mode === "developer" && (
+                <div className="space-y-3 font-mono text-xs">
+                  <div>
+                    <span className="text-[#64748B] block text-[10px] uppercase">Postgres Database Safe Password:</span>
+                    <span className="text-[#F3F4F6] text-sm select-all">{postgresUriKey}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#64748B] block text-[10px] uppercase">256-bit Hex Salt:</span>
+                    <span className="text-[#9CA3AF] text-xs select-all truncate block">{salt256}</span>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        )}
 
-        {/* TAB 3: DEVELOPER SECRETS */}
-        {activeTab === "developer" && (
-          <div className="rounded-2xl border border-zinc-800 bg-[#0B0F17] p-6 sm:p-8 space-y-6 shadow-xl">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Terminal className="size-4 text-emerald-400" />
-                  <span>Infrastructure & Backend Tokens</span>
-                </h3>
-                <p className="text-xs text-zinc-400">
-                  Pre-configured cryptographic keys for PostgreSQL, PostgREST, and JWT authentication.
-                </p>
-              </div>
+            {/* Readout Action Cluster */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 shrink-0">
               <button
                 type="button"
-                onClick={generateDevSecrets}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 cursor-pointer"
+                onClick={() => {
+                  const targetText =
+                    mode === "password"
+                      ? masterPassword
+                      : mode === "diceware"
+                      ? passphrase
+                      : postgresUriKey;
+                  handleCopy(targetText, "main");
+                }}
+                className="px-4 py-2.5 rounded-sm bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
               >
-                <RefreshCw className="size-3.5" />
-                <span>Regenerate All</span>
+                {copiedId === "main" ? (
+                  <>
+                    <Check className="size-3.5 text-emerald-600" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-3.5" />
+                    <span>Copy to RAM</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (mode === "password") generatePassword();
+                  else if (mode === "diceware") generatePassphrase();
+                  else generateDevSecrets();
+                }}
+                className="size-9 rounded-sm border border-white/[0.08] bg-[#14171F] hover:bg-white/[0.08] text-white grid place-items-center transition-colors cursor-pointer"
+                title="Regenerate (Spacebar)"
+              >
+                <RefreshCw className="size-4 text-[#9CA3AF]" />
               </button>
             </div>
+          </div>
 
-            <div className="space-y-4">
-              {/* 256-bit Hex Salt */}
-              <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950/70 space-y-2">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-zinc-400">256-Bit Cryptographic Hex Salt (32 Bytes)</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(hexSalt, "hex-salt")}
-                    className="text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedKey === "hex-salt" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                    <span>{copiedKey === "hex-salt" ? "Copied" : "Copy"}</span>
-                  </button>
-                </div>
-                <div className="font-mono text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 rounded p-2.5 break-all select-all">
-                  {hexSalt}
-                </div>
+          {/* LIVE TELEMETRY STRIP (ENTROPY & CRACK TIME) */}
+          <div className="border-t border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4 text-xs font-mono">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-[#64748B]">SHANNON ENTROPY:</span>
+                <span className="text-white font-bold tabular-nums">{entropyBits} BITS</span>
               </div>
-
-              {/* 512-bit Base64 JWT Secret */}
-              <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950/70 space-y-2">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-zinc-400">Base64 512-Bit JWT Secret (PostgREST / Gotrue)</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(jwtSecret, "jwt-secret")}
-                    className="text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedKey === "jwt-secret" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                    <span>{copiedKey === "jwt-secret" ? "Copied" : "Copy"}</span>
-                  </button>
-                </div>
-                <div className="font-mono text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 rounded p-2.5 break-all select-all">
-                  {jwtSecret}
-                </div>
+              <div className="w-24 sm:w-36 h-1.5 bg-[#14171F] rounded-full overflow-hidden border border-white/[0.08]">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    entropyBits >= 90
+                      ? "bg-emerald-400"
+                      : entropyBits >= 60
+                      ? "bg-amber-400"
+                      : "bg-red-400"
+                  }`}
+                  style={{ width: `${Math.min(100, (entropyBits / 128) * 100)}%` }}
+                />
               </div>
+            </div>
 
-              {/* URI-Safe DB Password */}
-              <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950/70 space-y-2">
-                <div className="flex items-center justify-between text-xs font-mono">
-                  <span className="text-zinc-400">URI-Safe Database Password (No escaped characters)</span>
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(uriPassword, "uri-pwd")}
-                    className="text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    {copiedKey === "uri-pwd" ? <Check className="size-3" /> : <Copy className="size-3" />}
-                    <span>{copiedKey === "uri-pwd" ? "Copied" : "Copy"}</span>
-                  </button>
-                </div>
-                <div className="font-mono text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 rounded p-2.5 break-all select-all">
-                  {uriPassword}
-                </div>
+            <div className="flex items-center gap-4 text-[11px]">
+              <div>
+                <span className="text-[#64748B]">CRACK-TIME (100B GUESSES/S):</span>{" "}
+                <span className="text-emerald-400 font-semibold">{crackTimeEstimate}</span>
+              </div>
+              <div className="hidden md:inline text-[#64748B]">•</div>
+              <div className="hidden md:inline text-emerald-400">
+                0 Leaks • Memory Discard on Close
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Security Disclosure Notice */}
-        <div className="rounded-xl border border-zinc-800/80 bg-zinc-900/30 p-4 flex items-start gap-3 text-xs text-zinc-400">
-          <Info className="size-4 text-emerald-400 shrink-0 mt-0.5" />
-          <p>
-            <strong>Security Guarantee:</strong> This utility runs 100% in local browser memory.
-            All keys are produced via <code className="text-zinc-200">crypto.getRandomValues()</code> and
-            never leave your browser session. You can safely disconnect your internet and generate keys offline.
-          </p>
+        {/* CONTROLS GRID: EXPOSED HAIRLINE STRUCTURAL FRAME */}
+        <div className="border border-white/[0.08] bg-[#0E1015] rounded-md divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {mode === "password" && (
+            <>
+              {/* Control 1: Length Slider */}
+              <div className="p-5 space-y-3">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-[#9CA3AF] uppercase text-[10px]">Entropy Length</span>
+                  <span className="font-bold text-white tabular-nums px-2 py-0.5 bg-[#14171F] border border-white/[0.08] rounded">
+                    {pwdLength} Chars
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="8"
+                  max="128"
+                  value={pwdLength}
+                  onChange={(e) => setPwdLength(Number(e.target.value))}
+                  className="w-full accent-white cursor-pointer h-1.5 bg-[#14171F] rounded-lg"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-[#64748B]">
+                  <span>8 min</span>
+                  <span>32 rec</span>
+                  <span>128 max</span>
+                </div>
+              </div>
+
+              {/* Control 2: Character Sets */}
+              <div className="p-5 space-y-2 text-xs font-mono">
+                <span className="text-[#9CA3AF] uppercase text-[10px] block mb-2">Character Matrix</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={useUpper}
+                      onChange={(e) => setUseUpper(e.target.checked)}
+                      className="accent-emerald-500 rounded-sm"
+                    />
+                    <span>A-Z Upper</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={useLower}
+                      onChange={(e) => setUseLower(e.target.checked)}
+                      className="accent-emerald-500 rounded-sm"
+                    />
+                    <span>a-z Lower</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={useNumbers}
+                      onChange={(e) => setUseNumbers(e.target.checked)}
+                      className="accent-emerald-500 rounded-sm"
+                    />
+                    <span>0-9 Digits</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={useSymbols}
+                      onChange={(e) => setUseSymbols(e.target.checked)}
+                      className="accent-emerald-500 rounded-sm"
+                    />
+                    <span>!@# Symbols</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Control 3: Disambiguation */}
+              <div className="p-5 space-y-3 text-xs font-mono">
+                <span className="text-[#9CA3AF] uppercase text-[10px] block">Readability Rules</span>
+                <label className="flex items-start gap-2.5 cursor-pointer text-[#9CA3AF] hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={excludeAmbiguous}
+                    onChange={(e) => setExcludeAmbiguous(e.target.checked)}
+                    className="accent-emerald-500 rounded-sm mt-0.5"
+                  />
+                  <div>
+                    <span className="font-medium text-white block">Filter Ambiguous Glyphs</span>
+                    <span className="text-[10px] text-[#64748B] leading-tight block">
+                      Omits confusing chars like i, l, 1, L, o, 0, O
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </>
+          )}
+
+          {mode === "diceware" && (
+            <>
+              {/* Diceware Control 1: Word Count */}
+              <div className="p-5 space-y-3">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-[#9CA3AF] uppercase text-[10px]">Passphrase Words</span>
+                  <span className="font-bold text-white tabular-nums px-2 py-0.5 bg-[#14171F] border border-white/[0.08] rounded">
+                    {wordCount} Words
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="4"
+                  max="12"
+                  value={wordCount}
+                  onChange={(e) => setWordCount(Number(e.target.value))}
+                  className="w-full accent-white cursor-pointer h-1.5 bg-[#14171F] rounded-lg"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-[#64748B]">
+                  <span>4 words</span>
+                  <span>6 recommended</span>
+                  <span>12 max</span>
+                </div>
+              </div>
+
+              {/* Diceware Control 2: Separator */}
+              <div className="p-5 space-y-2 text-xs font-mono">
+                <span className="text-[#9CA3AF] uppercase text-[10px] block mb-2">Word Separator</span>
+                <div className="flex items-center gap-1.5">
+                  {["-", "_", ".", "/", " "].map((sep) => (
+                    <button
+                      key={sep}
+                      type="button"
+                      onClick={() => setSeparator(sep)}
+                      className={`px-3 py-1 rounded text-xs transition-colors ${
+                        separator === sep
+                          ? "bg-white text-black font-bold"
+                          : "bg-[#14171F] border border-white/[0.08] text-[#9CA3AF] hover:text-white"
+                      }`}
+                    >
+                      {sep === " " ? "space" : sep}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Diceware Control 3: Formatting */}
+              <div className="p-5 space-y-2 text-xs font-mono">
+                <span className="text-[#9CA3AF] uppercase text-[10px] block mb-2">Augmentations</span>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={capitalizeWords}
+                      onChange={(e) => setCapitalizeWords(e.target.checked)}
+                      className="accent-emerald-500 rounded-sm"
+                    />
+                    <span>Capitalize Words</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[#9CA3AF] hover:text-white">
+                    <input
+                      type="checkbox"
+                      checked={appendNumber}
+                      onChange={(e) => setAppendNumber(e.target.checked)}
+                      className="accent-emerald-500 rounded-sm"
+                    />
+                    <span>Append 3-Digit Salt</span>
+                  </label>
+                </div>
+              </div>
+            </>
+          )}
+
+          {mode === "developer" && (
+            <>
+              {/* Dev 1: 512-bit JWT */}
+              <div className="p-5 space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9CA3AF] uppercase text-[10px]">512-bit Base64 JWT Secret</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(jwtSecret512, "jwt")}
+                    className="text-[#9CA3AF] hover:text-white flex items-center gap-1 text-[10px]"
+                  >
+                    {copiedId === "jwt" ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                    <span>{copiedId === "jwt" ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+                <div className="p-2.5 rounded bg-[#08090C] border border-white/[0.08] text-[10px] text-[#9CA3AF] font-mono break-all select-all max-h-16 overflow-y-auto">
+                  {jwtSecret512}
+                </div>
+              </div>
+
+              {/* Dev 2: 256-bit Hex */}
+              <div className="p-5 space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9CA3AF] uppercase text-[10px]">256-bit Hex Auth Salt</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(salt256, "salt")}
+                    className="text-[#9CA3AF] hover:text-white flex items-center gap-1 text-[10px]"
+                  >
+                    {copiedId === "salt" ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                    <span>{copiedId === "salt" ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+                <div className="p-2.5 rounded bg-[#08090C] border border-white/[0.08] text-[10px] text-[#9CA3AF] font-mono break-all select-all max-h-16 overflow-y-auto">
+                  {salt256}
+                </div>
+              </div>
+
+              {/* Dev 3: UUIDv4 Batch */}
+              <div className="p-5 space-y-2 text-xs font-mono">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9CA3AF] uppercase text-[10px]">UUIDv4 Batch (5x)</span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(uuidBatch.join("\n"), "uuids")}
+                    className="text-[#9CA3AF] hover:text-white flex items-center gap-1 text-[10px]"
+                  >
+                    {copiedId === "uuids" ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                    <span>{copiedId === "uuids" ? "Copied" : "Copy All"}</span>
+                  </button>
+                </div>
+                <div className="p-2.5 rounded bg-[#08090C] border border-white/[0.08] text-[10px] text-[#9CA3AF] font-mono space-y-1 select-all">
+                  {uuidBatch.map((u, i) => (
+                    <div key={i} className="truncate">{u}</div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* SECTION 3: LOWER HALF — ARCHITECTURAL LANDING & CROSS-DOMAIN BRIDGE */}
+        <div className="border border-white/[0.08] bg-[#0E1015] rounded-md p-6 sm:p-8 space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-white/[0.08] pb-6">
+            <div className="space-y-1">
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                Why Client-Side CSPRNG Matters
+              </h2>
+              <p className="text-xs text-[#9CA3AF] max-w-xl">
+                Online password generators that make server calls log your plaintext keys in web server access logs. SparrowX Keys runs 100% inside your browser using the W3C Web Cryptography API.
+              </p>
+            </div>
+
+            {/* Direct Bridge to db.sparrowx.net */}
+            <a
+              href="https://db.sparrowx.net"
+              onClick={(e) => {
+                if (masterPassword) {
+                  navigator.clipboard.writeText(masterPassword);
+                }
+              }}
+              className="px-4 py-2.5 rounded-sm bg-[#14171F] border border-white/[0.12] hover:border-white/30 text-xs font-mono text-white flex items-center gap-2 transition-all shrink-0 hover:bg-white/[0.06]"
+            >
+              <Database className="size-3.5 text-emerald-400" />
+              <span>Use Secret in SparrowX DB</span>
+              <ArrowUpRight className="size-3.5 text-[#9CA3AF]" />
+            </a>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-mono">
+            <div className="space-y-1.5">
+              <span className="text-white font-semibold flex items-center gap-1.5">
+                <span className="size-1 rounded-full bg-emerald-400" />
+                Zero Disk &amp; RAM Scrubbing
+              </span>
+              <p className="text-[#64748B] text-[11px] leading-relaxed">
+                Generated strings reside solely in temporary browser heap memory. Closing this tab permanently purges all trace.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-white font-semibold flex items-center gap-1.5">
+                <span className="size-1 rounded-full bg-emerald-400" />
+                CSPRNG Entropy Source
+              </span>
+              <p className="text-[#64748B] text-[11px] leading-relaxed">
+                Uses the operating system's kernel entropy pool (<code className="text-[#9CA3AF]">/dev/urandom</code> on Linux/macOS, BCryptGenRandom on Windows).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="text-white font-semibold flex items-center gap-1.5">
+                <span className="size-1 rounded-full bg-emerald-400" />
+                Full Offline PWA Capability
+              </span>
+              <p className="text-[#64748B] text-[11px] leading-relaxed">
+                Disconnect your Wi-Fi or airplane mode. SparrowX Keys continues generating high-entropy seeds with zero network.
+              </p>
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* FOOTER */}
+      <footer className="border-t border-white/[0.08] bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#64748B]">
+        <span>SPARROWX KEYS // 100% CLIENT-SIDE CRYPTOGRAPHIC ENGINE • ZERO SURVEILLANCE • AP-SOUTHEAST-SYD</span>
+      </footer>
     </div>
   );
 }

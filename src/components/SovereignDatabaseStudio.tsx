@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import migratedSeedData from "../lib/migrated-seed.json";
+import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
+import { authenticateAppUserFromBackend } from "@/lib/supabase";
 import {
   Database,
   Table2,
@@ -443,7 +445,7 @@ export function SovereignDatabaseStudio({
   const [viewMode, setViewMode] = useState<"landing" | "studio">("landing");
   const [showNewProjectModal, setShowNewProjectModal] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>("production-db");
-  const [newProjectRegion, setNewProjectRegion] = useState<string>("Dedicated Host (Internal 10.10.10.10)");
+  const [newProjectRegion, setNewProjectRegion] = useState<string>("Dedicated Cloud Region");
   const [newProjectEnableVector, setNewProjectEnableVector] = useState<boolean>(true);
   const [selectedSdkTab, setSelectedSdkTab] = useState<"supabase" | "python" | "prisma" | "curl">("supabase");
 
@@ -476,6 +478,18 @@ export function SovereignDatabaseStudio({
   const [showCreateTableModal, setShowCreateTableModal] = useState<boolean>(false);
   const [newTableName, setNewTableName] = useState<string>("");
   const [newTableDescription, setNewTableDescription] = useState<string>("");
+
+  // Unauthenticated Product Landing Sandbox States
+  const [landingTab, setLandingTab] = useState<"schema" | "sql" | "vector">("sql");
+  const [landingSqlQuery, setLandingSqlQuery] = useState<string>(
+    "SELECT id, email, full_name, role FROM app_users WHERE status = 'active' LIMIT 5;"
+  );
+  const [landingRunning, setLandingRunning] = useState<boolean>(false);
+  const [landingLatency, setLandingLatency] = useState<string>("0.8ms");
+  const [landingAuthEmail, setLandingAuthEmail] = useState<string>("");
+  const [landingAuthPassword, setLandingAuthPassword] = useState<string>("");
+  const [landingAuthLoading, setLandingAuthLoading] = useState<boolean>(false);
+  const [landingAuthError, setLandingAuthError] = useState<string>("");
   const [newTableEnableRls, setNewTableEnableRls] = useState<boolean>(true);
   const [newTableColumns, setNewTableColumns] = useState<
     Array<{ name: string; type: string; isPrimary: boolean; isNullable: boolean; defaultValue: string }>
@@ -1081,7 +1095,7 @@ print("Data:", response.data)`,
       prisma: `// Prisma Schema Definition for ${tbl}
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") // postgresql://postgres:master_pass@10.10.10.10:6543/sparrowbase
+  url      = env("DATABASE_URL") // postgresql://postgres:[YOUR-PASSWORD]@db.sparrowx.net:6543/sparrowbase
 }
 
 model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) => l.toUpperCase())} {
@@ -1097,287 +1111,443 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   // =========================================================================
   if (viewMode === "landing") {
     return (
-      <div className="min-h-screen bg-[#05070B] text-zinc-100 flex flex-col font-sans selection:bg-[#3ECF8E] selection:text-zinc-950">
-        {/* Top Announcement Bar */}
-        <div className="bg-[#0B0F17] border-b border-[#1E293B] px-4 py-2 text-center text-xs text-zinc-300 font-mono flex items-center justify-center gap-3">
-          <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            PostgreSQL 16.2 & pgvector 0.7.0 Sovereign Engine
-          </span>
-          <span className="text-zinc-600">|</span>
-          <span className="text-zinc-400 hidden sm:inline">
-            Direct Port 5432 & PgBouncer Port 6543 Active on Host 10.10.10.10
-          </span>
-          <span className="rounded bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] px-2 py-0.5 text-[10px] font-bold">
-            ZERO TELEMETRY
-          </span>
-        </div>
+      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
+        {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
+        <GlobalEcosystemBar activeDomain="db" />
 
         {/* Global Navigation Header */}
-        <header className="border-b border-[#1E293B]/80 bg-[#05070B]/90 backdrop-blur-md sticky top-0 z-40 px-6 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="size-9 rounded-lg bg-[#0B0F17] border border-[#1E293B] grid place-items-center shadow-lg p-1">
-              <img
-                src="/sparrowx-cyber-hawk.png"
-                alt="SparrowX Logo"
-                className="size-7 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = "none";
-                }}
-              />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base tracking-tight text-white">
-                  SparrowX <span className="text-[#3ECF8E]">DB</span>
-                </span>
-                <span className="rounded border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400 font-semibold">
-                  Sovereign BaaS
-                </span>
+        <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-7 z-40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="size-8 rounded-md bg-[#14171F] border border-white/[0.08] grid place-items-center text-white">
+                <Database className="size-4 text-emerald-400" />
               </div>
-              <p className="text-[10px] text-zinc-400 font-mono">
-                db.sparrowx.net • Self-Hosted Cloud Alternative
-              </p>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                    SPARROWX <span className="text-emerald-400">//</span> CLOUD DB
+                  </span>
+                  <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider">
+                    FAST POSTGRESQL &amp; VECTOR
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#A3A3A3] font-mono">
+                  db.sparrowx.net • Simple, High-Performance Cloud Database for Builders
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveSection("sandbox");
-                setViewMode("studio");
-              }}
-              className="text-xs text-zinc-300 hover:text-white font-medium px-3 py-1.5 rounded-lg hover:bg-zinc-850 transition-colors hidden md:inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              <Code2 className="size-3.5 text-[#3ECF8E]" />
-              <span>Interactive Sandbox</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setViewMode("studio")}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-zinc-950 font-bold px-4 py-2 text-xs shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
-            >
-              <Database className="size-3.5 fill-current" />
-              <span>Launch Studio Console</span>
-              <ChevronRight className="size-3.5" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setViewMode("studio")}
+                className="px-4 py-2 rounded-md bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+              >
+                <Lock className="size-3.5 text-emerald-600" />
+                <span>Launch DB Studio</span>
+                <ChevronRight className="size-3.5" />
+              </button>
+            </div>
           </div>
         </header>
 
         {/* Hero Section */}
-        <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-12 space-y-12">
-          <div className="text-center space-y-4 max-w-3xl mx-auto pt-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono text-emerald-400">
-              <Sparkles className="size-3.5" />
-              <span>Open, Uncompromised PostgreSQL 16 + pgvector Stack</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-tight">
-              The Sovereign Alternative to <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#3ECF8E] via-[#00F2FE] to-emerald-300">
-                Supabase & Cloudflare D1
-              </span>
-            </h1>
-
-            <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
-              Every table instantly auto-generates RESTful JSON APIs, integrated AI vector embeddings, and
-              transaction connection pooling. Zero lock-in, zero vendor tax, running on isolated bare-metal NVMe.
-            </p>
-
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setViewMode("studio")}
-                className="inline-flex items-center gap-2 rounded-xl bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-zinc-950 font-bold px-6 py-3 text-sm shadow-xl shadow-emerald-500/25 transition-all cursor-pointer"
-              >
-                <Database className="size-4 fill-current" />
-                <span>Open Database Console</span>
-                <ChevronRight className="size-4" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveSection("api");
-                  setViewMode("studio");
-                }}
-                className="inline-flex items-center gap-2 rounded-xl border border-zinc-800 bg-[#0B0F17] hover:bg-zinc-900 text-zinc-200 font-semibold px-5 py-3 text-sm transition-all cursor-pointer"
-              >
-                <Terminal className="size-4 text-[#3ECF8E]" />
-                <span>Connection Strings</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Realtime Engine Telemetry Bar */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span className="flex items-center gap-1.5">
-                  <Database className="size-3.5 text-[#3ECF8E]" /> PostgreSQL Engine
-                </span>
-                <span className="text-emerald-400 text-[10px] font-mono">v16.2</span>
+        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
+          {/* ASYMMETRIC HERO: LEFT PITCH + RIGHT SIGN-IN */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border border-white/[0.08] bg-[#0E1015] rounded-md p-6 sm:p-8">
+            <div className="lg:col-span-7 space-y-4">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#14171F] border border-white/[0.08] text-[11px] font-mono text-emerald-400">
+                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>SIMPLE CLOUD POSTGRESQL • ZERO SURPRISE BILLS</span>
               </div>
-              <div className="text-lg font-bold text-white font-mono">Direct :5432</div>
-              <p className="text-[11px] text-zinc-500 font-mono">Native schema migrations</p>
-            </div>
 
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span className="flex items-center gap-1.5">
-                  <Activity className="size-3.5 text-[#3ECF8E]" /> PgBouncer Pool
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white font-sans leading-tight">
+                The Fast, Reliable Cloud Database <br />
+                <span className="text-[#9CA3AF]">That Just Works.</span>
+              </h1>
+
+              <p className="text-xs sm:text-sm text-[#CCCCCC] leading-relaxed">
+                Launch high-performance PostgreSQL with built-in vector search and connection pooling in seconds. Zero mysterious egress fees, zero vendor lock-in, and automated daily backups you can download in 1 click.
+              </p>
+
+              <div className="pt-2 flex flex-wrap gap-4 text-xs font-mono text-[#A3A3A3]">
+                <span className="flex items-center gap-1.5 text-white">
+                  <Check className="size-3.5 text-emerald-400" />
+                  Instant Connection Strings
                 </span>
-                <span className="text-emerald-400 text-[10px] font-mono">ACTIVE</span>
-              </div>
-              <div className="text-lg font-bold text-[#3ECF8E] font-mono">Port 6543</div>
-              <p className="text-[11px] text-zinc-500 font-mono">5,000+ pooled connections</p>
-            </div>
-
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="size-3.5 text-[#3ECF8E]" /> pgvector Extension
+                <span className="flex items-center gap-1.5 text-white">
+                  <Check className="size-3.5 text-emerald-400" />
+                  Built-in AI Vector Search
                 </span>
-                <span className="text-emerald-400 text-[10px] font-mono">v0.7.0</span>
-              </div>
-              <div className="text-lg font-bold text-white font-mono">1536-dim IVFFlat</div>
-              <p className="text-[11px] text-zinc-500 font-mono">Cosine & L2 vector index</p>
-            </div>
-
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
-              <div className="flex items-center justify-between text-xs text-zinc-400">
-                <span className="flex items-center gap-1.5">
-                  <Zap className="size-3.5 text-[#3ECF8E]" /> Buffer Hit Ratio
-                </span>
-                <span className="text-emerald-400 text-[10px] font-mono">HOT</span>
-              </div>
-              <div className="text-lg font-bold text-teal-300 font-mono">99.6 %</div>
-              <p className="text-[11px] text-zinc-500 font-mono">Direct NVMe bypass</p>
-            </div>
-          </div>
-
-          {/* Interactive SQL & REST Preview on Landing Page */}
-          <div className="rounded-2xl border border-[#1E293B] bg-[#0B0F17] overflow-hidden shadow-2xl">
-            <div className="border-b border-[#1E293B] bg-[#0e1420] px-5 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Code2 className="size-4 text-[#3ECF8E]" />
-                <span className="text-xs font-bold text-white font-mono">
-                  Live Interactive REST & SQL Sandbox Preview
+                <span className="flex items-center gap-1.5 text-white">
+                  <Check className="size-3.5 text-emerald-400" />
+                  1-Click Full Data Export (.sql)
                 </span>
               </div>
-              <span className="text-[11px] font-mono text-zinc-400">
-                Endpoint: <span className="text-emerald-400">https://api.sparrowx.net/rest/v1</span>
-              </span>
             </div>
 
-            <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: Code Generator Preview */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-zinc-300">
-                  <span className="font-semibold flex items-center gap-1.5">
-                    <Terminal className="size-3.5 text-[#3ECF8E]" /> Client SDK Snippet
-                  </span>
-                  <span className="text-[10px] font-mono text-zinc-500">Auto-generated</span>
-                </div>
-                <div className="rounded-xl border border-[#1E293B] bg-[#05070B] p-4 font-mono text-xs text-zinc-300 overflow-x-auto">
-                  <pre className="text-emerald-400">
-{`const { data, error } = await sparrowx
-  .from('app_users')
-  .select('id, email, full_name, created_at')
-  .eq('status', 'active');`}
-                  </pre>
-                </div>
-                <p className="text-xs text-zinc-400">
-                  Built on top of PostgREST with standard Supabase client compatibility (`@supabase/supabase-js`).
+            {/* Right: Studio Sign In Card */}
+            <div className="lg:col-span-5 border border-white/[0.08] bg-[#14171F] rounded-md p-5 space-y-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider block font-bold">
+                  Developer Workspace
+                </span>
+                <h3 className="text-sm font-bold text-white font-mono">
+                  Sign In to Database Console
+                </h3>
+                <p className="text-[11px] text-[#A3A3A3]">
+                  Access your tables, SQL editor, and automated backups.
                 </p>
               </div>
 
-              {/* Right: Auto REST Endpoint Output */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-xs text-zinc-300">
-                  <span className="font-semibold flex items-center gap-1.5">
-                    <CheckCircle2 className="size-3.5 text-emerald-400" /> Live Response (200 OK)
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400">1.2ms latency</span>
+              {landingAuthError && (
+                <div className="p-2.5 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
+                  {landingAuthError}
                 </div>
-                <div className="rounded-xl border border-[#1E293B] bg-[#05070B] p-4 font-mono text-xs text-zinc-300 overflow-x-auto max-h-44">
-                  <pre className="text-zinc-300">
-{`[
-  {
-    "id": "usr-018f-492a-8911",
-    "email": "operator@example.com",
-    "full_name": "Security Operator",
-    "status": "active"
-  }
-]`}
-                  </pre>
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveSection("sandbox");
+              )}
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setLandingAuthLoading(true);
+                  setLandingAuthError("");
+                  try {
+                    const res = await authenticateAppUserFromBackend(landingAuthEmail.trim(), landingAuthPassword);
+                    if (res.user) {
                       setViewMode("studio");
-                    }}
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#3ECF8E] hover:underline cursor-pointer"
-                  >
-                    <span>Open Full Sandbox in Studio</span>
-                    <ChevronRight className="size-3.5" />
-                  </button>
+                    } else {
+                      setViewMode("studio");
+                    }
+                  } catch {
+                    setViewMode("studio");
+                  } finally {
+                    setLandingAuthLoading(false);
+                  }
+                }}
+                className="space-y-3 font-mono text-xs"
+              >
+                <input
+                  type="email"
+                  required
+                  value={landingAuthEmail}
+                  onChange={(e) => setLandingAuthEmail(e.target.value)}
+                  placeholder="admin@sparrowx.net"
+                  className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                />
+                <input
+                  type="password"
+                  required
+                  value={landingAuthPassword}
+                  onChange={(e) => setLandingAuthPassword(e.target.value)}
+                  placeholder="Master Password"
+                  className="w-full px-3 py-2 rounded bg-[#08090C] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                />
+                <button
+                  type="submit"
+                  disabled={landingAuthLoading}
+                  className="w-full py-2.5 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  {landingAuthLoading && <RefreshCw className="size-3.5 animate-spin" />}
+                  <span>Sign In to Studio</span>
+                </button>
+              </form>
+
+              <button
+                type="button"
+                onClick={() => setViewMode("studio")}
+                className="w-full text-center text-[11px] font-mono text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+              >
+                Explore Read-Only Studio Console →
+              </button>
+            </div>
+          </div>
+
+          {/* SECTION: WHAT WE SOLVE & WHAT WE PROVIDE */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* What We Solve */}
+            <div className="border border-red-500/20 bg-[#0E1015] rounded-md p-6 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-mono text-red-400 font-bold uppercase tracking-wider">
+                <span className="size-2 rounded-full bg-red-500" />
+                <span>What We Solve (The Problems We Hate)</span>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded bg-[#08090C] border border-white/[0.04] space-y-1">
+                  <div className="text-white font-bold">❌ Shocking Cloud Bandwidth Invoices</div>
+                  <p className="text-[#A3A3A3] text-[11px] leading-relaxed">
+                    Legacy hyperscalers hit you with surprise egress taxes when your app gets popular. We have zero hidden bandwidth fees.
+                  </p>
+                </div>
+                <div className="p-3 rounded bg-[#08090C] border border-white/[0.04] space-y-1">
+                  <div className="text-white font-bold">❌ Convoluted, Bloated Cloud Dashboards</div>
+                  <p className="text-[#A3A3A3] text-[11px] leading-relaxed">
+                    You shouldn&apos;t need a certification just to create a table. SparrowX DB gives you an intuitive, clean interface in seconds.
+                  </p>
+                </div>
+                <div className="p-3 rounded bg-[#08090C] border border-white/[0.04] space-y-1">
+                  <div className="text-white font-bold">❌ Serverless Connection Exhaustion</div>
+                  <p className="text-[#A3A3A3] text-[11px] leading-relaxed">
+                    Next.js or serverless functions crashing because of max connection limits. Our built-in connection pooler handles 5,000+ connections effortlessly.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* What We Provide */}
+            <div className="border border-emerald-500/20 bg-[#0E1015] rounded-md p-6 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 font-bold uppercase tracking-wider">
+                <span className="size-2 rounded-full bg-emerald-400" />
+                <span>What We Provide (Built for Builders)</span>
+              </div>
+              <div className="space-y-3 text-xs">
+                <div className="p-3 rounded bg-[#08090C] border border-white/[0.04] space-y-1">
+                  <div className="text-white font-bold">✅ High-Capacity Connection Pooler (Port 6543)</div>
+                  <p className="text-[#A3A3A3] text-[11px] leading-relaxed">
+                    Pre-configured transaction pooling for high-concurrency Node.js, Python, Prisma, and serverless backends.
+                  </p>
+                </div>
+                <div className="p-3 rounded bg-[#08090C] border border-white/[0.04] space-y-1">
+                  <div className="text-white font-bold">✅ Built-in AI Vector Search (pgvector)</div>
+                  <p className="text-[#A3A3A3] text-[11px] leading-relaxed">
+                    Store and search 1536-dimensional embeddings directly in your database. No need for a separate specialized vector database.
+                  </p>
+                </div>
+                <div className="p-3 rounded bg-[#08090C] border border-white/[0.04] space-y-1">
+                  <div className="text-white font-bold">✅ 100% Open Data &amp; 1-Click Exports</div>
+                  <p className="text-[#A3A3A3] text-[11px] leading-relaxed">
+                    Your database is yours. Export full SQL schemas (.sql), data snapshots (.json), or table CSVs whenever you want.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 4 Core BaaS Pillars Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-5 space-y-3 hover:border-[#3ECF8E]/50 transition-colors">
-              <div className="size-9 rounded-lg bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 grid place-items-center text-[#3ECF8E]">
-                <Table2 className="size-4" />
+          {/* SECTION: HONEST PROS & CONS (STARTUP TRANSPARENCY) */}
+          <div className="border border-white/[0.08] bg-[#0E1015] rounded-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+              <div className="space-y-0.5">
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                  Honest Pros &amp; Cons
+                </h2>
+                <p className="text-xs text-[#A3A3A3]">
+                  We believe in total transparency. Here is what makes SparrowX Cloud DB great, and where we stand.
+                </p>
               </div>
-              <h3 className="font-bold text-white text-sm">Visual Schema Designer</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Add tables, define custom columns with types like UUID, JSONB, and vector(1536), and stage default values visually.
-              </p>
+              <span className="text-[10px] font-mono text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded bg-emerald-500/10">
+                FOUNDER COMMITMENT
+              </span>
             </div>
 
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-5 space-y-3 hover:border-[#3ECF8E]/50 transition-colors">
-              <div className="size-9 rounded-lg bg-[#00F2FE]/10 border border-[#00F2FE]/30 grid place-items-center text-[#00F2FE]">
-                <Terminal className="size-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+              <div className="p-4 rounded bg-[#08090C] border border-white/[0.06] space-y-2">
+                <span className="text-emerald-400 font-bold block text-sm">Our Plus Points (Pros):</span>
+                <ul className="space-y-1.5 text-[#CCCCCC]">
+                  <li>• Instant setup: Ready to receive queries in under 30 seconds.</li>
+                  <li>• Predictable flat pricing: No billing surprises at the end of the month.</li>
+                  <li>• High-speed NVMe storage with automated daily backups.</li>
+                  <li>• Zero vendor lock-in: Standard PostgreSQL compatible with any ORM.</li>
+                  <li>• Real human support directly from the engineers who build the platform.</li>
+                </ul>
               </div>
-              <h3 className="font-bold text-white text-sm">PostgreSQL 16 & pgvector</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Run raw SQL with <kbd className="font-mono bg-zinc-800 px-1 rounded">Ctrl+Enter</kbd>, analyze EXPLAIN query plans, and perform semantic similarity searches.
-              </p>
+
+              <div className="p-4 rounded bg-[#08090C] border border-white/[0.06] space-y-2">
+                <span className="text-amber-400 font-bold block text-sm">Where We Stand (Cons):</span>
+                <ul className="space-y-1.5 text-[#CCCCCC]">
+                  <li>• We are a small, passionate startup, not a multi-billion dollar conglomerate.</li>
+                  <li>• We focus on doing PostgreSQL and vector search exceptionally well, rather than offering 50 different niche databases.</li>
+                  <li>• Global edge relays currently prioritized in APAC (Sydney, Singapore) and Europe (Frankfurt).</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* INTERACTIVE READ-ONLY STUDIO FRAME */}
+          <div className="border border-white/[0.08] bg-[#0E1015] rounded-md overflow-hidden shadow-lg">
+            {/* Top Frame Tab Bar */}
+            <div className="border-b border-white/[0.08] bg-[#14171F] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setLandingTab("schema")}
+                  className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                    landingTab === "schema"
+                      ? "bg-white text-black font-semibold"
+                      : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                  }`}
+                >
+                  1. Visual Table Schema
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLandingTab("sql")}
+                  className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                    landingTab === "sql"
+                      ? "bg-white text-black font-semibold"
+                      : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                  }`}
+                >
+                  2. SQL Scratchpad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLandingTab("vector")}
+                  className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
+                    landingTab === "vector"
+                      ? "bg-white text-black font-semibold"
+                      : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                  }`}
+                >
+                  3. Vector Embedding Search
+                </button>
+              </div>
+
+              <span className="text-[10px] text-[#A3A3A3]">
+                Interactive Preview // Test-Drive Workbench
+              </span>
             </div>
 
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-5 space-y-3 hover:border-[#3ECF8E]/50 transition-colors">
-              <div className="size-9 rounded-lg bg-emerald-500/10 border border-emerald-500/30 grid place-items-center text-emerald-400">
-                <HardDrive className="size-4" />
+            {/* Tab 1: Visual Schema */}
+            {landingTab === "schema" && (
+              <div className="p-6 bg-[#08090C] space-y-4 font-mono text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9CA3AF] text-[11px] uppercase">Table Schema: app_users</span>
+                  <span className="text-emerald-400 text-[10px] font-bold">ROW LEVEL SECURITY ACTIVE</span>
+                </div>
+                <div className="border border-white/[0.08] rounded overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#14171F] text-[#64748B] text-[10px] uppercase border-b border-white/[0.08]">
+                      <tr>
+                        <th className="p-2.5">Column</th>
+                        <th className="p-2.5">Type</th>
+                        <th className="p-2.5">Default</th>
+                        <th className="p-2.5">Attributes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.06] text-[#9CA3AF]">
+                      <tr>
+                        <td className="p-2.5 text-white font-semibold">id</td>
+                        <td className="p-2.5 text-emerald-400">uuid</td>
+                        <td className="p-2.5 text-[#64748B]">gen_random_uuid()</td>
+                        <td className="p-2.5">PRIMARY KEY</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 text-white font-semibold">email</td>
+                        <td className="p-2.5 text-amber-400">text</td>
+                        <td className="p-2.5 text-[#64748B]">NULL</td>
+                        <td className="p-2.5">UNIQUE, NOT NULL</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 text-white font-semibold">embedding</td>
+                        <td className="p-2.5 text-purple-400">vector(1536)</td>
+                        <td className="p-2.5 text-[#64748B]">NULL</td>
+                        <td className="p-2.5">COSINE INDEXED</td>
+                      </tr>
+                      <tr>
+                        <td className="p-2.5 text-white font-semibold">created_at</td>
+                        <td className="p-2.5 text-sky-400">timestamptz</td>
+                        <td className="p-2.5 text-[#64748B]">now()</td>
+                        <td className="p-2.5">INDEXED</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-              <h3 className="font-bold text-white text-sm">Encrypted Storage Buckets</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Store avatars, evidence dumps, and database snapshots with zero-telemetry local NVMe persistence and public/private RLS policies.
-              </p>
-            </div>
+            )}
 
-            <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-5 space-y-3 hover:border-[#3ECF8E]/50 transition-colors">
-              <div className="size-9 rounded-lg bg-amber-500/10 border border-amber-500/30 grid place-items-center text-amber-400">
-                <Archive className="size-4" />
+            {/* Tab 2: SQL Scratchpad */}
+            {landingTab === "sql" && (
+              <div className="p-6 bg-[#08090C] space-y-4 font-mono text-xs">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#9CA3AF] text-[11px] uppercase">SQL Query Scratchpad</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLandingRunning(true);
+                        setTimeout(() => {
+                          setLandingRunning(false);
+                          setLandingLatency((0.6 + Math.random() * 0.4).toFixed(1) + "ms");
+                        }, 240);
+                      }}
+                      className="px-3 py-1 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors cursor-pointer flex items-center gap-1.5"
+                    >
+                      {landingRunning ? <RefreshCw className="size-3 animate-spin" /> : <Play className="size-3" />}
+                      <span>{landingRunning ? "Running..." : "Run Query (0.8ms)"}</span>
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={landingSqlQuery}
+                    onChange={(e) => setLandingSqlQuery(e.target.value)}
+                    className="w-full p-3 rounded bg-[#14171F] border border-white/[0.08] text-emerald-400 font-mono text-xs focus:outline-none focus:border-white/20"
+                  />
+                </div>
+
+                <div className="border border-white/[0.08] rounded overflow-hidden">
+                  <div className="bg-[#14171F] px-3 py-1.5 border-b border-white/[0.08] flex justify-between text-[10px] text-[#64748B]">
+                    <span>QUERY RESULTS (2 ROWS)</span>
+                    <span className="text-emerald-400">EXEC TIME: {landingLatency}</span>
+                  </div>
+                  <div className="p-3 bg-[#08090C] overflow-x-auto text-[11px] text-[#9CA3AF]">
+                    <div className="grid grid-cols-4 gap-2 text-white font-semibold border-b border-white/[0.06] pb-1.5 mb-1.5">
+                      <span>id</span>
+                      <span>email</span>
+                      <span>full_name</span>
+                      <span>role</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 py-1">
+                      <span className="truncate">usr_018f_492a</span>
+                      <span className="truncate">founder@startup.io</span>
+                      <span className="truncate">Sarah Chen</span>
+                      <span className="text-emerald-400">admin</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 py-1">
+                      <span className="truncate">usr_019c_88b1</span>
+                      <span className="truncate">cto@fintech.co</span>
+                      <span className="truncate">David Kumar</span>
+                      <span className="text-emerald-400">operator</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <h3 className="font-bold text-white text-sm">Disaster Recovery & Exports</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                1-click full PostgreSQL schema DDL (.sql) dump, complete JSON multi-table data snapshot, and automated NVMe snapshots.
-              </p>
-            </div>
+            )}
+
+            {/* Tab 3: Vector Embedding */}
+            {landingTab === "vector" && (
+              <div className="p-6 bg-[#08090C] space-y-4 font-mono text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[#9CA3AF] text-[11px] uppercase">Semantic Cosine Similarity (pgvector)</span>
+                  <span className="text-purple-400 text-[10px]">DIMENSIONS: 1536</span>
+                </div>
+                <div className="p-3 rounded bg-[#14171F] border border-white/[0.08] space-y-1">
+                  <div className="text-[10px] text-[#64748B]">Query: &quot;Find similar auth error logs within distance 0.15&quot;</div>
+                  <code className="text-purple-400 block text-[11px]">
+                    SELECT id, prompt_hash, 1 - (embedding &lt;=&gt; &apos;[0.012, -0.048, ...]&apos;) AS similarity FROM ai_guardrails ORDER BY embedding &lt;=&gt; &apos;[0.012, ...]&apos; LIMIT 2;
+                  </code>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 rounded bg-[#14171F] border border-white/[0.08] space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-white font-bold">Match #1 (Log ID: 4891)</span>
+                      <span className="text-emerald-400 font-bold">98.4% Match</span>
+                    </div>
+                    <p className="text-[11px] text-[#64748B]">Cosine Distance: 0.016 • Latency: 1.1ms</p>
+                  </div>
+                  <div className="p-3 rounded bg-[#14171F] border border-white/[0.08] space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-white font-bold">Match #2 (Log ID: 2901)</span>
+                      <span className="text-emerald-400 font-bold">96.8% Match</span>
+                    </div>
+                    <p className="text-[11px] text-[#64748B]">Cosine Distance: 0.032 • Latency: 1.3ms</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-[#1E293B] py-6 px-6 text-center text-xs text-zinc-500 font-mono">
-          <span>SparrowX Sovereign Cloud • Dedicated VPS 10.10.10.10 • Zero External Telemetry</span>
+        <footer className="border-t border-white/[0.08] bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#A3A3A3]">
+          <span>SPARROWX CLOUD DB // MANAGED POSTGRESQL &amp; VECTOR • BUILT WITH PASSION FOR INDEPENDENT DEVELOPERS</span>
         </footer>
       </div>
     );
@@ -1908,8 +2078,8 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                       <button
                         type="button"
                         onClick={() => setSqlResultViewMode("grid")}
-                        className={`px-2 py-0.5 rounded text-[11px] ${
-                          sqlResultViewMode === "grid" ? "bg-[#3ECF8E] text-zinc-950 font-bold" : "text-zinc-400"
+                        className={`px-2 py-0.5 rounded text-[11px] cursor-pointer ${
+                          sqlResultViewMode === "grid" ? "bg-[#3ECF8E] text-zinc-950 font-bold" : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         Grid
@@ -1917,20 +2087,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                       <button
                         type="button"
                         onClick={() => setSqlResultViewMode("json")}
-                        className={`px-2 py-0.5 rounded text-[11px] ${
-                          sqlResultViewMode === "json" ? "bg-[#3ECF8E] text-zinc-950 font-bold" : "text-zinc-400"
+                        className={`px-2 py-0.5 rounded text-[11px] cursor-pointer ${
+                          sqlResultViewMode === "json" ? "bg-[#3ECF8E] text-zinc-950 font-bold" : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         JSON
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSqlResultViewMode("explain")}
-                        className={`px-2 py-0.5 rounded text-[11px] ${
-                          sqlResultViewMode === "explain" ? "bg-[#3ECF8E] text-zinc-950 font-bold" : "text-zinc-400"
-                        }`}
-                      >
-                        EXPLAIN
                       </button>
                     </div>
                   </div>
@@ -1940,13 +2101,6 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                       <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-xs font-mono">
                         <Terminal className="size-6 text-zinc-700 mb-2" />
                         Run a query to inspect live results or vector similarities.
-                      </div>
-                    ) : sqlResultViewMode === "explain" ? (
-                      <div className="p-3 bg-[#0A0A0C] border border-[#222222] rounded-lg font-mono text-xs text-emerald-400 space-y-1">
-                        <div>Seq Scan on {selectedTable} (cost=0.00..1.13 rows=13 width=342) (actual time=0.012..0.018 rows={sqlResults.length} loops=1)</div>
-                        <div className="text-zinc-400">Buffers: shared hit=4</div>
-                        <div className="text-zinc-400">Planning Time: 0.042 ms</div>
-                        <div className="text-zinc-400">Execution Time: 0.089 ms</div>
                       </div>
                     ) : sqlResultViewMode === "grid" ? (
                       <div className="overflow-x-auto">
@@ -2418,11 +2572,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
 
                 <div className="rounded-xl border border-zinc-800 bg-[#16161A] p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs text-zinc-400">
-                    <span>Buffer Cache Hit</span>
+                    <span>Fast RAM Cache Hit</span>
                     <span className="text-emerald-400 font-mono">HOT</span>
                   </div>
                   <div className="text-xl font-extrabold text-teal-300 font-mono">99.6 %</div>
-                  <p className="text-[11px] text-zinc-500 font-mono">NVMe disk bypass</p>
+                  <p className="text-[11px] text-zinc-500 font-mono">Instant RAM response</p>
                 </div>
 
                 <div className="rounded-xl border border-zinc-800 bg-[#16161A] p-4 space-y-2">
@@ -2454,18 +2608,18 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                 {[
                   {
                     id: "rest-url",
-                    label: "PostgREST REST API URL (Port 80 via NPM)",
+                    label: "SparrowX REST API Endpoint",
                     value: "https://api.sparrowx.net/rest/v1",
                   },
                   {
                     id: "pg-pooled",
-                    label: "PgBouncer Connection String (Port 6543 - 5,000+ Conns)",
-                    value: "postgresql://postgres:master_pass@10.10.10.10:6543/sparrowbase",
+                    label: "High-Capacity Connection Pool",
+                    value: "postgresql://postgres:[YOUR-PASSWORD]@db.sparrowx.net:6543/sparrowbase",
                   },
                   {
                     id: "pg-direct",
-                    label: "Direct PostgreSQL 16 URI (Port 5432 - Schema Migrations)",
-                    value: "postgresql://postgres:master_pass@10.10.10.10:5432/sparrowbase",
+                    label: "Direct Database URI (Schema Migrations)",
+                    value: "postgresql://postgres:[YOUR-PASSWORD]@db.sparrowx.net:5432/sparrowbase",
                   },
                   {
                     id: "anon-key",

@@ -5,11 +5,21 @@ import { BackgroundEngineToaster } from "@/components/BackgroundEngineToaster";
 export const Route = createFileRoute("/f/")({
   head: () => ({
     meta: [
-      { title: "SparrowX Files | Sovereign Storage" },
+      { title: "SparrowX Files — Instant Private File Transfer (Free, No Login)" },
       {
         name: "description",
-        content: "Persistent file storage and zero-disk ephemeral file drops.",
+        content:
+          "Private, encrypted file transfer with zero sign-up required. Share documents and media instantly with no account.",
       },
+      { property: "og:title", content: "SparrowX Files — Instant Private File Transfer" },
+      {
+        property: "og:description",
+        content:
+          "Free private file sharing without sign-up. 100% encrypted transfer.",
+      },
+    ],
+    links: [
+      { rel: "canonical", href: "https://file.sparrowx.net" },
     ],
   }),
   component: SparrowxFilesRoute,

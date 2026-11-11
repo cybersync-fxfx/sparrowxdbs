@@ -118,31 +118,44 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SparrowX | Here for you" },
+      { title: "SparrowX — Simple Cloud Tools, Fast Databases & Free Secure Utilities" },
       {
         name: "description",
         content:
-          "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
+          "SparrowX is an independent developer startup offering fast PostgreSQL cloud databases, instant zero-login ephemeral file sharing, offline hardware-grade password generation, and live DDoS defense.",
       },
-      { name: "author", content: "SparrowX" },
+      {
+        name: "keywords",
+        content:
+          "sparrowx, cloud database, postgresql cloud, pgvector, free file transfer no login, offline password generator, website ddos protection, shadowshield, threat map, developer tools, indie startup",
+      },
+      { name: "author", content: "SparrowX Technologies" },
+      { name: "robots", content: "index, follow" },
       {
         property: "og:title",
-        content: "SparrowX | Here for you",
+        content: "SparrowX — Simple Cloud Tools, Fast Databases & Free Secure Utilities",
       },
       {
         property: "og:description",
         content:
-          "SparrowX — Autonomous Security Operations Platform, Real-Time Threat Interception & AI Guardrails.",
+          "Independent startup offering instant zero-login file sharing, offline password generation, fast cloud PostgreSQL, and automated website security without corporate bloat.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "/sparrowx-logo.png" },
+      { property: "og:url", content: "https://sparrowx.net" },
+      { property: "og:image", content: "/sparrowx-cyber-hawk.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SparrowX — Simple, Honest Cloud Tools for Developers" },
+      {
+        name: "twitter:description",
+        content:
+          "Free, instant file sharing and password generation with zero sign-up required, built with love by an independent startup.",
+      },
       { name: "twitter:site", content: "@sparrowx" },
     ],
     links: [
       {
         rel: "canonical",
-        href: "https://db.sparrowx.net",
+        href: "https://sparrowx.net",
       },
       {
         rel: "stylesheet",
