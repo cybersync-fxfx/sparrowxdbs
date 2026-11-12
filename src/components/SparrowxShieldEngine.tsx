@@ -229,13 +229,13 @@ export function SparrowxShieldEngine({
                   if (onOpenClientArea) {
                     onOpenClientArea();
                   } else {
-                    window.location.href = "/";
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }
                 }}
                 className="px-4 py-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
               >
                 <User className="size-3.5" />
-                <span>Open Client Area ({currentUser.fullName || currentUser.email}) →</span>
+                <span>{onOpenClientArea ? `Open Client Area (${currentUser.fullName || currentUser.email}) →` : `Operator: ${currentUser.fullName || currentUser.email}`}</span>
               </button>
             ) : (
               <button
@@ -244,7 +244,7 @@ export function SparrowxShieldEngine({
                 className="px-4 py-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
               >
                 <Lock className="size-3.5" />
-                <span>Sign In to Client Area</span>
+                <span>{onOpenClientArea ? "Sign In to Client Area" : "Sign In to Shield Console"}</span>
               </button>
             )}
           </div>
@@ -640,11 +640,65 @@ export function SparrowxShieldEngine({
             </div>
           </div>
         </div>
+        {/* Standalone Protection Plans */}
+        <section className="mx-auto max-w-[1400px] pt-8 pb-4 space-y-5 border-t border-white/[0.06]">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
+            <div>
+              <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-[#FF8533]">
+                Edge Mitigation Plans
+              </span>
+              <h2 className="mt-1 text-xl sm:text-2xl font-bold text-white">
+                Always-on L7 WAF &amp; DDoS protection for your origin.
+              </h2>
+            </div>
+            <span className="text-xs font-mono text-[#A3A3A3]">Zero latency penalty • Instant DNS onboarding</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0D12] p-5 space-y-3">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-[#A3A3A3] uppercase">Edge Audit</span>
+                <span className="text-emerald-400 font-bold">$0 / forever</span>
+              </div>
+              <p className="text-xs text-[#D4D4D4] leading-relaxed">
+                Live DNS leak audit, SSL/TLS posture verification, and instant WAF rule simulation for any public domain.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[#FF6B00]/40 bg-gradient-to-b from-[#FF6B00]/10 to-[#0B0D12] p-5 space-y-3">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-[#FF8533] uppercase font-bold">Pro Origin Shield</span>
+                <span className="text-white font-bold">$19 / month</span>
+              </div>
+              <p className="text-xs text-[#E5E5E5] leading-relaxed">
+                Full origin IP cloaking, automated L7 bot &amp; DDoS scrubbing, custom rate limits, and 1-command Linux connector.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0D12] p-5 space-y-3 flex flex-col justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-[#A3A3A3] uppercase">Enterprise SOC</span>
+                  <span className="text-white font-bold">$79 / month</span>
+                </div>
+                <p className="text-xs text-[#D4D4D4] leading-relaxed">
+                  Multi-domain fleet protection, geo-fencing, webhook alerts, and dedicated mitigation SLA.
+                </p>
+              </div>
+              <a
+                href="mailto:security@sparrowx.net?subject=SparrowX%20Shield%20Deployment"
+                className="text-xs font-mono font-bold text-[#FF8533] hover:text-white transition-colors"
+              >
+                Deploy with security@sparrowx.net →
+              </a>
+            </div>
+          </div>
+        </section>
       </main>
 
       {/* FOOTER */}
       <footer className="border-t border-[#FF6B00]/25 bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#A3A3A3]">
-        <span>SPARROWX SHIELD // SHADOWSHIELD THREAT RADAR &amp; WAF • BUILT WITH PASSION FOR INDEPENDENT BUILDERS</span>
+        <span>SPARROWX SHIELD // L7 WAF &amp; EDGE DDOS MITIGATION • SEC.SPARROWX.NET • SECURITY@SPARROWX.NET</span>
       </footer>
 
       {/* Operator Auth Dialog */}
@@ -688,7 +742,7 @@ export function SparrowxShieldEngine({
                   if (onUserAuthenticated) {
                     onUserAuthenticated(res.user);
                   } else {
-                    window.location.href = "/";
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                   }
                 } else {
                   setAuthError(res.error || "Invalid sign-in credentials.");

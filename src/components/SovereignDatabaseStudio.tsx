@@ -1255,16 +1255,15 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             <div className="flex items-center gap-2 sm:gap-3">
               {sessionUser ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onOpenClientArea) onOpenClientArea();
-                      else window.location.href = "/";
-                    }}
-                    className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <span>← Client Area</span>
-                  </button>
+                  {!isStandaloneDomain && onOpenClientArea && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenClientArea()}
+                      className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>← Client Area</span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setViewMode("studio")}
@@ -1390,8 +1389,6 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                         setViewMode("studio");
                         if (onUserAuthenticated) {
                           onUserAuthenticated(res.user);
-                        } else {
-                          window.location.href = "/";
                         }
                       } else {
                         setLandingAuthError(res.error || "Invalid database account credentials.");
@@ -1500,8 +1497,6 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                       setViewMode("studio");
                       if (onUserAuthenticated) {
                         onUserAuthenticated(newUser);
-                      } else {
-                        window.location.href = "/";
                       }
                     } catch {
                       setLandingAuthError("Failed to provision database environment. Please try again.");
@@ -2007,18 +2002,17 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             <span className="font-mono text-[11px]">{pingStatus.postgrest ? `${pingStatus.postgrest}ms` : "Ping"}</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (onOpenClientArea) onOpenClientArea();
-              else window.location.href = "/";
-            }}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#3ECF8E]/40 bg-[#3ECF8E]/15 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-[#3ECF8E]/25 transition-colors cursor-pointer"
-            title="Open SparrowX Client Area & Services"
-          >
-            <Boxes className="size-3.5" />
-            <span className="font-semibold hidden xs:inline">Client Area</span>
-          </button>
+          {!isStandaloneDomain && onOpenClientArea && (
+            <button
+              type="button"
+              onClick={() => onOpenClientArea()}
+              className="inline-flex items-center gap-1.5 rounded-md border border-[#3ECF8E]/40 bg-[#3ECF8E]/15 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-[#3ECF8E]/25 transition-colors cursor-pointer"
+              title="Open SparrowX Client Area & Services"
+            >
+              <Boxes className="size-3.5" />
+              <span className="font-semibold hidden xs:inline">Client Area</span>
+            </button>
+          )}
 
           <button
             type="button"

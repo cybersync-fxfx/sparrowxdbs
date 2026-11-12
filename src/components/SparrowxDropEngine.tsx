@@ -1653,6 +1653,207 @@ export function SparrowxDropEngine() {
           </div>
         )}
       </main>
+
+      {/* Standalone Product Architecture, Business Tiers, FAQ & Footer */}
+      <section className="mx-auto max-w-6xl px-4 sm:px-6 pt-8 pb-16 space-y-16 border-t border-white/[0.06] mt-6">
+        {/* 3 Core Pillars */}
+        <div className="space-y-6">
+          <div className="max-w-2xl">
+            <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-emerald-400">
+              Zero-Knowledge Architecture
+            </span>
+            <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              Built for teams that never trust unencrypted transit.
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
+              Every file dropped into SparrowX Drop is sealed in your browser with AES-256-GCM before a single byte leaves your device.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 space-y-3">
+              <div className="size-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <Flame className="size-5" />
+              </div>
+              <h3 className="text-base font-semibold text-white">Ephemeral RAM Burn</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Send files up to 100 MB without creating an account. Payloads live strictly in volatile memory and self-destruct after download or TTL expiry.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 space-y-3">
+              <div className="size-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <Lock className="size-5" />
+              </div>
+              <h3 className="text-base font-semibold text-white">Client-Side AES-256-GCM</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Decryption keys stay in the URL fragment or your local passcode. Servers only ever relay opaque ciphertext—never plaintext bytes.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 space-y-3">
+              <div className="size-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <HardDrive className="size-5" />
+              </div>
+              <h3 className="text-base font-semibold text-white">Persistent 10 GB Vault</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Need permanent CDN-backed links, download counters, and instant revocation? Switch to Vault Mode for 10 GB of free encrypted object storage.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Business Model / Pricing Tiers */}
+        <div id="drop-pricing" className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-cyan-400">
+                Storage & Transfer Plans
+              </span>
+              <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                Simple, predictable storage pricing.
+              </h2>
+            </div>
+            <p className="text-xs text-zinc-400 font-mono">
+              No egress traps • Cancel anytime
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 flex flex-col justify-between space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Starter</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Active Now
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold text-white">$0</span>
+                  <span className="text-xs text-zinc-500 font-mono">/month</span>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  Instant zero-login RAM drops plus a free 10 GB persistent vault.
+                </p>
+                <ul className="space-y-2 pt-2 text-xs text-zinc-300">
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Unlimited ephemeral RAM drops</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />10 GB persistent encrypted vault</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Client-side AES-256-GCM sealing</li>
+                </ul>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode("storage");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+                className="w-full rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] py-2.5 text-xs font-semibold text-white transition-colors cursor-pointer"
+              >
+                Open Free 10 GB Vault
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/[0.08] to-[#0B0E14] p-6 flex flex-col justify-between space-y-6 shadow-lg shadow-emerald-950/30">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase tracking-wider text-emerald-400">Pro Vault</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500 text-zinc-950 font-bold">
+                    Popular
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold text-white">$9</span>
+                  <span className="text-xs text-zinc-400 font-mono">/month</span>
+                </div>
+                <p className="text-xs text-zinc-300">
+                  High-capacity encrypted file delivery for freelancers and indie studios.
+                </p>
+                <ul className="space-y-2 pt-2 text-xs text-zinc-200">
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />250 GB persistent vault storage</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Up to 5 GB single-file transfers</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Custom link expiry & download caps</li>
+                </ul>
+              </div>
+              <a
+                href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Pro%20Vault%20(250%20GB)"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 py-2.5 text-xs font-bold text-zinc-950 transition-colors"
+              >
+                <span>Upgrade to Pro Vault</span>
+                <ArrowRight className="size-3.5" />
+              </a>
+            </div>
+
+            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 flex flex-col justify-between space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Team Compliance</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/10">
+                    2 TB
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold text-white">$29</span>
+                  <span className="text-xs text-zinc-500 font-mono">/month</span>
+                </div>
+                <p className="text-xs text-zinc-400">
+                  Shared encrypted dropboxes, audit trails, and priority edge throughput.
+                </p>
+                <ul className="space-y-2 pt-2 text-xs text-zinc-300">
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-cyan-400 shrink-0" />2 TB pooled organization storage</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-cyan-400 shrink-0" />Audit logs & IP-locked share links</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-cyan-400 shrink-0" />Dedicated AP-Southeast NVMe nodes</li>
+                </ul>
+              </div>
+              <a
+                href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Team%20Vault%20(2%20TB)"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] py-2.5 text-xs font-semibold text-white transition-colors"
+              >
+                <span>Request Team Workspace</span>
+                <ArrowRight className="size-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Standalone FAQ */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <div className="rounded-lg border border-white/[0.06] bg-[#0B0E14]/70 p-4 space-y-1.5">
+            <h4 className="text-xs font-semibold text-white">Are ephemeral files written to disk?</h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              No. Ephemeral drops stay strictly in memory and are wiped immediately after the receiver downloads or the timer expires.
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/[0.06] bg-[#0B0E14]/70 p-4 space-y-1.5">
+            <h4 className="text-xs font-semibold text-white">Can SparrowX read my files?</h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              No. Encryption happens locally in your browser via WebCrypto AES-256-GCM before upload. Only holders of the share secret can decrypt.
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/[0.06] bg-[#0B0E14]/70 p-4 space-y-1.5">
+            <h4 className="text-xs font-semibold text-white">How do I upgrade beyond 10 GB?</h4>
+            <p className="text-xs text-zinc-400 leading-relaxed">
+              Start free with 10 GB in Vault Mode and contact <span className="font-mono text-zinc-300">files@sparrowx.net</span> whenever your team needs 250 GB or 2 TB.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-white/[0.06] bg-[#06080D] py-6 px-4 sm:px-6">
+        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
+          <div className="flex items-center gap-2 font-mono">
+            <ShieldCheck className="size-4 text-emerald-400" />
+            <span className="text-zinc-300 font-semibold">SparrowX Drop</span>
+            <span>·</span>
+            <span>Zero-Knowledge File Transfer &amp; Vault</span>
+          </div>
+          <div className="flex items-center gap-4 font-mono">
+            <a href="mailto:files@sparrowx.net" className="hover:text-zinc-300 transition-colors">
+              files@sparrowx.net
+            </a>
+            <span>© {new Date().getFullYear()} SparrowX Drop</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

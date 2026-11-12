@@ -728,20 +728,19 @@ export function SparrowxKeysEngine() {
               </p>
             </div>
 
-            {/* Direct Bridge to db.sparrowx.net */}
-            <a
-              href="https://db.sparrowx.net"
-              onClick={(e) => {
+            {/* Standalone Secret Copy Action */}
+            <button
+              type="button"
+              onClick={() => {
                 if (masterPassword) {
                   navigator.clipboard.writeText(masterPassword);
                 }
               }}
-              className="px-4 py-2.5 rounded-sm bg-[#14171F] border border-white/[0.12] hover:border-white/30 text-xs font-mono text-white flex items-center gap-2 transition-all shrink-0 hover:bg-white/[0.06]"
+              className="px-4 py-2.5 rounded-sm bg-[#14171F] border border-white/[0.12] hover:border-white/30 text-xs font-mono text-white flex items-center gap-2 transition-all shrink-0 hover:bg-white/[0.06] cursor-pointer"
             >
-              <Database className="size-3.5 text-emerald-400" />
-              <span>Use Secret in SparrowX DB</span>
-              <ArrowUpRight className="size-3.5 text-[#9CA3AF]" />
-            </a>
+              <Shield className="size-3.5 text-emerald-400" />
+              <span>Copy Master Secret</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs font-mono">
@@ -776,11 +775,47 @@ export function SparrowxKeysEngine() {
             </div>
           </div>
         </div>
+
+        {/* Standalone Plans & Enterprise Deployment */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+          <div className="rounded-sm border border-emerald-500/30 bg-[#0A0C10] p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400">Personal &amp; Indie</span>
+              <span className="text-xs font-mono font-bold text-white">$0 Forever</span>
+            </div>
+            <h3 className="text-lg font-bold text-white">Offline Browser &amp; PWA Instrument</h3>
+            <p className="text-xs text-[#9CA3AF] leading-relaxed">
+              Unlimited CSPRNG passwords, Diceware passphrases, API tokens, and UUIDv4 generation with zero sign-up, zero telemetry, and zero cloud storage.
+            </p>
+            <div className="text-[11px] font-mono text-emerald-400">
+              ✓ 100% Client-Side WebCrypto • Works Air-Gapped
+            </div>
+          </div>
+
+          <div className="rounded-sm border border-white/[0.1] bg-[#0A0C10] p-6 space-y-4 flex flex-col justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400">Enterprise &amp; Compliance</span>
+                <span className="text-xs font-mono font-bold text-white">$19/mo</span>
+              </div>
+              <h3 className="text-lg font-bold text-white">Self-Hosted Intranet &amp; Policy Bundle</h3>
+              <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                Deploy a branded air-gapped Docker container inside your private VPC with enforced minimum bit-entropy policies and SOC2 compliance attestations.
+              </p>
+            </div>
+            <a
+              href="mailto:keys@sparrowx.net?subject=SparrowX%20Keys%20Enterprise%20Intranet%20Bundle"
+              className="inline-flex items-center justify-center rounded-sm border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] px-4 py-2 text-xs font-mono font-semibold text-white transition-colors w-fit"
+            >
+              Request Private VPC Image →
+            </a>
+          </div>
+        </section>
       </main>
 
       {/* FOOTER */}
       <footer className="border-t border-white/[0.08] bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#64748B]">
-        <span>SPARROWX KEYS // 100% CLIENT-SIDE CRYPTOGRAPHIC ENGINE • ZERO SURVEILLANCE • AP-SOUTHEAST-SYD</span>
+        <span>SPARROWX PASSWORD // 100% CLIENT-SIDE CRYPTOGRAPHIC ENGINE • ZERO SURVEILLANCE • KEYS@SPARROWX.NET</span>
       </footer>
     </div>
   );

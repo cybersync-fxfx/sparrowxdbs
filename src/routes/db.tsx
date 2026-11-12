@@ -37,7 +37,7 @@ function SparrowxDbRoute() {
       <SovereignDatabaseStudio
         isStandaloneDomain={true}
         onOpenClientArea={() => {
-          window.location.href = "/";
+          window.scrollTo({ top: 0, behavior: "smooth" });
         }}
       />
       <BackgroundEngineToaster />
