@@ -71,7 +71,7 @@ function matchesPostgrestFilters(row: Record<string, unknown>, searchParams: URL
 async function handleSovereignRestApi(request: Request, url: URL): Promise<Response | null> {
   const match = url.pathname.match(/^\/rest\/v1\/([a-zA-Z0-9_]+)$/);
   if (!match) return null;
-  const tableName = match[1];
+  const tableName = match[1]!;
   const rows = getTableRows(tableName);
 
   // If running alongside self-hosted PostgREST container on OVH Ubuntu, sync & merge with PostgREST
@@ -153,7 +153,7 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
         Accept: request.headers.get("Accept") || "application/json",
         ...(request.headers.get("Prefer") ? { Prefer: request.headers.get("Prefer")! } : {}),
       },
-      body: clonedBodyText,
+      ...(clonedBodyText !== undefined ? { body: clonedBodyText } : {}),
     });
   } catch {
     // Ignore if PostgREST container is offline; memory store handles it below
@@ -165,7 +165,7 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
       const incoming = Array.isArray(payload) ? payload : [payload];
       const inserted: Array<Record<string, unknown>> = [];
       for (const item of incoming) {
-        const record = {
+        const record: Record<string, unknown> = {
           ...item,
           created_at: item.created_at || new Date().toISOString(),
         };
@@ -173,8 +173,9 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
         if (recordId) {
           const existingIdx = rows.findIndex((r) => String(r.id ?? "") === recordId);
           if (existingIdx >= 0) {
-            rows[existingIdx] = { ...rows[existingIdx], ...record };
-            inserted.push(rows[existingIdx]);
+            const merged = { ...rows[existingIdx], ...record };
+            rows[existingIdx] = merged;
+            inserted.push(merged);
             continue;
           }
         }
@@ -198,9 +199,11 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
       const patch = (await request.json()) as Record<string, unknown>;
       const updated: Array<Record<string, unknown>> = [];
       for (let i = 0; i < rows.length; i++) {
-        if (matchesPostgrestFilters(rows[i], url.searchParams)) {
-          rows[i] = { ...rows[i], ...patch };
-          updated.push(rows[i]);
+        const row = rows[i];
+        if (row && matchesPostgrestFilters(row, url.searchParams)) {
+          const merged = { ...row, ...patch };
+          rows[i] = merged;
+          updated.push(merged);
         }
       }
       return new Response(JSON.stringify(updated), {
@@ -348,7 +351,7 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
   // 2b. Tenant Database Dedicated IPs Table API
   const tenantIpsMatch = url.pathname.match(/^\/api\/v1\/tenant\/([^/]+)\/ips(?:\/([^/]+))?$/);
   if (tenantIpsMatch) {
-    const tenantId = tenantIpsMatch[1];
+    const tenantId = tenantIpsMatch[1] ?? "";
     const ipRecordId = tenantIpsMatch[2];
     const dbPartition = `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
     const ipTableName = `${dbPartition}_ips`;
@@ -443,7 +446,7 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
   // 2c. Tenant API Credentials Reset Endpoint
   const tenantResetMatch = url.pathname.match(/^\/api\/v1\/tenant\/([^/]+)\/reset-(?:credentials|keys)$/);
   if (tenantResetMatch && request.method === "POST") {
-    const tenantId = tenantResetMatch[1];
+    const tenantId = tenantResetMatch[1] ?? "";
     const rawId = tenantId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
     const randKey = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
     const randCid = Math.random().toString(36).substring(2, 8);
