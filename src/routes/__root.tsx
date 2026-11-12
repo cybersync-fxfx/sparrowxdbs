@@ -130,7 +130,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "sparrowx, cloud database, postgresql cloud, pgvector, free file transfer no login, offline password generator, website ddos protection, shadowshield, threat map, developer tools, indie startup",
       },
       { name: "author", content: "SparrowX Technologies" },
-      { name: "robots", content: "index, follow" },
+      { name: "robots", content: "index, follow, max-image-preview:large" },
+      { name: "theme-color", content: "#090B0E" },
+      { property: "og:site_name", content: "SparrowX" },
       {
         property: "og:title",
         content: "SparrowX — Simple Cloud Tools, Fast Databases & Free Secure Utilities",
@@ -142,8 +144,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://sparrowx.net" },
-      { property: "og:image", content: "/sparrowx-cyber-hawk.png" },
+      { property: "og:image", content: "https://sparrowx.net/sparrowx-logo.png" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://sparrowx.net/sparrowx-logo.png" },
       { name: "twitter:title", content: "SparrowX — Simple, Honest Cloud Tools for Developers" },
       {
         name: "twitter:description",
@@ -183,10 +186,39 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        name: "SparrowX Technologies",
+        url: "https://sparrowx.net",
+        logo: "https://sparrowx.net/sparrowx-logo.png",
+        email: "support@sparrowx.net",
+      },
+      {
+        "@type": "SoftwareApplication",
+        name: "SparrowX Sovereign Cloud & Developer Utilities",
+        applicationCategory: "DeveloperApplication",
+        operatingSystem: "Web",
+        url: "https://sparrowx.net",
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+        },
+      },
+    ],
+  };
+
   return (
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <script
           src="/sparrowx-shield.js"
           data-site-id="TNT-3800"
