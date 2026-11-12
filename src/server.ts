@@ -3,6 +3,11 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import migratedSeedData from "./lib/migrated-seed.json";
+import {
+  createRateLimiter,
+  handleContactRequest,
+  type ContactInquiryRecord,
+} from "./lib/contact-inquiry";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -225,6 +230,25 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
   });
 }
 
+const contactRateLimiter = createRateLimiter(5, 60 * 60 * 1000);
+
+// Persist to self-hosted PostgREST when reachable; otherwise keep in the in-memory store
+// so the submission is never silently lost while the DB container warms up.
+async function persistContactInquiry(record: ContactInquiryRecord): Promise<void> {
+  const postgrestInternal = process.env.POSTGREST_INTERNAL_URL || "http://127.0.0.1:3001";
+  try {
+    const res = await fetch(`${postgrestInternal.replace(/\/+$/, "")}/contact_inquiries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(record),
+    });
+    if (res.ok) return;
+  } catch {
+    // fall through to in-memory store
+  }
+  getTableRows("contact_inquiries").unshift({ ...record });
+}
+
 // Real Ingestion & Handshake Endpoints for External Client Services
 async function handleSparrowxApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
@@ -238,6 +262,15 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
   if (url.pathname.startsWith("/rest/v1/")) {
     const restResponse = await handleSovereignRestApi(request, url);
     if (restResponse) return restResponse;
+  }
+
+  // 0b. Public contact inquiry form
+  if (url.pathname === "/api/v1/contact") {
+    return handleContactRequest(request, {
+      persist: persistContactInquiry,
+      limiter: contactRateLimiter,
+      corsHeaders: CORS_HEADERS,
+    });
   }
 
   // 1. Health Probe

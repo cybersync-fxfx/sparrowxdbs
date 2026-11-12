@@ -239,3 +239,19 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO web_anon;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO web_anon;
 
 COMMIT;
+
+-- 15. Public Contact Inquiries (insert via POST /api/v1/contact; ip stored hashed only)
+CREATE TABLE IF NOT EXISTS public.contact_inquiries (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  topic TEXT NOT NULL,
+  message TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new',
+  ip_hash TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_contact_inquiries_created_at ON public.contact_inquiries (created_at DESC);
+-- Inquiries contain personal data: the anonymous PostgREST role may only insert, never read back.
+REVOKE ALL ON public.contact_inquiries FROM web_anon;
+GRANT INSERT ON public.contact_inquiries TO web_anon;
