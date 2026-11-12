@@ -24,8 +24,7 @@ export interface ContactInquiryRecord extends ContactInquiryInput {
 }
 
 export type ValidationResult =
-  | { ok: true; value: ContactInquiryInput }
-  | { ok: false; errors: Record<string, string> };
+  { ok: true; value: ContactInquiryInput } | { ok: false; errors: Record<string, string> };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -40,7 +39,8 @@ export function validateContactPayload(raw: unknown): ValidationResult {
 
   if (name.length < 2 || name.length > 80) errors.name = "Name must be 2-80 characters.";
   if (email.length > 254 || !EMAIL_RE.test(email)) errors.email = "Enter a valid email address.";
-  if (!(CONTACT_TOPICS as readonly string[]).includes(topic)) errors.topic = "Choose a valid topic.";
+  if (!(CONTACT_TOPICS as readonly string[]).includes(topic))
+    errors.topic = "Choose a valid topic.";
   if (message.length < 10 || message.length > 4000)
     errors.message = "Message must be 10-4000 characters.";
 
@@ -57,7 +57,7 @@ export function createRateLimiter(limit: number, windowMs: number, now: () => nu
       const recent = (hits.get(key) ?? []).filter((ts) => t - ts < windowMs);
       if (recent.length >= limit) {
         hits.set(key, recent);
-        return Math.max(1, Math.ceil((windowMs - (t - recent[0])) / 1000));
+        return Math.max(1, Math.ceil((windowMs - (t - (recent[0] ?? t))) / 1000));
       }
       recent.push(t);
       hits.set(key, recent);
@@ -92,18 +92,16 @@ export interface ContactDeps {
   now?: () => Date;
 }
 
-export async function handleContactRequest(
-  request: Request,
-  deps: ContactDeps,
-): Promise<Response> {
+export async function handleContactRequest(request: Request, deps: ContactDeps): Promise<Response> {
   const { persist, limiter, corsHeaders } = deps;
   if (request.method !== "POST") {
     return json(405, { error: "Method not allowed. Use POST." }, corsHeaders, { Allow: "POST" });
   }
 
   const ip =
-    request.headers.get("cf-connecting-ip") ||
-    (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
+    ((request.headers.get("cf-connecting-ip") ||
+      (request.headers.get("x-forwarded-for") || "").split(",")[0]?.trim()) ??
+      "") ||
     request.headers.get("x-real-ip") ||
     "unknown";
 
@@ -145,7 +143,11 @@ export async function handleContactRequest(
     await persist(record);
   } catch (err) {
     console.error("[contact] persist failed", err);
-    return json(503, { error: "Could not save your message. Please email founder@sparrowx.net." }, corsHeaders);
+    return json(
+      503,
+      { error: "Could not save your message. Please email founder@sparrowx.net." },
+      corsHeaders,
+    );
   }
   return json(201, { ok: true, ticketId: record.id }, corsHeaders);
 }

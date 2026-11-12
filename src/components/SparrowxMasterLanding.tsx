@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Database,
   Shield,
@@ -23,6 +23,8 @@ import {
   X,
 } from "lucide-react";
 import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
+import { ComparisonSection } from "./landing/ComparisonSection";
+import { ContactSection } from "./landing/ContactSection";
 import {
   Dialog,
   DialogContent,
@@ -90,7 +92,7 @@ function OperatorLoginDialog({
           <DialogTitle className="text-xl font-bold text-white tracking-tight font-sans">
             Access Developer Workspace
           </DialogTitle>
-          <DialogDescription className="text-xs text-[#94A3B8] leading-relaxed">
+          <DialogDescription className="text-xs text-[#A3B1C6] leading-relaxed">
             Enter your credentials to manage your databases, security shields, and persistent vaults.
           </DialogDescription>
         </DialogHeader>
@@ -103,26 +105,26 @@ function OperatorLoginDialog({
 
         <form onSubmit={handleSignIn} className="space-y-4 pt-1 font-mono text-xs">
           <div className="space-y-1.5 text-left">
-            <label className="text-[11px] text-[#94A3B8]">Account Email</label>
+            <label className="text-[11px] text-[#A3B1C6]">Account Email</label>
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@yourdomain.com"
-              className="w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#64748B] focus:outline-none focus:border-sky-400"
+              className="w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
             />
           </div>
 
           <div className="space-y-1.5 text-left">
-            <label className="text-[11px] text-[#94A3B8]">Password</label>
+            <label className="text-[11px] text-[#A3B1C6]">Password</label>
             <input
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••••••"
-              className="w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#64748B] focus:outline-none focus:border-sky-400"
+              placeholder="Enter your password"
+              className="w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
             />
           </div>
 
@@ -130,7 +132,7 @@ function OperatorLoginDialog({
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="px-4 py-2 rounded text-xs text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+              className="px-4 py-2 rounded text-xs text-[#A3B1C6] hover:text-white transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -150,7 +152,7 @@ function OperatorLoginDialog({
 }
 
 // -----------------------------------------------------------------------------
-// Flagship Master Company Portal (sparrowx.net) — Warm, Blue Startup Aesthetic
+// Flagship Master Company Portal (sparrowx.net) - Warm, Blue Startup Aesthetic
 // -----------------------------------------------------------------------------
 export function SparrowxMasterLanding({
   onOpenLogin,
@@ -161,6 +163,29 @@ export function SparrowxMasterLanding({
   const [vpsCurrency, setVpsCurrency] = useState<"INR" | "USD">("INR");
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("");
+
+  // Highlight the nav link for the section currently in view.
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const ids = ["comparison", "story", "vps", "contact"];
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActiveSection(entry.target.id);
+        }
+      },
+      { rootMargin: "-30% 0px -60% 0px" },
+    );
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const navLinkClass = (id: string) =>
+    `transition-colors ${activeSection === id ? "text-white font-semibold underline decoration-sky-400 underline-offset-8" : "hover:text-white"}`;
 
   const vpsPlans = [
     {
@@ -170,7 +195,7 @@ export function SparrowxMasterLanding({
       ram: "2 GB ECC",
       storage: "40 GB Fast NVMe",
       bandwidth: "1 TB Anycast Bandwidth",
-      priceInr: "₹340",
+      priceInr: "â‚¹340",
       priceUsd: "$4",
       period: "/mo",
       tag: "Starter",
@@ -182,7 +207,7 @@ export function SparrowxMasterLanding({
       ram: "4 GB ECC",
       storage: "80 GB Fast NVMe",
       bandwidth: "2 TB Anycast Bandwidth",
-      priceInr: "₹670",
+      priceInr: "â‚¹670",
       priceUsd: "$8",
       period: "/mo",
       tag: "Most Popular",
@@ -194,7 +219,7 @@ export function SparrowxMasterLanding({
       ram: "8 GB ECC",
       storage: "160 GB Fast NVMe",
       bandwidth: "4 TB Anycast Bandwidth",
-      priceInr: "₹1,260",
+      priceInr: "â‚¹1,260",
       priceUsd: "$15",
       period: "/mo",
       tag: "BEST VALUE",
@@ -207,7 +232,7 @@ export function SparrowxMasterLanding({
       ram: "16 GB ECC",
       storage: "400 GB Fast NVMe",
       bandwidth: "8 TB Anycast Bandwidth",
-      priceInr: "₹2,440",
+      priceInr: "â‚¹2,440",
       priceUsd: "$29",
       period: "/mo",
       tag: "Heavy Workloads",
@@ -262,7 +287,7 @@ export function SparrowxMasterLanding({
           </div>
 
           {/* Center Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 text-xs text-[#94A3B8] font-mono">
+          <nav className="hidden md:flex items-center gap-6 text-xs text-[#A3B1C6] font-mono">
             {/* Products Dropdown */}
             <div className="relative">
               <button
@@ -290,7 +315,7 @@ export function SparrowxMasterLanding({
                     <Database className="size-4 text-emerald-400 shrink-0" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Cloud DB</div>
-                      <div className="text-[10px] text-[#94A3B8]">PostgreSQL &amp; AI Vector Studio</div>
+                      <div className="text-[10px] text-[#A3B1C6]">PostgreSQL &amp; AI Vector Studio</div>
                     </div>
                   </button>
 
@@ -305,7 +330,7 @@ export function SparrowxMasterLanding({
                     <FileUp className="size-4 text-sky-400 shrink-0" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Files</div>
-                      <div className="text-[10px] text-[#94A3B8]">Zero-Login File Drop &amp; 10GB Vault</div>
+                      <div className="text-[10px] text-[#A3B1C6]">Zero-Login File Drop &amp; 10GB Vault</div>
                     </div>
                   </button>
 
@@ -320,7 +345,7 @@ export function SparrowxMasterLanding({
                     <KeyRound className="size-4 text-amber-400 shrink-0" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Keys</div>
-                      <div className="text-[10px] text-[#94A3B8]">Offline Password Instrument (No Login)</div>
+                      <div className="text-[10px] text-[#A3B1C6]">Offline Password Instrument (No Login)</div>
                     </div>
                   </button>
 
@@ -335,7 +360,7 @@ export function SparrowxMasterLanding({
                     <Shield className="size-4 text-orange-500 shrink-0" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Shield</div>
-                      <div className="text-[10px] text-[#94A3B8]">Cyber Threat Map &amp; DDoS Defense</div>
+                      <div className="text-[10px] text-[#A3B1C6]">Cyber Threat Map &amp; DDoS Defense</div>
                     </div>
                   </button>
 
@@ -350,18 +375,24 @@ export function SparrowxMasterLanding({
                     <Terminal className="size-4 text-indigo-400 shrink-0" />
                     <div>
                       <div className="font-bold text-xs">SparrowX API Gateway</div>
-                      <div className="text-[10px] text-[#94A3B8]">Instant REST API with cURL &amp; SDKs</div>
+                      <div className="text-[10px] text-[#A3B1C6]">Instant REST API with cURL &amp; SDKs</div>
                     </div>
                   </button>
                 </div>
               )}
             </div>
 
-            <a href="#story" className="hover:text-white transition-colors">
+            <a href="#comparison" aria-current={activeSection === "comparison" ? "true" : undefined} className={navLinkClass("comparison")}>
+              Why Us
+            </a>
+            <a href="#story" aria-current={activeSection === "story" ? "true" : undefined} className={navLinkClass("story")}>
               Our Story
             </a>
-            <a href="#vps" className="hover:text-white transition-colors">
+            <a href="#vps" aria-current={activeSection === "vps" ? "true" : undefined} className={navLinkClass("vps")}>
               VPS Cloud
+            </a>
+            <a href="#contact" aria-current={activeSection === "contact" ? "true" : undefined} className={navLinkClass("contact")}>
+              Contact
             </a>
             <a
               href="https://password.sparrowx.net"
@@ -382,7 +413,7 @@ export function SparrowxMasterLanding({
             <button
               type="button"
               onClick={() => setOperatorModalOpen(true)}
-              className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#94A3B8] hover:text-white transition-all items-center gap-1.5 cursor-pointer"
+              className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#A3B1C6] hover:text-white transition-all items-center gap-1.5 cursor-pointer"
             >
               <Lock className="size-3 text-sky-400" />
               <span>Workspace Sign-In</span>
@@ -431,7 +462,7 @@ export function SparrowxMasterLanding({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud DB</div>
-                  <div className="text-[10px] text-[#94A3B8] truncate">Managed PostgreSQL &amp; Vector Studio</div>
+                  <div className="text-[10px] text-[#A3B1C6] truncate">Managed PostgreSQL &amp; Vector Studio</div>
                 </div>
                 <span className="text-[10px] font-mono text-emerald-400 shrink-0">db.sparrowx.net</span>
               </button>
@@ -449,7 +480,7 @@ export function SparrowxMasterLanding({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Files</div>
-                  <div className="text-[10px] text-[#94A3B8] truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
+                  <div className="text-[10px] text-[#A3B1C6] truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
                 </div>
                 <span className="text-[10px] font-mono text-sky-400 shrink-0">file.sparrowx.net</span>
               </button>
@@ -467,7 +498,7 @@ export function SparrowxMasterLanding({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Keys (Free)</div>
-                  <div className="text-[10px] text-[#94A3B8] truncate">Offline Cryptographic Generator (No Login)</div>
+                  <div className="text-[10px] text-[#A3B1C6] truncate">Offline Cryptographic Generator (No Login)</div>
                 </div>
                 <span className="text-[10px] font-mono text-amber-400 shrink-0">password.sparrowx.net</span>
               </button>
@@ -485,7 +516,7 @@ export function SparrowxMasterLanding({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Shield</div>
-                  <div className="text-[10px] text-[#94A3B8] truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
+                  <div className="text-[10px] text-[#A3B1C6] truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
                 </div>
                 <span className="text-[10px] font-mono text-orange-400 shrink-0">sec.sparrowx.net</span>
               </button>
@@ -503,7 +534,7 @@ export function SparrowxMasterLanding({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX API Gateway</div>
-                  <div className="text-[10px] text-[#94A3B8] truncate">Instant REST API with cURL &amp; SDKs</div>
+                  <div className="text-[10px] text-[#A3B1C6] truncate">Instant REST API with cURL &amp; SDKs</div>
                 </div>
                 <span className="text-[10px] font-mono text-indigo-400 shrink-0">api.sparrowx.net</span>
               </button>
@@ -511,9 +542,18 @@ export function SparrowxMasterLanding({
 
             <div className="pt-2 border-t border-sky-500/15 flex flex-col gap-2 font-mono text-xs">
               <a
+                href="#comparison"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
+              >
+                <span>Why Switch (Comparison)</span>
+                <ArrowRight className="size-3.5 text-sky-400" />
+              </a>
+
+              <a
                 href="#story"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#111A30] text-[#94A3B8] hover:text-white flex items-center justify-between"
+                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
               >
                 <span>Read Our Story</span>
                 <ArrowRight className="size-3.5 text-sky-400" />
@@ -522,9 +562,18 @@ export function SparrowxMasterLanding({
               <a
                 href="#vps"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#111A30] text-[#94A3B8] hover:text-white flex items-center justify-between"
+                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
               >
                 <span>Cloud VPS Pricing</span>
+                <ArrowRight className="size-3.5 text-sky-400" />
+              </a>
+
+              <a
+                href="#contact"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
+              >
+                <span>Contact Engineers</span>
                 <ArrowRight className="size-3.5 text-sky-400" />
               </a>
 
@@ -562,7 +611,7 @@ export function SparrowxMasterLanding({
               <span className="text-sky-400">Built for Real Builders.</span>
             </h1>
 
-            <p className="text-xs sm:text-base text-[#94A3B8] max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-base text-[#A3B1C6] max-w-2xl leading-relaxed">
               We&apos;re a small, independent developer team building fast cloud databases, instant encrypted file sharing, hardware-grade offline passwords, and automated DDoS defense.
               No surprise bills, no shady telemetry, and no forced logins for simple utilities.
             </p>
@@ -590,7 +639,7 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#94A3B8] hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#A3B1C6] hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Database className="size-4 text-emerald-400" />
                 <span>Postgres Studio</span>
@@ -616,7 +665,7 @@ export function SparrowxMasterLanding({
                   <Zap className="size-3.5 text-amber-400" />
                   <span>Zero Forced Sign-Ups</span>
                 </div>
-                <p className="text-[#94A3B8] text-[11px] leading-relaxed">
+                <p className="text-[#A3B1C6] text-[11px] leading-relaxed">
                   Need a secure 64-character password or to send a file to a client? Just open the link and do it. No account creation required.
                 </p>
               </div>
@@ -626,7 +675,7 @@ export function SparrowxMasterLanding({
                   <Shield className="size-3.5 text-orange-400" />
                   <span>Tactical DDoS &amp; Origin Defense</span>
                 </div>
-                <p className="text-[#94A3B8] text-[11px] leading-relaxed">
+                <p className="text-[#A3B1C6] text-[11px] leading-relaxed">
                   We cloak your real server IP and deflect malicious attacks in under 1 second using our live global threat map.
                 </p>
               </div>
@@ -636,7 +685,7 @@ export function SparrowxMasterLanding({
                   <Heart className="size-3.5 text-rose-400" />
                   <span>Real Human Support</span>
                 </div>
-                <p className="text-[#94A3B8] text-[11px] leading-relaxed">
+                <p className="text-[#A3B1C6] text-[11px] leading-relaxed">
                   We are a small startup. When you reach out to us, you talk directly to the engineers building the product.
                 </p>
               </div>
@@ -646,7 +695,7 @@ export function SparrowxMasterLanding({
       </section>
 
       {/* SECTION 3: 6 DEDICATED PRODUCT TOOLS (BENTO GRID) */}
-      <section id="products" className="px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8">
+      <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400">
             <Sparkles className="size-3.5" />
@@ -655,7 +704,7 @@ export function SparrowxMasterLanding({
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
             Six Focused Tools. Zero Clutter.
           </h2>
-          <p className="text-xs sm:text-sm text-[#94A3B8]">
+          <p className="text-xs sm:text-sm text-[#A3B1C6]">
             Each tool has its own dedicated home with specialized features built for speed and security.
           </p>
         </div>
@@ -674,8 +723,8 @@ export function SparrowxMasterLanding({
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Cloud DB</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
-                Fast, reliable managed PostgreSQL with built-in connection pooling and pgvector search. No sudden \$1,000 bandwidth bills.
+              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+                Fast, reliable managed PostgreSQL with built-in connection pooling and pgvector search. No sudden $1,000 bandwidth bills.
               </p>
             </div>
             <button
@@ -700,7 +749,7 @@ export function SparrowxMasterLanding({
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Files</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
+              <p className="text-xs text-[#A3B1C6] leading-relaxed">
                 Drop files instantly with zero login (auto-purged from memory for privacy) or unlock your persistent 10GB cloud vault.
               </p>
             </div>
@@ -726,7 +775,7 @@ export function SparrowxMasterLanding({
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Keys</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
+              <p className="text-xs text-[#A3B1C6] leading-relaxed">
                 100% offline cryptographic password generator. Press spacebar to regenerate. Runs directly in your browser with zero network calls.
               </p>
             </div>
@@ -752,7 +801,7 @@ export function SparrowxMasterLanding({
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Shield</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
+              <p className="text-xs text-[#A3B1C6] leading-relaxed">
                 Shadowshield defense engine with our iconic 2D Dot-Matrix Threat Map. Sub-second DDoS deflection and complete origin IP cloaking.
               </p>
             </div>
@@ -778,7 +827,7 @@ export function SparrowxMasterLanding({
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX API Gateway</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
+              <p className="text-xs text-[#A3B1C6] leading-relaxed">
                 Instant RESTful API for your database with one-click code generation in cURL, TypeScript, and Python with ultra-fast latency.
               </p>
             </div>
@@ -804,7 +853,7 @@ export function SparrowxMasterLanding({
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Compute VPS</h3>
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
+              <p className="text-xs text-[#A3B1C6] leading-relaxed">
                 Affordable virtual machines with fast ECC RAM and NVMe storage. Predictable flat monthly rates in INR and USD.
               </p>
             </div>
@@ -819,8 +868,10 @@ export function SparrowxMasterLanding({
         </div>
       </section>
 
-      {/* SECTION 4: OUR STORY / FOUNDER LETTER */}
-      <section id="story" className="border-t border-sky-500/15 bg-[#090E1D] px-4 sm:px-6 py-16">
+      <ComparisonSection />
+
+      {/* SECTION 5: OUR STORY / FOUNDER LETTER */}
+      <section id="story" className="scroll-mt-24 border-t border-sky-500/15 bg-[#090E1D] px-4 sm:px-6 py-16">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="border border-sky-500/25 bg-[#0D1526] rounded-lg p-6 sm:p-10 space-y-5 shadow-2xl relative">
             <div className="inline-flex items-center gap-2 text-xs font-mono text-sky-400">
@@ -832,7 +883,7 @@ export function SparrowxMasterLanding({
               Why We Started SparrowX
             </h2>
 
-            <div className="space-y-4 text-xs sm:text-sm text-[#94A3B8] leading-relaxed font-sans">
+            <div className="space-y-4 text-xs sm:text-sm text-[#A3B1C6] leading-relaxed font-sans">
               <p>
                 When we were building our first projects as independent developers, we were constantly frustrated by large cloud monopolies. Signing up required navigating through dozens of confusing menus, and at the end of the month, we were hit with unexpected bandwidth and egress charges.
               </p>
@@ -856,7 +907,7 @@ export function SparrowxMasterLanding({
       </section>
 
       {/* SECTION 5: AFFORDABLE CLOUD VPS PLANS */}
-      <section id="vps" className="border-t border-sky-500/15 bg-[#070A12] px-4 sm:px-6 py-16">
+      <section id="vps" className="scroll-mt-24 border-t border-sky-500/15 bg-[#070A12] px-4 sm:px-6 py-16">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-sky-500/15 pb-6">
             <div className="space-y-1">
@@ -866,7 +917,7 @@ export function SparrowxMasterLanding({
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
                 Simple, High-Speed Cloud VPS
               </h2>
-              <p className="text-xs text-[#94A3B8]">
+              <p className="text-xs text-[#A3B1C6]">
                 Dedicated performance with fast NVMe storage and zero hidden egress bandwidth fees.
               </p>
             </div>
@@ -877,16 +928,16 @@ export function SparrowxMasterLanding({
                 type="button"
                 onClick={() => setVpsCurrency("INR")}
                 className={`px-3 py-1 rounded transition-colors ${
-                  vpsCurrency === "INR" ? "bg-sky-500 text-black font-bold" : "text-[#94A3B8] hover:text-white"
+                  vpsCurrency === "INR" ? "bg-sky-500 text-black font-bold" : "text-[#A3B1C6] hover:text-white"
                 }`}
               >
-                INR (₹)
+                INR (â‚¹)
               </button>
               <button
                 type="button"
                 onClick={() => setVpsCurrency("USD")}
                 className={`px-3 py-1 rounded transition-colors ${
-                  vpsCurrency === "USD" ? "bg-sky-500 text-black font-bold" : "text-[#94A3B8] hover:text-white"
+                  vpsCurrency === "USD" ? "bg-sky-500 text-black font-bold" : "text-[#A3B1C6] hover:text-white"
                 }`}
               >
                 USD ($)
@@ -910,7 +961,7 @@ export function SparrowxMasterLanding({
                       className={`text-[9px] px-2 py-0.5 rounded font-bold ${
                         plan.highlight
                           ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
-                          : "bg-white/10 text-[#94A3B8]"
+                          : "bg-white/10 text-[#A3B1C6]"
                       }`}
                     >
                       {plan.tag}
@@ -921,24 +972,24 @@ export function SparrowxMasterLanding({
                     <span className="text-2xl font-bold text-white tabular-nums">
                       {vpsCurrency === "INR" ? plan.priceInr : plan.priceUsd}
                     </span>
-                    <span className="text-xs text-[#94A3B8]">{plan.period}</span>
+                    <span className="text-xs text-[#A3B1C6]">{plan.period}</span>
                   </div>
 
-                  <div className="space-y-2 text-xs text-[#94A3B8] pt-2 border-t border-sky-500/15">
+                  <div className="space-y-2 text-xs text-[#A3B1C6] pt-2 border-t border-sky-500/15">
                     <div className="flex justify-between">
-                      <span className="text-[#64748B]">CPU:</span>
+                      <span className="text-[#8795AB]">CPU:</span>
                       <span className="text-white font-semibold">{plan.vCpu}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#64748B]">RAM:</span>
+                      <span className="text-[#8795AB]">RAM:</span>
                       <span className="text-white font-semibold">{plan.ram}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#64748B]">Disk:</span>
+                      <span className="text-[#8795AB]">Disk:</span>
                       <span className="text-white font-semibold">{plan.storage}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#64748B]">Egress:</span>
+                      <span className="text-[#8795AB]">Egress:</span>
                       <span className="text-sky-400 font-semibold">{plan.bandwidth}</span>
                     </div>
                   </div>
@@ -961,8 +1012,10 @@ export function SparrowxMasterLanding({
         </div>
       </section>
 
+      <ContactSection />
+
       {/* FOOTER */}
-      <footer className="border-t border-sky-500/15 bg-[#05070D] px-6 py-10 text-[#94A3B8] text-xs font-mono mt-auto">
+      <footer className="border-t border-sky-500/15 bg-[#05070D] px-6 py-10 text-[#A3B1C6] text-xs font-mono mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-left space-y-1">
             <div className="font-extrabold text-white text-sm flex items-center gap-2">
@@ -971,47 +1024,60 @@ export function SparrowxMasterLanding({
                 INDEPENDENT STARTUP
               </span>
             </div>
-            <p className="text-[11px] text-[#64748B]">
+            <p className="text-[11px] text-[#8795AB]">
               Built with care for developers, startups, and privacy-conscious builders.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-[#94A3B8]">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-[#A3B1C6]">
             <a href="https://sparrowx.net" className="hover:text-white transition-colors">
               sparrowx.net
             </a>
-            <span>•</span>
+            <span className="text-[#475569]">&bull;</span>
             <a href="https://db.sparrowx.net" className="hover:text-white transition-colors">
               db.sparrowx.net
             </a>
-            <span>•</span>
+            <span className="text-[#475569]">&bull;</span>
             <a href="https://sec.sparrowx.net" className="hover:text-white transition-colors">
               sec.sparrowx.net
             </a>
-            <span>•</span>
+            <span className="text-[#475569]">&bull;</span>
             <a href="https://file.sparrowx.net" className="hover:text-white transition-colors">
               file.sparrowx.net
             </a>
-            <span>•</span>
+            <span className="text-[#475569]">&bull;</span>
             <a href="https://password.sparrowx.net" className="hover:text-white transition-colors">
               password.sparrowx.net
             </a>
-            <span>•</span>
+            <span className="text-[#475569]">&bull;</span>
             <a href="https://api.sparrowx.net" className="hover:text-white transition-colors">
               api.sparrowx.net
             </a>
+            <span className="text-[#475569]">&bull;</span>
+            <a href="#comparison" className="text-sky-400 hover:text-sky-300 transition-colors">
+              Why Us
+            </a>
+            <span className="text-[#475569]">&bull;</span>
+            <a href="#contact" className="text-sky-400 hover:text-sky-300 transition-colors">
+              Contact
+            </a>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
+          <div className="flex items-center gap-3 text-[11px]">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px]">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>All Systems Operational</span>
+            </div>
+            <span className="text-[#475569]">&bull;</span>
             <button
               type="button"
               onClick={() => setOperatorModalOpen(true)}
-              className="text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+              className="text-[#A3B1C6] hover:text-white transition-colors cursor-pointer"
             >
               Sign In
             </button>
-            <span>•</span>
-            <span className="text-[#64748B]">
+            <span className="text-[#475569]">&bull;</span>
+            <span className="text-[#8795AB]">
               &copy; {new Date().getFullYear()} SparrowX
             </span>
           </div>

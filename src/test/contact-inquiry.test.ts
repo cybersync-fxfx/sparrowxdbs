@@ -18,7 +18,7 @@ function makeRequest(body: unknown, method = "POST", ip = "1.2.3.4") {
   return new Request("https://sparrowx.net/api/v1/contact", {
     method,
     headers: { "content-type": "application/json", "x-forwarded-for": ip },
-    body: method === "POST" ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
+    ...(method === "POST" ? { body: typeof body === "string" ? body : JSON.stringify(body) } : {}),
   });
 }
 
@@ -56,7 +56,7 @@ describe("handleContactRequest", () => {
     const body = await res.json();
     expect(body.ticketId).toMatch(/^SPX-INQ-[A-F0-9]{6}$/);
     expect(saved).toHaveLength(1);
-    expect(saved[0].ip_hash).not.toContain("1.2.3.4");
+    expect(saved[0]?.ip_hash).not.toContain("1.2.3.4");
   });
 
   it("rejects invalid input with 422", async () => {
