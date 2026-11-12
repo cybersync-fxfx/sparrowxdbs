@@ -27,7 +27,6 @@ import {
   ExternalLink,
   User,
 } from "lucide-react";
-import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import {
   Dialog,
@@ -192,11 +191,8 @@ export function SparrowxShieldEngine({
 
   return (
     <div className="min-h-screen bg-[#07080A] text-[#F3F4F6] flex flex-col font-sans selection:bg-[#FF6B00] selection:text-black">
-      {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
-      <GlobalEcosystemBar activeDomain="sec" />
-
       {/* TACTICAL HEADER — ICONIC CYBER ORANGE THEME */}
-      <header className="border-b border-[#FF6B00]/30 bg-[#0C0E14] px-4 sm:px-6 py-3.5 shadow-[0_2px_15px_rgba(255,107,0,0.08)] sticky top-7 z-40 backdrop-blur-md">
+      <header className="border-b border-[#FF6B00]/30 bg-[#0C0E14] px-4 sm:px-6 py-3.5 shadow-[0_2px_15px_rgba(255,107,0,0.08)] sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="size-9 rounded-md bg-[#161311] border border-[#FF6B00]/40 grid place-items-center shadow-[0_0_12px_rgba(255,107,0,0.2)]">

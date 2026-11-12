@@ -22,7 +22,6 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 import { ComparisonSection } from "./landing/ComparisonSection";
 import { ContactSection } from "./landing/ContactSection";
 import {
@@ -256,11 +255,8 @@ export function SparrowxMasterLanding({
 
   return (
     <div className="min-h-screen bg-[#070A12] text-[#F3F4F6] font-sans antialiased selection:bg-sky-500 selection:text-black flex flex-col">
-      {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
-      <GlobalEcosystemBar activeDomain="hub" />
-
       {/* SECTION 1: HEADER (CLEAN BLUE ACCENTS) */}
-      <header className="border-b border-sky-500/15 bg-[#0B1020]/95 px-4 sm:px-6 py-3.5 sticky top-7 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      <header className="border-b border-sky-500/15 bg-[#0B1020]/95 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Left Brand */}
           <div className="flex items-center gap-3">

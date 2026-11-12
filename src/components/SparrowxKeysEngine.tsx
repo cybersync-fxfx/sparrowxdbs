@@ -18,7 +18,6 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
-import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 
 // EFF Long Wordlist excerpt for Diceware
 const EFF_WORDLIST = [
@@ -273,9 +272,6 @@ export function SparrowxKeysEngine() {
 
   return (
     <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] font-sans selection:bg-white selection:text-black flex flex-col">
-      {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
-      <GlobalEcosystemBar activeDomain="password" />
-
       {/* SECTION 1: HARDWARE CRYPTO INSTRUMENT HEADER */}
       <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3 border-t border-white/[0.16]">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">

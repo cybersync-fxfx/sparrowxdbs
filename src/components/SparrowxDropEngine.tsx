@@ -35,7 +35,6 @@ import {
   Layers,
   Database,
 } from "lucide-react";
-import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 import { authenticateAppUserFromBackend } from "@/lib/supabase";
 
 interface StagedFile {
@@ -667,9 +666,6 @@ export function SparrowxDropEngine() {
 
   return (
     <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
-      {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
-      <GlobalEcosystemBar activeDomain="file" />
-
       {/* Main Header */}
       <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16]">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">

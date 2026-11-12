@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import migratedSeedData from "../lib/migrated-seed.json";
-import { GlobalEcosystemBar } from "./GlobalEcosystemBar";
 import {
   authenticateAppUserFromBackend,
   persistAppUserToBackend,
@@ -1231,11 +1230,8 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   if (viewMode === "landing") {
     return (
       <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
-        {/* SECTION 0: GLOBAL ECOSYSTEM BAR */}
-        <GlobalEcosystemBar activeDomain="db" />
-
         {/* Global Navigation Header */}
-        <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-7 z-40 backdrop-blur-md">
+        <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-0 z-40 backdrop-blur-md">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="size-8 rounded-md bg-[#14171F] border border-white/[0.08] grid place-items-center text-white">
@@ -1889,7 +1885,6 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   if (!sessionUser) {
     return (
       <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
-        <GlobalEcosystemBar activeDomain="db" />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="max-w-md w-full border border-red-500/30 bg-[#0E1015] rounded-md p-6 sm:p-8 space-y-5 text-center shadow-[0_0_50px_rgba(239,68,68,0.1)]">
             <div className="size-12 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 grid place-items-center mx-auto">
