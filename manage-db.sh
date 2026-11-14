@@ -11,8 +11,19 @@
 # ============================================================================
 set -u
 
-INSTALL_DIR="/opt/sparrowx"
-[ ! -d "${INSTALL_DIR}" ] && INSTALL_DIR="$(pwd)"
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_SOURCE}")" && pwd)"
+if [ "$(basename "${SCRIPT_DIR}")" = "ovh" ]; then
+  INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+elif [ -d "${SCRIPT_DIR}/ovh" ] || [ -f "${SCRIPT_DIR}/docker-compose.ovh.yml" ]; then
+  INSTALL_DIR="${SCRIPT_DIR}"
+elif [ -d "/opt/sparrowxdbs" ]; then
+  INSTALL_DIR="/opt/sparrowxdbs"
+elif [ -d "/opt/sparrowx" ]; then
+  INSTALL_DIR="/opt/sparrowx"
+else
+  INSTALL_DIR="$(pwd)"
+fi
 DATA_DIR="${INSTALL_DIR}/data"
 USERS_DIR="${DATA_DIR}/users"
 BACKUP_DIR="${DATA_DIR}/backups"
