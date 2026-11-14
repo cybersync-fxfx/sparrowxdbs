@@ -1501,6 +1501,7 @@ EOF_WINGS
     fi
   fi
 
+  systemctl reset-failed wings >/dev/null 2>&1 || true
   systemctl restart wings >/dev/null 2>&1 || true
   local wings_ok="false"
   for _w in 1 2 3 4 5; do
@@ -1533,8 +1534,9 @@ EOF_WINGS
     fi
   else
     local w_err=""
-    w_err="$(journalctl -u wings -n 15 --no-pager 2>/dev/null | tr '\n' ' ' || true)"
-    log_warn "Wings service did not respond on :${wings_port} yet (${w_err:0:220})"
+    w_err="$(timeout 5 /usr/local/bin/wings --config /etc/pterodactyl/config.yml 2>&1 | tail -n 10 | tr '\n' ' ' || true)"
+    [ -z "${w_err}" ] && w_err="$(journalctl -u wings -n 15 --no-pager 2>/dev/null | tr '\n' ' ' || true)"
+    log_warn "Wings service did not respond on :${wings_port} yet (${w_err:0:240})"
   fi
 }
 
@@ -2949,7 +2951,11 @@ done
     echo "--- WINGS DIAGNOSTICS ---"
     ls -la /etc/pterodactyl 2>/dev/null || true
     ss -tulpn 2>/dev/null | grep -E ":(${WINGS_PORT:-8080}|${WINGS_SFTP_PORT:-2022}) " || true
-    journalctl -u wings -n 25 --no-pager 2>/dev/null || true
+    if ! systemctl is-active --quiet wings 2>/dev/null; then
+      echo "--- WINGS DIRECT DRY-RUN OUTPUT ---"
+      timeout 5 /usr/local/bin/wings --config /etc/pterodactyl/config.yml 2>&1 | tail -n 20 || true
+    fi
+    journalctl -u wings -n 20 --no-pager 2>/dev/null || true
   fi
   if [ "${HAS_DOCKER}" = "true" ]; then
     echo "--- DOCKER PS -A ---"
