@@ -1,58 +1,61 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
     <radialGradient id="dbGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#3ECF8E" stop-opacity="0.38" />
-      <stop offset="100%" stop-color="#3ECF8E" stop-opacity="0" />
+      <stop offset="0%" stop-color="#A3E635" stop-opacity="0.38" />
+      <stop offset="100%" stop-color="#A3E635" stop-opacity="0" />
     </radialGradient>
     <linearGradient id="dbWingLeft" x1="10%" y1="15%" x2="90%" y2="85%">
-      <stop offset="0%" stop-color="#6EE7B7" />
-      <stop offset="50%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#065F46" />
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="35%" stop-color="#BEF264" />
+      <stop offset="70%" stop-color="#A3E635" />
+      <stop offset="100%" stop-color="#65A30D" />
     </linearGradient>
     <linearGradient id="dbWingRight" x1="90%" y1="15%" x2="10%" y2="85%">
-      <stop offset="0%" stop-color="#6EE7B7" />
-      <stop offset="50%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#065F46" />
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="35%" stop-color="#BEF264" />
+      <stop offset="70%" stop-color="#A3E635" />
+      <stop offset="100%" stop-color="#65A30D" />
     </linearGradient>
     <linearGradient id="dbDiscBody" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#064E3B" />
-      <stop offset="35%" stop-color="#047857" />
-      <stop offset="65%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#022C22" />
+      <stop offset="0%" stop-color="#05060A" />
+      <stop offset="35%" stop-color="#0A0D14" />
+      <stop offset="65%" stop-color="#111622" />
+      <stop offset="100%" stop-color="#05060A" />
     </linearGradient>
     <linearGradient id="dbDiscTop" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A7F3D0" />
-      <stop offset="45%" stop-color="#3ECF8E" />
-      <stop offset="100%" stop-color="#059669" />
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="40%" stop-color="#BEF264" />
+      <stop offset="75%" stop-color="#A3E635" />
+      <stop offset="100%" stop-color="#65A30D" />
     </linearGradient>
   </defs>
 
   <circle cx="64" cy="64" r="56" fill="url(#dbGlow)" />
 
   <!-- Swept Cyber-Hawk Sovereign Wings -->
-  <path d="M12 42 L44 50 L40 62 L18 56 Z" fill="url(#dbWingLeft)" opacity="0.95" />
+  <path d="M12 42 L44 50 L40 62 L18 56 Z" fill="url(#dbWingLeft)" opacity="0.96" />
   <path d="M18 60 L40 65 L38 75 L24 71 Z" fill="url(#dbWingLeft)" opacity="0.82" />
-  <path d="M116 42 L84 50 L88 62 L110 56 Z" fill="url(#dbWingRight)" opacity="0.95" />
+  <path d="M116 42 L84 50 L88 62 L110 56 Z" fill="url(#dbWingRight)" opacity="0.96" />
   <path d="M110 60 L88 65 L90 75 L104 71 Z" fill="url(#dbWingRight)" opacity="0.82" />
 
   <!-- Bottom 3D Database Cylinder Tier -->
-  <path d="M36 80 L36 96 C36 104 92 104 92 96 L92 80 Z" fill="url(#dbDiscBody)" stroke="#34D399" stroke-width="1.5" stroke-opacity="0.55" />
-  <ellipse cx="64" cy="80" rx="28" ry="10" fill="#065F46" stroke="#6EE7B7" stroke-width="1.2" stroke-opacity="0.5" />
-  <circle cx="48" cy="89" r="2" fill="#A7F3D0" />
-  <rect x="54" y="88" width="12" height="2" rx="1" fill="#34D399" opacity="0.7" />
+  <path d="M36 80 L36 96 C36 104 92 104 92 96 L92 80 Z" fill="url(#dbDiscBody)" stroke="#A3E635" stroke-width="1.5" stroke-opacity="0.65" />
+  <ellipse cx="64" cy="80" rx="28" ry="10" fill="#0A0D14" stroke="#BEF264" stroke-width="1.2" stroke-opacity="0.6" />
+  <circle cx="48" cy="89" r="2" fill="#FFFFFF" />
+  <rect x="54" y="88" width="12" height="2" rx="1" fill="#A3E635" opacity="0.85" />
 
   <!-- Middle 3D Database Cylinder Tier -->
-  <path d="M36 60 L36 75 C36 83 92 83 92 75 L92 60 Z" fill="url(#dbDiscBody)" stroke="#34D399" stroke-width="1.5" stroke-opacity="0.7" />
-  <ellipse cx="64" cy="60" rx="28" ry="10" fill="#047857" stroke="#6EE7B7" stroke-width="1.3" stroke-opacity="0.65" />
-  <circle cx="48" cy="69" r="2" fill="#A7F3D0" />
-  <rect x="54" y="68" width="16" height="2" rx="1" fill="#6EE7B7" opacity="0.85" />
+  <path d="M36 60 L36 75 C36 83 92 83 92 75 L92 60 Z" fill="url(#dbDiscBody)" stroke="#A3E635" stroke-width="1.5" stroke-opacity="0.8" />
+  <ellipse cx="64" cy="60" rx="28" ry="10" fill="#0D121B" stroke="#BEF264" stroke-width="1.3" stroke-opacity="0.7" />
+  <circle cx="48" cy="69" r="2" fill="#FFFFFF" />
+  <rect x="54" y="68" width="16" height="2" rx="1" fill="#BEF264" opacity="0.9" />
 
   <!-- Top 3D PostgreSQL + Vector Cylinder Tier -->
-  <path d="M36 36 L36 53 C36 61 92 61 92 53 L92 36 Z" fill="url(#dbDiscBody)" stroke="#6EE7B7" stroke-width="1.6" />
-  <ellipse cx="64" cy="36" rx="28" ry="10.5" fill="url(#dbDiscTop)" stroke="#ECFDF5" stroke-width="1.5" stroke-opacity="0.8" />
+  <path d="M36 36 L36 53 C36 61 92 61 92 53 L92 36 Z" fill="url(#dbDiscBody)" stroke="#A3E635" stroke-width="1.6" />
+  <ellipse cx="64" cy="36" rx="28" ry="10.5" fill="url(#dbDiscTop)" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.9" />
 
   <!-- Vector Mesh Nodes on Top Plate -->
-  <path d="M52 36 L64 31 L76 36 L64 41 Z" fill="#064E3B" fill-opacity="0.5" stroke="#ECFDF5" stroke-width="1.2" stroke-opacity="0.85" />
+  <path d="M52 36 L64 31 L76 36 L64 41 Z" fill="#05060A" fill-opacity="0.62" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.92" />
   <circle cx="64" cy="36" r="2.6" fill="#FFFFFF" />
-  <circle cx="48" cy="46" r="2" fill="#A7F3D0" />
+  <circle cx="48" cy="46" r="2" fill="#A3E635" />
 </svg>

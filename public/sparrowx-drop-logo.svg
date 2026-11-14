@@ -1,46 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
     <radialGradient id="dropGlow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#22D3EE" stop-opacity="0.38" />
-      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0" />
+      <stop offset="0%" stop-color="#A855F7" stop-opacity="0.42" />
+      <stop offset="100%" stop-color="#A855F7" stop-opacity="0" />
     </radialGradient>
     <linearGradient id="dropWing" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#A5F3FC" />
-      <stop offset="50%" stop-color="#22D3EE" />
-      <stop offset="100%" stop-color="#0E7490" />
+      <stop offset="0%" stop-color="#E9D5FF" />
+      <stop offset="45%" stop-color="#A855F7" />
+      <stop offset="100%" stop-color="#7E22CE" />
     </linearGradient>
     <linearGradient id="dropLeftFace" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0891B2" />
-      <stop offset="100%" stop-color="#164E63" />
+      <stop offset="0%" stop-color="#090B12" />
+      <stop offset="100%" stop-color="#05060A" />
     </linearGradient>
     <linearGradient id="dropRightFace" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#3ECF8E" />
-      <stop offset="100%" stop-color="#065F46" />
+      <stop offset="0%" stop-color="#9333EA" />
+      <stop offset="100%" stop-color="#1E1035" />
     </linearGradient>
     <linearGradient id="dropTopFace" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#CFFAFE" />
-      <stop offset="60%" stop-color="#22D3EE" />
-      <stop offset="100%" stop-color="#10B981" />
+      <stop offset="0%" stop-color="#F5F3FF" />
+      <stop offset="50%" stop-color="#C084FC" />
+      <stop offset="100%" stop-color="#A855F7" />
     </linearGradient>
   </defs>
 
   <circle cx="64" cy="64" r="56" fill="url(#dropGlow)" />
 
   <!-- Ascending Aerodynamic Transfer Wings -->
-  <path d="M12 52 L42 36 L40 50 L18 63 Z" fill="url(#dropWing)" opacity="0.95" />
-  <path d="M18 68 L40 56 L40 67 L25 76 Z" fill="url(#dropWing)" opacity="0.75" />
-  <path d="M116 52 L86 36 L88 50 L110 63 Z" fill="url(#dropWing)" opacity="0.95" />
-  <path d="M110 68 L88 56 L88 67 L103 76 Z" fill="url(#dropWing)" opacity="0.75" />
+  <path d="M12 52 L42 36 L40 50 L18 63 Z" fill="url(#dropWing)" opacity="0.96" />
+  <path d="M18 68 L40 56 L40 67 L25 76 Z" fill="url(#dropWing)" opacity="0.78" />
+  <path d="M116 52 L86 36 L88 50 L110 63 Z" fill="url(#dropWing)" opacity="0.96" />
+  <path d="M110 68 L88 56 L88 67 L103 76 Z" fill="url(#dropWing)" opacity="0.78" />
 
   <!-- 3D Encrypted Vault Cube -->
-  <polygon points="64,34 94,50 64,66 34,50" fill="url(#dropTopFace)" stroke="#ECFEFF" stroke-width="1.5" stroke-opacity="0.85" />
-  <polygon points="34,50 64,66 64,102 34,86" fill="url(#dropLeftFace)" stroke="#67E8F9" stroke-width="1.4" stroke-opacity="0.7" />
-  <polygon points="94,50 64,66 64,102 94,86" fill="url(#dropRightFace)" stroke="#6EE7B7" stroke-width="1.4" stroke-opacity="0.7" />
+  <polygon points="64,34 94,50 64,66 34,50" fill="url(#dropTopFace)" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.9" />
+  <polygon points="34,50 64,66 64,102 34,86" fill="url(#dropLeftFace)" stroke="#C084FC" stroke-width="1.4" stroke-opacity="0.75" />
+  <polygon points="94,50 64,66 64,102 94,86" fill="url(#dropRightFace)" stroke="#A855F7" stroke-width="1.4" stroke-opacity="0.85" />
 
   <!-- Encrypted Transfer Arrow / Beam Rising from Core -->
-  <path d="M64 16 L76 30 L69 30 L69 48 L59 48 L59 30 L52 30 Z" fill="#FFFFFF" fill-opacity="0.95" stroke="#22D3EE" stroke-width="1.5" />
+  <path d="M64 16 L76 30 L69 30 L69 48 L59 48 L59 30 L52 30 Z" fill="#FFFFFF" fill-opacity="0.96" stroke="#A855F7" stroke-width="1.5" />
 
   <!-- Vault Keyhole / Lock Badge on Front Ridge -->
-  <circle cx="51" cy="73" r="4.5" fill="#ECFEFF" fill-opacity="0.92" />
-  <path d="M49 76 L53 76 L54 84 L48 84 Z" fill="#ECFEFF" fill-opacity="0.92" />
+  <circle cx="51" cy="73" r="4.5" fill="#F5F3FF" fill-opacity="0.95" />
+  <path d="M49 76 L53 76 L54 84 L48 84 Z" fill="#F5F3FF" fill-opacity="0.95" />
 </svg>
