@@ -300,6 +300,112 @@ h4 {
   background: rgba(255, 255, 255, 0.3);
 }
 
+@keyframes spx-orb-drift-1 {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate3d(60px, -40px, 0px) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-45px, 35px, 0px) scale(0.95);
+  }
+}
+
+@keyframes spx-orb-drift-2 {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate3d(-70px, 45px, 0px) scale(1.1);
+  }
+  66% {
+    transform: translate3d(50px, -55px, 0px) scale(0.94);
+  }
+}
+
+@keyframes spx-orb-drift-3 {
+  0%, 100% {
+    transform: translate3d(0px, 0px, 0px) scale(0.98);
+  }
+  50% {
+    transform: translate3d(40px, 50px, 0px) scale(1.12);
+  }
+}
+
+@keyframes spx-beam-x {
+  0% {
+    transform: translate3d(-20vw, 0, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.9;
+  }
+  88% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate3d(120vw, 0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes spx-beam-y {
+  0% {
+    transform: translate3d(0, -20vh, 0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.85;
+  }
+  88% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(0, 120vh, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes spx-grid-pan {
+  0% {
+    background-position: 0px 0px;
+  }
+  100% {
+    background-position: 40px 40px;
+  }
+}
+
+.animate-spx-orb-1 {
+  animation: spx-orb-drift-1 19s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-spx-orb-2 {
+  animation: spx-orb-drift-2 23s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-spx-orb-3 {
+  animation: spx-orb-drift-3 26s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-spx-beam-x {
+  animation: spx-beam-x var(--beam-duration, 9s) linear infinite;
+  will-change: transform, opacity;
+}
+
+.animate-spx-beam-y {
+  animation: spx-beam-y var(--beam-duration, 11s) linear infinite;
+  will-change: transform, opacity;
+}
+
+.animate-spx-grid-pan {
+  animation: spx-grid-pan 18s linear infinite;
+  will-change: background-position;
+}
+
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

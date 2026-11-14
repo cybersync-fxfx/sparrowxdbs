@@ -34,6 +34,7 @@ import {
 import { authenticateAppUserFromBackend } from "@/lib/supabase";
 import type { AppUser } from "@/lib/supabase";
 import { issueSignedSessionToken } from "@/lib/advanced-features";
+import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 
 interface SparrowxMasterLandingProps {
   onOpenLogin: () => void;
@@ -279,9 +280,11 @@ export function SparrowxMasterLanding({
   };
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-[#F3F4F6] font-sans antialiased selection:bg-sky-500 selection:text-black flex flex-col">
+    <div className="min-h-screen bg-[#070A12] text-[#F3F4F6] font-sans antialiased selection:bg-sky-500 selection:text-black flex flex-col relative overflow-x-hidden">
+      <AnimatedCloudBackground variant="sky" intensity="full" />
+
       {/* SECTION 1: HEADER (CLEAN BLUE ACCENTS) */}
-      <header className="border-b border-sky-500/15 bg-[#0B1020]/95 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      <header className="border-b border-sky-500/15 bg-[#0B1020]/85 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Left Brand */}
           <div className="flex items-center gap-3">
@@ -610,13 +613,22 @@ export function SparrowxMasterLanding({
       </header>
 
       {/* SECTION 2: EMOTIONAL STARTUP HERO */}
-      <section className="border-b border-sky-500/15 bg-gradient-to-b from-[#090E1D] via-[#070A12] to-[#070A12] px-4 sm:px-6 py-10 sm:py-20 relative overflow-hidden">
-        {/* Soft Blue Ambient Glow */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-sky-600/10 rounded-full blur-3xl pointer-events-none" />
+      <section className="border-b border-sky-500/15 bg-gradient-to-b from-[#090E1D]/75 via-[#070A12]/50 to-transparent px-4 sm:px-6 py-10 sm:py-20 relative z-10 overflow-hidden">
+        {/* Soft Animated Ambient Glow */}
+        <div className="animate-spx-orb-1 absolute -top-10 left-1/4 w-96 h-96 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="animate-spx-orb-2 absolute bottom-0 right-1/5 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
           {/* Left Column: Human, Emotional Pitch */}
           <div className="lg:col-span-7 space-y-5 sm:space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 backdrop-blur-sm text-[11px] font-mono text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.12)]">
+              <span className="relative flex size-2">
+                <span className="animate-spx-pulse-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full size-2 bg-emerald-400" />
+              </span>
+              <span>SOVEREIGN CLOUD MESH • LIVE TELEMETRY &amp; ZERO TRACKERS</span>
+            </div>
+
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans text-balance">
               Simple, Honest Cloud Tools <br />
               <span className="text-sky-400">Built for Real Builders.</span>
@@ -641,7 +653,7 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => handleLaunch("password", "https://password.sparrowx.net", "password")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-[#111A30] border border-sky-500/30 hover:border-sky-500/60 text-white font-mono text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-[#111A30]/90 backdrop-blur-md border border-sky-500/30 hover:border-sky-500/60 text-white font-mono text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <KeyRound className="size-4 text-sky-400" />
                 <span>Offline Keys (No Login)</span>
@@ -650,7 +662,7 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#A3B1C6] hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#A3B1C6] hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer backdrop-blur-sm"
               >
                 <Database className="size-4 text-emerald-400" />
                 <span>Postgres Studio</span>
@@ -659,7 +671,7 @@ export function SparrowxMasterLanding({
           </div>
 
           {/* Right Column: Why Developers Love Us Card */}
-          <div className="lg:col-span-5 border border-sky-500/20 bg-[#0C1222] rounded-lg p-6 space-y-4 shadow-xl">
+          <div className="lg:col-span-5 border border-sky-500/20 bg-[#0C1222]/85 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-sky-500/15 pb-3">
               <span className="text-xs font-mono text-sky-400 font-bold uppercase tracking-wider">
                 Why Builders Choose SparrowX
@@ -706,7 +718,7 @@ export function SparrowxMasterLanding({
       </section>
 
       {/* SECTION 3: 6 DEDICATED PRODUCT TOOLS (BENTO GRID) */}
-      <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8">
+      <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400">
             <Sparkles className="size-3.5" />
@@ -721,7 +733,7 @@ export function SparrowxMasterLanding({
         </div>
 
         {/* 6 PRODUCTS GRID */}
-        <div className="border border-sky-500/20 bg-[#0C1222] rounded-lg divide-y md:divide-y-0 divide-sky-500/15 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 overflow-hidden">
+        <div className="border border-sky-500/20 bg-[#0C1222]/85 backdrop-blur-md rounded-lg divide-y md:divide-y-0 divide-sky-500/15 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 overflow-hidden shadow-xl">
           {/* 1. SparrowX Cloud DB */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors border-r border-sky-500/15">
             <div className="space-y-3">
@@ -879,12 +891,14 @@ export function SparrowxMasterLanding({
         </div>
       </section>
 
-      <ComparisonSection />
+      <div className="relative z-10">
+        <ComparisonSection />
+      </div>
 
       {/* SECTION 5: SHORT EMOTIONAL STORY TEASER -> FULL /story PAGE */}
-      <section id="story" className="scroll-mt-24 border-t border-sky-500/15 bg-[#090E1D] px-4 sm:px-6 py-14">
+      <section id="story" className="scroll-mt-24 border-t border-sky-500/15 bg-[#090E1D]/70 backdrop-blur-sm px-4 sm:px-6 py-14 relative z-10">
         <div className="max-w-4xl mx-auto">
-          <div className="border border-sky-500/25 bg-[#0D1526] rounded-lg p-6 sm:p-9 space-y-6 shadow-2xl relative">
+          <div className="border border-sky-500/25 bg-[#0D1526]/85 backdrop-blur-md rounded-lg p-6 sm:p-9 space-y-6 shadow-2xl relative">
             <div className="inline-flex items-center gap-2 text-xs font-mono text-sky-400">
               <Heart className="size-4 text-rose-400" />
               <span>A NOTE FROM OUR TEAM</span>
@@ -947,7 +961,7 @@ export function SparrowxMasterLanding({
       </section>
 
       {/* SECTION 5: AFFORDABLE CLOUD VPS PLANS */}
-      <section id="vps" className="scroll-mt-24 border-t border-sky-500/15 bg-[#070A12] px-4 sm:px-6 py-16">
+      <section id="vps" className="scroll-mt-24 border-t border-sky-500/15 bg-[#070A12]/65 px-4 sm:px-6 py-16 relative z-10">
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-sky-500/15 pb-6">
             <div className="space-y-1">
@@ -986,7 +1000,7 @@ export function SparrowxMasterLanding({
           </div>
 
           {/* 4 Plans Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-sky-500/15 border border-sky-500/20 rounded-lg bg-[#0C1222] overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-sky-500/15 border border-sky-500/20 rounded-lg bg-[#0C1222]/85 backdrop-blur-md overflow-hidden shadow-xl">
             {vpsPlans.map((plan) => (
               <div
                 key={plan.id}
@@ -1052,10 +1066,12 @@ export function SparrowxMasterLanding({
         </div>
       </section>
 
-      <ContactSection />
+      <div className="relative z-10">
+        <ContactSection />
+      </div>
 
       {/* FOOTER */}
-      <footer className="border-t border-sky-500/15 bg-[#05070D] px-6 py-10 text-[#A3B1C6] text-xs font-mono mt-auto">
+      <footer className="relative z-10 border-t border-sky-500/15 bg-[#05070D]/85 backdrop-blur-md px-6 py-10 text-[#A3B1C6] text-xs font-mono mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-left space-y-1">
             <div className="font-extrabold text-white text-sm flex items-center gap-2">

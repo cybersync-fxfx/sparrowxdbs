@@ -14,6 +14,7 @@ import {
   verifySessionToken,
   clearSessionToken,
 } from "@/lib/advanced-features";
+import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import {
   Database,
   Table2,
@@ -1277,9 +1278,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   // =========================================================================
   if (viewMode === "landing") {
     return (
-      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
+      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black relative overflow-x-hidden">
+        <AnimatedCloudBackground variant="emerald" intensity="full" />
+
         {/* Global Navigation Header */}
-        <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-0 z-40 backdrop-blur-md">
+        <header className="border-b border-white/[0.08] bg-[#0E1015]/85 px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-0 z-40 backdrop-blur-md">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img
@@ -1341,11 +1344,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
         </header>
 
         {/* Hero Section */}
-        <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
+        <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-8">
           {/* ASYMMETRIC HERO: LEFT PITCH + RIGHT SIGN-IN */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border border-white/[0.08] bg-[#0E1015] rounded-md p-6 sm:p-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border border-emerald-500/20 bg-[#0E1015]/80 backdrop-blur-md rounded-md p-6 sm:p-8 shadow-[0_0_50px_rgba(16,185,129,0.06)] relative overflow-hidden">
             <div className="lg:col-span-7 space-y-4">
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#14171F] border border-white/[0.08] text-[11px] font-mono text-emerald-400">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#14171F]/90 border border-white/[0.08] text-[11px] font-mono text-emerald-400">
                 <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span>SIMPLE CLOUD POSTGRESQL • STRICT AUTH ISOLATION</span>
               </div>
@@ -1376,7 +1379,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             </div>
 
             {/* Right: Studio Strict Auth Card with Sign In / Register Tabs */}
-            <div id="db-auth-card" className="lg:col-span-5 border border-white/[0.08] bg-[#14171F] rounded-md p-5 space-y-4 shadow-lg">
+            <div id="db-auth-card" className="lg:col-span-5 border border-white/[0.08] bg-[#14171F]/90 backdrop-blur-md rounded-md p-5 space-y-4 shadow-lg">
               <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
                 <div className="flex items-center gap-2">
                   <button
@@ -1700,7 +1703,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           </div>
 
           {/* SECTION: HONEST PROS & CONS (STARTUP TRANSPARENCY) */}
-          <div className="border border-white/[0.08] bg-[#0E1015] rounded-md p-6 space-y-4">
+          <div className="border border-white/[0.08] bg-[#0E1015]/85 backdrop-blur-md rounded-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div className="space-y-0.5">
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
@@ -1716,7 +1719,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-              <div className="p-4 rounded bg-[#08090C] border border-white/[0.06] space-y-2">
+              <div className="p-4 rounded bg-[#08090C]/85 border border-white/[0.06] space-y-2">
                 <span className="text-emerald-400 font-bold block text-sm">Our Plus Points (Pros):</span>
                 <ul className="space-y-1.5 text-[#CCCCCC]">
                   <li>• Instant setup: Ready to receive queries in under 30 seconds.</li>
@@ -1727,7 +1730,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                 </ul>
               </div>
 
-              <div className="p-4 rounded bg-[#08090C] border border-white/[0.06] space-y-2">
+              <div className="p-4 rounded bg-[#08090C]/85 border border-white/[0.06] space-y-2">
                 <span className="text-amber-400 font-bold block text-sm">Where We Stand (Cons):</span>
                 <ul className="space-y-1.5 text-[#CCCCCC]">
                   <li>• We are a small, passionate startup, not a multi-billion dollar conglomerate.</li>
@@ -1739,7 +1742,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           </div>
 
           {/* INTERACTIVE READ-ONLY STUDIO FRAME */}
-          <div className="border border-white/[0.08] bg-[#0E1015] rounded-md overflow-hidden shadow-lg">
+          <div className="border border-white/[0.08] bg-[#0E1015]/85 backdrop-blur-md rounded-md overflow-hidden shadow-lg">
             {/* Top Frame Tab Bar */}
             <div className="border-b border-white/[0.08] bg-[#14171F] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
               <div className="flex items-center gap-1.5">
@@ -1924,7 +1927,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
         </main>
 
         {/* Footer */}
-        <footer className="border-t border-white/[0.08] bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#A3A3A3]">
+        <footer className="relative z-10 border-t border-white/[0.08] bg-[#050608]/85 backdrop-blur-md px-6 py-4 text-center text-[10px] font-mono text-[#A3A3A3]">
           <span>SPARROWX CLOUD DB // MANAGED POSTGRESQL &amp; VECTOR • BUILT WITH PASSION FOR INDEPENDENT DEVELOPERS</span>
         </footer>
       </div>
@@ -1937,9 +1940,10 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   // =========================================================================
   if (!sessionUser) {
     return (
-      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="max-w-md w-full border border-red-500/30 bg-[#0E1015] rounded-md p-6 sm:p-8 space-y-5 text-center shadow-[0_0_50px_rgba(239,68,68,0.1)]">
+      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black relative overflow-hidden">
+        <AnimatedCloudBackground variant="emerald" intensity="subtle" />
+        <div className="relative z-10 flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full border border-red-500/30 bg-[#0E1015]/85 backdrop-blur-md rounded-md p-6 sm:p-8 space-y-5 text-center shadow-[0_0_50px_rgba(239,68,68,0.1)]">
             <div className="size-12 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 grid place-items-center mx-auto">
               <Lock className="size-6" />
             </div>
@@ -1971,9 +1975,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-[#121212] text-zinc-100 font-sans selection:bg-[#3ECF8E] selection:text-zinc-950">
+    <div className="flex h-screen w-full flex-col bg-[#0B0D11] text-zinc-100 font-sans selection:bg-[#3ECF8E] selection:text-zinc-950 relative overflow-hidden">
+      <AnimatedCloudBackground variant="emerald" intensity="subtle" />
+
       {/* STUDIO TOP HEADER WITH SEPARATE ENVIRONMENTS & ACCOUNT IDENTITY */}
-      <header className="h-12 border-b border-[#2E2E2E] bg-[#181818] px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
+      <header className="relative z-10 h-12 border-b border-[#2E2E2E] bg-[#181818]/90 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             type="button"
@@ -2089,7 +2095,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
       {/* STATUS NOTIFICATION BAR */}
       {statusBanner && (
         <div
-          className={`px-4 py-2 text-xs flex items-center justify-between border-b ${
+          className={`relative z-10 px-4 py-2 text-xs flex items-center justify-between border-b ${
             statusBanner.type === "success"
               ? "bg-[#3ECF8E]/10 border-[#3ECF8E]/30 text-[#3ECF8E]"
               : statusBanner.type === "error"
@@ -2116,9 +2122,9 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
       )}
 
       {/* MAIN STUDIO WORKSPACE */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="relative z-10 flex-1 flex min-h-0 overflow-hidden">
         {/* FAR-LEFT ICON RAIL (Supabase Studio Style) */}
-        <aside className="w-13 border-r border-[#2E2E2E] bg-[#181818] flex flex-col items-center py-3 gap-2 shrink-0">
+        <aside className="w-13 border-r border-[#2E2E2E] bg-[#181818]/90 backdrop-blur-md flex flex-col items-center py-3 gap-2 shrink-0">
           {[
             { id: "tables", label: "Table Editor", icon: Table2 },
             { id: "sql", label: "SQL Studio & pgvector", icon: Terminal },
