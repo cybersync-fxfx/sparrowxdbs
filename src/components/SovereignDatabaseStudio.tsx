@@ -520,6 +520,32 @@ export function SovereignDatabaseStudio({
       .replace(/[^a-z0-9]/g, "-");
   }, [sessionUser]);
 
+  const defaultStudioKey = `spx_live_${tenantSlug}_${(sessionUser?.id || "usr").slice(-6)}`;
+  const [customAnonKey, setCustomAnonKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return localStorage.getItem(`spx_studio_key_${tenantSlug}`) || defaultStudioKey;
+      } catch {
+        // Ignore storage read errors
+      }
+    }
+    return defaultStudioKey;
+  });
+
+  useEffect(() => {
+    const nextFallback = `spx_live_${tenantSlug}_${(sessionUser?.id || "usr").slice(-6)}`;
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(`spx_studio_key_${tenantSlug}`);
+        setCustomAnonKey(stored || nextFallback);
+        return;
+      } catch {
+        // Ignore storage read errors
+      }
+    }
+    setCustomAnonKey(nextFallback);
+  }, [tenantSlug, sessionUser?.id]);
+
   const activeProject = useMemo(() => {
     const envUpper = activeEnv.toUpperCase();
     const envConfigs = {
@@ -546,11 +572,27 @@ export function SovereignDatabaseStudio({
       connectionUri: `postgresql://${dbUser}:••••••••••••@db.sparrowx.net:${cfg.port}/${dbName}?sslmode=require`,
       directUri: `postgresql://${dbUser}:••••••••••••@db.sparrowx.net:${cfg.port}/${dbName}?sslmode=require`,
       pooledUri: `postgresql://${dbUser}:••••••••••••@db.sparrowx.net:${cfg.poolerPort}/${dbName}?pgbouncer=true&sslmode=require`,
-      anonKey: `spx_anon_${tenantSlug}_${activeEnv}_${(sessionUser?.id || "anon").slice(-6)}`,
+      anonKey: customAnonKey,
       serviceRoleKey: `spx_service_${tenantSlug}_${activeEnv}_${(sessionUser?.id || "svc").slice(-6)}`,
-      restBaseUrl: `https://api.sparrowx.net/rest/v1/${tenantSlug}`,
+      restBaseUrl: "https://db.sparrowx.net/rest/v1",
     };
-  }, [sessionUser, tenantSlug, activeEnv]);
+  }, [sessionUser, tenantSlug, activeEnv, customAnonKey]);
+
+  const handleRotateStudioApiKey = () => {
+    const freshKey = generateSecureSparrowKey("spx_live");
+    setCustomAnonKey(freshKey);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`spx_studio_key_${tenantSlug}`, freshKey);
+      } catch {
+        // Ignore storage write errors
+      }
+    }
+    setStatusBanner({
+      type: "success",
+      message: "Generated new personal Database API Key for this tenant workspace.",
+    });
+  };
 
   const handleLockWorkspace = () => {
     clearSessionToken();
@@ -689,7 +731,7 @@ export function SovereignDatabaseStudio({
         const res = await fetch(`/rest/v1/${tableName}?select=*`, {
           headers: {
             Accept: "application/json",
-            apikey: "spx_ovh_sovereign_key",
+            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
           },
         });
         if (res.ok) {
@@ -713,7 +755,7 @@ export function SovereignDatabaseStudio({
         setLoading(false);
       }
     },
-    []
+    [activeProject.anonKey]
   );
 
   // Refresh counts across all studio tables
@@ -724,7 +766,7 @@ export function SovereignDatabaseStudio({
           headers: {
             Range: "0-0",
             Prefer: "count=exact",
-            apikey: "spx_ovh_sovereign_key",
+            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
           },
         });
         const contentRange = res.headers.get("content-range");
@@ -741,7 +783,7 @@ export function SovereignDatabaseStudio({
       const local = LOCAL_SEED_TABLES[t.name] || [];
       setTableCounts((prev) => ({ ...prev, [t.name]: local.length }));
     }
-  }, [studioTables]);
+  }, [studioTables, activeProject.anonKey]);
 
   // Initial load
   useEffect(() => {
@@ -795,7 +837,10 @@ export function SovereignDatabaseStudio({
     setPingStatus((prev) => ({ ...prev, testing: true }));
     const t0 = performance.now();
     try {
-      await fetch("/rest/v1/", { method: "HEAD" }).catch(() => {});
+      await fetch("/rest/v1/", {
+        method: "HEAD",
+        headers: { apikey: activeProject.anonKey || "spx_ovh_sovereign_key" },
+      }).catch(() => {});
       const pRest = Math.max(0.8, Math.round((performance.now() - t0) * 10) / 10);
       setPingStatus({
         postgrest: pRest,
@@ -836,7 +881,7 @@ export function SovereignDatabaseStudio({
           headers: {
             "Content-Type": "application/json",
             Prefer: "return=representation",
-            apikey: "spx_ovh_sovereign_key",
+            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
           },
           body: JSON.stringify(parsed),
         });
@@ -853,7 +898,7 @@ export function SovereignDatabaseStudio({
           headers: {
             "Content-Type": "application/json",
             Prefer: "return=representation",
-            apikey: "spx_ovh_sovereign_key",
+            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
           },
           body: JSON.stringify(parsed),
         });
@@ -886,7 +931,7 @@ export function SovereignDatabaseStudio({
     try {
       const res = await fetch(`/rest/v1/${selectedTable}?${col}=eq.${encodeURIComponent(String(val))}`, {
         method: "DELETE",
-        headers: { apikey: "spx_ovh_sovereign_key" },
+        headers: { apikey: activeProject.anonKey || "spx_ovh_sovereign_key" },
       });
       if (res.ok) {
         setStatusBanner({ type: "success", message: `Record deleted from ${selectedTable}.` });
@@ -1176,13 +1221,15 @@ export function SovereignDatabaseStudio({
   // Code snippets for Sandbox
   const sandboxSnippets = useMemo(() => {
     const tbl = sandboxSelectedTable;
+    const apiBase = activeProject.restBaseUrl;
+    const apiKey = activeProject.anonKey;
     return {
       js: `// 1. Initialize the SparrowX Database Client
 import { createClient } from '@sparrowx/client';
 
 const sparrowx = createClient(
-  'https://api.sparrowx.net',
-  'spx_live_58c7e9f3b1402a7'
+  '${apiBase}',
+  '${apiKey}'
 );
 
 // 2. Query sovereign data with Row Level Security
@@ -1195,16 +1242,16 @@ const { data, error } = await sparrowx
 if (error) console.error('Query error:', error);
 else console.log('Fetched records:', data);`,
       curl: `# Query PostgREST REST API Gateway directly
-curl -X GET "https://api.sparrowx.net/rest/v1/${tbl}?select=*&limit=10" \\
-  -H "apikey: spx_live_58c7e9f3b1402a7" \\
-  -H "Authorization: Bearer spx_live_58c7e9f3b1402a7" \\
+curl -X GET "${apiBase}/${tbl}?select=*&limit=10" \\
+  -H "apikey: ${apiKey}" \\
+  -H "Authorization: Bearer ${apiKey}" \\
   -H "Accept: application/json"`,
       python: `# Python SDK (sparrowx-py)
 from sparrowx import create_client
 
 sparrowx = create_client(
-    "https://api.sparrowx.net",
-    "spx_live_58c7e9f3b1402a7"
+    "${apiBase}",
+    "${apiKey}"
 )
 
 # Fetch table records
@@ -1222,7 +1269,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
   // Extended fields mapped automatically
 }`,
     };
-  }, [sandboxSelectedTable]);
+  }, [sandboxSelectedTable, activeProject.restBaseUrl, activeProject.anonKey]);
 
   // =========================================================================
   // VIEW MODE 1: PRODUCT LANDING PAGE (db.sparrowx.net)
@@ -2694,7 +2741,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                     <div className="flex-1 rounded-xl border border-zinc-800 bg-[#09090C] p-3 overflow-auto">
                       <pre className="font-mono text-xs text-emerald-400 leading-relaxed">
                         {sandboxResponse ||
-                          `// Click "Test REST Endpoint" to execute live request against https://api.sparrowx.net/rest/v1/${sandboxSelectedTable}`}
+                          `// Click "Test REST Endpoint" to execute live request against ${activeProject.restBaseUrl}/${sandboxSelectedTable}`}
                       </pre>
                     </div>
                   </div>
@@ -3011,14 +3058,24 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           {/* TAB 7: API & CREDENTIALS */}
           {activeSection === "api" && (
             <div className="flex-1 p-6 overflow-y-auto space-y-5">
-              <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
-                  <Server className="size-4 text-[#3ECF8E]" />
-                  <span>Sovereign Database Connection & Dedicated Domain Settings</span>
-                </h2>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  Connect directly to your local PostgreSQL 16 + PostgREST instance or dedicated Studio domain.
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-white flex items-center gap-2">
+                    <Server className="size-4 text-[#3ECF8E]" />
+                    <span>Sovereign Database Connection & Dedicated Domain Settings</span>
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Private, account-scoped PostgreSQL 16 + PostgREST credentials for your authenticated workspace.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRotateStudioApiKey}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-[#3ECF8E] hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="size-3.5" />
+                  <span>Generate New API Key</span>
+                </button>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -3040,7 +3097,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                   },
                   {
                     id: "anon-key",
-                    label: `Public Anonymous API Key (RLS Enforced • ${activeProject.environment})`,
+                    label: `Personal Database API Key (Account-Scoped • ${activeProject.environment})`,
                     value: activeProject.anonKey,
                   },
                 ].map((item) => (

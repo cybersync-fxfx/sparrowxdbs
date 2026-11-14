@@ -18,37 +18,42 @@ import {
   Layers,
   Lock,
   RefreshCw,
+  LogOut,
+  RotateCcw,
 } from "lucide-react";
+import {
+  authenticateAppUserFromBackend,
+  generateSecureSparrowKey,
+  type AppUser,
+} from "@/lib/supabase";
+import {
+  verifySessionToken,
+  issueSignedSessionToken,
+  clearSessionToken,
+} from "@/lib/advanced-features";
 
 interface EndpointMeta {
   path: string;
   method: "GET" | "POST" | "PATCH";
   description: string;
-  category: "Auth & Users" | "Database Tables" | "Security Telemetry" | "System Health";
+  category: "Workspace Tables" | "Security Telemetry" | "System Health";
   exampleQuery: string;
   payload?: string;
 }
 
 const ENDPOINTS: EndpointMeta[] = [
   {
-    path: "/rest/v1/app_users",
-    method: "GET",
-    description: "Query registered platform users, roles, and administrative profiles.",
-    category: "Auth & Users",
-    exampleQuery: "select=id,email,full_name,admin&limit=5",
-  },
-  {
     path: "/rest/v1/client_tenants",
     method: "GET",
-    description: "Multi-tenant organizations, API keys, and service quotas.",
-    category: "Database Tables",
+    description: "Your organization workspaces, connection metadata, and active service quotas.",
+    category: "Workspace Tables",
     exampleQuery: "select=*&status=eq.Active",
   },
   {
     path: "/rest/v1/protected_services",
     method: "GET",
     description: "Active web services, endpoints, and microservices guarded by SparrowX.",
-    category: "Database Tables",
+    category: "Workspace Tables",
     exampleQuery: "select=*&order=created_at.desc&limit=10",
   },
   {
@@ -56,7 +61,7 @@ const ENDPOINTS: EndpointMeta[] = [
     method: "GET",
     description: "Real-time edge security incidents, WAF triggers, and mitigation logs.",
     category: "Security Telemetry",
-    exampleQuery: "select=*&severity=eq.High&order=detected_at.desc&limit=5",
+    exampleQuery: "select=*&severity=eq.High&order=created_at.desc&limit=5",
   },
   {
     path: "/rest/v1/threat_indicators",
@@ -74,7 +79,36 @@ const ENDPOINTS: EndpointMeta[] = [
   },
 ];
 
+function getOrCreateUserDbApiKey(userId: string): string {
+  const fallback = generateSecureSparrowKey("spx_db");
+  if (typeof window === "undefined") return fallback;
+  const storageKey = `spx_user_db_api_key_${userId}`;
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing && existing.startsWith("spx_")) return existing;
+  window.localStorage.setItem(storageKey, fallback);
+  return fallback;
+}
+
 export function SparrowxApiGatewayPortal() {
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => {
+    const verified = verifySessionToken();
+    if (!verified) return null;
+    return {
+      id: verified.sub,
+      email: verified.email,
+      fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
+      password: "",
+      admin: verified.role === "admin" ? "yes" : "no",
+      tenantId: verified.tenantId,
+    };
+  });
+
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  const [userApiKey, setUserApiKey] = useState<string>("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EndpointMeta>(ENDPOINTS[0]);
   const [customParams, setCustomParams] = useState(ENDPOINTS[0].exampleQuery);
@@ -83,13 +117,64 @@ export function SparrowxApiGatewayPortal() {
   const [statusCode, setStatusCode] = useState<number | null>(null);
   const [latencyMs, setLatencyMs] = useState<string>("0.8ms");
   const [activeCodeTab, setActiveCodeTab] = useState<"curl" | "typescript" | "python">("curl");
-  const [apiBaseUrl, setApiBaseUrl] = useState("https://api.sparrowx.net");
+  const [apiBaseUrl, setApiBaseUrl] = useState("https://db.sparrowx.net");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       setApiBaseUrl(window.location.origin);
     }
   }, []);
+
+  useEffect(() => {
+    if (sessionUser) {
+      setUserApiKey(getOrCreateUserDbApiKey(sessionUser.id));
+    } else {
+      setUserApiKey("");
+    }
+  }, [sessionUser]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    if (!loginEmail.trim() || !loginPassword) {
+      setLoginError("Please enter your account email and password.");
+      return;
+    }
+    setLoggingIn(true);
+    try {
+      const user = await authenticateAppUserFromBackend(loginEmail.trim(), loginPassword);
+      if (!user) {
+        setLoginError("Invalid email or password. Sign in with your registered SparrowX account.");
+        return;
+      }
+      issueSignedSessionToken(
+        user.id,
+        user.email,
+        user.admin === "yes" ? "admin" : "tenant_user",
+        user.tenantId,
+        user.fullName,
+      );
+      setSessionUser(user);
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : "Authentication failed.");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleRotateKey = () => {
+    if (!sessionUser || typeof window === "undefined") return;
+    const nextKey = generateSecureSparrowKey("spx_db");
+    window.localStorage.setItem(`spx_user_db_api_key_${sessionUser.id}`, nextKey);
+    setUserApiKey(nextKey);
+  };
+
+  const handleSignOut = () => {
+    clearSessionToken();
+    setSessionUser(null);
+    setApiResponse(null);
+    setStatusCode(null);
+  };
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -98,6 +183,7 @@ export function SparrowxApiGatewayPortal() {
   };
 
   const handleRunRequest = async () => {
+    if (!sessionUser || !userApiKey) return;
     setLoading(true);
     setApiResponse(null);
     setStatusCode(null);
@@ -108,40 +194,33 @@ export function SparrowxApiGatewayPortal() {
       }`;
       const res = await fetch(fullUrl, {
         headers: {
-          apikey: "spx_ovh_sovereign_key",
+          apikey: userApiKey,
+          Authorization: `Bearer ${userApiKey}`,
           Accept: "application/json",
         },
       });
       const end = performance.now();
       setLatencyMs((end - start).toFixed(1) + "ms");
       setStatusCode(res.status);
-      const data = await res.json();
-      setApiResponse(JSON.stringify(data, null, 2));
-    } catch {
+      const text = await res.text();
+      try {
+        setApiResponse(JSON.stringify(JSON.parse(text), null, 2));
+      } catch {
+        setApiResponse(text);
+      }
+    } catch (err) {
       const end = performance.now();
       setLatencyMs((end - start).toFixed(1) + "ms");
-      setStatusCode(200);
+      setStatusCode(503);
       setApiResponse(
         JSON.stringify(
-          [
-            {
-              id: "usr_018f_492a",
-              email: "operator@sparrowx.net",
-              full_name: "Security Lead",
-              admin: "yes",
-              created_at: "2026-11-10T04:12:00Z",
-            },
-            {
-              id: "usr_019c_88b1",
-              email: "dev@client.com",
-              full_name: "App Developer",
-              admin: "no",
-              created_at: "2026-11-11T09:20:00Z",
-            },
-          ],
+          {
+            error: "Gateway Unreachable",
+            detail: err instanceof Error ? err.message : "Network error connecting to hosted DB API.",
+          },
           null,
-          2
-        )
+          2,
+        ),
       );
     } finally {
       setLoading(false);
@@ -150,21 +229,22 @@ export function SparrowxApiGatewayPortal() {
 
   // Generate code snippet based on activeCodeTab
   const getCodeSnippet = () => {
+    const activeKey = userApiKey || "spx_db_sign_in_to_generate";
     const fullUrl = `${apiBaseUrl}${selectedEndpoint.path}${
       customParams ? `?${customParams}` : ""
     }`;
 
     if (activeCodeTab === "curl") {
       return `curl -X ${selectedEndpoint.method} "${fullUrl}" \\
-  -H "apikey: spx_ovh_sovereign_key" \\
-  -H "Authorization: Bearer spx_ovh_sovereign_key" \\
+  -H "apikey: ${activeKey}" \\
+  -H "Authorization: Bearer ${activeKey}" \\
   -H "Accept: application/json"`;
     }
 
     if (activeCodeTab === "typescript") {
       return `import { createClient } from '@supabase/supabase-js';
 
-const sparrowx = createClient('${apiBaseUrl}', 'spx_ovh_sovereign_key');
+const sparrowx = createClient('${apiBaseUrl}', '${activeKey}');
 
 const { data, error } = await sparrowx
   .from('${selectedEndpoint.path.replace("/rest/v1/", "")}')
@@ -178,14 +258,121 @@ console.log(data);`;
 
 url = "${fullUrl}"
 headers = {
-    "apikey": "spx_ovh_sovereign_key",
-    "Authorization": "Bearer spx_ovh_sovereign_key",
+    "apikey": "${activeKey}",
+    "Authorization": "Bearer ${activeKey}",
     "Accept": "application/json"
 }
 
 response = requests.get(url, headers=headers)
 print(response.json())`;
   };
+
+  if (!sessionUser) {
+    return (
+      <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
+        <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img
+                src="/sparrowx-api-logo.svg"
+                alt="SparrowX Private Database API"
+                className="size-9 object-contain shrink-0"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                    SPARROWX // PRIVATE DATABASE API
+                  </span>
+                  <span className="rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
+                    AUTH REQUIRED
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#64748B] font-mono">
+                  Zero-Trust Endpoint • Sign in to access your personal hosted DB API &amp; keys
+                </p>
+              </div>
+            </div>
+
+            <a
+              href="https://db.sparrowx.net"
+              className="px-3 py-1.5 rounded bg-[#14171F] border border-white/10 text-xs font-mono text-[#9CA3AF] hover:text-white transition-colors"
+            >
+              Open DB Studio
+            </a>
+          </div>
+        </header>
+
+        <main className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md border border-white/[0.1] bg-[#0E1015] rounded-lg p-6 sm:p-8 space-y-6 shadow-2xl">
+            <div className="space-y-2 text-center">
+              <div className="mx-auto size-11 rounded-lg bg-emerald-500/10 border border-emerald-500/30 grid place-items-center text-emerald-400">
+                <Lock className="size-5" />
+              </div>
+              <h1 className="text-xl font-bold text-white tracking-tight">
+                Private Database API — Account Sign-In Required
+              </h1>
+              <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                For your security, SparrowX does not expose database schemas, endpoints, or API keys publicly. Sign in with your account to view and generate your personal Database API credentials (also available in Dashboard Settings).
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              {loginError && (
+                <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-mono">
+                  {loginError}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
+                  Account Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  className="w-full h-10 rounded border border-white/10 bg-[#08090C] px-3 text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full h-10 rounded border border-white/10 bg-[#08090C] px-3 text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-emerald-500/50"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loggingIn}
+                className="w-full h-10 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {loggingIn ? "Verifying Credentials..." : "Sign In to Access Your DB API"}
+              </button>
+            </form>
+
+            <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-[#64748B]">
+              <a href="https://sparrowx.net" className="hover:text-white transition-colors">
+                ← sparrowx.net
+              </a>
+              <a href="https://db.sparrowx.net" className="text-emerald-400 hover:underline">
+                Manage in DB Studio →
+              </a>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
@@ -201,14 +388,14 @@ print(response.json())`;
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                  SPARROWX // API GATEWAY
+                  SPARROWX // HOSTED DB API
                 </span>
                 <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
-                  POSTGREST 12.2
+                  AUTHENTICATED
                 </span>
               </div>
               <p className="text-[10px] text-[#64748B] font-mono">
-                api.sparrowx.net • Zero-Boilerplate Auto-Generated Schema REST
+                Signed in as {sessionUser.email} • Private Database REST &amp; Key Console
               </p>
             </div>
           </div>
@@ -216,37 +403,54 @@ print(response.json())`;
           <div className="flex items-center gap-2 text-xs font-mono">
             <div className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm text-[#9CA3AF]">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>JWT BEARER ACTIVE</span>
+              <span>PERSONAL KEY ACTIVE</span>
             </div>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] hover:bg-red-500/10 hover:text-red-400 px-2.5 py-1 rounded-sm text-[#9CA3AF] transition-colors cursor-pointer"
+            >
+              <LogOut className="size-3" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Two-Pane Technical Workspace */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
-        {/* Top Technical Pitch Banner */}
-        <div className="border border-white/[0.08] bg-[#0E1015] rounded-md p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        {/* Top Technical Banner & Personal Key Generator */}
+        <div className="border border-white/[0.08] bg-[#0E1015] rounded-md p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white font-mono">
-              PostgREST 12 + Compiled OpenAPI Gateway
+              Your Hosted Database REST API
             </h1>
             <p className="text-xs text-[#9CA3AF] max-w-2xl">
-              Every table in your PostgreSQL database automatically publishes instant REST endpoints with JSON operators, pagination, and JWT verification. Zero manual route code.
+              Authenticated REST endpoints scoped to your account. Use or rotate your personal key below to connect apps to your hosted SparrowX database.
             </p>
           </div>
 
-          {/* Anon Key Copy Widget */}
-          <div className="border border-white/[0.08] bg-[#14171F] p-2.5 rounded-sm flex items-center gap-3 text-xs font-mono">
+          {/* Personal API Key Widget */}
+          <div className="border border-white/[0.08] bg-[#14171F] p-3 rounded-sm flex flex-wrap items-center gap-3 text-xs font-mono">
             <div className="space-y-0.5">
-              <span className="text-[10px] text-[#64748B] uppercase block">Public Anon Key:</span>
-              <code className="text-[#F3F4F6] text-[11px] block select-all">spx_ovh_sovereign_key</code>
+              <span className="text-[10px] text-[#64748B] uppercase block">Your Personal DB API Key:</span>
+              <code className="text-emerald-400 text-[11px] block select-all">{userApiKey}</code>
             </div>
             <button
               type="button"
-              onClick={() => handleCopy("spx_ovh_sovereign_key", "anon-top")}
-              className="px-2.5 py-1 rounded bg-[#08090C] border border-white/10 hover:border-white/20 text-[#9CA3AF] hover:text-white transition-colors cursor-pointer"
+              onClick={() => handleCopy(userApiKey, "anon-top")}
+              className="px-2.5 py-1 rounded bg-[#08090C] border border-white/10 hover:border-white/20 text-[#9CA3AF] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
             >
               {copiedKey === "anon-top" ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+              <span>{copiedKey === "anon-top" ? "Copied" : "Copy"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleRotateKey}
+              className="px-2.5 py-1 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <RotateCcw className="size-3" />
+              <span>Generate New Key</span>
             </button>
           </div>
         </div>

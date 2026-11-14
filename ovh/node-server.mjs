@@ -501,6 +501,25 @@ const server = createServer(async (req, res) => {
 
     // If it's a programmatic query to PostgREST (/rest/v1 or api domain queries)
     if (!isHealthRoute && !isBrowserNavigationToApiHome && (isApiHost || isRestPath)) {
+      const apiKey = String(
+        req.headers["apikey"] ||
+          String(req.headers["authorization"] || "").replace(/^Bearer\s+/i, "")
+      ).trim();
+
+      const hasValidKeyFormat =
+        apiKey.startsWith("spx_") || apiKey.split(".").length === 3;
+
+      if (req.method !== "HEAD" && !hasValidKeyFormat) {
+        res.writeHead(401, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            error:
+              "Unauthorized: Private Database API requires a valid personal API key. Sign in to your SparrowX Dashboard -> Settings to generate your key.",
+          })
+        );
+        return;
+      }
+
       let targetPath = reqUrl;
       if (isRestPath) {
         targetPath = reqUrl.replace(/^\/rest\/v1/, "") || "/";

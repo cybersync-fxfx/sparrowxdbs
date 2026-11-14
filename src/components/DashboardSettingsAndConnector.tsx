@@ -122,6 +122,20 @@ export function DashboardSettingsAndConnector({
       : "Connector not verified yet. Paste the snippet into your website and click Connect below.",
   });
 
+  // Hosted Database REST API & Personal Key State
+  const [dbApiCodeTab, setDbApiCodeTab] = useState<"curl" | "js" | "python">("curl");
+  const [copiedDbUrl, setCopiedDbUrl] = useState(false);
+  const [copiedDbEndpoint, setCopiedDbEndpoint] = useState(false);
+  const [copiedDbSnippet, setCopiedDbSnippet] = useState(false);
+  const [isTestingDbApi, setIsTestingDbApi] = useState(false);
+  const [dbApiTestResult, setDbApiTestResult] = useState<{
+    tested: boolean;
+    success: boolean;
+    status?: number;
+    latencyMs?: number;
+    message: string;
+  } | null>(null);
+
   // Server connector test state
   const [serverHostInput, setServerHostInput] = useState(() => {
     return dbConfig.connectors.vpsServer.serverIp || "";
@@ -323,6 +337,104 @@ export function DashboardSettingsAndConnector({
       setDbConfig(getTenantDatabaseConfig(tenantId, tenantName, primaryDomain));
     }
   };
+
+  const handleGenerateNewDbApiKey = () => {
+    const newKey = rotateTenantDashboardApiKey(tenantId);
+    const updated = getTenantDatabaseConfig(tenantId, tenantName, primaryDomain);
+    setDbConfig(updated);
+    setShowApiKey(true);
+    setLastResetFeedback(`New personal Database API Key issued (${newKey.slice(0, 12)}...).`);
+    showToast("Generated new personal Database API Key");
+  };
+
+  const handleCopyDbField = (text: string, field: "url" | "endpoint" | "snippet") => {
+    navigator.clipboard.writeText(text);
+    if (field === "url") {
+      setCopiedDbUrl(true);
+      setTimeout(() => setCopiedDbUrl(false), 2000);
+      showToast("Hosted Database REST API URL copied");
+    } else if (field === "endpoint") {
+      setCopiedDbEndpoint(true);
+      setTimeout(() => setCopiedDbEndpoint(false), 2000);
+      showToast("Tenant-scoped endpoint copied");
+    } else {
+      setCopiedDbSnippet(true);
+      setTimeout(() => setCopiedDbSnippet(false), 2000);
+      showToast("Database SDK snippet copied");
+    }
+  };
+
+  const handleTestDbApiConnection = async () => {
+    setIsTestingDbApi(true);
+    const t0 = performance.now();
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://db.sparrowx.net";
+      const res = await fetch(
+        `${origin}/rest/v1/tenant_ips?tenant_id=eq.${encodeURIComponent(tenantId)}&limit=1`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+            apikey: dbConfig.dashboardApiKey,
+            Authorization: `Bearer ${dbConfig.dashboardApiKey}`,
+            "x-sparrowx-client-id": dbConfig.apiClientId,
+          },
+        },
+      );
+      const latencyMs = Math.max(1, Math.round(performance.now() - t0));
+      if (res.ok) {
+        const msg = `Hosted Database API connected (HTTP ${res.status}, ${latencyMs}ms). Authenticated with your personal key.`;
+        setDbApiTestResult({ tested: true, success: true, status: res.status, latencyMs, message: msg });
+        showToast(msg);
+      } else {
+        const msg = `Database API responded with HTTP ${res.status} (${latencyMs}ms). Verify server status or key.`;
+        setDbApiTestResult({ tested: true, success: false, status: res.status, latencyMs, message: msg });
+        showToast(msg, "warning");
+      }
+    } catch (err) {
+      const latencyMs = Math.max(1, Math.round(performance.now() - t0));
+      const msg = err instanceof Error ? err.message : "Unable to reach Hosted Database API endpoint.";
+      setDbApiTestResult({ tested: true, success: false, latencyMs, message: msg });
+      showToast(msg, "error");
+    } finally {
+      setIsTestingDbApi(false);
+    }
+  };
+
+  const hostedDbBaseUrl = "https://db.sparrowx.net/rest/v1";
+  const tenantScopedEndpoint = `${hostedDbBaseUrl}/tenant_ips?tenant_id=eq.${tenantId}`;
+
+  const dbApiSnippet =
+    dbApiCodeTab === "curl"
+      ? `curl -X GET "${tenantScopedEndpoint}&select=*" \\
+  -H "apikey: ${dbConfig.dashboardApiKey}" \\
+  -H "Authorization: Bearer ${dbConfig.dashboardApiKey}" \\
+  -H "x-sparrowx-client-id: ${dbConfig.apiClientId}" \\
+  -H "Accept: application/json"`
+      : dbApiCodeTab === "js"
+        ? `// Connect to your private hosted SparrowX PostgreSQL DB
+const res = await fetch("${tenantScopedEndpoint}&select=*", {
+  headers: {
+    "apikey": "${dbConfig.dashboardApiKey}",
+    "Authorization": "Bearer ${dbConfig.dashboardApiKey}",
+    "x-sparrowx-client-id": "${dbConfig.apiClientId}",
+    "Accept": "application/json"
+  }
+});
+const rows = await res.json();
+console.log("Tenant DB records:", rows);`
+        : `import requests
+
+url = "${tenantScopedEndpoint}&select=*"
+headers = {
+    "apikey": "${dbConfig.dashboardApiKey}",
+    "Authorization": "Bearer ${dbConfig.dashboardApiKey}",
+    "x-sparrowx-client-id": "${dbConfig.apiClientId}",
+    "Accept": "application/json"
+}
+
+r = requests.get(url, headers=headers)
+print(r.json())`;
 
   const htmlConnectorSnippet = `<!-- SparrowX Autonomous Cyber Defense & AI Shield -->
 <script 
@@ -566,6 +678,186 @@ export function DashboardSettingsAndConnector({
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* 2B. HOSTED DATABASE REST API & PERSONAL KEY GENERATOR (PRIVATE TO ACCOUNT) */}
+      <section className="rounded-xl border border-emerald-500/30 bg-card p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3.5">
+          <div className="flex items-center gap-2.5">
+            <div className="grid size-8 place-items-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+              <Database className="size-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-foreground">
+                Hosted Database REST API &amp; SDK Connection (Private to Your Account)
+              </h2>
+              <p className="text-[11px] text-muted-foreground">
+                Only visible when signed into your account. Connect external apps to your hosted database using your personal key — zero public endpoint exposure.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleGenerateNewDbApiKey}
+              className="h-8 gap-1.5 text-xs font-semibold border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+            >
+              <RotateCcw className="size-3" />
+              <span>Generate New API Key</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={isTestingDbApi}
+              onClick={handleTestDbApiConnection}
+              className="h-8 gap-1.5 text-xs font-semibold bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+            >
+              <Zap className={`size-3.5 ${isTestingDbApi ? "animate-pulse" : ""}`} />
+              <span>{isTestingDbApi ? "Testing..." : "Test Database API Connection"}</span>
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          {/* Private Hosted REST Base URL */}
+          <div className="rounded-lg border border-border bg-background p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground">Private Hosted REST API Base URL</span>
+              <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase">Authenticated Only</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={hostedDbBaseUrl}
+                className="h-9 w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-emerald-400 outline-none select-all"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleCopyDbField(hostedDbBaseUrl, "url")}
+                className="h-9 gap-1 text-xs shrink-0"
+              >
+                {copiedDbUrl ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                <span>{copiedDbUrl ? "Copied" : "Copy"}</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Tenant-Scoped Endpoint */}
+          <div className="rounded-lg border border-border bg-background p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-foreground">Your Scoped Database Endpoint</span>
+              <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase">{dbConfig.ipTableName}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={tenantScopedEndpoint}
+                className="h-9 w-full rounded-md border border-border bg-card px-3 font-mono text-xs text-cyan-300 outline-none select-all"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleCopyDbField(tenantScopedEndpoint, "endpoint")}
+                className="h-9 gap-1 text-xs shrink-0"
+              >
+                {copiedDbEndpoint ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                <span>{copiedDbEndpoint ? "Copied" : "Copy"}</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Key Summary & Connection Test Feedback */}
+        <div className="rounded-lg border border-border bg-background p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-2 min-w-0">
+            <Lock className="size-3.5 text-emerald-400 shrink-0" />
+            <span className="text-muted-foreground">Active Personal Key:</span>
+            <code className="text-foreground truncate">
+              {showApiKey ? dbConfig.dashboardApiKey : `${dbConfig.dashboardApiKey.slice(0, 10)}••••••••••••${dbConfig.dashboardApiKey.slice(-4)}`}
+            </code>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowApiKey(!showApiKey)}
+            className="text-[11px] text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+          >
+            {showApiKey ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+            <span>{showApiKey ? "Hide Key" : "Reveal Key"}</span>
+          </button>
+        </div>
+
+        {dbApiTestResult && (
+          <div
+            className={`rounded-lg border p-3 text-xs flex items-center gap-2 ${
+              dbApiTestResult.success
+                ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
+                : "border-amber-500/40 bg-amber-950/20 text-amber-300"
+            }`}
+          >
+            {dbApiTestResult.success ? (
+              <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />
+            ) : (
+              <AlertTriangle className="size-4 text-amber-400 shrink-0" />
+            )}
+            <span>{dbApiTestResult.message}</span>
+          </div>
+        )}
+
+        {/* Code Snippet Generator Tabs */}
+        <div className="rounded-lg border border-border bg-background p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1 bg-card p-1 rounded-md border border-border text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setDbApiCodeTab("curl")}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  dbApiCodeTab === "curl" ? "bg-emerald-500 text-zinc-950 font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                cURL
+              </button>
+              <button
+                type="button"
+                onClick={() => setDbApiCodeTab("js")}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  dbApiCodeTab === "js" ? "bg-emerald-500 text-zinc-950 font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                JavaScript / TypeScript
+              </button>
+              <button
+                type="button"
+                onClick={() => setDbApiCodeTab("python")}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  dbApiCodeTab === "python" ? "bg-emerald-500 text-zinc-950 font-bold" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Python
+              </button>
+            </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleCopyDbField(dbApiSnippet, "snippet")}
+              className="h-7 gap-1 text-xs"
+            >
+              {copiedDbSnippet ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+              <span>{copiedDbSnippet ? "Copied" : "Copy Snippet"}</span>
+            </Button>
+          </div>
+
+          <pre className="rounded-md border border-border bg-card p-3 font-mono text-[11px] text-emerald-400 overflow-x-auto leading-relaxed">
+            {dbApiSnippet}
+          </pre>
         </div>
       </section>
 
