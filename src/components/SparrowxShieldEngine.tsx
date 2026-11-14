@@ -26,6 +26,9 @@ import {
   Target,
   ExternalLink,
   User,
+  Mail,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import {
@@ -127,6 +130,7 @@ export function SparrowxShieldEngine({
   const [socFullName, setSocFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
 
@@ -784,21 +788,52 @@ export function SparrowxShieldEngine({
 
       {/* Operator Auth Dialog */}
       <Dialog open={socModalOpen} onOpenChange={setSocModalOpen}>
-        <DialogContent className="bg-[#0F131D] border border-[#FF6B00]/40 text-white max-w-md p-6 font-sans">
-          <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#08090C] border border-[#FF6B00]/25 p-1 font-mono text-xs mb-2">
+        <DialogContent className="bg-[#0B0E17]/95 backdrop-blur-xl border border-white/[0.10] text-white sm:max-w-[440px] p-0 gap-0 overflow-hidden rounded-2xl sm:rounded-2xl font-sans shadow-[0_24px_80px_rgba(0,0,0,0.85),0_0_40px_rgba(255,107,0,0.08)]">
+          {/* Top Accent Hairline & Ambient Glow */}
+          <div className="h-px w-full bg-gradient-to-r from-transparent via-[#FF6B00]/75 to-transparent" />
+          <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-72 rounded-full bg-[#FF6B00]/12 blur-3xl" />
+
+          <DialogHeader className="relative px-6 pt-6 pb-4 pr-12 text-left space-y-2.5">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-[#FF6B00]/15 border border-[#FF6B00]/30 text-[#FF8533] grid place-items-center shrink-0 shadow-[0_0_20px_rgba(255,107,0,0.15)]">
+                <Shield className="size-5" />
+              </div>
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/25 px-2.5 py-0.5 text-[10px] font-mono text-[#FF8533] font-semibold tracking-wider">
+                <span className="size-1.5 rounded-full bg-[#FF6B00] animate-pulse" />
+                <span>SHADOWSHIELD OPERATOR GATEWAY</span>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <DialogTitle className="text-xl font-bold text-white tracking-tight font-sans">
+                {socAuthMode === "signin"
+                  ? "Sign In to Shield Dashboard"
+                  : "Register Shield Operator"}
+              </DialogTitle>
+              <DialogDescription className="text-[13px] text-[#94A3B8] leading-relaxed font-sans">
+                {socAuthMode === "signin"
+                  ? "Authenticate operator credentials to inspect active packet scrubbing and manage firewall rules."
+                  : "Provision a new SparrowX Shield operator account for domain cloaking and L7 WAF control."}
+              </DialogDescription>
+            </div>
+          </DialogHeader>
+
+          {/* Segmented Mode Switcher Below Header (Zero Close-Button Overlap) */}
+          <div className="mx-6 mb-4 grid grid-cols-2 gap-1 rounded-xl bg-[#06080E] border border-white/[0.07] p-1 text-xs">
             <button
               type="button"
               onClick={() => {
                 setSocAuthMode("signin");
                 setAuthError("");
               }}
-              className={`py-2 rounded font-bold transition-colors cursor-pointer ${
+              className={`py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 socAuthMode === "signin"
-                  ? "bg-[#FF6B00] text-black"
-                  : "text-[#A3A3A3] hover:text-white"
+                  ? "bg-gradient-to-r from-[#FF6B00] to-[#FF8533] text-black shadow-[0_2px_12px_rgba(255,107,0,0.3)]"
+                  : "text-[#94A3B8] hover:text-white"
               }`}
             >
-              Sign In to SOC
+              <Lock className="size-3.5" />
+              <span>Sign In to SOC</span>
             </button>
             <button
               type="button"
@@ -806,36 +841,21 @@ export function SparrowxShieldEngine({
                 setSocAuthMode("register");
                 setAuthError("");
               }}
-              className={`py-2 rounded font-bold transition-colors cursor-pointer ${
+              className={`py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 socAuthMode === "register"
-                  ? "bg-[#FF6B00] text-black"
-                  : "text-[#A3A3A3] hover:text-white"
+                  ? "bg-gradient-to-r from-[#FF6B00] to-[#FF8533] text-black shadow-[0_2px_12px_rgba(255,107,0,0.3)]"
+                  : "text-[#94A3B8] hover:text-white"
               }`}
             >
-              Register Operator
+              <User className="size-3.5" />
+              <span>Register Operator</span>
             </button>
           </div>
 
-          <DialogHeader className="text-left space-y-1.5 mb-2">
-            <div className="inline-flex items-center gap-1.5 text-xs font-mono text-[#FF8533] mb-1 font-bold">
-              <span className="size-1.5 rounded-full bg-[#FF6B00] animate-pulse" />
-              SHADOWSHIELD OPERATOR GATEWAY
-            </div>
-            <DialogTitle className="text-xl font-bold text-white tracking-tight font-mono">
-              {socAuthMode === "signin"
-                ? "Sign In to Shield Dashboard"
-                : "Register Shield Operator"}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-[#A3A3A3] leading-relaxed">
-              {socAuthMode === "signin"
-                ? "Authenticate operator credentials to inspect active packet scrubbing and manage firewall rules."
-                : "Provision a new SparrowX Shield operator account for domain cloaking and L7 WAF control."}
-            </DialogDescription>
-          </DialogHeader>
-
           {authError && (
-            <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
-              {authError}
+            <div className="mx-6 mb-4 rounded-xl bg-red-500/10 border border-red-500/25 px-3.5 py-2.5 text-red-300 text-xs flex items-start gap-2.5">
+              <AlertTriangle className="size-4 shrink-0 text-red-400 mt-0.5" />
+              <span>{authError}</span>
             </div>
           )}
 
@@ -916,69 +936,118 @@ export function SparrowxShieldEngine({
                 setAuthLoading(false);
               }
             }}
-            className="space-y-4 pt-1 font-mono text-xs"
+            className="px-6 pb-5 space-y-4"
           >
             {socAuthMode === "register" && (
               <div className="space-y-1.5 text-left">
-                <label className="text-[11px] text-[#A3A3A3]">Operator Name</label>
-                <input
-                  type="text"
-                  required
-                  value={socFullName}
-                  onChange={(e) => setSocFullName(e.target.value)}
-                  placeholder="Alex Rivera"
-                  className="w-full px-3.5 py-2.5 rounded bg-[#08090C] border border-[#FF6B00]/30 text-white placeholder-[#666666] focus:outline-none focus:border-[#FF6B00]"
-                />
+                <label className="text-xs font-medium text-[#CBD5E1] block">
+                  Operator Name
+                </label>
+                <div className="relative group">
+                  <User className="size-4 text-[#64748B] group-focus-within:text-[#FF8533] transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={socFullName}
+                    onChange={(e) => setSocFullName(e.target.value)}
+                    placeholder="Alex Rivera"
+                    className="w-full rounded-xl border border-white/[0.10] bg-[#06080E]/90 hover:border-white/[0.18] pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/20 transition-all"
+                  />
+                </div>
               </div>
             )}
 
             <div className="space-y-1.5 text-left">
-              <label className="text-[11px] text-[#A3A3A3]">Operator Email</label>
-              <input
-                type="email"
-                required
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="admin@sparrowx.net"
-                className="w-full px-3.5 py-2.5 rounded bg-[#08090C] border border-[#FF6B00]/30 text-white placeholder-[#666666] focus:outline-none focus:border-[#FF6B00]"
-              />
+              <label className="text-xs font-medium text-[#CBD5E1] block">
+                Operator Email
+              </label>
+              <div className="relative group">
+                <Mail className="size-4 text-[#64748B] group-focus-within:text-[#FF8533] transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="email"
+                  required
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="admin@sparrowx.net"
+                  className="w-full rounded-xl border border-white/[0.10] bg-[#06080E]/90 hover:border-white/[0.18] pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/20 transition-all"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5 text-left">
-              <label className="text-[11px] text-[#A3A3A3]">Cryptographic Key / Password</label>
-              <input
-                type="password"
-                required
-                minLength={socAuthMode === "register" ? 6 : undefined}
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="••••••••••••••••"
-                className="w-full px-3.5 py-2.5 rounded bg-[#08090C] border border-[#FF6B00]/30 text-white placeholder-[#666666] focus:outline-none focus:border-[#FF6B00]"
-              />
+              <label className="text-xs font-medium text-[#CBD5E1] block">
+                Cryptographic Key / Password
+              </label>
+              <div className="relative group">
+                <Lock className="size-4 text-[#64748B] group-focus-within:text-[#FF8533] transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type={showAuthPassword ? "text" : "password"}
+                  required
+                  minLength={socAuthMode === "register" ? 6 : undefined}
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="••••••••••••••••"
+                  className="w-full rounded-xl border border-white/[0.10] bg-[#06080E]/90 hover:border-white/[0.18] pl-10 pr-10 py-2.5 text-sm text-white placeholder-[#64748B] focus:outline-none focus:border-[#FF6B00] focus:ring-2 focus:ring-[#FF6B00]/20 transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAuthPassword((prev) => !prev)}
+                  aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-white transition-colors cursor-pointer p-1"
+                >
+                  {showAuthPassword ? (
+                    <EyeOff className="size-4" />
+                  ) : (
+                    <Eye className="size-4" />
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="pt-2 flex items-center justify-end gap-2">
+            <button
+              type="submit"
+              disabled={authLoading}
+              className="w-full h-11 rounded-xl bg-gradient-to-r from-[#FF6B00] to-[#FF8533] hover:brightness-110 text-black font-bold text-xs sm:text-sm tracking-tight shadow-[0_4px_20px_rgba(255,107,0,0.3)] flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer mt-1"
+            >
+              {authLoading ? (
+                <RefreshCw className="size-4 animate-spin" />
+              ) : (
+                <Shield className="size-4" />
+              )}
+              <span>
+                {socAuthMode === "signin"
+                  ? "Authenticate Operator"
+                  : "Create Shield Operator"}
+              </span>
+              {!authLoading && <ArrowRight className="size-4" />}
+            </button>
+          </form>
+
+          {/* Subtle Security Footer Strip */}
+          <div className="bg-[#06080E]/90 border-t border-white/[0.06] px-6 py-3.5 flex items-center justify-between text-xs text-[#64748B]">
+            <div className="flex items-center gap-2">
+              <span className="size-1.5 rounded-full bg-emerald-400" />
               <button
                 type="button"
-                onClick={() => setSocModalOpen(false)}
-                className="px-4 py-2 rounded text-xs text-[#A3A3A3] hover:text-white cursor-pointer"
+                onClick={() => {
+                  setSocAuthMode(socAuthMode === "signin" ? "register" : "signin");
+                  setAuthError("");
+                }}
+                className="text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="px-5 py-2 rounded bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                {authLoading && <RefreshCw className="size-3 animate-spin" />}
-                <span>
-                  {socAuthMode === "signin"
-                    ? "Authenticate Operator"
-                    : "Create Shield Operator"}
-                </span>
+                {socAuthMode === "signin"
+                  ? "Need access? Register operator"
+                  : "Already registered? Sign in"}
               </button>
             </div>
-          </form>
+            <button
+              type="button"
+              onClick={() => setSocModalOpen(false)}
+              className="text-[#94A3B8] hover:text-white font-medium transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

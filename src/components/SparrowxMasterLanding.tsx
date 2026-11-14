@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  AlertCircle,
   Database,
   Shield,
   FileUp,
@@ -23,6 +24,10 @@ import {
   X,
   User,
   LogOut,
+  Mail,
+  Eye,
+  EyeOff,
+  Building2,
 } from "lucide-react";
 import { ComparisonSection } from "./landing/ComparisonSection";
 import { ContactSection } from "./landing/ContactSection";
@@ -76,6 +81,7 @@ function OperatorLoginDialog({
   const [orgName, setOrgName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,34 +198,50 @@ function OperatorLoginDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#0D1526] border border-sky-500/20 text-white max-w-md p-6 font-sans shadow-2xl">
-        <DialogHeader className="text-left space-y-1.5 mb-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400 mb-1">
-            <span className="size-1.5 rounded-full bg-sky-400 animate-pulse" />
-            SPARROWX CLOUD IDENTITY
+      <DialogContent className="bg-[#080808]/95 backdrop-blur-xl border border-white/25 text-white sm:max-w-[440px] p-0 gap-0 overflow-hidden rounded-2xl sm:rounded-2xl font-sans shadow-[0_24px_80px_rgba(0,0,0,0.9),0_0_40px_rgba(255,255,255,0.06)]">
+        {/* Top Accent Hairline & Ambient Glow */}
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-white/75 to-transparent" />
+        <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 h-40 w-72 rounded-full bg-white/10 blur-3xl" />
+
+        <DialogHeader className="relative px-6 pt-6 pb-4 pr-12 text-left space-y-2.5">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl grid place-items-center shrink-0 border bg-white/10 border-white/30 text-white shadow-[0_0_20px_rgba(255,255,255,0.12)]">
+              <Lock className="size-5" aria-hidden="true" />
+            </div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/25 px-2.5 py-0.5 text-[10px] font-mono text-zinc-200 font-semibold tracking-wider">
+              <span className="size-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
+              <span>SPARROWX CLOUD IDENTITY</span>
+            </div>
           </div>
-          <DialogTitle className="text-xl font-bold text-white tracking-tight font-sans">
-            {authTab === "signin" ? "Access Developer Workspace" : "Create SparrowX Account"}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-[#A3B1C6] leading-relaxed">
-            {authTab === "signin"
-              ? "Sign in with your verified credentials to manage your databases, shields, and vault."
-              : "Provision an isolated database tenant, API key, and encrypted vault account."}
-          </DialogDescription>
+
+          <div className="space-y-1">
+            <DialogTitle className="text-xl font-bold text-white tracking-tight font-sans">
+              {authTab === "signin" ? "Access Developer Workspace" : "Create SparrowX Account"}
+            </DialogTitle>
+            <DialogDescription className="text-[13px] text-zinc-400 leading-relaxed font-sans">
+              {authTab === "signin"
+                ? "Sign in with your verified credentials to manage your databases, shields, and vault."
+                : "Provision an isolated database tenant, API key, and encrypted vault account."}
+            </DialogDescription>
+          </div>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3 font-mono text-xs">
+        {/* Segmented Mode Switcher Below Header (Zero Close-Button Overlap) */}
+        <div className="mx-6 mb-4 grid grid-cols-2 gap-1 rounded-xl bg-black border border-white/20 p-1 text-xs">
           <button
             type="button"
             onClick={() => {
               setAuthTab("signin");
               setError("");
             }}
-            className={`px-3 py-1.5 rounded font-bold transition-colors cursor-pointer ${
-              authTab === "signin" ? "bg-sky-500 text-black" : "text-[#A3B1C6] hover:text-white"
+            className={`py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              authTab === "signin"
+                ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
-            Sign In
+            <Lock className="size-3.5" aria-hidden="true" />
+            <span>Sign In</span>
           </button>
           <button
             type="button"
@@ -227,96 +249,140 @@ function OperatorLoginDialog({
               setAuthTab("register");
               setError("");
             }}
-            className={`px-3 py-1.5 rounded font-bold transition-colors cursor-pointer ${
-              authTab === "register" ? "bg-emerald-500 text-black" : "text-[#A3B1C6] hover:text-white"
+            className={`py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              authTab === "register"
+                ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
-            Create Account
+            <User className="size-3.5" aria-hidden="true" />
+            <span>Create Account</span>
           </button>
         </div>
 
         {error && (
-          <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
-            {error}
+          <div className="mx-6 mb-4 rounded-xl bg-white/[0.06] border border-white/40 px-3.5 py-2.5 text-white text-xs flex items-start gap-2.5">
+            <AlertCircle className="size-4 shrink-0 text-white mt-0.5" aria-hidden="true" />
+            <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={authTab === "signin" ? handleSignIn : handleRegister} className="space-y-3.5 pt-1 font-mono text-xs">
+        <form onSubmit={authTab === "signin" ? handleSignIn : handleRegister} className="px-6 pb-5 space-y-4">
           {authTab === "register" && (
             <>
-              <div className="space-y-1 text-left">
-                <label className="text-[11px] text-[#A3B1C6]">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Alex Turner"
-                  className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
-                />
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-medium text-zinc-200 block">Full Name</label>
+                <div className="relative group">
+                  <User className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Alex Turner"
+                    className="w-full rounded-xl border border-white/35 bg-[#080808] hover:border-white/55 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all"
+                  />
+                </div>
               </div>
-              <div className="space-y-1 text-left">
-                <label className="text-[11px] text-[#A3B1C6]">Workspace / Organization (Optional)</label>
-                <input
-                  type="text"
-                  value={orgName}
-                  onChange={(e) => setOrgName(e.target.value)}
-                  placeholder="Acme Cloud Lab"
-                  className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
-                />
+              <div className="space-y-1.5 text-left">
+                <label className="text-xs font-medium text-zinc-200 block">
+                  Workspace / Organization <span className="text-zinc-400">(Optional)</span>
+                </label>
+                <div className="relative group">
+                  <Building2 className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+                  <input
+                    type="text"
+                    value={orgName}
+                    onChange={(e) => setOrgName(e.target.value)}
+                    placeholder="Acme Cloud Lab"
+                    className="w-full rounded-xl border border-white/35 bg-[#080808] hover:border-white/55 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all"
+                  />
+                </div>
               </div>
             </>
           )}
 
-          <div className="space-y-1 text-left">
-            <label className="text-[11px] text-[#A3B1C6]">Account Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@yourdomain.com"
-              className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
-            />
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-medium text-zinc-200 block">Account Email</label>
+            <div className="relative group">
+              <Mail className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@yourdomain.com"
+                className="w-full rounded-xl border border-white/35 bg-[#080808] hover:border-white/55 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all"
+              />
+            </div>
           </div>
 
-          <div className="space-y-1 text-left">
-            <label className="text-[11px] text-[#A3B1C6]">Password (min 6 chars)</label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
-            />
+          <div className="space-y-1.5 text-left">
+            <label className="text-xs font-medium text-zinc-200 block">
+              Password <span className="text-zinc-400">(min 6 chars)</span>
+            </label>
+            <div className="relative group">
+              <Lock className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full rounded-xl border border-white/35 bg-[#080808] hover:border-white/55 pl-10 pr-10 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all font-mono"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors cursor-pointer p-1"
+              >
+                {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+              </button>
+            </div>
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2">
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-11 rounded-xl font-bold text-xs sm:text-sm tracking-tight flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer mt-1 bg-white hover:bg-zinc-200 text-black shadow-[0_4px_20px_rgba(255,255,255,0.2)]"
+          >
+            {loading ? <RefreshCw className="size-4 animate-spin" aria-hidden="true" /> : <Lock className="size-4" aria-hidden="true" />}
+            <span>
+              {loading
+                ? "Verifying..."
+                : authTab === "signin"
+                  ? "Sign In"
+                  : "Create Account"}
+            </span>
+            {!loading && <ArrowRight className="size-4" aria-hidden="true" />}
+          </button>
+        </form>
+
+        {/* Subtle Security Footer Strip */}
+        <div className="bg-black border-t border-white/15 px-6 py-3.5 flex items-center justify-between text-xs text-zinc-400">
+          <div className="flex items-center gap-2">
+            <span className="size-1.5 rounded-full bg-white" aria-hidden="true" />
             <button
               type="button"
-              onClick={() => onOpenChange(false)}
-              className="px-4 py-2 rounded text-xs text-[#A3B1C6] hover:text-white transition-colors cursor-pointer"
+              onClick={() => {
+                setAuthTab(authTab === "signin" ? "register" : "signin");
+                setError("");
+              }}
+              className="text-zinc-300 hover:text-white transition-colors cursor-pointer"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-5 py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.3)]"
-            >
-              {loading && <RefreshCw className="size-3 animate-spin" />}
-              <span>
-                {loading
-                  ? "Verifying..."
-                  : authTab === "signin"
-                    ? "Sign In"
-                    : "Create Account"}
-              </span>
+              {authTab === "signin" ? "New to SparrowX? Create account" : "Have an account? Sign in"}
             </button>
           </div>
-        </form>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="text-zinc-300 hover:text-white font-medium transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+        </div>
       </DialogContent>
     </Dialog>
   );
