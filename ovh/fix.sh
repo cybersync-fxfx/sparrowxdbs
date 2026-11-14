@@ -79,16 +79,58 @@ C_WHITE="\033[1;37m"
 
 FIXED_COUNT=0
 WARN_COUNT=0
+ERR_COUNT=0
 declare -a FIXED_LOG=()
+declare -a WARN_LOG=()
+declare -a ERR_LOG=()
+
+FIX_LOG_DIR="/var/log/sparrowx"
+REPO_LOG_DIR="${INSTALL_DIR}/logs"
+mkdir -p "${FIX_LOG_DIR}" "${REPO_LOG_DIR}" 2>/dev/null || true
+FIX_FULL_LOG="${FIX_LOG_DIR}/fix-latest.log"
+FIX_ERROR_LOG="${FIX_LOG_DIR}/errors.log"
+REPO_FULL_LOG="${REPO_LOG_DIR}/fix-latest.log"
+REPO_ERROR_LOG="${REPO_LOG_DIR}/errors.log"
+
+{
+  echo "=============================================================================="
+  echo "SPARROWX FIX RUN STARTED: $(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date)"
+  echo "=============================================================================="
+} > "${FIX_FULL_LOG}" 2>/dev/null || true
+cp -f "${FIX_FULL_LOG}" "${REPO_FULL_LOG}" 2>/dev/null || true
+
+# Mirror all terminal output (ANSI-stripped) to persistent log files
+exec > >(tee >(sed -r 's/\x1B\[[0-9;]*[mK]//g' >> "${FIX_FULL_LOG}" 2>/dev/null) >(sed -r 's/\x1B\[[0-9;]*[mK]//g' >> "${REPO_FULL_LOG}" 2>/dev/null)) 2>&1
+
+append_error_record() {
+  local level="$1"
+  local msg="$2"
+  local ts
+  ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || date)"
+  local line="[${ts}] [${level}] ${msg}"
+  echo "${line}" >> "${FIX_ERROR_LOG}" 2>/dev/null || true
+  echo "${line}" >> "${REPO_ERROR_LOG}" 2>/dev/null || true
+}
 
 log_scan()   { echo -e "  ${C_CYAN}[SCAN]${C_RESET}     $*"; }
 log_ok()     { echo -e "  ${C_GREEN}[ OK ]${C_RESET}     $*"; }
-log_warn()   { echo -e "  ${C_YELLOW}[WARN]${C_RESET}     $*"; WARN_COUNT=$((WARN_COUNT + 1)); }
-log_err()    { echo -e "  ${C_RED}[ERR ]${C_RESET}     $*"; }
+log_warn()   {
+  echo -e "  ${C_YELLOW}[WARN]${C_RESET}     $*"
+  WARN_COUNT=$((WARN_COUNT + 1))
+  WARN_LOG+=("$*")
+  append_error_record "WARN" "$*"
+}
+log_err()    {
+  echo -e "  ${C_RED}[ERR ]${C_RESET}     $*"
+  ERR_COUNT=$((ERR_COUNT + 1))
+  ERR_LOG+=("$*")
+  append_error_record "ERR" "$*"
+}
 log_fix() {
   echo -e "  ${C_YELLOW}[AUTO-FIX]${C_RESET} ${C_WHITE}$*${C_RESET}"
   FIXED_COUNT=$((FIXED_COUNT + 1))
   FIXED_LOG+=("$*")
+  append_error_record "AUTO-FIX" "$*"
 }
 log_healed() { echo -e "  ${C_GREEN}[HEALED]${C_RESET}   $*"; }
 
@@ -1810,7 +1852,43 @@ echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres Host    : 
 echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres DB/User : ${C_WHITE}${POSTGRES_DB} / ${POSTGRES_USER}${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres Pass    : ${C_YELLOW}${POSTGRES_PASSWORD}${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Credentials File : ${C_WHITE}/root/.sparrowx-ptero-credentials.txt${C_RESET}"
+echo -e "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Full Run Log     : ${C_WHITE}${FIX_FULL_LOG}${C_RESET}"
+echo -e "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Error Bundle Log : ${C_WHITE}${FIX_ERROR_LOG}${C_RESET}"
 echo -e "${C_GREEN}╚══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
+
+# Write structured diagnostic error bundle for future auto-patch updates
+{
+  echo ""
+  echo "=============================================================================="
+  echo "DIAGNOSTIC SNAPSHOT: $(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date)"
+  echo "GIT_HEAD: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+  echo "HEALTH: PG=${PG_READY:-?} PGRST=${PGRST_HEALTH} APP=${APP_HEALTH} HTTP=${EDGE_HTTP_HEALTH} HTTPS=${EDGE_HTTPS_HEALTH} PTERO=${PTERO_HEALTH}"
+  echo "COUNTS: FIXED=${FIXED_COUNT} WARN=${WARN_COUNT} ERR=${ERR_COUNT}"
+  if [ -f "/var/www/pterodactyl/storage/logs/laravel.log" ]; then
+    echo "--- PTERODACTYL LARAVEL.LOG (LAST 40 LINES) ---"
+    tail -n 40 /var/www/pterodactyl/storage/logs/laravel.log 2>/dev/null || true
+  fi
+  if [ -f "/var/log/nginx/pterodactyl.app-error.log" ]; then
+    echo "--- NGINX PTERO ERROR.LOG (LAST 20 LINES) ---"
+    tail -n 20 /var/log/nginx/pterodactyl.app-error.log 2>/dev/null || true
+  fi
+  if [ -f "/var/log/nginx/error.log" ]; then
+    echo "--- NGINX GLOBAL ERROR.LOG (LAST 20 LINES) ---"
+    tail -n 20 /var/log/nginx/error.log 2>/dev/null || true
+  fi
+  echo "--- SYSTEMD SERVICES ---"
+  for s in mariadb redis-server nginx pteroq docker php8.4-fpm php8.3-fpm php8.2-fpm php8.1-fpm; do
+    if systemctl list-unit-files 2>/dev/null | grep -q "^${s}.service"; then
+      echo "${s}: $(systemctl is-active "${s}" 2>/dev/null || echo unknown)"
+    fi
+  done
+  if [ "${HAS_DOCKER}" = "true" ]; then
+    echo "--- DOCKER PS -A ---"
+    docker ps -a --filter name=sparrowx --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
+  fi
+  echo "=============================================================================="
+} >> "${FIX_ERROR_LOG}" 2>/dev/null || true
+cp -f "${FIX_ERROR_LOG}" "${REPO_ERROR_LOG}" 2>/dev/null || true
 
 if [ "${HAS_DOCKER}" = "true" ]; then
   echo ""
