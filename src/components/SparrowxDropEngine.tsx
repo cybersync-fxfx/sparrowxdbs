@@ -671,30 +671,30 @@ export function SparrowxDropEngine() {
   const getFileIcon = (mimeOrName: string) => {
     const lower = mimeOrName.toLowerCase();
     if (lower.includes("image") || lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".svg"))
-      return <FileImage className="size-4 text-emerald-400" />;
+      return <FileImage className="size-4 text-purple-400" />;
     if (lower.includes("video") || lower.endsWith(".mp4") || lower.endsWith(".mov"))
       return <FileVideo className="size-4 text-blue-400" />;
     if (lower.includes("audio") || lower.endsWith(".mp3") || lower.endsWith(".wav"))
       return <FileAudio className="size-4 text-purple-400" />;
     if (lower.includes("zip") || lower.includes("tar") || lower.endsWith(".gz") || lower.endsWith(".7z"))
-      return <FileArchive className="size-4 text-amber-400" />;
+      return <FileArchive className="size-4 text-purple-400" />;
     if (lower.includes("json") || lower.includes("javascript") || lower.endsWith(".ts") || lower.endsWith(".py") || lower.endsWith(".sql"))
-      return <FileCode className="size-4 text-cyan-400" />;
+      return <FileCode className="size-4 text-purple-400" />;
     return <FileText className="size-4 text-zinc-400" />;
   };
 
   const getLargeFileIcon = (mimeOrName: string) => {
     const lower = mimeOrName.toLowerCase();
     if (lower.includes("image") || lower.endsWith(".png") || lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".svg") || lower.endsWith(".webp") || lower.endsWith(".gif"))
-      return <FileImage className="size-12 text-emerald-400" />;
+      return <FileImage className="size-12 text-purple-400" />;
     if (lower.includes("video") || lower.endsWith(".mp4") || lower.endsWith(".mov") || lower.endsWith(".mkv") || lower.endsWith(".webm") || lower.endsWith(".avi"))
       return <FileVideo className="size-12 text-blue-400" />;
     if (lower.includes("audio") || lower.endsWith(".mp3") || lower.endsWith(".wav") || lower.endsWith(".ogg") || lower.endsWith(".flac"))
       return <FileAudio className="size-12 text-purple-400" />;
     if (lower.includes("zip") || lower.includes("tar") || lower.endsWith(".gz") || lower.endsWith(".7z") || lower.endsWith(".rar") || lower.endsWith(".iso"))
-      return <FileArchive className="size-12 text-amber-400" />;
+      return <FileArchive className="size-12 text-purple-400" />;
     if (lower.includes("json") || lower.includes("javascript") || lower.endsWith(".ts") || lower.endsWith(".py") || lower.endsWith(".sql") || lower.endsWith(".html") || lower.endsWith(".css") || lower.endsWith(".sh"))
-      return <FileCode className="size-12 text-cyan-400" />;
+      return <FileCode className="size-12 text-purple-400" />;
     return <FileText className="size-12 text-zinc-300" />;
   };
 
@@ -707,61 +707,66 @@ export function SparrowxDropEngine() {
   const totalDownloads = persistentFiles.reduce((acc, f) => acc + (f.downloads || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
-      {/* Main Header */}
-      <header className="border-b border-white/[0.08] bg-[#0E1015]/95 px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-0 z-40 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-[#05060A] text-white flex flex-col font-sans selection:bg-[#A855F7] selection:text-white">
+      {/* ELEGANT NAVBAR (MIDNIGHT BLACK & ELECTRIC PURPLE) */}
+      <header className="border-b border-purple-500/20 bg-[#05060A]/90 sticky top-0 z-40 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5 shrink-0">
             <img
               src="/sparrowx-drop-logo.svg"
-              alt="SparrowX Files"
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(34,211,238,0.3)]"
+              alt="SparrowX Drop"
+              className="size-7 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(168,85,247,0.35)]"
             />
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                SPARROWX // FILES
-              </span>
-            </div>
+            <span className="font-bold text-sm tracking-tight text-white">SparrowX</span>
+            <span className="px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-[10px] font-mono font-semibold text-purple-300">
+              DROP
+            </span>
           </div>
 
-          {/* Center Mode Pills */}
-          <nav className="hidden lg:flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-[#08090C] p-1 text-[11px] font-mono">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveMode("ephemeral");
-                setIncomingDrop(null);
-                setIncomingPersistentId(null);
-              }}
-              className={`px-3 py-1 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeMode === "ephemeral"
-                  ? "bg-white text-black font-semibold"
-                  : "text-[#9CA3AF] hover:text-white"
-              }`}
-            >
-              <Zap className="size-3 text-emerald-500" />
-              <span>Ephemeral Drop</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveMode("storage");
-                setIncomingDrop(null);
-                setIncomingPersistentId(null);
-              }}
-              className={`px-3 py-1 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeMode === "storage"
-                  ? "bg-emerald-500 text-black font-semibold"
-                  : "text-[#9CA3AF] hover:text-white"
-              }`}
-            >
-              <Lock className="size-3 text-amber-500" />
-              <span>10GB Cloud Vault</span>
-            </button>
-          </nav>
+          {/* Center Navigation & Mode Switcher */}
+          <div className="hidden md:flex items-center gap-6">
+            <nav aria-label="Drop Mode Switcher" className="flex items-center gap-1 rounded-lg border border-purple-500/25 bg-[#090B12] p-0.5 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode("ephemeral");
+                  setIncomingDrop(null);
+                  setIncomingPersistentId(null);
+                }}
+                className={`px-3 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeMode === "ephemeral"
+                    ? "bg-[#A855F7] text-white font-semibold shadow-sm"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                <Zap className="size-3.5" />
+                <span>Ephemeral Drop</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode("storage");
+                  setIncomingDrop(null);
+                  setIncomingPersistentId(null);
+                }}
+                className={`px-3 py-1 rounded-md transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeMode === "storage"
+                    ? "bg-[#A855F7] text-white font-semibold shadow-sm"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                <Lock className="size-3.5" />
+                <span>10 GB Vault</span>
+              </button>
+            </nav>
 
-          {/* Right Vault Account & Node Controls */}
-          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+            <a href="#drop-pricing" className="text-xs font-medium text-zinc-400 hover:text-white transition-colors">
+              Pricing
+            </a>
+          </div>
+
+          {/* Right Vault Account Controls */}
+          <div className="flex items-center gap-2.5 text-xs">
             {isVaultAuthenticated && vaultUser ? (
               <>
                 <button
@@ -771,7 +776,7 @@ export function SparrowxDropEngine() {
                     setIncomingDrop(null);
                     setIncomingPersistentId(null);
                   }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-purple-500/15 border border-purple-500/35 text-purple-300 hover:bg-purple-500/25 transition-colors cursor-pointer font-mono"
                 >
                   <ShieldCheck className="size-3.5 shrink-0" />
                   <span className="max-w-[150px] truncate">{vaultUser.email}</span>
@@ -785,7 +790,7 @@ export function SparrowxDropEngine() {
                     setVaultUser(null);
                     setIsVaultAuthenticated(false);
                   }}
-                  className="px-2.5 py-1.5 rounded border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-md border border-white/15 bg-[#090B12] hover:border-purple-500/40 text-zinc-300 hover:text-white transition-colors cursor-pointer font-medium"
                 >
                   Sign Out
                 </button>
@@ -798,10 +803,10 @@ export function SparrowxDropEngine() {
                   setIncomingDrop(null);
                   setIncomingPersistentId(null);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-neutral-200 text-black font-semibold transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#A855F7] hover:bg-[#9333EA] text-white font-semibold transition-colors cursor-pointer shadow-sm"
               >
-                <Lock className="size-3 text-emerald-600" />
-                <span>Vault Sign In &amp; Register →</span>
+                <Lock className="size-3.5" />
+                <span>Vault Sign In</span>
               </button>
             )}
           </div>
@@ -810,10 +815,10 @@ export function SparrowxDropEngine() {
 
       {/* Main Workspace */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* TOP MODE SWITCHER (THE CORE UX HOOK) */}
+        {/* Compact Mobile Mode Switcher */}
         {(!incomingDrop && !incomingPersistentId) && (
-          <div className="flex justify-center w-full">
-            <div className="w-full sm:w-auto flex flex-col sm:flex-row p-1 rounded-md border border-white/[0.08] bg-[#0E1015] shadow-sm gap-1">
+          <div className="flex md:hidden justify-center w-full">
+            <div className="w-full grid grid-cols-2 p-1 rounded-lg border border-purple-500/25 bg-[#090B12] gap-1">
               <button
                 type="button"
                 onClick={() => {
@@ -821,15 +826,14 @@ export function SparrowxDropEngine() {
                   setIncomingDrop(null);
                   setIncomingPersistentId(null);
                 }}
-                className={`w-full sm:w-auto min-h-[40px] px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                className={`min-h-[38px] px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeMode === "ephemeral"
-                    ? "bg-white text-black font-semibold shadow-sm"
-                    : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                    ? "bg-[#A855F7] text-white font-semibold"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
-                <Zap className="size-3.5 text-emerald-500 fill-current shrink-0" />
-                <span className="hidden sm:inline">⚡ EPHEMERAL RAM DROP (NO LOGIN • ZERO DISK)</span>
-                <span className="inline sm:hidden">⚡ RAM DROP (NO LOGIN)</span>
+                <Zap className="size-3.5 shrink-0" />
+                <span>Ephemeral Drop</span>
               </button>
 
               <button
@@ -839,15 +843,14 @@ export function SparrowxDropEngine() {
                   setIncomingDrop(null);
                   setIncomingPersistentId(null);
                 }}
-                className={`w-full sm:w-auto min-h-[40px] px-3.5 sm:px-5 py-2 rounded-sm text-xs font-mono font-medium transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                className={`min-h-[38px] px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                   activeMode === "storage"
-                    ? "bg-white text-black font-semibold shadow-sm"
-                    : "text-[#9CA3AF] hover:text-white hover:bg-white/[0.04]"
+                    ? "bg-[#A855F7] text-white font-semibold"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
-                <Lock className="size-3.5 text-amber-500 shrink-0" />
-                <span className="hidden sm:inline">🔒 PERSISTENT CLOUD VAULT (10 GB FREE • LOGIN)</span>
-                <span className="inline sm:hidden">🔒 10GB CLOUD VAULT (LOGIN)</span>
+                <Lock className="size-3.5 shrink-0" />
+                <span>10 GB Vault</span>
               </button>
             </div>
           </div>
@@ -859,21 +862,21 @@ export function SparrowxDropEngine() {
           <div className="space-y-8 max-w-3xl mx-auto">
             {/* 1. Loading State for Persistent File */}
             {incomingPersistentId && persistentLoading && (
-              <div className="rounded-2xl border border-white/[0.08] bg-[#0B0F17] p-12 text-center space-y-4 shadow-2xl">
-                <RefreshCw className="size-9 text-emerald-400 animate-spin mx-auto" />
+              <div className="rounded-2xl border border-white/[0.08] bg-[#090B12] p-12 text-center space-y-4 shadow-2xl">
+                <RefreshCw className="size-9 text-purple-400 animate-spin mx-auto" />
                 <h3 className="text-xl font-bold text-white tracking-tight">
                   Connecting to Sovereign Storage...
                 </h3>
                 <p className="text-xs text-zinc-400 font-mono">
-                  Querying NVMe cluster for file ID: <span className="text-emerald-400">{incomingPersistentId}</span>
+                  Querying NVMe cluster for file ID: <span className="text-purple-400">{incomingPersistentId}</span>
                 </p>
               </div>
             )}
 
             {/* 2. File Not Found State for Persistent File */}
             {incomingPersistentId && !persistentLoading && !persistentFileInfo && (
-              <div className="rounded-2xl border border-amber-500/30 bg-[#0B0F17] p-10 text-center space-y-5 shadow-2xl">
-                <div className="size-14 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 grid place-items-center mx-auto">
+              <div className="rounded-2xl border border-purple-500/30 bg-[#090B12] p-10 text-center space-y-5 shadow-2xl">
+                <div className="size-14 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 grid place-items-center mx-auto">
                   <AlertTriangle className="size-7" />
                 </div>
                 <div className="space-y-2">
@@ -892,7 +895,7 @@ export function SparrowxDropEngine() {
                       window.history.pushState({}, "", "/");
                     }
                   }}
-                  className="px-6 py-3 rounded-xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-bold text-xs cursor-pointer shadow-lg transition-all"
+                  className="px-6 py-3 rounded-xl bg-[#A855F7] hover:bg-[#9333EA] text-white font-bold text-xs cursor-pointer shadow-lg transition-all"
                 >
                   Go to SparrowX File Vault →
                 </button>
@@ -901,8 +904,8 @@ export function SparrowxDropEngine() {
 
             {/* 3. Persistent File Welcoming Receiver Card */}
             {incomingPersistentId && !persistentLoading && persistentFileInfo && (
-              <div className="rounded-3xl border border-white/[0.12] bg-[#0B0F17] p-6 sm:p-10 shadow-2xl space-y-8 relative overflow-hidden">
-                <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-36 bg-emerald-500/10 blur-3xl pointer-events-none" />
+              <div className="rounded-3xl border border-white/[0.12] bg-[#090B12] p-6 sm:p-10 shadow-2xl space-y-8 relative overflow-hidden">
+                <div className="absolute -top-24 left-1/2 -translate-x-1/2 w-96 h-36 bg-purple-500/10 blur-3xl pointer-events-none" />
 
                 {/* Hero Greeting */}
                 <div className="text-center space-y-3 relative z-10">
@@ -915,7 +918,7 @@ export function SparrowxDropEngine() {
                 </div>
 
                 {/* File Showcase Box */}
-                <div className="p-6 rounded-2xl bg-[#05070B] border border-white/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10 shadow-inner">
+                <div className="p-6 rounded-2xl bg-[#05060A] border border-white/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5 relative z-10 shadow-inner">
                   <div className="flex items-center gap-4 min-w-0">
                     <div className="size-16 rounded-2xl bg-[#0E1420] border border-white/[0.1] grid place-items-center shrink-0 shadow-lg">
                       {getLargeFileIcon(persistentFileInfo.name)}
@@ -925,7 +928,7 @@ export function SparrowxDropEngine() {
                         {persistentFileInfo.name}
                       </div>
                       <div className="flex flex-wrap items-center gap-2 mt-1.5 font-mono text-xs text-zinc-400">
-                        <span className="font-bold text-emerald-400">{formatSize(persistentFileInfo.size)}</span>
+                        <span className="font-bold text-purple-400">{formatSize(persistentFileInfo.size)}</span>
                         <span className="text-zinc-600">•</span>
                         <span>NVMe High-Speed Storage</span>
                         <span className="text-zinc-600">•</span>
@@ -935,7 +938,7 @@ export function SparrowxDropEngine() {
                   </div>
 
                   <div className="shrink-0 flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-mono font-semibold">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/25 text-purple-400 text-xs font-mono font-semibold">
                       <Check className="size-3.5" />
                       SHA-256 Verified
                     </span>
@@ -944,8 +947,8 @@ export function SparrowxDropEngine() {
 
                 {/* Download Success Banner */}
                 {persistentDownloadSuccess && (
-                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-center gap-3">
-                    <CheckCircle2 className="size-5 text-emerald-400 shrink-0" />
+                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-mono flex items-center gap-3">
+                    <CheckCircle2 className="size-5 text-purple-400 shrink-0" />
                     <div>
                       <p className="font-bold text-white">Download initiated successfully!</p>
                       <p className="text-[11px] text-zinc-400">Your download is streaming directly from the server. Check your browser's download shelf.</p>
@@ -958,7 +961,7 @@ export function SparrowxDropEngine() {
                   <button
                     type="button"
                     onClick={handleDownloadPersistentFileDirect}
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer group"
+                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#A855F7] hover:bg-[#9333EA] text-white font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-3 cursor-pointer group"
                   >
                     <Download className="size-5 group-hover:translate-y-0.5 transition-transform" />
                     <span>Download File ({formatSize(persistentFileInfo.size)})</span>
@@ -979,10 +982,10 @@ export function SparrowxDropEngine() {
                 </div>
 
                 {/* Direct Link & Origin Fallback */}
-                <div className="p-4 rounded-xl bg-[#05070B] border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
+                <div className="p-4 rounded-xl bg-[#05060A] border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
                   <div className="text-zinc-400 flex items-center gap-2 truncate w-full sm:w-auto">
                     <span className="text-zinc-500 shrink-0">Direct Link:</span>
-                    <span className="text-emerald-400 truncate select-all">
+                    <span className="text-purple-400 truncate select-all">
                       {typeof window !== "undefined" ? `${window.location.origin}/f/${persistentFileInfo.id}` : `/f/${persistentFileInfo.id}`}
                     </span>
                   </div>
@@ -998,7 +1001,7 @@ export function SparrowxDropEngine() {
                       }}
                       className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors cursor-pointer flex items-center gap-1.5"
                     >
-                      {copiedPersistentId === persistentFileInfo.id ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                      {copiedPersistentId === persistentFileInfo.id ? <Check className="size-3.5 text-purple-400" /> : <Copy className="size-3.5" />}
                       <span>{copiedPersistentId === persistentFileInfo.id ? "Copied!" : "Copy Link"}</span>
                     </button>
                     <a
@@ -1016,27 +1019,27 @@ export function SparrowxDropEngine() {
 
                 {/* Trust Guarantees */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-white/[0.06]">
-                  <div className="p-3.5 rounded-xl bg-[#05070B] border border-white/[0.04] space-y-1">
+                  <div className="p-3.5 rounded-xl bg-[#05060A] border border-white/[0.04] space-y-1">
                     <div className="flex items-center gap-2 text-white text-xs font-semibold">
-                      <Zap className="size-3.5 text-emerald-400" />
+                      <Zap className="size-3.5 text-purple-400" />
                       <span>Unthrottled Gigabit Pipe</span>
                     </div>
                     <p className="text-[11px] text-zinc-500 leading-normal">
                       Direct bare-metal NVMe stream with unlimited direct bandwidth.
                     </p>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-[#05070B] border border-white/[0.04] space-y-1">
+                  <div className="p-3.5 rounded-xl bg-[#05060A] border border-white/[0.04] space-y-1">
                     <div className="flex items-center gap-2 text-white text-xs font-semibold">
-                      <Shield className="size-3.5 text-emerald-400" />
+                      <Shield className="size-3.5 text-purple-400" />
                       <span>Zero Adware or Popups</span>
                     </div>
                     <p className="text-[11px] text-zinc-500 leading-normal">
                       Clean transfer without countdown timers, ad networks, or captchas.
                     </p>
                   </div>
-                  <div className="p-3.5 rounded-xl bg-[#05070B] border border-white/[0.04] space-y-1">
+                  <div className="p-3.5 rounded-xl bg-[#05060A] border border-white/[0.04] space-y-1">
                     <div className="flex items-center gap-2 text-white text-xs font-semibold">
-                      <Lock className="size-3.5 text-emerald-400" />
+                      <Lock className="size-3.5 text-purple-400" />
                       <span>Sovereign Storage</span>
                     </div>
                     <p className="text-[11px] text-zinc-500 leading-normal">
@@ -1049,8 +1052,8 @@ export function SparrowxDropEngine() {
 
             {/* 4. Ephemeral Drop Welcoming Receiver Card */}
             {incomingDrop && (
-              <div className="rounded-3xl border-2 border-emerald-500/40 bg-[#0B0F17] p-6 sm:p-10 shadow-2xl space-y-8 text-center relative overflow-hidden">
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-mono text-emerald-400 font-semibold">
+              <div className="rounded-3xl border-2 border-purple-500/40 bg-[#090B12] p-6 sm:p-10 shadow-2xl space-y-8 text-center relative overflow-hidden">
+                <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3.5 py-1 text-xs font-mono text-purple-400 font-semibold">
                   <ShieldCheck className="size-4" />
                   <span>Incoming Zero-Disk Encrypted Drop</span>
                 </div>
@@ -1064,9 +1067,9 @@ export function SparrowxDropEngine() {
                   </p>
                 </div>
 
-                <div className="p-5 rounded-2xl bg-[#05070B] border border-zinc-800 flex items-center justify-between text-left font-mono shadow-inner">
+                <div className="p-5 rounded-2xl bg-[#05060A] border border-zinc-800 flex items-center justify-between text-left font-mono shadow-inner">
                   <div className="flex items-center gap-4 truncate mr-2">
-                    <div className="size-14 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 grid place-items-center shrink-0">
+                    <div className="size-14 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 grid place-items-center shrink-0">
                       {getLargeFileIcon(incomingDrop.filename)}
                     </div>
                     <div className="truncate">
@@ -1079,7 +1082,7 @@ export function SparrowxDropEngine() {
                     </div>
                   </div>
 
-                  <span className="shrink-0 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 text-xs font-bold font-mono">
+                  <span className="shrink-0 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-1 text-xs font-bold font-mono">
                     AES-GCM-256
                   </span>
                 </div>
@@ -1092,7 +1095,7 @@ export function SparrowxDropEngine() {
                 )}
 
                 {downloadSuccess && (
-                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono text-left flex items-center gap-2">
+                  <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-mono text-left flex items-center gap-2">
                     <CheckCircle2 className="size-4 shrink-0" />
                     <span>File decrypted in RAM and saved to your downloads folder!</span>
                   </div>
@@ -1103,7 +1106,7 @@ export function SparrowxDropEngine() {
                     type="button"
                     onClick={handleDecryptAndDownloadIncoming}
                     disabled={decrypting}
-                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#3ECF8E] hover:bg-[#34b77d] text-zinc-950 font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-[#A855F7] hover:bg-[#9333EA] text-white font-extrabold text-xs shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {decrypting ? <RefreshCw className="size-4 animate-spin" /> : <Download className="size-4" />}
                     <span>{decrypting ? "Decrypting in RAM..." : `Decrypt & Download "${incomingDrop.filename}"`}</span>
@@ -1134,7 +1137,7 @@ export function SparrowxDropEngine() {
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08] text-xs font-medium transition-all cursor-pointer"
               >
                 <span>Need to host or share files securely? Open Sovereign Storage Vault</span>
-                <ArrowRight className="size-3.5 text-emerald-400" />
+                <ArrowRight className="size-3.5 text-purple-400" />
               </button>
             </div>
           </div>
@@ -1147,12 +1150,12 @@ export function SparrowxDropEngine() {
           <div className="space-y-6">
             {!isVaultAuthenticated ? (
               /* 10 GB FREE VAULT UNLOCK FRAME (LOGGED OUT) */
-              <div className="border border-white/[0.08] bg-[#0E1015] rounded-md overflow-hidden shadow-xl">
+              <div className="border border-white/[0.08] bg-[#090B12] rounded-md overflow-hidden shadow-xl">
                 {/* Asymmetric Header */}
                 <div className="border-b border-white/[0.08] bg-[#14171F] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-amber-400" />
+                      <span className="size-2 rounded-full bg-purple-400" />
                       <h2 className="text-base font-bold text-white font-mono uppercase tracking-tight">
                         Persistent Sovereign Vault // 10 GB Free Tier
                       </h2>
@@ -1161,19 +1164,19 @@ export function SparrowxDropEngine() {
                       Unlock permanent file hosting, hit telemetry, and password-protected direct links.
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded w-fit">
+                  <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded w-fit">
                     ACCOUNT SIGN-IN REQUIRED
                   </span>
                 </div>
 
                 {/* Visual Storage Allocation Bar */}
-                <div className="p-6 border-b border-white/[0.08] bg-[#08090C] space-y-2">
+                <div className="p-6 border-b border-white/[0.08] bg-[#05060A] space-y-2">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <span className="text-[#9CA3AF]">Storage Allocation:</span>
                     <span className="text-white font-bold tabular-nums">0.00 GB / 10.00 GB Allocated</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-[#14171F] border border-white/[0.08] overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[2%]" />
+                    <div className="h-full bg-purple-500 w-[2%]" />
                   </div>
                   <div className="flex justify-between text-[10px] font-mono text-[#64748B]">
                     <span>0 GB</span>
@@ -1183,10 +1186,10 @@ export function SparrowxDropEngine() {
                 </div>
 
                 {/* 4 Feature Breakdown Grid (Hairline exposed) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] border-b border-white/[0.08] bg-[#0E1015]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] border-b border-white/[0.08] bg-[#090B12]">
                   <div className="p-4 space-y-1">
                     <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <ExternalLink className="size-3.5 text-emerald-400" />
+                      <ExternalLink className="size-3.5 text-purple-400" />
                       Permanent URLs
                     </span>
                     <p className="text-[11px] text-[#64748B]">
@@ -1195,7 +1198,7 @@ export function SparrowxDropEngine() {
                   </div>
                   <div className="p-4 space-y-1">
                     <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <Activity className="size-3.5 text-emerald-400" />
+                      <Activity className="size-3.5 text-purple-400" />
                       Download Analytics
                     </span>
                     <p className="text-[11px] text-[#64748B]">
@@ -1204,7 +1207,7 @@ export function SparrowxDropEngine() {
                   </div>
                   <div className="p-4 space-y-1">
                     <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <Lock className="size-3.5 text-emerald-400" />
+                      <Lock className="size-3.5 text-purple-400" />
                       Password Shares
                     </span>
                     <p className="text-[11px] text-[#64748B]">
@@ -1213,7 +1216,7 @@ export function SparrowxDropEngine() {
                   </div>
                   <div className="p-4 space-y-1">
                     <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <HardDrive className="size-3.5 text-emerald-400" />
+                      <HardDrive className="size-3.5 text-purple-400" />
                       RAID-1 Redundancy
                     </span>
                     <p className="text-[11px] text-[#64748B]">
@@ -1248,7 +1251,7 @@ export function SparrowxDropEngine() {
                         }}
                         className={`py-2 rounded font-semibold transition-colors cursor-pointer ${
                           vaultAuthMode === "register"
-                            ? "bg-emerald-500 text-black"
+                            ? "bg-purple-500 text-white"
                             : "text-[#9CA3AF] hover:text-white"
                         }`}
                       >
@@ -1405,14 +1408,14 @@ export function SparrowxDropEngine() {
               /* LOGGED IN: FULL SOVEREIGN FILE MANAGER WORKSPACE */
               <div className="space-y-6">
                 {/* User Session Bar */}
-                <div className="border border-white/[0.08] bg-[#0E1015] px-4 py-2.5 rounded flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                <div className="border border-white/[0.08] bg-[#090B12] px-4 py-2.5 rounded flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="size-2 rounded-full bg-purple-500 animate-pulse" />
                     <span className="text-white font-medium">10 GB Vault Active</span>
                     {vaultUser && (
                       <>
                         <span className="text-[#64748B]">•</span>
-                        <span className="text-emerald-400">
+                        <span className="text-purple-400">
                           {vaultUser.fullName || vaultUser.email} ({vaultUser.email})
                         </span>
                       </>
@@ -1436,7 +1439,7 @@ export function SparrowxDropEngine() {
                 </div>
             {/* Header intro */}
             <div className="text-center space-y-3 max-w-2xl mx-auto">
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-mono text-emerald-400">
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-400">
                 <HardDrive className="size-3.5" />
                 <span>Sovereign NVMe Disk Storage • Permanent Unique URLs</span>
               </div>
@@ -1451,37 +1454,37 @@ export function SparrowxDropEngine() {
 
             {/* Storage Hardware Telemetry HUD */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
+              <div className="rounded-xl border border-[#1E293B] bg-[#090B12] p-4 space-y-1">
                 <div className="text-[11px] text-zinc-500 font-mono flex items-center justify-between">
                   <span>NVMe Disk Used</span>
-                  <HardDrive className="size-3 text-[#3ECF8E]" />
+                  <HardDrive className="size-3 text-[#A855F7]" />
                 </div>
                 <div className="text-lg font-bold text-white font-mono">{formatSize(totalDiskUsedBytes)}</div>
                 <p className="text-[10px] text-zinc-500 font-mono">Quota: 500 GB Allocated</p>
               </div>
 
-              <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
+              <div className="rounded-xl border border-[#1E293B] bg-[#090B12] p-4 space-y-1">
                 <div className="text-[11px] text-zinc-500 font-mono flex items-center justify-between">
                   <span>Total Hosted Files</span>
-                  <FolderOpen className="size-3 text-cyan-400" />
+                  <FolderOpen className="size-3 text-purple-400" />
                 </div>
-                <div className="text-lg font-bold text-[#3ECF8E] font-mono">{persistentFiles.length} Files</div>
+                <div className="text-lg font-bold text-[#A855F7] font-mono">{persistentFiles.length} Files</div>
                 <p className="text-[10px] text-zinc-500 font-mono">Retained until deleted</p>
               </div>
 
-              <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
+              <div className="rounded-xl border border-[#1E293B] bg-[#090B12] p-4 space-y-1">
                 <div className="text-[11px] text-zinc-500 font-mono flex items-center justify-between">
                   <span>Total Downloads</span>
-                  <Download className="size-3 text-amber-400" />
+                  <Download className="size-3 text-purple-400" />
                 </div>
-                <div className="text-lg font-bold text-amber-300 font-mono">{totalDownloads}</div>
-                <p className="text-[10px] text-emerald-400 font-mono">Unlimited direct bandwidth</p>
+                <div className="text-lg font-bold text-purple-300 font-mono">{totalDownloads}</div>
+                <p className="text-[10px] text-purple-400 font-mono">Unlimited direct bandwidth</p>
               </div>
 
-              <div className="rounded-xl border border-[#1E293B] bg-[#0B0F17] p-4 space-y-1">
+              <div className="rounded-xl border border-[#1E293B] bg-[#090B12] p-4 space-y-1">
                 <div className="text-[11px] text-zinc-500 font-mono flex items-center justify-between">
                   <span>Encryption Standard</span>
-                  <Lock className="size-3 text-emerald-400" />
+                  <Lock className="size-3 text-purple-400" />
                 </div>
                 <div className="text-lg font-bold text-white font-mono">AES-256-XTS</div>
                 <p className="text-[10px] text-zinc-500 font-mono">Encrypted on bare-metal NVMe</p>
@@ -1498,7 +1501,7 @@ export function SparrowxDropEngine() {
               }}
               onDragOver={(e) => e.preventDefault()}
               onClick={() => persistentInputRef.current?.click()}
-              className="rounded-2xl border-2 border-dashed border-[#1E293B] hover:border-[#3ECF8E]/60 bg-[#0B0F17]/60 p-10 text-center cursor-pointer transition-all hover:bg-[#0B0F17] group space-y-3"
+              className="rounded-2xl border-2 border-dashed border-[#1E293B] hover:border-[#A855F7]/60 bg-[#090B12]/60 p-10 text-center cursor-pointer transition-all hover:bg-[#090B12] group space-y-3"
             >
               <input
                 type="file"
@@ -1510,7 +1513,7 @@ export function SparrowxDropEngine() {
                 }}
                 className="hidden"
               />
-              <div className="size-14 rounded-2xl bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 text-[#3ECF8E] grid place-items-center mx-auto group-hover:scale-105 transition-transform">
+              <div className="size-14 rounded-2xl bg-[#A855F7]/10 border border-[#A855F7]/20 text-[#A855F7] grid place-items-center mx-auto group-hover:scale-105 transition-transform">
                 <UploadCloud className="size-7" />
               </div>
               <div className="space-y-1">
@@ -1526,11 +1529,11 @@ export function SparrowxDropEngine() {
                 <div className="max-w-md mx-auto pt-2 space-y-1.5">
                   <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
                     <div
-                      className="bg-[#3ECF8E] h-full transition-all duration-300"
+                      className="bg-[#A855F7] h-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400">
+                  <span className="text-[10px] font-mono text-purple-400">
                     Writing to server disk: {uploadProgress}%
                   </span>
                 </div>
@@ -1538,11 +1541,11 @@ export function SparrowxDropEngine() {
             </div>
 
             {/* Hosted Files Explorer Table */}
-            <div className="rounded-2xl border border-[#1E293B] bg-[#0B0F17] overflow-hidden shadow-2xl space-y-0">
+            <div className="rounded-2xl border border-[#1E293B] bg-[#090B12] overflow-hidden shadow-2xl space-y-0">
               {/* Table Toolbar */}
               <div className="border-b border-[#1E293B] bg-[#0E1420] px-5 py-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="size-4 text-[#3ECF8E]" />
+                  <FolderOpen className="size-4 text-[#A855F7]" />
                   <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
                     Hosted Files Dashboard ({persistentFiles.length})
                   </span>
@@ -1556,7 +1559,7 @@ export function SparrowxDropEngine() {
                       placeholder="Filter files..."
                       value={fileSearchQuery}
                       onChange={(e) => setFileSearchQuery(e.target.value)}
-                      className="h-7 w-48 rounded-md border border-zinc-800 bg-[#05070B] pl-7 pr-2 text-xs font-mono text-zinc-200 placeholder-zinc-500 outline-none focus:border-[#3ECF8E]"
+                      className="h-7 w-48 rounded-md border border-zinc-800 bg-[#05060A] pl-7 pr-2 text-xs font-mono text-zinc-200 placeholder-zinc-500 outline-none focus:border-[#A855F7]"
                     />
                   </div>
                   <button
@@ -1597,7 +1600,7 @@ export function SparrowxDropEngine() {
                             <span className="truncate">{file.name}</span>
                           </td>
                           <td className="p-3 text-zinc-300">{formatSize(file.size)}</td>
-                          <td className="p-3 text-[#3ECF8E] truncate max-w-sm">
+                          <td className="p-3 text-[#A855F7] truncate max-w-sm">
                             <a
                               href={file.url}
                               target="_blank"
@@ -1623,7 +1626,7 @@ export function SparrowxDropEngine() {
                               >
                                 {copiedPersistentId === file.id ? (
                                   <>
-                                    <Check className="size-3 text-emerald-400" />
+                                    <Check className="size-3 text-purple-400" />
                                     <span>Copied</span>
                                   </>
                                 ) : (
@@ -1637,7 +1640,7 @@ export function SparrowxDropEngine() {
                               <a
                                 href={file.url}
                                 download={file.name}
-                                className="inline-flex items-center gap-1 rounded bg-[#3ECF8E] hover:bg-[#3ecf8e]/90 text-zinc-950 font-bold px-2.5 py-1 text-[11px] cursor-pointer"
+                                className="inline-flex items-center gap-1 rounded bg-[#A855F7] hover:bg-[#A855F7]/90 text-white font-bold px-2.5 py-1 text-[11px] cursor-pointer"
                                 title="Download file"
                               >
                                 <Download className="size-3" />
@@ -1672,7 +1675,7 @@ export function SparrowxDropEngine() {
         {activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
             <div className="text-center space-y-3 max-w-2xl mx-auto">
-              <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-mono text-amber-400">
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-400">
                 <Flame className="size-3.5" />
                 <span>Zero-Disk RAM Lifetime • 15-Minute Auto-Purge</span>
               </div>
@@ -1686,9 +1689,9 @@ export function SparrowxDropEngine() {
             </div>
 
             {burnNotice && (
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs font-mono text-amber-300 flex items-center justify-between">
+              <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4 text-xs font-mono text-purple-300 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Flame className="size-4 text-amber-400 shrink-0" />
+                  <Flame className="size-4 text-purple-400 shrink-0" />
                   <span>{burnNotice}</span>
                 </div>
                 <button
@@ -1711,7 +1714,7 @@ export function SparrowxDropEngine() {
                 }}
                 onDragOver={(e) => e.preventDefault()}
                 onClick={() => ephemeralInputRef.current?.click()}
-                className="rounded-2xl border-2 border-dashed border-[#1E293B] hover:border-amber-500/60 bg-[#0B0F17]/60 p-12 text-center cursor-pointer transition-all hover:bg-[#0B0F17] group space-y-4"
+                className="rounded-2xl border-2 border-dashed border-[#1E293B] hover:border-purple-500/60 bg-[#090B12]/60 p-12 text-center cursor-pointer transition-all hover:bg-[#090B12] group space-y-4"
               >
                 <input
                   type="file"
@@ -1723,7 +1726,7 @@ export function SparrowxDropEngine() {
                   }}
                   className="hidden"
                 />
-                <div className="size-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 grid place-items-center mx-auto group-hover:scale-105 transition-transform">
+                <div className="size-16 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 grid place-items-center mx-auto group-hover:scale-105 transition-transform">
                   <UploadCloud className="size-8" />
                 </div>
                 <div className="space-y-1">
@@ -1736,12 +1739,12 @@ export function SparrowxDropEngine() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-[#1E293B] bg-[#0B0F17] p-6 space-y-6 shadow-2xl">
+              <div className="rounded-2xl border border-[#1E293B] bg-[#090B12] p-6 space-y-6 shadow-2xl">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-4">
                   <div className="flex items-center gap-3">
                     <span className="relative flex size-3">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full size-3 bg-emerald-500" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full size-3 bg-purple-500" />
                     </span>
                     <div>
                       <div className="text-xs font-bold text-white uppercase tracking-wider font-mono">
@@ -1753,17 +1756,17 @@ export function SparrowxDropEngine() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 font-mono text-xs text-amber-300">
-                    <Clock className="size-3.5 text-amber-400" />
+                  <div className="flex items-center gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-1.5 font-mono text-xs text-purple-300">
+                    <Clock className="size-3.5 text-purple-400" />
                     <span>Auto-Purge TTL:</span>
                     <span className="font-bold">{formatTtl(ttlSeconds)}</span>
                   </div>
                 </div>
 
                 {ephemeralFile && (
-                  <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[#05070B] p-4 text-xs font-mono">
+                  <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-[#05060A] p-4 text-xs font-mono">
                     <div className="flex items-center gap-3 truncate">
-                      <div className="size-10 rounded-lg bg-zinc-800 grid place-items-center text-[#3ECF8E]">
+                      <div className="size-10 rounded-lg bg-zinc-800 grid place-items-center text-[#A855F7]">
                         <FileText className="size-5" />
                       </div>
                       <div className="truncate">
@@ -1773,7 +1776,7 @@ export function SparrowxDropEngine() {
                         </p>
                       </div>
                     </div>
-                    <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[10px]">
+                    <span className="rounded bg-purple-500/10 border border-purple-500/30 text-purple-400 px-2 py-0.5 text-[10px]">
                       AES-GCM-256
                     </span>
                   </div>
@@ -1784,14 +1787,14 @@ export function SparrowxDropEngine() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
-                        <span className="size-2 rounded-full bg-emerald-400" />
+                        <span className="size-2 rounded-full bg-purple-400" />
                         Canonical Domain Link (file.sparrowx.net)
                       </span>
                       <span className="text-[10px] font-mono text-zinc-500">AES-256 key in #hash</span>
                     </label>
 
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-[#3ECF8E] truncate select-all">
+                      <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05060A] px-3 py-2 font-mono text-xs text-[#A855F7] truncate select-all">
                         {ephemeralShareLink}
                       </div>
                       <button
@@ -1801,7 +1804,7 @@ export function SparrowxDropEngine() {
                           setCopiedLink(true);
                           setTimeout(() => setCopiedLink(false), 2000);
                         }}
-                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#3ECF8E] text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0 min-h-[40px] sm:min-h-0"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#A855F7] text-white font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0 min-h-[40px] sm:min-h-0"
                       >
                         {copiedLink ? (
                           <>
@@ -1822,15 +1825,15 @@ export function SparrowxDropEngine() {
                   {directShareLink && directShareLink !== ephemeralShareLink && (
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold text-zinc-300 flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-cyan-400">
-                          <span className="size-2 rounded-full bg-cyan-400" />
+                        <span className="flex items-center gap-1.5 text-purple-400">
+                          <span className="size-2 rounded-full bg-purple-400" />
                           Direct Gateway Link (Works immediately on active host)
                         </span>
                         <span className="text-[10px] font-mono text-zinc-500">Zero-configuration fallback</span>
                       </label>
 
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                        <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05070B] px-3 py-2 font-mono text-xs text-cyan-300 truncate select-all">
+                        <div className="flex-1 rounded-lg border border-zinc-800 bg-[#05060A] px-3 py-2 font-mono text-xs text-purple-300 truncate select-all">
                           {directShareLink}
                         </div>
                         <button
@@ -1840,7 +1843,7 @@ export function SparrowxDropEngine() {
                             setCopiedDirectLink(true);
                             setTimeout(() => setCopiedDirectLink(false), 2000);
                           }}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0 min-h-[40px] sm:min-h-0"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 text-white font-bold px-4 py-2 text-xs shadow cursor-pointer shrink-0 min-h-[40px] sm:min-h-0"
                         >
                           {copiedDirectLink ? (
                             <>
@@ -1861,7 +1864,7 @@ export function SparrowxDropEngine() {
 
                 <div className="flex items-center justify-between border-t border-[#1E293B] pt-4">
                   <div className="text-[11px] text-zinc-500 font-mono flex items-center gap-1.5">
-                    <Shield className="size-3.5 text-[#3ECF8E]" />
+                    <Shield className="size-3.5 text-[#A855F7]" />
                     <span>Zero telemetry • Zero disk footprint</span>
                   </div>
 
@@ -1885,7 +1888,7 @@ export function SparrowxDropEngine() {
         {/* 3 Core Pillars */}
         <div className="space-y-6">
           <div className="max-w-2xl">
-            <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-emerald-400">
+            <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-purple-400">
               Zero-Knowledge Architecture
             </span>
             <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-white">
@@ -1897,8 +1900,8 @@ export function SparrowxDropEngine() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 space-y-3">
-              <div className="size-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <div className="rounded-xl border border-white/[0.08] bg-[#090B12] p-6 space-y-3">
+              <div className="size-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
                 <Flame className="size-5" />
               </div>
               <h3 className="text-base font-semibold text-white">Ephemeral RAM Burn</h3>
@@ -1907,8 +1910,8 @@ export function SparrowxDropEngine() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 space-y-3">
-              <div className="size-10 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <div className="rounded-xl border border-white/[0.08] bg-[#090B12] p-6 space-y-3">
+              <div className="size-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
                 <Lock className="size-5" />
               </div>
               <h3 className="text-base font-semibold text-white">Client-Side AES-256-GCM</h3>
@@ -1917,8 +1920,8 @@ export function SparrowxDropEngine() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 space-y-3">
-              <div className="size-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+            <div className="rounded-xl border border-white/[0.08] bg-[#090B12] p-6 space-y-3">
+              <div className="size-10 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
                 <HardDrive className="size-5" />
               </div>
               <h3 className="text-base font-semibold text-white">Persistent 10 GB Vault</h3>
@@ -1933,7 +1936,7 @@ export function SparrowxDropEngine() {
         <div id="drop-pricing" className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-cyan-400">
+              <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-purple-400">
                 Storage & Transfer Plans
               </span>
               <h2 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-white">
@@ -1946,11 +1949,11 @@ export function SparrowxDropEngine() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 flex flex-col justify-between space-y-6">
+            <div className="rounded-xl border border-white/[0.08] bg-[#090B12] p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Starter</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
                     Active Now
                   </span>
                 </div>
@@ -1962,9 +1965,9 @@ export function SparrowxDropEngine() {
                   Instant zero-login RAM drops plus a free 10 GB persistent vault.
                 </p>
                 <ul className="space-y-2 pt-2 text-xs text-zinc-300">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Unlimited ephemeral RAM drops</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />10 GB persistent encrypted vault</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Client-side AES-256-GCM sealing</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Unlimited ephemeral RAM drops</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />10 GB persistent encrypted vault</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Client-side AES-256-GCM sealing</li>
                 </ul>
               </div>
               <button
@@ -1979,11 +1982,11 @@ export function SparrowxDropEngine() {
               </button>
             </div>
 
-            <div className="rounded-xl border border-emerald-500/40 bg-gradient-to-b from-emerald-500/[0.08] to-[#0B0E14] p-6 flex flex-col justify-between space-y-6 shadow-lg shadow-emerald-950/30">
+            <div className="rounded-xl border border-purple-500/40 bg-gradient-to-b from-purple-500/[0.08] to-[#090B12] p-6 flex flex-col justify-between space-y-6 shadow-lg shadow-purple-950/30">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono uppercase tracking-wider text-emerald-400">Pro Vault</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500 text-zinc-950 font-bold">
+                  <span className="text-xs font-mono uppercase tracking-wider text-purple-400">Pro Vault</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500 text-white font-bold">
                     Popular
                   </span>
                 </div>
@@ -1995,21 +1998,21 @@ export function SparrowxDropEngine() {
                   High-capacity encrypted file delivery for freelancers and indie studios.
                 </p>
                 <ul className="space-y-2 pt-2 text-xs text-zinc-200">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />250 GB persistent vault storage</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Up to 5 GB single-file transfers</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-emerald-400 shrink-0" />Custom link expiry & download caps</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />250 GB persistent vault storage</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Up to 5 GB single-file transfers</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Custom link expiry & download caps</li>
                 </ul>
               </div>
               <a
                 href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Pro%20Vault%20(250%20GB)"
-                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 py-2.5 text-xs font-bold text-zinc-950 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 py-2.5 text-xs font-bold text-white transition-colors"
               >
                 <span>Upgrade to Pro Vault</span>
                 <ArrowRight className="size-3.5" />
               </a>
             </div>
 
-            <div className="rounded-xl border border-white/[0.08] bg-[#0B0E14] p-6 flex flex-col justify-between space-y-6">
+            <div className="rounded-xl border border-white/[0.08] bg-[#090B12] p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Team Compliance</span>
@@ -2025,9 +2028,9 @@ export function SparrowxDropEngine() {
                   Shared encrypted dropboxes, audit trails, and priority edge throughput.
                 </p>
                 <ul className="space-y-2 pt-2 text-xs text-zinc-300">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-cyan-400 shrink-0" />2 TB pooled organization storage</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-cyan-400 shrink-0" />Audit logs & IP-locked share links</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-cyan-400 shrink-0" />Dedicated AP-Southeast NVMe nodes</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />2 TB pooled organization storage</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Audit logs & IP-locked share links</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Dedicated AP-Southeast NVMe nodes</li>
                 </ul>
               </div>
               <a
@@ -2043,19 +2046,19 @@ export function SparrowxDropEngine() {
 
         {/* Standalone FAQ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-          <div className="rounded-lg border border-white/[0.06] bg-[#0B0E14]/70 p-4 space-y-1.5">
+          <div className="rounded-lg border border-white/[0.06] bg-[#090B12]/70 p-4 space-y-1.5">
             <h4 className="text-xs font-semibold text-white">Are ephemeral files written to disk?</h4>
             <p className="text-xs text-zinc-400 leading-relaxed">
               No. Ephemeral drops stay strictly in memory and are wiped immediately after the receiver downloads or the timer expires.
             </p>
           </div>
-          <div className="rounded-lg border border-white/[0.06] bg-[#0B0E14]/70 p-4 space-y-1.5">
+          <div className="rounded-lg border border-white/[0.06] bg-[#090B12]/70 p-4 space-y-1.5">
             <h4 className="text-xs font-semibold text-white">Can SparrowX read my files?</h4>
             <p className="text-xs text-zinc-400 leading-relaxed">
               No. Encryption happens locally in your browser via WebCrypto AES-256-GCM before upload. Only holders of the share secret can decrypt.
             </p>
           </div>
-          <div className="rounded-lg border border-white/[0.06] bg-[#0B0E14]/70 p-4 space-y-1.5">
+          <div className="rounded-lg border border-white/[0.06] bg-[#090B12]/70 p-4 space-y-1.5">
             <h4 className="text-xs font-semibold text-white">How do I upgrade beyond 10 GB?</h4>
             <p className="text-xs text-zinc-400 leading-relaxed">
               Start free with 10 GB in Vault Mode and contact <span className="font-mono text-zinc-300">files@sparrowx.net</span> whenever your team needs 250 GB or 2 TB.
@@ -2064,10 +2067,10 @@ export function SparrowxDropEngine() {
         </div>
       </section>
 
-      <footer className="border-t border-white/[0.06] bg-[#06080D] py-6 px-4 sm:px-6">
+      <footer className="border-t border-white/[0.06] bg-[#05060A] py-6 px-4 sm:px-6">
         <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
           <div className="flex items-center gap-2 font-mono">
-            <ShieldCheck className="size-4 text-emerald-400" />
+            <ShieldCheck className="size-4 text-purple-400" />
             <span className="text-zinc-300 font-semibold">SparrowX Drop</span>
             <span>·</span>
             <span>Zero-Knowledge File Transfer &amp; Vault</span>

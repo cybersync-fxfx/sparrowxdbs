@@ -482,7 +482,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "vue",
     label: "Vue",
     badge: "Vu",
-    accent: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
+    accent: "text-lime-400 border-lime-500/30 bg-lime-500/10",
     snippet: (restBase, anonKey) =>
       `<!-- src/components/TenantList.vue -->\n<script setup lang="ts">\nimport { ref, onMounted } from 'vue'\nconst tenants = ref([])\nonMounted(async () => {\n  const r = await fetch('${restBase}/client_tenants?select=*', {\n    headers: { apikey: '${anonKey}' }\n  })\n  tenants.value = await r.json()\n})\n</script>`,
   },
@@ -490,7 +490,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "nuxt",
     label: "Nuxt",
     badge: "Nu",
-    accent: "text-emerald-300 border-emerald-400/30 bg-emerald-500/10",
+    accent: "text-lime-300 border-lime-400/30 bg-lime-500/10",
     snippet: (restBase, anonKey) =>
       `// server/api/tenants.ts\nexport default defineEventHandler(async () => {\n  return await $fetch('${restBase}/client_tenants?select=*', {\n    headers: { apikey: '${anonKey}' }\n  })\n})`,
   },
@@ -708,7 +708,7 @@ function NativeDialog({
         }
         pressedOutsideRef.current = false;
       }}
-      className={`m-auto w-[calc(100%-2rem)] ${maxWidthClass} rounded-xl border border-[#2E2E2E] bg-[#171717] p-0 text-zinc-100 shadow-2xl overscroll-contain backdrop:bg-black/80 backdrop:backdrop-blur-sm backdrop:overflow-hidden backdrop:overscroll-contain`}
+      className={`m-auto w-[calc(100%-2rem)] ${maxWidthClass} rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-0 text-zinc-100 shadow-2xl overscroll-contain backdrop:bg-black/80 backdrop:backdrop-blur-sm backdrop:overflow-hidden backdrop:overscroll-contain`}
       {...({ closedby: "any" } as Record<string, string>)}
     >
       {children}
@@ -734,10 +734,10 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
   return (
     <div className="space-y-4">
       <div
-        className="relative rounded-xl border border-[#2E2E2E] bg-[#121212] p-6 min-h-[210px] flex items-center justify-center overflow-hidden"
+        className="relative rounded-xl border border-[#2E2E2E] bg-[#05060A] p-6 min-h-[210px] flex items-center justify-center overflow-hidden"
         style={DOT_GRID_STYLE}
       >
-        <div className="absolute right-3 top-3 flex items-center rounded-md border border-[#2E2E2E] bg-[#181818] p-0.5 text-xs">
+        <div className="absolute right-3 top-3 flex items-center rounded-md border border-[#2E2E2E] bg-[#0C0F17] p-0.5 text-xs">
           <button
             type="button"
             onClick={() => setTopologyMode("topology")}
@@ -764,10 +764,10 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
           </button>
         </div>
 
-        <div className="w-full max-w-sm rounded-lg border border-[#2E2E2E] bg-[#181818]/95 backdrop-blur-md p-4 shadow-xl space-y-3">
+        <div className="w-full max-w-sm rounded-lg border border-[#2E2E2E] bg-[#0C0F17]/95 backdrop-blur-md p-4 shadow-xl space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="size-9 rounded-md bg-[#3ECF8E]/15 border border-[#3ECF8E]/40 grid place-items-center text-[#3ECF8E] shrink-0">
+              <div className="size-9 rounded-md bg-[#A3E635]/15 border border-[#A3E635]/40 grid place-items-center text-[#A3E635] shrink-0">
                 <Database className="size-4" />
               </div>
               <div>
@@ -778,8 +778,8 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
                 </div>
               </div>
             </div>
-            <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-mono text-[#3ECF8E]">
-              <span className="size-1.5 rounded-full bg-[#3ECF8E] animate-pulse" />
+            <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 bg-lime-500/10 border border-lime-500/30 text-[10px] font-mono text-[#A3E635]">
+              <span className="size-1.5 rounded-full bg-[#A3E635] animate-pulse" />
               LIVE
             </span>
           </div>
@@ -798,7 +798,7 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
 
       {/* Compute & Disk Telemetry Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 space-y-3">
+        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
@@ -824,14 +824,14 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
               </div>
               <div>
                 <div className="text-[10px] text-zinc-500 flex items-center justify-end gap-1">
-                  <span className="size-1.5 rounded-full bg-emerald-400" /> DISK IO BALANCE
+                  <span className="size-1.5 rounded-full bg-lime-400" /> DISK IO BALANCE
                 </div>
                 <div className="text-sm font-semibold text-white">99%</div>
               </div>
             </div>
           </div>
 
-          <div className="h-28 relative rounded-md bg-[#121212] border border-[#242424] px-2 pt-2 pb-1">
+          <div className="h-28 relative rounded-md bg-[#05060A] border border-[#242424] px-2 pt-2 pb-1">
             <svg viewBox="0 0 360 80" className="w-full h-full overflow-visible" preserveAspectRatio="none">
               <line x1="28" y1="8" x2="356" y2="8" stroke="rgba(239,68,68,0.45)" strokeWidth="1" />
               <line x1="28" y1="30" x2="356" y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
@@ -853,7 +853,7 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 space-y-3">
+        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
@@ -880,7 +880,7 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
             </div>
           </div>
 
-          <div className="h-28 relative rounded-md bg-[#121212] border border-[#242424] px-2 pt-2 pb-1">
+          <div className="h-28 relative rounded-md bg-[#05060A] border border-[#242424] px-2 pt-2 pb-1">
             <svg viewBox="0 0 360 80" className="w-full h-full overflow-visible" preserveAspectRatio="none">
               <line x1="28" y1="8" x2="356" y2="8" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
               <line x1="28" y1="30" x2="356" y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
@@ -890,11 +890,11 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
               <text x="4" y="57" fill="#71717a" fontSize="8" fontFamily="monospace">50%</text>
               <path
                 d="M 28 65 L 140 65 L 220 63 L 356 62 L 356 76 L 28 76 Z"
-                fill="rgba(62,207,142,0.12)"
+                fill="rgba(163,230,53,0.12)"
               />
               <polyline
                 fill="none"
-                stroke="#3ECF8E"
+                stroke="#A3E635"
                 strokeWidth="1.75"
                 points="28,65 140,65 220,63 356,62"
               />
@@ -2024,65 +2024,51 @@ export function SovereignDatabaseStudio({
     };
 
     return (
-      <div className="min-h-screen bg-[#0F0F10] text-[#F3F4F6] flex flex-col font-sans selection:bg-[#3ECF8E] selection:text-[#11181C] relative overflow-x-hidden">
-        <AnimatedCloudBackground variant="emerald" intensity="subtle" />
+      <div className="min-h-screen bg-[#05060A] text-white flex flex-col font-sans selection:bg-[#A3E635] selection:text-black relative overflow-x-hidden">
+        <AnimatedCloudBackground variant="lime" intensity="subtle" />
 
-        {/* SUPABASE-STYLE TOP NAVBAR */}
-        <header className="border-b border-[#262626] bg-[#121212]/90 px-4 sm:px-6 py-3 sticky top-0 z-40 backdrop-blur-md">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
+        {/* ELEGANT DB NAVBAR (MIDNIGHT BLACK, PURE WHITE & LIME GREEN) */}
+        <header className="border-b border-white/10 bg-[#05060A]/90 sticky top-0 z-40 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2.5 min-w-0">
               <img
                 src="/sparrowx-db-logo.svg"
-                alt="SparrowX Cloud DB"
-                className="size-8 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(62,207,142,0.3)]"
+                alt="SparrowX DB"
+                className="size-7 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(163,230,53,0.3)]"
               />
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                  SPARROWX <span className="text-[#3ECF8E]">//</span> CLOUD DB
-                </span>
-              </div>
+              <span className="font-bold text-sm tracking-tight text-white">SparrowX</span>
+              <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[10px] font-mono font-semibold text-[#A3E635]">
+                DB
+              </span>
             </div>
 
-            <nav aria-label="Product Navigation" className="hidden lg:flex items-center gap-6 text-xs font-medium text-zinc-400">
-              <a href="#db-bento" className="hover:text-white transition-colors">Product</a>
-              <a href="#db-docs" className="hover:text-white transition-colors">Developers</a>
-              <a href="#db-sandbox" className="hover:text-white transition-colors">Solutions</a>
-              <a href="#db-pricing" className="hover:text-white transition-colors">Pricing</a>
+            <nav aria-label="Product Navigation" className="hidden lg:flex items-center gap-7 text-xs font-medium text-zinc-400">
+              <a href="#db-bento" className="hover:text-white transition-colors">Features</a>
               <a href="#db-docs" className="hover:text-white transition-colors">Docs</a>
-              <a href="#db-pros-cons" className="hover:text-white transition-colors">Why SparrowX</a>
+              <a href="#db-sandbox" className="hover:text-white transition-colors">Sandbox</a>
+              <a href="#db-pricing" className="hover:text-white transition-colors">Pricing</a>
             </nav>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               {sessionUser ? (
                 <>
-                  <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#1B1B1E] border border-[#2E2E2E] text-zinc-200 font-mono text-[11px]">
-                    <span className="size-1.5 rounded-full bg-[#3ECF8E]" />
+                  <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#0A0D14] border border-white/15 text-zinc-200 font-mono text-[11px]">
+                    <span className="size-1.5 rounded-full bg-[#A3E635]" />
                     <span className="max-w-[130px] truncate">{sessionUser.fullName || sessionUser.email}</span>
                   </span>
                   {!isStandaloneDomain && onOpenClientArea && (
                     <button
                       type="button"
                       onClick={() => onOpenClientArea()}
-                      className="hidden sm:inline-flex px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#181818] hover:bg-[#232323] text-xs font-medium text-zinc-200 transition-colors cursor-pointer"
+                      className="hidden sm:inline-flex px-3 py-1.5 rounded-md border border-white/15 bg-[#0A0D14] hover:border-white/30 text-xs font-medium text-zinc-200 transition-colors cursor-pointer"
                     >
                       Client Area
                     </button>
                   )}
                   <button
                     type="button"
-                    onClick={() => {
-                      navigateStudioSection("auth");
-                      setViewMode("studio");
-                    }}
-                    className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#181818] hover:border-[#3ECF8E]/40 text-xs font-medium text-zinc-200 transition-colors cursor-pointer"
-                  >
-                    <Users className="size-3.5 text-[#3ECF8E]" />
-                    <span>Auth &amp; Users</span>
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setViewMode("studio")}
-                    className="px-3.5 py-1.5 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    className="px-3.5 py-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-black font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
                   >
                     <span>Open Studio</span>
                     <ChevronRight className="size-3.5" />
@@ -2090,7 +2076,7 @@ export function SovereignDatabaseStudio({
                   <button
                     type="button"
                     onClick={handleLockWorkspace}
-                    className="p-1.5 rounded-md border border-[#2E2E2E] bg-[#181818] hover:border-red-500/40 text-zinc-400 hover:text-red-400 transition-colors cursor-pointer"
+                    className="p-1.5 rounded-md border border-white/15 bg-[#0A0D14] hover:border-white/35 text-zinc-400 hover:text-white transition-colors cursor-pointer"
                     title="Sign out"
                     aria-label="Sign out"
                   >
@@ -2103,7 +2089,7 @@ export function SovereignDatabaseStudio({
                     <button
                       type="button"
                       onClick={() => onClose()}
-                      className="hidden sm:inline-flex px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#171717] hover:bg-[#222222] text-zinc-300 text-xs font-medium transition-colors cursor-pointer"
+                      className="hidden sm:inline-flex px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-white text-xs font-medium transition-colors cursor-pointer"
                     >
                       ← Back
                     </button>
@@ -2111,16 +2097,16 @@ export function SovereignDatabaseStudio({
                   <button
                     type="button"
                     onClick={() => scrollToAuthCard("signin")}
-                    className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#171717] hover:bg-[#242424] text-zinc-100 font-medium text-xs transition-colors cursor-pointer"
+                    className="px-3 py-1.5 rounded-md text-xs font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
                   >
-                    Sign in
+                    Sign In
                   </button>
                   <button
                     type="button"
                     onClick={() => scrollToAuthCard("register")}
-                    className="px-3.5 py-1.5 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] font-semibold text-xs transition-colors cursor-pointer shadow-sm"
+                    className="px-3.5 py-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-black font-semibold text-xs transition-colors cursor-pointer shadow-sm"
                   >
-                    Start your project
+                    Start Project
                   </button>
                 </>
               )}
@@ -2128,7 +2114,7 @@ export function SovereignDatabaseStudio({
               <button
                 type="button"
                 onClick={() => setLandingMobileMenuOpen((v) => !v)}
-                className="lg:hidden p-1.5 rounded-md border border-[#2E2E2E] bg-[#171717] text-zinc-300 cursor-pointer"
+                className="lg:hidden p-1.5 rounded-md border border-white/15 bg-[#0A0D14] text-zinc-300 cursor-pointer"
                 aria-label="Toggle Menu"
               >
                 <Menu className="size-4" />
@@ -2137,23 +2123,22 @@ export function SovereignDatabaseStudio({
           </div>
 
           {landingMobileMenuOpen && (
-            <div className="lg:hidden mt-3 pt-3 border-t border-[#262626] flex flex-wrap gap-3 text-xs font-medium text-zinc-300">
-              <a href="#db-bento" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-[#1E1E1E]">Product</a>
-              <a href="#db-docs" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-[#1E1E1E]">Docs &amp; Quickstarts</a>
-              <a href="#db-sandbox" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-[#1E1E1E]">SQL &amp; Vector Sandbox</a>
-              <a href="#db-pricing" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-[#1E1E1E]">Pricing</a>
-              <a href="#db-pros-cons" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-[#1E1E1E]">Why SparrowX</a>
+            <div className="lg:hidden px-4 sm:px-6 py-3 border-t border-white/10 bg-[#05060A] flex flex-wrap gap-3 text-xs font-medium text-zinc-300">
+              <a href="#db-bento" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Features</a>
+              <a href="#db-docs" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Docs</a>
+              <a href="#db-sandbox" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Sandbox</a>
+              <a href="#db-pricing" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Pricing</a>
             </div>
           )}
         </header>
 
         <main className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-10 space-y-14">
           {/* HERO + STRICT AUTH CARD */}
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border border-[#262626] bg-[#141416]/90 backdrop-blur-md rounded-xl p-6 sm:p-8 shadow-2xl">
+          <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border border-[#262626] bg-[#0A0D14]/90 backdrop-blur-md rounded-xl p-6 sm:p-8 shadow-2xl">
             <div className="lg:col-span-7 space-y-5">
               <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-[1.12]">
                 Build in a weekend. <br />
-                <span className="text-[#3ECF8E]">Scale to millions.</span>
+                <span className="text-[#A3E635]">Scale to millions.</span>
               </h1>
 
               <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl">
@@ -2164,7 +2149,7 @@ export function SovereignDatabaseStudio({
                 <button
                   type="button"
                   onClick={() => (sessionUser ? setViewMode("studio") : scrollToAuthCard("register"))}
-                  className="px-4 py-2 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] font-semibold text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-semibold text-xs transition-colors cursor-pointer"
                 >
                   {sessionUser ? "Open Database Studio →" : "Start your project"}
                 </button>
@@ -2178,13 +2163,13 @@ export function SovereignDatabaseStudio({
 
               <div className="pt-2 flex flex-wrap gap-5 text-xs font-mono text-zinc-300">
                 <span className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#3ECF8E]" /> 100% Portable Postgres
+                  <Check className="size-3.5 text-[#A3E635]" /> 100% Portable Postgres
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#3ECF8E]" /> Built-in Auth &amp; RLS
+                  <Check className="size-3.5 text-[#A3E635]" /> Built-in Auth &amp; RLS
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#3ECF8E]" /> PgBouncer Port 6543 Pooler
+                  <Check className="size-3.5 text-[#A3E635]" /> PgBouncer Port 6543 Pooler
                 </span>
               </div>
             </div>
@@ -2192,7 +2177,7 @@ export function SovereignDatabaseStudio({
             {/* Right: Studio Strict Auth Card */}
             <div
               id="db-auth-card"
-              className="lg:col-span-5 border border-[#2E2E2E] bg-[#17171A] rounded-xl p-5 space-y-4 shadow-xl scroll-mt-20"
+              className="lg:col-span-5 border border-[#2E2E2E] bg-[#0A0D14] rounded-xl p-5 space-y-4 shadow-xl scroll-mt-20"
             >
               <div className="flex items-center justify-between border-b border-[#262626] pb-3">
                 <div className="flex items-center gap-1.5">
@@ -2218,7 +2203,7 @@ export function SovereignDatabaseStudio({
                     }}
                     className={`text-xs font-mono font-semibold px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                       landingAuthMode === "register"
-                        ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
+                        ? "bg-[#A3E635] text-[#11181C] shadow-sm"
                         : "text-zinc-400 hover:text-white"
                     }`}
                   >
@@ -2284,7 +2269,7 @@ export function SovereignDatabaseStudio({
                       value={landingAuthEmail}
                       onChange={(e) => setLandingAuthEmail(e.target.value)}
                       placeholder="admin@sparrowx.net"
-                      className="w-full px-3 py-2 rounded-md bg-[#0F0F12] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#3ECF8E]"
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#A3E635]"
                     />
                   </div>
                   <div>
@@ -2298,7 +2283,7 @@ export function SovereignDatabaseStudio({
                       value={landingAuthPassword}
                       onChange={(e) => setLandingAuthPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-3 py-2 rounded-md bg-[#0F0F12] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#3ECF8E]"
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#A3E635]"
                     />
                   </div>
                   <button
@@ -2314,7 +2299,7 @@ export function SovereignDatabaseStudio({
                     <button
                       type="button"
                       onClick={() => setLandingAuthMode("register")}
-                      className="text-[#3ECF8E] hover:underline font-semibold cursor-pointer"
+                      className="text-[#A3E635] hover:underline font-semibold cursor-pointer"
                     >
                       Provision free project
                     </button>
@@ -2411,7 +2396,7 @@ export function SovereignDatabaseStudio({
                       value={landingRegisterOrg}
                       onChange={(e) => setLandingRegisterOrg(e.target.value)}
                       placeholder="Acme Technologies"
-                      className="w-full px-3 py-2 rounded-md bg-[#0F0F12] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#3ECF8E]"
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#A3E635]"
                     />
                   </div>
                   <div>
@@ -2424,7 +2409,7 @@ export function SovereignDatabaseStudio({
                       value={landingRegisterName}
                       onChange={(e) => setLandingRegisterName(e.target.value)}
                       placeholder="Alex Turner"
-                      className="w-full px-3 py-2 rounded-md bg-[#0F0F12] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#3ECF8E]"
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#A3E635]"
                     />
                   </div>
                   <div>
@@ -2437,7 +2422,7 @@ export function SovereignDatabaseStudio({
                       value={landingRegisterEmail}
                       onChange={(e) => setLandingRegisterEmail(e.target.value)}
                       placeholder="alex@acme.com"
-                      className="w-full px-3 py-2 rounded-md bg-[#0F0F12] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#3ECF8E]"
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#A3E635]"
                     />
                   </div>
                   <div>
@@ -2451,13 +2436,13 @@ export function SovereignDatabaseStudio({
                       value={landingRegisterPassword}
                       onChange={(e) => setLandingRegisterPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-3 py-2 rounded-md bg-[#0F0F12] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#3ECF8E]"
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white placeholder-zinc-600 focus:outline-none focus:border-[#A3E635]"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={landingAuthLoading}
-                    className="w-full py-2.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-semibold text-xs hover:bg-[#34b27b] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2.5 rounded-md bg-[#A3E635] text-[#11181C] font-semibold text-xs hover:bg-[#84CC16] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     {landingAuthLoading && <RefreshCw className="size-3.5 animate-spin" />}
                     <span>Create Isolated Environment</span>
@@ -2481,7 +2466,7 @@ export function SovereignDatabaseStudio({
           <section id="db-bento" className="scroll-mt-20 space-y-5">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
               {/* 1. Postgres Database (Wide 6 cols) */}
-              <div className="lg:col-span-6 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between relative overflow-hidden min-h-[260px]">
+              <div className="lg:col-span-6 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between relative overflow-hidden min-h-[260px]">
                 <div className="space-y-2 max-w-xs z-10">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <Database className="size-4 text-zinc-400" />
@@ -2501,19 +2486,19 @@ export function SovereignDatabaseStudio({
                   <rect x="20" y="10" width="140" height="130" rx="18" fill="none" stroke="#2a2a2e" strokeWidth="1" />
                   <ellipse cx="90" cy="48" rx="44" ry="18" fill="none" stroke="#52525b" strokeWidth="1.4" />
                   <path d="M46 48 v46 c0 10 20 18 44 18 s44-8 44-18 V48" fill="none" stroke="#52525b" strokeWidth="1.4" />
-                  <path d="M46 71 c0 10 20 18 44 18 s44-8 44-18" fill="none" stroke="#3ECF8E" strokeOpacity="0.45" strokeWidth="1.2" />
-                  <circle cx="118" cy="44" r="3" fill="#3ECF8E" />
+                  <path d="M46 71 c0 10 20 18 44 18 s44-8 44-18" fill="none" stroke="#A3E635" strokeOpacity="0.45" strokeWidth="1.2" />
+                  <circle cx="118" cy="44" r="3" fill="#A3E635" />
                 </svg>
 
                 <ul className="space-y-1.5 text-xs text-zinc-300 z-10 mt-6">
-                  <li className="flex items-center gap-2"><Check className="size-3.5 text-[#3ECF8E]" /> 100% portable</li>
-                  <li className="flex items-center gap-2"><Check className="size-3.5 text-[#3ECF8E]" /> Built-in Auth with RLS</li>
-                  <li className="flex items-center gap-2"><Check className="size-3.5 text-[#3ECF8E]" /> Easy to extend</li>
+                  <li className="flex items-center gap-2"><Check className="size-3.5 text-[#A3E635]" /> 100% portable</li>
+                  <li className="flex items-center gap-2"><Check className="size-3.5 text-[#A3E635]" /> Built-in Auth with RLS</li>
+                  <li className="flex items-center gap-2"><Check className="size-3.5 text-[#A3E635]" /> Easy to extend</li>
                 </ul>
               </div>
 
               {/* 2. Authentication (3 cols) */}
-              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between min-h-[260px] overflow-hidden">
+              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between min-h-[260px] overflow-hidden">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <Lock className="size-4 text-zinc-400" />
@@ -2544,7 +2529,7 @@ export function SovereignDatabaseStudio({
               </div>
 
               {/* 3. Edge Functions (3 cols) */}
-              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between min-h-[260px] relative overflow-hidden">
+              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between min-h-[260px] relative overflow-hidden">
                 <div className="space-y-2 z-10">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <Zap className="size-4 text-zinc-400" />
@@ -2559,7 +2544,7 @@ export function SovereignDatabaseStudio({
                   <div className="rounded-full border border-[#2E2E2E] bg-[#101012]/95 px-3 py-1.5 font-mono text-[11px] text-zinc-300 shadow-lg flex items-center gap-2">
                     <span className="text-zinc-500">$</span>
                     <span>sparrowx</span>
-                    <span className="text-[#3ECF8E]">functions deploy</span>
+                    <span className="text-[#A3E635]">functions deploy</span>
                   </div>
                 </div>
 
@@ -2572,12 +2557,12 @@ export function SovereignDatabaseStudio({
                   <ellipse cx="120" cy="115" rx="95" ry="44" fill="none" stroke="#3f3f46" strokeWidth="1" />
                   <line x1="25" y1="95" x2="215" y2="95" stroke="#27272a" strokeWidth="1" />
                   <circle cx="105" cy="48" r="2.5" fill="#fff" />
-                  <circle cx="182" cy="88" r="2.5" fill="#3ECF8E" />
+                  <circle cx="182" cy="88" r="2.5" fill="#A3E635" />
                 </svg>
               </div>
 
               {/* 4. Storage (3 cols) */}
-              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between min-h-[210px]">
+              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between min-h-[210px]">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <HardDrive className="size-4 text-zinc-400" />
@@ -2601,7 +2586,7 @@ export function SovereignDatabaseStudio({
               </div>
 
               {/* 5. Realtime (3 cols) */}
-              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between min-h-[210px] overflow-hidden" style={DOT_GRID_STYLE}>
+              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between min-h-[210px] overflow-hidden" style={DOT_GRID_STYLE}>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <Radio className="size-4 text-zinc-400" />
@@ -2613,15 +2598,15 @@ export function SovereignDatabaseStudio({
                 </div>
 
                 <div className="mt-6 flex items-center justify-center">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#3ECF8E]/40 bg-[#18181B] shadow-lg">
-                    <span className="size-2 rounded-full bg-[#3ECF8E] animate-ping" />
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[#A3E635]/40 bg-[#18181B] shadow-lg">
+                    <span className="size-2 rounded-full bg-[#A3E635] animate-ping" />
                     <span className="text-xs font-mono text-zinc-200">ws://realtime • live sync</span>
                   </div>
                 </div>
               </div>
 
               {/* 6. Vector (3 cols) */}
-              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between min-h-[210px] relative overflow-hidden">
+              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between min-h-[210px] relative overflow-hidden">
                 <div className="space-y-2 z-10">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <Box className="size-4 text-zinc-400" />
@@ -2636,14 +2621,14 @@ export function SovereignDatabaseStudio({
                   <span className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#1A1A1E] text-[11px] font-mono text-zinc-300">
                     OpenAI
                   </span>
-                  <span className="px-2.5 py-1 rounded border border-[#3ECF8E]/30 bg-[#3ECF8E]/10 text-[11px] font-mono text-[#3ECF8E]">
+                  <span className="px-2.5 py-1 rounded border border-[#A3E635]/30 bg-[#A3E635]/10 text-[11px] font-mono text-[#A3E635]">
                     Gemini 1536d
                   </span>
                 </div>
               </div>
 
               {/* 7. Data APIs (3 cols) */}
-              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#3ECF8E]/40 transition-colors bg-[#141416] p-6 flex flex-col justify-between min-h-[210px]">
+              <div className="lg:col-span-3 rounded-xl border border-[#262626] hover:border-[#A3E635]/40 transition-colors bg-[#0A0D14] p-6 flex flex-col justify-between min-h-[210px]">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-white">
                     <BracesIconFallback />
@@ -2665,7 +2650,7 @@ export function SovereignDatabaseStudio({
                         {r.tbl}
                       </span>
                       <span className="text-zinc-600">•••</span>
-                      <span className="px-2 py-1 rounded border border-[#262626] bg-[#141416] text-[#3ECF8E] truncate">
+                      <span className="px-2 py-1 rounded border border-[#262626] bg-[#0A0D14] text-[#A3E635] truncate">
                         {r.path}
                       </span>
                     </div>
@@ -2679,8 +2664,8 @@ export function SovereignDatabaseStudio({
           <section id="db-docs" className="scroll-mt-20 border-t border-b border-[#242424] py-10 space-y-10">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               <div className="lg:col-span-6 flex items-start gap-5">
-                <div className="size-16 rounded-xl border border-[#2A2A2E] bg-[#17171A] grid place-items-center shrink-0">
-                  <BookOpen className="size-7 text-[#3ECF8E]" />
+                <div className="size-16 rounded-xl border border-[#2A2A2E] bg-[#0A0D14] grid place-items-center shrink-0">
+                  <BookOpen className="size-7 text-[#A3E635]" />
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
@@ -2732,7 +2717,7 @@ export function SovereignDatabaseStudio({
                     title="Copy setup snippet"
                     aria-label="Copy setup snippet"
                   >
-                    {copiedKey === "doc-setup" ? <Check className="size-3.5 text-[#3ECF8E]" /> : <Copy className="size-3.5" />}
+                    {copiedKey === "doc-setup" ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
                   </button>
                 </div>
 
@@ -2741,20 +2726,20 @@ export function SovereignDatabaseStudio({
                     <p>Help me get set up with SparrowX Cloud DB. Do the following:</p>
                     <p>
                       1. Install the client SDK as a project dependency with{" "}
-                      <code className="px-1.5 py-0.5 rounded bg-[#0F0F12] border border-[#2A2A2E] text-[#3ECF8E] font-mono text-[11px]">
+                      <code className="px-1.5 py-0.5 rounded bg-[#07090E] border border-[#2A2A2E] text-[#A3E635] font-mono text-[11px]">
                         npm install @supabase/supabase-js
                       </code>
                     </p>
                     <p>
                       2. Point your client URL to{" "}
-                      <code className="px-1.5 py-0.5 rounded bg-[#0F0F12] border border-[#2A2A2E] text-zinc-200 font-mono text-[11px]">
+                      <code className="px-1.5 py-0.5 rounded bg-[#07090E] border border-[#2A2A2E] text-zinc-200 font-mono text-[11px]">
                         https://db.sparrowx.net
                       </code>{" "}
                       with your workspace API key.
                     </p>
                   </div>
                 ) : (
-                  <pre className="p-3 rounded-md bg-[#0F0F12] border border-[#262626] font-mono text-[11px] text-[#3ECF8E] overflow-x-auto">
+                  <pre className="p-3 rounded-md bg-[#07090E] border border-[#262626] font-mono text-[11px] text-[#A3E635] overflow-x-auto">
 {`# Connect CLI & verify sovereign PostgreSQL 16 cluster
 psql "postgresql://postgres:[PASSWORD]@db.sparrowx.net:6543/sparrowbase?sslmode=require"
 curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY"`}
@@ -2770,9 +2755,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <p className="text-sm text-zinc-400">
                   Start with a quickstart guide to connect your project in minutes.
                 </p>
-                <div className="pt-2 rounded-lg border border-[#262626] bg-[#141416] p-3 space-y-2">
+                <div className="pt-2 rounded-lg border border-[#262626] bg-[#0A0D14] p-3 space-y-2">
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-[#3ECF8E] font-semibold">{activeFramework.label} Quickstart</span>
+                    <span className="text-[#A3E635] font-semibold">{activeFramework.label} Quickstart</span>
                     <button
                       type="button"
                       onClick={() =>
@@ -2785,7 +2770,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     >
                       {copiedKey === `fw-${activeFramework.id}` ? (
                         <>
-                          <Check className="size-3 text-[#3ECF8E]" /> Copied
+                          <Check className="size-3 text-[#A3E635]" /> Copied
                         </>
                       ) : (
                         <>
@@ -2810,8 +2795,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       onClick={() => setSelectedFramework(fw.id)}
                       className={`flex items-center gap-3 p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                         selected
-                          ? "border-[#3ECF8E] bg-[#18221D]"
-                          : "border-[#262626] bg-[#141416] hover:border-zinc-600"
+                          ? "border-[#A3E635] bg-[#18221D]"
+                          : "border-[#262626] bg-[#0A0D14] hover:border-zinc-600"
                       }`}
                     >
                       <span
@@ -2829,25 +2814,25 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
           {/* SECTION: WHAT WE SOLVE & WHAT WE PROVIDE */}
           <section id="db-features" className="scroll-mt-20 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="border border-red-500/20 bg-[#141416] rounded-xl p-6 space-y-4">
+            <div className="border border-red-500/20 bg-[#0A0D14] rounded-xl p-6 space-y-4">
               <div className="flex items-center gap-2 text-xs font-mono text-red-400 font-bold uppercase tracking-wider">
                 <span className="size-2 rounded-full bg-red-500" />
                 <span>What We Solve (The Problems We Hate)</span>
               </div>
               <div className="space-y-3 text-xs">
-                <div className="p-3.5 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-1">
+                <div className="p-3.5 rounded-lg bg-[#07090E] border border-[#242428] space-y-1">
                   <div className="text-white font-semibold">Zero Shocking Cloud Bandwidth Invoices</div>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">
                     Legacy clouds surprise you with aggressive egress fees. SparrowX keeps egress transparent and developer-friendly.
                   </p>
                 </div>
-                <div className="p-3.5 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-1">
+                <div className="p-3.5 rounded-lg bg-[#07090E] border border-[#242428] space-y-1">
                   <div className="text-white font-semibold">Clean Studio Instead of Bloated Menus</div>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">
                     Browse rows, inspect schemas visually, edit RLS policies, and execute SQL without nested legacy wizards.
                   </p>
                 </div>
-                <div className="p-3.5 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-1">
+                <div className="p-3.5 rounded-lg bg-[#07090E] border border-[#242428] space-y-1">
                   <div className="text-white font-semibold">No Serverless Connection Exhaustion</div>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">
                     Built-in PgBouncer connection pooler on Port 6543 handles high-concurrency serverless bursts cleanly.
@@ -2856,25 +2841,25 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               </div>
             </div>
 
-            <div className="border border-[#3ECF8E]/25 bg-[#141416] rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-mono text-[#3ECF8E] font-bold uppercase tracking-wider">
-                <span className="size-2 rounded-full bg-[#3ECF8E]" />
+            <div className="border border-[#A3E635]/25 bg-[#0A0D14] rounded-xl p-6 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-mono text-[#A3E635] font-bold uppercase tracking-wider">
+                <span className="size-2 rounded-full bg-[#A3E635]" />
                 <span>What We Provide (Built for Builders)</span>
               </div>
               <div className="space-y-3 text-xs">
-                <div className="p-3.5 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-1">
+                <div className="p-3.5 rounded-lg bg-[#07090E] border border-[#242428] space-y-1">
                   <div className="text-white font-semibold">High-Capacity Pooler (Port 6543)</div>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">
                     Pre-configured transaction pooling for Node.js, Python, Prisma, and edge runtimes.
                   </p>
                 </div>
-                <div className="p-3.5 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-1">
+                <div className="p-3.5 rounded-lg bg-[#07090E] border border-[#242428] space-y-1">
                   <div className="text-white font-semibold">Built-in AI Vector Search (pgvector v0.7.0)</div>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">
                     Store and query 1536-dimensional embeddings directly beside your relational tables.
                   </p>
                 </div>
-                <div className="p-3.5 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-1">
+                <div className="p-3.5 rounded-lg bg-[#07090E] border border-[#242428] space-y-1">
                   <div className="text-white font-semibold">100% Open Data &amp; 1-Click Exports</div>
                   <p className="text-zinc-400 text-[11px] leading-relaxed">
                     Export complete PostgreSQL schemas (.sql), multi-table JSON dumps, or CSV snapshots anytime.
@@ -2885,7 +2870,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           </section>
 
           {/* SECTION: HONEST PROS & CONS */}
-          <section id="db-pros-cons" className="scroll-mt-20 border border-[#262626] bg-[#141416] rounded-xl p-6 space-y-4">
+          <section id="db-pros-cons" className="scroll-mt-20 border border-[#262626] bg-[#0A0D14] rounded-xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#242428] pb-3">
               <div className="space-y-0.5">
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
@@ -2898,8 +2883,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-              <div className="p-4 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-2">
-                <span className="text-[#3ECF8E] font-bold block text-sm">Our Plus Points (Pros):</span>
+              <div className="p-4 rounded-lg bg-[#07090E] border border-[#242428] space-y-2">
+                <span className="text-[#A3E635] font-bold block text-sm">Our Plus Points (Pros):</span>
                 <ul className="space-y-1.5 text-zinc-300">
                   <li>• Instant setup: PostgreSQL + PostgREST ready in under 30 seconds.</li>
                   <li>• Predictable flat pricing without billing shocks.</li>
@@ -2907,7 +2892,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <li>• Zero vendor lock-in: standard PostgreSQL 16 + Prisma + Drizzle compatible.</li>
                 </ul>
               </div>
-              <div className="p-4 rounded-lg bg-[#0F0F12] border border-[#242428] space-y-2">
+              <div className="p-4 rounded-lg bg-[#07090E] border border-[#242428] space-y-2">
                 <span className="text-amber-400 font-bold block text-sm">Where We Stand (Cons):</span>
                 <ul className="space-y-1.5 text-zinc-300">
                   <li>• Focused startup engineering team rather than a mega-conglomerate.</li>
@@ -2919,7 +2904,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           </section>
 
           {/* INTERACTIVE TEST-DRIVE WORKBENCH */}
-          <section id="db-sandbox" className="scroll-mt-20 border border-[#262626] bg-[#141416] rounded-xl overflow-hidden shadow-lg">
+          <section id="db-sandbox" className="scroll-mt-20 border border-[#262626] bg-[#0A0D14] rounded-xl overflow-hidden shadow-lg">
             <div className="border-b border-[#262626] bg-[#19191D] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
               <div className="flex items-center gap-1.5">
                 {[
@@ -2933,7 +2918,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     onClick={() => setLandingTab(t.id)}
                     className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${
                       landingTab === t.id
-                        ? "bg-[#3ECF8E] text-[#11181C] font-semibold"
+                        ? "bg-[#A3E635] text-[#11181C] font-semibold"
                         : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
                     }`}
                   >
@@ -2945,10 +2930,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             </div>
 
             {landingTab === "schema" && (
-              <div className="p-6 bg-[#0F0F12] space-y-4 font-mono text-xs">
+              <div className="p-6 bg-[#07090E] space-y-4 font-mono text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-[11px] uppercase">Table Schema: app_users</span>
-                  <span className="text-[#3ECF8E] text-[10px] font-bold">ROW LEVEL SECURITY ACTIVE</span>
+                  <span className="text-[#A3E635] text-[10px] font-bold">ROW LEVEL SECURITY ACTIVE</span>
                 </div>
                 <div className="border border-[#262626] rounded overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -2963,7 +2948,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <tbody className="divide-y divide-[#202024] text-zinc-300">
                       <tr>
                         <td className="p-2.5 text-white font-semibold">id</td>
-                        <td className="p-2.5 text-[#3ECF8E]">uuid</td>
+                        <td className="p-2.5 text-[#A3E635]">uuid</td>
                         <td className="p-2.5 text-zinc-500">gen_random_uuid()</td>
                         <td className="p-2.5">PRIMARY KEY</td>
                       </tr>
@@ -2986,7 +2971,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             )}
 
             {landingTab === "sql" && (
-              <div className="p-6 bg-[#0F0F12] space-y-4 font-mono text-xs">
+              <div className="p-6 bg-[#07090E] space-y-4 font-mono text-xs">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-zinc-400 text-[11px] uppercase">SQL Query Scratchpad</span>
@@ -2999,7 +2984,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           setLandingLatency((0.6 + Math.random() * 0.4).toFixed(1) + "ms");
                         }, 200);
                       }}
-                      className="px-3 py-1 rounded bg-[#3ECF8E] text-[#11181C] font-semibold text-xs hover:bg-[#34b27b] transition-colors cursor-pointer flex items-center gap-1.5"
+                      className="px-3 py-1 rounded bg-[#A3E635] text-[#11181C] font-semibold text-xs hover:bg-[#84CC16] transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       {landingRunning ? <RefreshCw className="size-3 animate-spin" /> : <Play className="size-3" />}
                       <span>{landingRunning ? "Running..." : "Run Query"}</span>
@@ -3009,16 +2994,16 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     rows={3}
                     value={landingSqlQuery}
                     onChange={(e) => setLandingSqlQuery(e.target.value)}
-                    className="w-full p-3 rounded-md bg-[#18181B] border border-[#262626] text-[#3ECF8E] font-mono text-xs focus:outline-none focus:border-[#3ECF8E]"
+                    className="w-full p-3 rounded-md bg-[#18181B] border border-[#262626] text-[#A3E635] font-mono text-xs focus:outline-none focus:border-[#A3E635]"
                   />
                 </div>
 
                 <div className="border border-[#262626] rounded overflow-hidden">
                   <div className="bg-[#18181B] px-3 py-1.5 border-b border-[#262626] flex justify-between text-[10px] text-zinc-500">
                     <span>QUERY RESULTS (2 ROWS)</span>
-                    <span className="text-[#3ECF8E]">EXEC TIME: {landingLatency}</span>
+                    <span className="text-[#A3E635]">EXEC TIME: {landingLatency}</span>
                   </div>
-                  <div className="p-3 bg-[#0F0F12] overflow-x-auto text-[11px] text-zinc-400">
+                  <div className="p-3 bg-[#07090E] overflow-x-auto text-[11px] text-zinc-400">
                     <div className="grid grid-cols-4 gap-2 text-white font-semibold border-b border-[#242428] pb-1.5 mb-1.5">
                       <span>id</span>
                       <span>email</span>
@@ -3029,13 +3014,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       <span className="truncate">usr_018f_492a</span>
                       <span className="truncate">founder@startup.io</span>
                       <span className="truncate">Sarah Chen</span>
-                      <span className="text-[#3ECF8E]">admin</span>
+                      <span className="text-[#A3E635]">admin</span>
                     </div>
                     <div className="grid grid-cols-4 gap-2 py-1">
                       <span className="truncate">usr_019c_88b1</span>
                       <span className="truncate">cto@fintech.co</span>
                       <span className="truncate">David Kumar</span>
-                      <span className="text-[#3ECF8E]">operator</span>
+                      <span className="text-[#A3E635]">operator</span>
                     </div>
                   </div>
                 </div>
@@ -3043,7 +3028,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             )}
 
             {landingTab === "vector" && (
-              <div className="p-6 bg-[#0F0F12] space-y-4 font-mono text-xs">
+              <div className="p-6 bg-[#07090E] space-y-4 font-mono text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 text-[11px] uppercase">Semantic Cosine Similarity (pgvector)</span>
                   <span className="text-purple-400 text-[10px]">DIMENSIONS: 1536</span>
@@ -3057,14 +3042,14 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <div className="p-3 rounded bg-[#18181B] border border-[#262626] space-y-1">
                     <div className="flex justify-between">
                       <span className="text-white font-bold">Match #1 (vec-4891)</span>
-                      <span className="text-[#3ECF8E] font-bold">98.4% Match</span>
+                      <span className="text-[#A3E635] font-bold">98.4% Match</span>
                     </div>
                     <p className="text-[11px] text-zinc-500">Cosine Distance: 0.016 • Latency: 1.1ms</p>
                   </div>
                   <div className="p-3 rounded bg-[#18181B] border border-[#262626] space-y-1">
                     <div className="flex justify-between">
                       <span className="text-white font-bold">Match #2 (vec-2901)</span>
-                      <span className="text-[#3ECF8E] font-bold">96.8% Match</span>
+                      <span className="text-[#A3E635] font-bold">96.8% Match</span>
                     </div>
                     <p className="text-[11px] text-zinc-500">Cosine Distance: 0.032 • Latency: 1.3ms</p>
                   </div>
@@ -3092,10 +3077,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     key={tier.id}
                     className={`rounded-xl border p-6 flex flex-col justify-between transition-all ${
                       tier.highlighted
-                        ? "border-[#3ECF8E]/60 bg-[#17191A] shadow-[0_0_40px_rgba(62,207,142,0.08)]"
+                        ? "border-[#A3E635]/60 bg-[#17191A] shadow-[0_0_40px_rgba(163,230,53,0.08)]"
                         : isSelected
                           ? "border-zinc-500 bg-[#161618]"
-                          : "border-[#262626] bg-[#141416]"
+                          : "border-[#262626] bg-[#0A0D14]"
                     }`}
                   >
                     <div className="space-y-5">
@@ -3123,7 +3108,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         className={`w-full py-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           tier.id === "Enterprise"
                             ? "border border-[#2E2E2E] bg-[#1D1D21] hover:bg-[#26262B] text-white"
-                            : "bg-[#117A4B] hover:bg-[#3ECF8E] hover:text-[#11181C] text-white border border-[#3ECF8E]/40"
+                            : "bg-[#65A30D] hover:bg-[#A3E635] hover:text-[#11181C] text-white border border-[#A3E635]/40"
                         }`}
                       >
                         {tier.cta}
@@ -3142,7 +3127,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <ul className="space-y-2">
                           {tier.features.map((feat, fIdx) => (
                             <li key={fIdx} className="flex items-start gap-2 text-zinc-200">
-                              <Check className="size-3.5 text-[#3ECF8E] shrink-0 mt-0.5" />
+                              <Check className="size-3.5 text-[#A3E635] shrink-0 mt-0.5" />
                               <div>
                                 <div>{feat.title}</div>
                                 {feat.detail && (
@@ -3161,7 +3146,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           </section>
         </main>
 
-        <footer className="relative z-10 border-t border-[#262626] bg-[#121212] px-6 py-5 text-center text-[11px] font-mono text-zinc-500">
+        <footer className="relative z-10 border-t border-[#262626] bg-[#05060A] px-6 py-5 text-center text-[11px] font-mono text-zinc-500">
           <span>SPARROWX CLOUD DB // POSTGRESQL 16 + PGVECTOR + ROW LEVEL SECURITY • DB.SPARROWX.NET</span>
         </footer>
       </div>
@@ -3174,10 +3159,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
   // =========================================================================
   if (!sessionUser) {
     return (
-      <div className="min-h-screen bg-[#0F0F10] text-[#F3F4F6] flex flex-col font-sans selection:bg-[#3ECF8E] selection:text-[#11181C] relative overflow-hidden">
+      <div className="min-h-screen bg-[#05060A] text-[#F3F4F6] flex flex-col font-sans selection:bg-[#A3E635] selection:text-[#11181C] relative overflow-hidden">
         <AnimatedCloudBackground variant="emerald" intensity="subtle" />
         <div className="relative z-10 flex-1 flex items-center justify-center p-4">
-          <div className="max-w-md w-full border border-red-500/30 bg-[#17171A] rounded-xl p-6 sm:p-8 space-y-5 text-center shadow-2xl">
+          <div className="max-w-md w-full border border-red-500/30 bg-[#0A0D14] rounded-xl p-6 sm:p-8 space-y-5 text-center shadow-2xl">
             <div className="size-12 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 grid place-items-center mx-auto">
               <Lock className="size-6" />
             </div>
@@ -3193,7 +3178,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             <button
               type="button"
               onClick={() => setViewMode("landing")}
-              className="w-full py-2.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-semibold text-xs hover:bg-[#34b27b] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2.5 rounded-md bg-[#A3E635] text-[#11181C] font-semibold text-xs hover:bg-[#84CC16] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <ArrowLeft className="size-3.5" />
               <span>Return to Sign In</span>
@@ -3265,9 +3250,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
   const effectiveDatabaseTab = activeSection === "backups" ? "backups" : databaseSubTab;
 
   return (
-    <div className="flex h-screen w-full flex-col bg-[#121212] text-zinc-100 font-sans selection:bg-[#3ECF8E] selection:text-[#11181C] overflow-hidden">
-      {/* STUDIO TOP BREADCRUMB & COMMAND HEADER (SCREENSHOTS 1, 6, 9, 10) */}
-      <header className="h-12 border-b border-[#2E2E2E] bg-[#141414] px-3 flex items-center justify-between shrink-0 gap-2 z-30">
+    <div className="flex h-screen w-full flex-col bg-[#05060A] text-white font-sans selection:bg-[#A3E635] selection:text-black overflow-hidden">
+      {/* STUDIO TOP BREADCRUMB & COMMAND HEADER */}
+      <header className="h-12 border-b border-white/10 bg-[#05060A] px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2 z-30">
         {/* Left Breadcrumbs + Connect */}
         <div className="flex items-center gap-2 min-w-0">
           <button
@@ -3283,22 +3268,16 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
           <div className="hidden sm:flex items-center gap-1.5 text-xs">
             <span className="font-medium text-zinc-200">{activeProject.organization}</span>
-            <span className="px-1.5 py-0.5 rounded bg-[#232323] border border-[#333333] text-[9px] font-mono text-zinc-400">
-              {selectedPricingPlan.toUpperCase()}
-            </span>
           </div>
 
-          <span className="text-zinc-600 font-light hidden md:inline">/</span>
+          <span className="text-zinc-600 font-light hidden sm:inline">/</span>
 
           <div className="flex items-center gap-1.5 text-xs truncate">
-            <Database className="size-3.5 text-zinc-400 shrink-0 hidden md:inline" />
-            <span className="font-semibold text-white truncate max-w-[110px]">{activeProject.name}</span>
+            <span className="font-semibold text-white truncate max-w-[120px]">{activeProject.name}</span>
           </div>
 
-          <span className="text-zinc-600 font-light">/</span>
-
           {/* Environment Switcher Pill */}
-          <div className="flex items-center gap-1 bg-[#181818] border border-[#2E2E2E] rounded-md p-0.5 text-[10px] font-mono">
+          <div className="flex items-center gap-0.5 bg-[#0A0D14] border border-white/15 rounded-md p-0.5 text-[10px] font-mono ml-1">
             {(["production", "staging", "development"] as const).map((env) => (
               <button
                 key={env}
@@ -3312,30 +3291,27 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 }}
                 className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
                   activeEnv === env
-                    ? env === "production"
-                      ? "bg-amber-500/15 text-amber-300 border border-amber-500/40"
-                      : "bg-[#3ECF8E]/15 text-[#3ECF8E] border border-[#3ECF8E]/40"
-                    : "text-zinc-500 hover:text-zinc-200"
+                    ? "bg-[#A3E635]/15 text-[#A3E635] border border-[#A3E635]/40 font-semibold"
+                    : "text-zinc-400 hover:text-white"
                 }`}
               >
-                {env === "production" ? "main • PROD" : env === "staging" ? "STAGE" : "DEV"}
+                {env === "production" ? "PROD" : env === "staging" ? "STAGE" : "DEV"}
               </button>
             ))}
           </div>
 
-          {/* CONNECT MODAL TRIGGER (SCREENSHOTS 1, 2, 6, 9, 10) */}
           <button
             type="button"
             onClick={() => setShowConnectModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#1E1E1E] hover:bg-[#282828] px-2.5 py-1 text-xs font-medium text-zinc-200 transition-colors cursor-pointer shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-[#0A0D14] hover:border-[#A3E635]/40 px-2.5 py-1 text-xs font-medium text-white transition-colors cursor-pointer shrink-0"
           >
-            <Plug className="size-3.5 text-[#3ECF8E]" />
+            <Plug className="size-3.5 text-[#A3E635]" />
             <span>Connect</span>
           </button>
         </div>
 
         {/* Right Command Search & Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="relative hidden md:block">
             <Search className="size-3.5 text-zinc-500 absolute left-2.5 top-2" />
             <input
@@ -3343,9 +3319,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               type="text"
               value={studioSearchQuery}
               onChange={(e) => setStudioSearchQuery(e.target.value)}
-              placeholder="Search tables..."
+              placeholder="Search..."
               aria-label="Search tables or press Ctrl+K"
-              className="h-7 w-44 lg:w-52 rounded-md border border-[#2E2E2E] bg-[#1B1B1B] pl-8 pr-12 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#3ECF8E]"
+              className="h-7 w-40 lg:w-48 rounded-md border border-white/15 bg-[#0A0D14] pl-8 pr-12 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
             />
             <span className="absolute right-2 top-1.5 text-[10px] font-mono text-zinc-500 pointer-events-none">
               Ctrl K
@@ -3356,10 +3332,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             type="button"
             onClick={handleRunPingDiagnostics}
             disabled={pingStatus.testing}
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#1B1B1B] hover:bg-[#252525] px-2 py-1 text-xs text-zinc-300 cursor-pointer"
+            className="hidden lg:inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-[#0A0D14] hover:border-white/30 px-2 py-1 text-xs text-zinc-300 cursor-pointer"
             title="Test PostgreSQL / PostgREST latency"
           >
-            <Activity className={`size-3.5 text-[#3ECF8E] ${pingStatus.testing ? "animate-spin" : ""}`} />
+            <Activity className={`size-3.5 text-[#A3E635] ${pingStatus.testing ? "animate-spin" : ""}`} />
             <span className="font-mono text-[11px]">{pingStatus.postgrest ?? 1.2}ms</span>
           </button>
 
@@ -3367,24 +3343,24 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             <button
               type="button"
               onClick={() => onOpenClientArea()}
-              className="hidden sm:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#1B1B1B] hover:bg-[#252525] px-2.5 py-1 text-xs text-zinc-200 cursor-pointer"
+              className="hidden sm:inline-flex items-center gap-1 rounded-md border border-white/15 bg-[#0A0D14] hover:border-white/30 px-2.5 py-1 text-xs text-zinc-200 cursor-pointer"
             >
-              <Boxes className="size-3.5 text-[#3ECF8E]" />
+              <Boxes className="size-3.5 text-[#A3E635]" />
               <span>Client Area</span>
             </button>
           )}
 
-          {/* Signed-in Avatar Pill (jumps to Authentication -> Users / Account) */}
+          {/* Signed-in Avatar Pill */}
           <button
             type="button"
             onClick={() => navigateStudioSection("auth")}
-            className="inline-flex items-center gap-1.5 rounded-full border border-[#2E2E2E] bg-[#1F1F22] hover:border-[#3ECF8E]/50 px-2.5 py-1 text-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-[#0A0D14] hover:border-[#A3E635]/50 px-2.5 py-1 text-xs cursor-pointer"
             title={`Signed in as ${sessionUser.email}`}
           >
-            <span className="size-4 rounded-full bg-[#3ECF8E]/20 text-[#3ECF8E] font-mono text-[10px] font-bold grid place-items-center">
+            <span className="size-4 rounded-full bg-[#A3E635]/20 text-[#A3E635] font-mono text-[10px] font-bold grid place-items-center">
               {(sessionUser.fullName || sessionUser.email || "U").charAt(0).toUpperCase()}
             </span>
-            <span className="hidden lg:inline font-mono text-[11px] text-zinc-300 max-w-[110px] truncate">
+            <span className="hidden lg:inline font-mono text-[11px] text-zinc-200 max-w-[110px] truncate">
               {sessionUser.fullName || sessionUser.email}
             </span>
           </button>
@@ -3392,11 +3368,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           <button
             type="button"
             onClick={handleLockWorkspace}
-            className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 text-xs font-mono text-red-400 cursor-pointer"
-            title="Lock workspace and sign out"
+            className="inline-flex items-center gap-1 rounded-md border border-white/15 bg-[#0A0D14] hover:border-white/35 px-2 py-1 text-xs font-medium text-zinc-300 hover:text-white cursor-pointer"
+            title="Sign out"
           >
-            <Lock className="size-3" />
-            <span className="hidden xl:inline">Lock</span>
+            <LogOut className="size-3.5" />
+            <span className="hidden xl:inline">Sign Out</span>
           </button>
         </div>
       </header>
@@ -3406,7 +3382,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
         <div
           className={`px-4 py-2 text-xs flex items-center justify-between border-b shrink-0 ${
             statusBanner.type === "success"
-              ? "bg-[#3ECF8E]/10 border-[#3ECF8E]/30 text-[#3ECF8E]"
+              ? "bg-[#A3E635]/10 border-[#A3E635]/30 text-[#A3E635]"
               : statusBanner.type === "error"
                 ? "bg-red-500/10 border-red-500/30 text-red-400"
                 : "bg-blue-500/10 border-blue-500/30 text-blue-300"
@@ -3438,7 +3414,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           aria-label="Studio Navigation"
           className={`${
             sidebarCollapsed ? "w-13" : "w-13 md:w-52"
-          } border-r border-[#2E2E2E] bg-[#141414] flex flex-col justify-between shrink-0 transition-all`}
+          } border-r border-[#2E2E2E] bg-[#080A10] flex flex-col justify-between shrink-0 transition-all`}
         >
           <div className="flex-1 overflow-y-auto py-2 px-1.5 space-y-3">
             {PRIMARY_NAV_GROUPS.map((group, gIdx) => (
@@ -3465,11 +3441,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       }`}
                     >
                       <span className="flex items-center gap-2.5 min-w-0">
-                        <Icon className={`size-4 shrink-0 ${active ? "text-[#3ECF8E]" : "text-zinc-400"}`} />
+                        <Icon className={`size-4 shrink-0 ${active ? "text-[#A3E635]" : "text-zinc-400"}`} />
                         {!sidebarCollapsed && <span className="hidden md:inline truncate">{item.label}</span>}
                       </span>
                       {!sidebarCollapsed && item.badge && (
-                        <span className="hidden md:inline-block px-1.5 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/30 text-[9px] font-mono text-[#3ECF8E]">
+                        <span className="hidden md:inline-block px-1.5 py-0.2 rounded bg-lime-500/15 border border-lime-500/30 text-[9px] font-mono text-[#A3E635]">
                           {item.badge}
                         </span>
                       )}
@@ -3495,7 +3471,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 type="button"
                 onClick={handleShiftCloudToLocal}
                 disabled={syncingCloud}
-                className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-zinc-400 hover:text-[#3ECF8E] cursor-pointer"
+                className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-zinc-400 hover:text-[#A3E635] cursor-pointer"
                 title="Sync & verify PostgreSQL cluster"
               >
                 <RefreshCw className={`size-3 ${syncingCloud ? "animate-spin" : ""}`} />
@@ -3508,7 +3484,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
         {/* SECONDARY SIDEBARS */}
         {/* A. Table Editor Secondary Sidebar (Screenshot 6) */}
         {activeSection === "tables" && (
-          <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#161616] flex-col shrink-0">
+          <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0">
             <div className="p-3 border-b border-[#242424] space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-zinc-200">Table Editor</span>
@@ -3533,7 +3509,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 onClick={() => setShowCreateTableModal(true)}
                 className="w-full flex items-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#1A1A1A] hover:bg-[#232323] px-2.5 py-1.5 text-xs font-medium text-zinc-200 cursor-pointer"
               >
-                <Plus className="size-3.5 text-[#3ECF8E]" />
+                <Plus className="size-3.5 text-[#A3E635]" />
                 <span>New table</span>
               </button>
               <div className="relative">
@@ -3543,7 +3519,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   value={tableSidebarFilter}
                   onChange={(e) => setTableSidebarFilter(e.target.value)}
                   placeholder="Search tables..."
-                  className="w-full h-7 rounded-md border border-[#262626] bg-[#121212] pl-8 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#3ECF8E]"
+                  className="w-full h-7 rounded-md border border-[#262626] bg-[#05060A] pl-8 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
                 />
               </div>
             </div>
@@ -3563,12 +3539,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-mono transition-colors text-left cursor-pointer ${
                       isSelected
-                        ? "bg-[#262629] text-white font-semibold border-l-2 border-[#3ECF8E]"
-                        : "text-zinc-400 hover:bg-[#1E1E1E] hover:text-zinc-200"
+                        ? "bg-[#262629] text-white font-semibold border-l-2 border-[#A3E635]"
+                        : "text-zinc-400 hover:bg-[#101520] hover:text-zinc-200"
                     }`}
                   >
                     <div className="flex items-center gap-2 truncate">
-                      <Table2 className={`size-3.5 shrink-0 ${isSelected ? "text-[#3ECF8E]" : "text-zinc-500"}`} />
+                      <Table2 className={`size-3.5 shrink-0 ${isSelected ? "text-[#A3E635]" : "text-zinc-500"}`} />
                       <span className="truncate">{t.label}</span>
                       <Globe className="size-2.5 text-zinc-600 shrink-0" />
                     </div>
@@ -3582,7 +3558,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
         {/* B. SQL Editor Secondary Sidebar (Screenshot 7) */}
         {activeSection === "sql" && (
-          <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#161616] flex-col shrink-0">
+          <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0">
             <div className="p-3 border-b border-[#242424] space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-zinc-200">SQL Editor</span>
@@ -3595,7 +3571,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     value={sqlQueryFilter}
                     onChange={(e) => setSqlQueryFilter(e.target.value)}
                     placeholder="Search queries..."
-                    className="w-full h-7 rounded-md border border-[#262626] bg-[#121212] pl-7 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#3ECF8E]"
+                    className="w-full h-7 rounded-md border border-[#262626] bg-[#05060A] pl-7 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
                   />
                 </div>
                 <button
@@ -3682,7 +3658,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
         {/* C. Database Secondary Sidebar (Screenshot 8) */}
         {isDatabaseOrBackups && (
-          <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#161616] flex-col shrink-0 overflow-y-auto">
+          <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0 overflow-y-auto">
             <div className="p-3.5 border-b border-[#242424] text-xs font-semibold text-white">
               Database
             </div>
@@ -3709,7 +3685,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                       effectiveDatabaseTab === sub.id
                         ? "bg-[#262629] text-white font-medium"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                     }`}
                   >
                     {sub.label}
@@ -3735,7 +3711,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                       effectiveDatabaseTab === sub.id
                         ? "bg-[#262629] text-white font-medium"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                     }`}
                   >
                     {sub.label}
@@ -3756,7 +3732,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                     effectiveDatabaseTab === "backups"
                       ? "bg-[#262629] text-white font-medium"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                   }`}
                 >
                   Backups &amp; DDL Exports
@@ -3768,7 +3744,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
         {/* D. Authentication Secondary Sidebar (Screenshot 9) */}
         {activeSection === "auth" && (
-          <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#161616] flex-col shrink-0 overflow-y-auto">
+          <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0 overflow-y-auto">
             <div className="p-3.5 border-b border-[#242424] text-xs font-semibold text-white">
               Authentication
             </div>
@@ -3788,7 +3764,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                       authSubTab === sub.id
                         ? "bg-[#262629] text-white font-medium"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                     }`}
                   >
                     {sub.label}
@@ -3813,7 +3789,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                       authSubTab === sub.id
                         ? "bg-[#262629] text-white font-medium"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                     }`}
                   >
                     {sub.label}
@@ -3826,7 +3802,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
         {/* E. Settings Secondary Sidebar (Screenshots 1-5) */}
         {isSettingsOrApi && (
-          <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#161616] flex-col shrink-0 overflow-y-auto">
+          <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0 overflow-y-auto">
             <div className="p-3.5 border-b border-[#242424] text-xs font-semibold text-white">
               Settings
             </div>
@@ -3854,7 +3830,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
                       effectiveSettingsTab === sub.id
                         ? "bg-[#262629] text-white font-medium"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                     }`}
                   >
                     {sub.label}
@@ -3869,7 +3845,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <button
                   type="button"
                   onClick={() => navigateStudioSection("sandbox")}
-                  className="w-full text-left px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E] cursor-pointer flex items-center justify-between"
+                  className="w-full text-left px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-[#101520] cursor-pointer flex items-center justify-between"
                 >
                   <span>Data API</span>
                   <ChevronRight className="size-3" />
@@ -3883,7 +3859,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer flex items-center justify-between ${
                     effectiveSettingsTab === "vault"
                       ? "bg-[#262629] text-white font-medium"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                   }`}
                 >
                   <span>Vault</span>
@@ -3906,7 +3882,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer flex items-center justify-between ${
                     effectiveSettingsTab === "billing"
                       ? "bg-[#262629] text-white font-medium"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#1E1E1E]"
+                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
                   }`}
                 >
                   <span>Subscription &amp; Usage</span>
@@ -3918,7 +3894,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
         )}
 
         {/* MAIN CONTENT WORKSPACE */}
-        <main className="flex-1 flex flex-col min-h-0 bg-[#121212] overflow-hidden">
+        <main className="flex-1 flex flex-col min-h-0 bg-[#05060A] overflow-hidden">
           {/* =============================================================== */}
           {/* VIEW: PROJECT OVERVIEW (SCREENSHOT 10 + 3)                      */}
           {/* =============================================================== */}
@@ -3928,7 +3904,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
                     <h1 className="text-xl font-bold text-white tracking-tight">{activeProject.name}</h1>
-                    <span className="px-2 py-0.5 rounded bg-[#3ECF8E]/15 border border-[#3ECF8E]/30 text-[10px] font-mono text-[#3ECF8E] font-semibold">
+                    <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[10px] font-mono text-[#A3E635] font-semibold">
                       {activeProject.cfg.label}
                     </span>
                   </div>
@@ -3939,7 +3915,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       onClick={() => copyText("overview-url", `https://${activeProject.id}.db.sparrowx.net`)}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#2E2E2E] bg-[#1A1A1A] hover:bg-[#242424] text-[11px] text-zinc-300 cursor-pointer"
                     >
-                      {copiedKey === "overview-url" ? <Check className="size-3 text-[#3ECF8E]" /> : <Copy className="size-3" />}
+                      {copiedKey === "overview-url" ? <Check className="size-3 text-[#A3E635]" /> : <Copy className="size-3" />}
                       <span>Copy</span>
                     </button>
                   </div>
@@ -3949,14 +3925,14 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <button
                     type="button"
                     onClick={() => navigateStudioSection("tables")}
-                    className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#181818] hover:bg-[#232323] text-xs font-medium text-zinc-200 cursor-pointer"
+                    className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#0C0F17] hover:bg-[#232323] text-xs font-medium text-zinc-200 cursor-pointer"
                   >
                     Open Table Editor ({studioTables.length} tables)
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowConnectModal(true)}
-                    className="px-3.5 py-1.5 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] font-semibold text-xs cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-semibold text-xs cursor-pointer"
                   >
                     Connect SDK / psql
                   </button>
@@ -3971,7 +3947,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     label: "STATUS",
                     value: "Healthy",
                     sub: `PgBouncer Port ${activeProject.poolerPort}`,
-                    accent: "text-[#3ECF8E]",
+                    accent: "text-[#A3E635]",
                   },
                   {
                     icon: Cpu,
@@ -3999,10 +3975,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   return (
                     <div
                       key={stat.label}
-                      className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex items-start gap-3"
+                      className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-start gap-3"
                     >
-                      <div className="size-9 rounded-lg border border-[#2A2A2E] bg-[#121212] grid place-items-center shrink-0">
-                        <Icon className="size-4 text-[#3ECF8E]" />
+                      <div className="size-9 rounded-lg border border-[#2A2A2E] bg-[#05060A] grid place-items-center shrink-0">
+                        <Icon className="size-4 text-[#A3E635]" />
                       </div>
                       <div className="min-w-0">
                         <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
@@ -4025,7 +4001,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
               {/* Quick Table Stats Summary Strip */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex items-center justify-between">
+                <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-medium text-zinc-400">Active Tables in public</div>
                     <div className="text-lg font-bold text-white font-mono mt-1">{studioTables.length} Tables</div>
@@ -4033,25 +4009,25 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <button
                     type="button"
                     onClick={() => navigateStudioSection("tables")}
-                    className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#1F1F22] hover:text-[#3ECF8E] text-xs cursor-pointer"
+                    className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#101520] hover:text-[#A3E635] text-xs cursor-pointer"
                   >
                     Browse →
                   </button>
                 </div>
-                <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex items-center justify-between">
+                <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-medium text-zinc-400">REST API Success Rate</div>
-                    <div className="text-lg font-bold text-[#3ECF8E] font-mono mt-1">100.0%</div>
+                    <div className="text-lg font-bold text-[#A3E635] font-mono mt-1">100.0%</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => navigateStudioSection("sandbox")}
-                    className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#1F1F22] hover:text-[#3ECF8E] text-xs cursor-pointer"
+                    className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#101520] hover:text-[#A3E635] text-xs cursor-pointer"
                   >
                     Test API →
                   </button>
                 </div>
-                <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex items-center justify-between">
+                <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
                   <div>
                     <div className="text-xs font-medium text-zinc-400">Authenticated Operator</div>
                     <div className="text-sm font-semibold text-white font-mono mt-1 truncate max-w-[160px]">
@@ -4061,7 +4037,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <button
                     type="button"
                     onClick={() => navigateStudioSection("auth")}
-                    className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#1F1F22] hover:text-[#3ECF8E] text-xs cursor-pointer"
+                    className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#101520] hover:text-[#A3E635] text-xs cursor-pointer"
                   >
                     Manage →
                   </button>
@@ -4076,15 +4052,15 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           {activeSection === "tables" && (
             <>
               {/* Open Table Tab Strip */}
-              <div className="border-b border-[#242424] bg-[#141414] px-3 pt-1.5 flex items-center gap-1 overflow-x-auto shrink-0">
+              <div className="border-b border-[#242424] bg-[#080A10] px-3 pt-1.5 flex items-center gap-1 overflow-x-auto shrink-0">
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-t-md bg-[#1D1D1F] border-t border-l border-r border-[#2E2E2E] text-xs font-mono text-white">
-                  <Table2 className="size-3.5 text-[#3ECF8E]" />
+                  <Table2 className="size-3.5 text-[#A3E635]" />
                   <span>{selectedTable}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShowCreateTableModal(true)}
-                  className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-[#1E1E1E] cursor-pointer"
+                  className="p-1.5 rounded text-zinc-400 hover:text-white hover:bg-[#101520] cursor-pointer"
                   title="Create new table"
                   aria-label="Create new table"
                 >
@@ -4093,7 +4069,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               </div>
 
               {/* Top Filter & Action Toolbar (Screenshot 6) */}
-              <div className="border-b border-[#2E2E2E] bg-[#181818] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5">
+              <div className="border-b border-[#2E2E2E] bg-[#0C0F17] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <select
                     value={selectedTable}
@@ -4102,7 +4078,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       setCurrentPage(1);
                       setSearchFilter("");
                     }}
-                    className="md:hidden bg-[#121212] border border-[#2E2E2E] rounded px-2 py-1 text-xs text-white font-mono max-w-[140px]"
+                    className="md:hidden bg-[#05060A] border border-[#2E2E2E] rounded px-2 py-1 text-xs text-white font-mono max-w-[140px]"
                     aria-label="Select database table"
                   >
                     {studioTables.map((t) => (
@@ -4122,17 +4098,17 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         setSearchFilter(e.target.value);
                         setCurrentPage(1);
                       }}
-                      className="h-7 w-44 sm:w-64 rounded-md border border-[#2E2E2E] bg-[#121212] pl-7 pr-2 text-xs font-mono text-zinc-200 placeholder-zinc-500 outline-none focus:border-[#3ECF8E]"
+                      className="h-7 w-44 sm:w-64 rounded-md border border-[#2E2E2E] bg-[#05060A] pl-7 pr-2 text-xs font-mono text-zinc-200 placeholder-zinc-500 outline-none focus:border-[#A3E635]"
                     />
                   </div>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span className="hidden lg:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#121212] px-2 py-1 text-[11px] font-mono text-zinc-300">
+                  <span className="hidden lg:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2 py-1 text-[11px] font-mono text-zinc-300">
                     <span className="size-4 rounded-full bg-[#2A2A2D] grid place-items-center text-[10px]">1</span>
                     <span>RLS policy</span>
                   </span>
-                  <span className="hidden xl:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#121212] px-2 py-1 text-[11px] font-mono text-zinc-300">
+                  <span className="hidden xl:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2 py-1 text-[11px] font-mono text-zinc-300">
                     Role postgres
                   </span>
 
@@ -4162,7 +4138,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       setJsonDraft(JSON.stringify(activeTableMeta.defaultRow, null, 2));
                       setShowInsertModal(true);
                     }}
-                    className="inline-flex items-center gap-1 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] px-3 py-1 text-xs font-bold shadow-sm cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-3 py-1 text-xs font-bold shadow-sm cursor-pointer"
                   >
                     <Plus className="size-3.5" />
                     <span>Insert</span>
@@ -4175,7 +4151,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 tabIndex={0}
                 role="region"
                 aria-label={`${selectedTable} records grid`}
-                className="flex-1 overflow-auto bg-[#121212]"
+                className="flex-1 overflow-auto bg-[#05060A]"
               >
                 <table className="w-full border-collapse text-left text-xs font-mono min-w-[600px]">
                   <caption className="sr-only">{selectedTable} database records</caption>
@@ -4208,10 +4184,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                   setSortDirection("asc");
                                 }
                               }}
-                              className="w-full min-h-[28px] px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-[#222222] text-zinc-200 font-semibold cursor-pointer focus-visible:outline focus-visible:outline-[#3ECF8E]"
+                              className="w-full min-h-[28px] px-3 py-2 flex items-center justify-between gap-2 text-left hover:bg-[#222222] text-zinc-200 font-semibold cursor-pointer focus-visible:outline focus-visible:outline-[#A3E635]"
                             >
                               <span className="flex items-center gap-1.5 truncate">
-                                {col.isPrimary && <KeyRound className="size-3 text-[#3ECF8E] shrink-0" aria-hidden="true" />}
+                                {col.isPrimary && <KeyRound className="size-3 text-[#A3E635] shrink-0" aria-hidden="true" />}
                                 <span className="truncate">{col.name}</span>
                                 <span className="text-[10px] font-normal text-zinc-500">{col.type}</span>
                               </span>
@@ -4226,7 +4202,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     {loading ? (
                       <tr>
                         <td colSpan={tableColumns.length + 1} className="p-8 text-center text-zinc-500">
-                          <RefreshCw className="size-5 animate-spin mx-auto mb-2 text-[#3ECF8E]" />
+                          <RefreshCw className="size-5 animate-spin mx-auto mb-2 text-[#A3E635]" />
                           Querying table {selectedTable}...
                         </td>
                       </tr>
@@ -4293,7 +4269,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               </div>
 
               {/* Pagination Footer */}
-              <div className="border-t border-[#2E2E2E] bg-[#181818] px-4 py-2 flex items-center justify-between text-xs text-zinc-400 font-mono">
+              <div className="border-t border-[#2E2E2E] bg-[#0C0F17] px-4 py-2 flex items-center justify-between text-xs text-zinc-400 font-mono">
                 <div>
                   Showing {processedRows.length === 0 ? 0 : (currentPage - 1) * pageSize + 1} –{" "}
                   {Math.min(currentPage * pageSize, processedRows.length)} of {processedRows.length} rows
@@ -4329,13 +4305,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           {/* VIEW: SQL EDITOR (SCREENSHOT 7)                                 */}
           {/* =============================================================== */}
           {activeSection === "sql" && (
-            <div className="flex-1 flex flex-col min-h-0 bg-[#121212] overflow-hidden">
-              <div className="border-b border-[#2E2E2E] bg-[#161616] px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex-1 flex flex-col min-h-0 bg-[#05060A] overflow-hidden">
+              <div className="border-b border-[#2E2E2E] bg-[#080A10] px-4 py-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#222225] border border-[#2E2E2E] text-xs font-mono text-white">
-                    <Plus className="size-3 text-[#3ECF8E]" /> Query Scratchpad
+                    <Plus className="size-3 text-[#A3E635]" /> Query Scratchpad
                   </span>
-                  <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-[#3ECF8E] px-2 py-0.5 text-[10px] font-mono">
+                  <span className="rounded bg-lime-500/10 border border-lime-500/30 text-[#A3E635] px-2 py-0.5 text-[10px] font-mono">
                     {activeProject.dbName}
                   </span>
                 </div>
@@ -4347,7 +4323,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       const t = SQL_TEMPLATES.find((x) => x.id === e.target.value);
                       if (t) setActiveSql(t.sql);
                     }}
-                    className="h-8 rounded-md border border-[#2E2E2E] bg-[#121212] px-2.5 text-xs text-zinc-300 font-mono outline-none focus:border-[#3ECF8E]"
+                    className="h-8 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2.5 text-xs text-zinc-300 font-mono outline-none focus:border-[#A3E635]"
                   >
                     <option value="">Templates...</option>
                     {SQL_TEMPLATES.map((tmpl) => (
@@ -4370,7 +4346,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     type="button"
                     onClick={handleExecuteSql}
                     disabled={executingSql}
-                    className="inline-flex items-center gap-1.5 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] px-3.5 py-1.5 text-xs font-bold shadow cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-3.5 py-1.5 text-xs font-bold shadow cursor-pointer disabled:opacity-50"
                   >
                     <Play className={`size-3.5 fill-current ${executingSql ? "animate-spin" : ""}`} />
                     <span>{executingSql ? "Running..." : "Run Ctrl ↵"}</span>
@@ -4380,7 +4356,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
               <div className="flex-1 flex flex-col min-h-0">
                 {/* Editor with Line Numbers */}
-                <div className="h-[48%] min-h-[180px] flex border-b border-[#2E2E2E] bg-[#0F0F12]">
+                <div className="h-[48%] min-h-[180px] flex border-b border-[#2E2E2E] bg-[#07090E]">
                   <div className="w-10 py-3 bg-[#141417] border-r border-[#222226] text-right pr-2 font-mono text-[11px] text-zinc-600 select-none overflow-hidden">
                     {activeSql.split("\n").map((_, idx) => (
                       <div key={idx} className="leading-relaxed">
@@ -4393,7 +4369,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     onChange={(e) => setActiveSql(e.target.value)}
                     onKeyDown={handleSqlKeyDown}
                     placeholder="-- Hit Ctrl+Enter to run query or start typing PostgreSQL / pgvector SQL..."
-                    className="flex-1 p-3 bg-transparent text-[#3ECF8E] font-mono text-xs outline-none resize-none leading-relaxed"
+                    className="flex-1 p-3 bg-transparent text-[#A3E635] font-mono text-xs outline-none resize-none leading-relaxed"
                   />
                 </div>
 
@@ -4417,7 +4393,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
 
                 {/* Results | Chart | JSON Panel */}
-                <div className="flex-1 flex flex-col bg-[#141416] min-h-0">
+                <div className="flex-1 flex flex-col bg-[#0A0D14] min-h-0">
                   <div className="border-b border-[#242428] bg-[#18181B] px-4 py-2 flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-4">
                       {[
@@ -4441,7 +4417,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     </div>
 
                     {sqlExecutionStats && (
-                      <span className="text-[#3ECF8E] text-[11px]">
+                      <span className="text-[#A3E635] text-[11px]">
                         {sqlExecutionStats.rowCount} rows ({sqlExecutionStats.timeMs}ms)
                       </span>
                     )}
@@ -4481,7 +4457,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     ) : sqlResultViewMode === "chart" ? (
                       <div className="p-4 rounded-lg border border-[#242428] bg-[#111114] space-y-3">
                         <div className="flex items-center gap-2 text-xs font-semibold text-white">
-                          <BarChart3 className="size-4 text-[#3ECF8E]" />
+                          <BarChart3 className="size-4 text-[#A3E635]" />
                           <span>Row Distribution Across Schema Tables</span>
                         </div>
                         <div className="space-y-2 font-mono text-[11px]">
@@ -4492,16 +4468,16 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                               <div key={t.name} className="flex items-center gap-3">
                                 <span className="w-36 truncate text-zinc-300">{t.name}</span>
                                 <div className="flex-1 h-3 rounded bg-[#1B1B1F] overflow-hidden">
-                                  <div className="h-full bg-[#3ECF8E]/80 rounded" style={{ width: `${pct}%` }} />
+                                  <div className="h-full bg-[#A3E635]/80 rounded" style={{ width: `${pct}%` }} />
                                 </div>
-                                <span className="w-10 text-right text-[#3ECF8E]">{count}</span>
+                                <span className="w-10 text-right text-[#A3E635]">{count}</span>
                               </div>
                             );
                           })}
                         </div>
                       </div>
                     ) : (
-                      <pre className="text-xs font-mono text-[#3ECF8E] bg-[#0F0F12] p-4 rounded-lg overflow-x-auto border border-[#242428]">
+                      <pre className="text-xs font-mono text-[#A3E635] bg-[#07090E] p-4 rounded-lg overflow-x-auto border border-[#242428]">
                         {JSON.stringify(sqlResults, null, 2)}
                       </pre>
                     )}
@@ -4518,9 +4494,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {effectiveDatabaseTab === "visualizer" && (
                 <>
-                  <div className="border-b border-[#2E2E2E] bg-[#181818] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="border-b border-[#2E2E2E] bg-[#0C0F17] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded bg-[#121212] border border-[#2E2E2E] font-mono text-zinc-200">
+                      <span className="px-2.5 py-1 rounded bg-[#05060A] border border-[#2E2E2E] font-mono text-zinc-200">
                         schema public
                       </span>
                       <div className="relative">
@@ -4530,7 +4506,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           value={schemaFindTable}
                           onChange={(e) => setSchemaFindTable(e.target.value)}
                           placeholder="Find table..."
-                          className="h-7 w-44 rounded-md border border-[#2E2E2E] bg-[#121212] pl-7 pr-2 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#3ECF8E]"
+                          className="h-7 w-44 rounded-md border border-[#2E2E2E] bg-[#05060A] pl-7 pr-2 text-xs font-mono text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
                         />
                       </div>
                     </div>
@@ -4542,7 +4518,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-[#2E2E2E] bg-[#222222] hover:bg-[#2a2a2a] text-xs font-medium text-zinc-200 cursor-pointer"
                       >
                         {copiedKey === "schema-ddl" ? (
-                          <Check className="size-3.5 text-[#3ECF8E]" />
+                          <Check className="size-3.5 text-[#A3E635]" />
                         ) : (
                           <Copy className="size-3.5" />
                         )}
@@ -4578,7 +4554,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             >
                               <div className="px-3 py-2 bg-[#1D1D20] border-b border-[#2A2A2E] flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-white font-semibold">
-                                  <Table2 className="size-3.5 text-[#3ECF8E]" />
+                                  <Table2 className="size-3.5 text-[#A3E635]" />
                                   <span>{tbl.name}</span>
                                 </div>
                                 <button
@@ -4587,7 +4563,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                     setSelectedTable(tbl.name);
                                     navigateStudioSection("tables");
                                   }}
-                                  className="text-[10px] text-zinc-400 hover:text-[#3ECF8E] cursor-pointer"
+                                  className="text-[10px] text-zinc-400 hover:text-[#A3E635] cursor-pointer"
                                 >
                                   Open →
                                 </button>
@@ -4603,7 +4579,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                     >
                                       <span className="flex items-center gap-1.5 text-zinc-300 truncate">
                                         {isPk ? (
-                                          <KeyRound className="size-3 text-[#3ECF8E] shrink-0" />
+                                          <KeyRound className="size-3 text-[#A3E635] shrink-0" />
                                         ) : (
                                           <span className="size-1.5 rounded-full bg-zinc-600 shrink-0 ml-1 mr-0.5" />
                                         )}
@@ -4629,12 +4605,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <button
                       type="button"
                       onClick={() => setShowCreateTableModal(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-bold text-xs cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
                     >
                       <Plus className="size-3.5" /> New table
                     </button>
                   </div>
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] overflow-hidden">
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                     <table className="w-full text-left text-xs font-mono">
                       <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E] text-zinc-400">
                         <tr>
@@ -4649,7 +4625,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         {studioTables.map((t) => (
                           <tr key={t.name} className="hover:bg-[#1E1E22]">
                             <td className="p-3 text-white font-semibold">{t.name}</td>
-                            <td className="p-3 text-[#3ECF8E]">{t.primaryKey}</td>
+                            <td className="p-3 text-[#A3E635]">{t.primaryKey}</td>
                             <td className="p-3 text-zinc-300">{tableCounts[t.name] ?? "-"}</td>
                             <td className="p-3 text-zinc-400 truncate max-w-xs">{t.description}</td>
                             <td className="p-3 text-right">
@@ -4659,7 +4635,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                   setSelectedTable(t.name);
                                   navigateStudioSection("tables");
                                 }}
-                                className="text-[#3ECF8E] hover:underline cursor-pointer"
+                                className="text-[#A3E635] hover:underline cursor-pointer"
                               >
                                 Inspect
                               </button>
@@ -4677,10 +4653,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <h2 className="text-base font-bold text-white">PostgreSQL 16 Extensions</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {POSTGRES_EXTENSIONS.map((ext) => (
-                      <div key={ext.name} className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 space-y-2">
+                      <div key={ext.name} className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="font-mono font-bold text-sm text-white">{ext.name}</span>
-                          <span className="px-2 py-0.5 rounded bg-[#3ECF8E]/15 border border-[#3ECF8E]/30 text-[10px] font-mono text-[#3ECF8E]">
+                          <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[10px] font-mono text-[#A3E635]">
                             {ext.status} v{ext.version}
                           </span>
                         </div>
@@ -4700,7 +4676,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <h2 className="text-base font-bold text-white capitalize">
                     PostgreSQL {effectiveDatabaseTab} Manager
                   </h2>
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-5 space-y-3 text-xs font-mono">
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3 text-xs font-mono">
                     {effectiveDatabaseTab === "roles" ? (
                       <div className="space-y-2">
                         {[
@@ -4710,7 +4686,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           { role: "anon", desc: "Restricted public read role with zero mutation writes" },
                         ].map((r) => (
                           <div key={r.role} className="flex items-center justify-between p-3 rounded bg-[#111114] border border-[#242428]">
-                            <span className="text-[#3ECF8E] font-bold">{r.role}</span>
+                            <span className="text-[#A3E635] font-bold">{r.role}</span>
                             <span className="text-zinc-400">{r.desc}</span>
                           </div>
                         ))}
@@ -4723,7 +4699,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <button
                           type="button"
                           onClick={handleExportFullSchemaSql}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#3ECF8E] text-[#11181C] font-bold cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#A3E635] text-[#11181C] font-bold cursor-pointer"
                         >
                           <Download className="size-3.5" /> Export Full SQL Definition
                         </button>
@@ -4737,7 +4713,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <div className="flex-1 p-6 overflow-y-auto space-y-6">
                   <div>
                     <h2 className="text-base font-bold text-white flex items-center gap-2">
-                      <Archive className="size-4 text-[#3ECF8E]" />
+                      <Archive className="size-4 text-[#A3E635]" />
                       <span>Database Backups, DDL Dumps &amp; Disaster Recovery</span>
                     </h2>
                     <p className="text-xs text-zinc-400 mt-1">
@@ -4746,8 +4722,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-5 space-y-3">
-                      <FileCode className="size-5 text-[#3ECF8E]" />
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3">
+                      <FileCode className="size-5 text-[#A3E635]" />
                       <h3 className="font-bold text-white text-sm">Full Schema DDL (.sql)</h3>
                       <p className="text-xs text-zinc-400">
                         Exports all {studioTables.length} tables, pgvector indexes, and RLS policies.
@@ -4755,13 +4731,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       <button
                         type="button"
                         onClick={handleExportFullSchemaSql}
-                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-bold px-3 py-2 text-xs cursor-pointer"
+                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold px-3 py-2 text-xs cursor-pointer"
                       >
                         <Download className="size-3.5" /> Export Schema (.sql)
                       </button>
                     </div>
 
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-5 space-y-3">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3">
                       <Database className="size-5 text-blue-400" />
                       <h3 className="font-bold text-white text-sm">Full Data Snapshot (.json)</h3>
                       <p className="text-xs text-zinc-400">Multi-table dump bundling all workspace records.</p>
@@ -4774,11 +4750,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       </button>
                     </div>
 
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-5 space-y-3">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3">
                       <Table2 className="size-5 text-amber-400" />
                       <h3 className="font-bold text-white text-sm">Active Table CSV</h3>
                       <p className="text-xs text-zinc-400">
-                        Download spreadsheet-ready CSV of <span className="text-[#3ECF8E] font-mono">{selectedTable}</span>.
+                        Download spreadsheet-ready CSV of <span className="text-[#A3E635] font-mono">{selectedTable}</span>.
                       </p>
                       <button
                         type="button"
@@ -4809,7 +4785,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <button
                           type="button"
                           onClick={() => fetchTableRows("app_users")}
-                          className="p-1.5 rounded-md border border-[#2E2E2E] bg-[#1B1B1E] text-zinc-300 hover:text-white cursor-pointer"
+                          className="p-1.5 rounded-md border border-[#2E2E2E] bg-[#0D111A] text-zinc-300 hover:text-white cursor-pointer"
                           title="Refresh users"
                           aria-label="Refresh users"
                         >
@@ -4817,7 +4793,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         </button>
                         <a
                           href="#provision-user-panel"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] font-bold text-xs"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-xs"
                         >
                           <UserPlus className="size-3.5" /> Add user
                         </a>
@@ -4835,7 +4811,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           value={authUserSearch}
                           onChange={(e) => setAuthUserSearch(e.target.value)}
                           placeholder="Search by email"
-                          className="w-full h-8 rounded-md border border-[#2E2E2E] bg-[#121215] pl-8 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#3ECF8E]"
+                          className="w-full h-8 rounded-md border border-[#2E2E2E] bg-[#121215] pl-8 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
                         />
                       </div>
                       <span className="px-2.5 py-1.5 rounded-md border border-[#2E2E2E] bg-[#171719] text-zinc-400 font-mono">
@@ -4851,16 +4827,16 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <div id="provision-user-panel" className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     <form
                       onSubmit={handleUpdateOwnAccount}
-                      className="rounded-xl border border-[#2E2E2E] bg-[#17171A] p-4 space-y-3"
+                      className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262629] pb-2.5">
                         <div className="flex items-center gap-2">
-                          <UserCheck className="size-4 text-[#3ECF8E]" />
+                          <UserCheck className="size-4 text-[#A3E635]" />
                           <span className="text-xs font-bold text-white font-mono">
                             My Database Account &amp; Session
                           </span>
                         </div>
-                        <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-[#3ECF8E] font-mono text-[10px] font-bold">
+                        <span className="px-2 py-0.5 rounded bg-lime-500/15 border border-lime-500/30 text-[#A3E635] font-mono text-[10px] font-bold">
                           {sessionUser.admin === "yes" ? "SUPERUSER" : "ISOLATED DEVELOPER"}
                         </span>
                       </div>
@@ -4882,7 +4858,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             required
                             value={accountDisplayName}
                             onChange={(e) => setAccountDisplayName(e.target.value)}
-                            className="w-full px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                            className="w-full px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                           />
                         </div>
                         <div>
@@ -4895,7 +4871,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             value={accountNewPassword}
                             onChange={(e) => setAccountNewPassword(e.target.value)}
                             placeholder="6+ chars"
-                            className="w-full px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                            className="w-full px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                           />
                         </div>
                       </div>
@@ -4904,7 +4880,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <button
                           type="submit"
                           disabled={savingAccount}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] font-bold text-xs cursor-pointer disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-xs cursor-pointer disabled:opacity-50"
                         >
                           <Save className="size-3.5" />
                           <span>{savingAccount ? "Saving..." : "Save Profile & Password"}</span>
@@ -4914,11 +4890,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
                     <form
                       onSubmit={handleProvisionDatabaseUser}
-                      className="rounded-xl border border-[#2E2E2E] bg-[#17171A] p-4 space-y-3"
+                      className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262629] pb-2.5">
                         <div className="flex items-center gap-2">
-                          <UserPlus className="size-4 text-[#3ECF8E]" />
+                          <UserPlus className="size-4 text-[#A3E635]" />
                           <span className="text-xs font-bold text-white font-mono">
                             Provision New Database Account (app_users)
                           </span>
@@ -4933,7 +4909,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           value={newUserFullName}
                           onChange={(e) => setNewUserFullName(e.target.value)}
                           placeholder="Full Name"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                         />
                         <input
                           type="email"
@@ -4941,7 +4917,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           value={newUserEmail}
                           onChange={(e) => setNewUserEmail(e.target.value)}
                           placeholder="dev@company.com"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                         />
                         <input
                           type="password"
@@ -4950,13 +4926,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           value={newUserPassword}
                           onChange={(e) => setNewUserPassword(e.target.value)}
                           placeholder="Password (6+)"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                         />
                         <select
                           aria-label="New user role"
                           value={newUserRole}
                           onChange={(e) => setNewUserRole(e.target.value === "yes" ? "yes" : "no")}
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                         >
                           <option value="no">Developer</option>
                           <option value="yes">Admin</option>
@@ -4966,7 +4942,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           value={newUserTenantId}
                           onChange={(e) => setNewUserTenantId(e.target.value)}
                           placeholder="Tenant ID"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#3ECF8E]"
+                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
                         />
                       </div>
 
@@ -5013,7 +4989,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                               <tr key={String(u.id ?? idx)} className="hover:bg-[#1E1E22]">
                                 <td className="p-3 text-zinc-300">{String(u.id ?? "-")}</td>
                                 <td className="p-3 text-white font-medium">{fullNameStr}</td>
-                                <td className="p-3 text-[#3ECF8E]">{emailStr}</td>
+                                <td className="p-3 text-[#A3E635]">{emailStr}</td>
                                 <td className="p-3">
                                   <span
                                     className={`px-2 py-0.5 rounded text-[10px] ${
@@ -5081,7 +5057,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       return (
                         <div
                           key={pol.id}
-                          className="rounded-xl border border-[#2E2E2E] bg-[#17171A] p-4 flex items-center justify-between gap-4"
+                          className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between gap-4"
                         >
                           <div>
                             <div className="text-sm font-semibold text-white">{pol.title}</div>
@@ -5094,7 +5070,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             }
                             className={`px-3 py-1 rounded-full text-xs font-mono font-bold border cursor-pointer ${
                               enabled
-                                ? "bg-[#3ECF8E]/20 border-[#3ECF8E] text-[#3ECF8E]"
+                                ? "bg-[#A3E635]/20 border-[#A3E635] text-[#A3E635]"
                                 : "bg-[#222226] border-[#333338] text-zinc-400"
                             }`}
                           >
@@ -5117,12 +5093,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       { name: "GitHub OAuth", status: "Ready", detail: "Configure OAuth Client ID in Settings" },
                       { name: "SAML 2.0 SSO", status: "Team Plan", detail: "Enterprise workspace federation" },
                     ].map((prov) => (
-                      <div key={prov.name} className="rounded-xl border border-[#2E2E2E] bg-[#17171A] p-4 flex items-center justify-between">
+                      <div key={prov.name} className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
                         <div>
                           <div className="font-semibold text-white text-sm">{prov.name}</div>
                           <div className="text-zinc-400 mt-0.5">{prov.detail}</div>
                         </div>
-                        <span className="px-2 py-0.5 rounded bg-[#3ECF8E]/15 text-[#3ECF8E] font-mono text-[10px]">
+                        <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 text-[#A3E635] font-mono text-[10px]">
                           {prov.status}
                         </span>
                       </div>
@@ -5136,7 +5112,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <h2 className="text-lg font-bold text-white">
                     {authSubTab === "sessions" ? "Active Cryptographic Session Claims" : "Authentication Audit Logs"}
                   </h2>
-                  <pre className="rounded-xl border border-[#2E2E2E] bg-[#161618] p-4 font-mono text-xs text-[#3ECF8E] overflow-x-auto">
+                  <pre className="rounded-xl border border-[#2E2E2E] bg-[#161618] p-4 font-mono text-xs text-[#A3E635] overflow-x-auto">
                     {JSON.stringify(
                       authSubTab === "sessions"
                         ? verifySessionToken() || { sub: sessionUser.id, email: sessionUser.email, role: sessionUser.admin }
@@ -5154,8 +5130,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           {/* VIEW: STORAGE BUCKETS                                           */}
           {/* =============================================================== */}
           {activeSection === "storage" && (
-            <div className="flex-1 flex min-h-0 bg-[#121212] overflow-hidden">
-              <div className="w-60 border-r border-[#2E2E2E] bg-[#161616] p-3 flex flex-col shrink-0">
+            <div className="flex-1 flex min-h-0 bg-[#05060A] overflow-hidden">
+              <div className="w-60 border-r border-[#2E2E2E] bg-[#080A10] p-3 flex flex-col shrink-0">
                 <div className="flex items-center justify-between pb-2 border-b border-[#2E2E2E]">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                     Storage Buckets ({storageBucketsList.length})
@@ -5163,7 +5139,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <button
                     type="button"
                     onClick={() => setShowNewBucketModal(true)}
-                    className="p-1 rounded hover:bg-zinc-800 text-[#3ECF8E] cursor-pointer"
+                    className="p-1 rounded hover:bg-zinc-800 text-[#A3E635] cursor-pointer"
                     title="New Bucket"
                     aria-label="New Bucket"
                   >
@@ -5179,12 +5155,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       onClick={() => setSelectedBucket(b)}
                       className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
                         selectedBucket.id === b.id
-                          ? "bg-[#242426] text-[#3ECF8E] font-bold border border-[#3ECF8E]/30"
-                          : "text-zinc-300 hover:bg-[#1E1E1E]"
+                          ? "bg-[#242426] text-[#A3E635] font-bold border border-[#A3E635]/30"
+                          : "text-zinc-300 hover:bg-[#101520]"
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <HardDrive className="size-3.5 text-[#3ECF8E]" />
+                        <HardDrive className="size-3.5 text-[#A3E635]" />
                         <span className="truncate">{b.name}</span>
                       </div>
                       <span className="text-[10px] text-zinc-500">{b.fileCount}</span>
@@ -5201,7 +5177,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       <span
                         className={`text-[10px] px-2 py-0.5 rounded font-mono ${
                           selectedBucket.isPublic
-                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            ? "bg-lime-500/20 text-lime-400 border border-lime-500/30"
                             : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                         }`}
                       >
@@ -5232,13 +5208,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         message: `File "${newFile.name}" uploaded to bucket "${selectedBucket.name}".`,
                       });
                     }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-bold text-xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
                   >
                     <Plus className="size-3.5" /> Upload Object
                   </button>
                 </div>
 
-                <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] overflow-hidden">
+                <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                   <table className="w-full text-left text-xs font-mono">
                     <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E]">
                       <tr>
@@ -5272,7 +5248,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           {/* =============================================================== */}
           {activeSection === "functions" && (
             <div className="flex-1 flex min-h-0 overflow-hidden">
-              <div className="w-60 border-r border-[#2E2E2E] bg-[#161616] p-3 space-y-2 shrink-0">
+              <div className="w-60 border-r border-[#2E2E2E] bg-[#080A10] p-3 space-y-2 shrink-0">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 pb-2 border-b border-[#242424]">
                   Edge Functions ({EDGE_FUNCTIONS_CATALOG.length})
                 </div>
@@ -5286,12 +5262,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     }}
                     className={`w-full text-left p-2.5 rounded-lg text-xs font-mono cursor-pointer transition-colors ${
                       activeEdgeFn.id === fn.id
-                        ? "bg-[#242428] text-[#3ECF8E] border border-[#3ECF8E]/30 font-semibold"
+                        ? "bg-[#242428] text-[#A3E635] border border-[#A3E635]/30 font-semibold"
                         : "text-zinc-300 hover:bg-[#1E1E22]"
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <Zap className="size-3.5 text-[#3ECF8E]" />
+                      <Zap className="size-3.5 text-[#A3E635]" />
                       <span>{fn.name}</span>
                     </div>
                     <div className="text-[10px] text-zinc-500 mt-1">{fn.avgLatencyMs} avg RTT</div>
@@ -5329,20 +5305,20 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         );
                       }, 150);
                     }}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-bold text-xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
                   >
                     <Play className="size-3.5" />
                     <span>{edgeFnInvoking ? "Invoking..." : "Invoke Edge Function"}</span>
                   </button>
                 </div>
 
-                <pre className="rounded-xl border border-[#2E2E2E] bg-[#0F0F12] p-4 font-mono text-xs text-zinc-200 overflow-x-auto leading-relaxed">
+                <pre className="rounded-xl border border-[#2E2E2E] bg-[#07090E] p-4 font-mono text-xs text-zinc-200 overflow-x-auto leading-relaxed">
                   {activeEdgeFn.code}
                 </pre>
 
                 {edgeFnInvokeResult && (
-                  <div className="rounded-xl border border-[#3ECF8E]/30 bg-[#141A17] p-4 space-y-2">
-                    <div className="text-xs font-mono text-[#3ECF8E] font-bold">HTTP 200 Invocation Response</div>
+                  <div className="rounded-xl border border-[#A3E635]/30 bg-[#141A17] p-4 space-y-2">
+                    <div className="text-xs font-mono text-[#A3E635] font-bold">HTTP 200 Invocation Response</div>
                     <pre className="font-mono text-xs text-zinc-200 overflow-x-auto">{edgeFnInvokeResult}</pre>
                   </div>
                 )}
@@ -5354,10 +5330,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           {/* VIEW: REALTIME & POSTGREST SANDBOX                              */}
           {/* =============================================================== */}
           {activeSection === "sandbox" && (
-            <div className="flex-1 flex flex-col min-h-0 bg-[#121212] overflow-hidden">
-              <div className="border-b border-[#2E2E2E] bg-[#181818] px-4 py-2.5 flex items-center justify-between">
+            <div className="flex-1 flex flex-col min-h-0 bg-[#05060A] overflow-hidden">
+              <div className="border-b border-[#2E2E2E] bg-[#0C0F17] px-4 py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Code2 className="size-4 text-[#3ECF8E]" />
+                  <Code2 className="size-4 text-[#A3E635]" />
                   <span className="font-bold text-sm text-white">Interactive Data API &amp; Realtime Sandbox</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -5388,7 +5364,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           `CREATE TABLE IF NOT EXISTS ${sandboxSelectedTable} (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  data JSONB DEFAULT '{}'::jsonb,\n  created_at TIMESTAMPTZ DEFAULT now()\n);`
                         )
                       }
-                      className="text-[11px] text-[#3ECF8E] hover:underline cursor-pointer"
+                      className="text-[11px] text-[#A3E635] hover:underline cursor-pointer"
                     >
                       Reset to {sandboxSelectedTable}
                     </button>
@@ -5396,7 +5372,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <textarea
                     value={sandboxSql}
                     onChange={(e) => setSandboxSql(e.target.value)}
-                    className="flex-1 p-4 bg-[#0B0B0E] text-[#3ECF8E] font-mono text-xs outline-none resize-none leading-relaxed"
+                    className="flex-1 p-4 bg-[#0B0B0E] text-[#A3E635] font-mono text-xs outline-none resize-none leading-relaxed"
                   />
                   <div className="p-3 border-t border-[#222222] bg-[#141418] flex items-center justify-between text-xs text-zinc-400">
                     <span className="text-[11px] font-mono">OpenAPI + PostgREST synced</span>
@@ -5404,7 +5380,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       type="button"
                       onClick={handleTestSandboxEndpoint}
                       disabled={sandboxLoading}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-bold px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50"
                     >
                       <Send className="size-3" />
                       <span>{sandboxLoading ? "Testing..." : "Test REST Endpoint"}</span>
@@ -5421,7 +5397,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           type="button"
                           onClick={() => setSandboxTab(tab)}
                           className={`px-2.5 py-1 rounded text-xs font-mono transition-colors cursor-pointer uppercase ${
-                            sandboxTab === tab ? "bg-[#3ECF8E] text-[#11181C] font-bold" : "text-zinc-400 hover:text-white"
+                            sandboxTab === tab ? "bg-[#A3E635] text-[#11181C] font-bold" : "text-zinc-400 hover:text-white"
                           }`}
                         >
                           {tab}
@@ -5432,7 +5408,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <button
                       type="button"
                       onClick={() => copyText(`snippet-${sandboxTab}`, sandboxSnippets[sandboxTab])}
-                      className="inline-flex items-center gap-1 text-[11px] text-[#3ECF8E] hover:underline cursor-pointer"
+                      className="inline-flex items-center gap-1 text-[11px] text-[#A3E635] hover:underline cursor-pointer"
                     >
                       {copiedKey === `snippet-${sandboxTab}` ? <Check className="size-3" /> : <Copy className="size-3" />}
                       <span>{copiedKey === `snippet-${sandboxTab}` ? "Copied" : "Copy"}</span>
@@ -5447,13 +5423,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <div className="flex items-center justify-between text-xs text-zinc-400 font-mono">
                       <span className="text-white font-semibold">Live PostgREST Response</span>
                       {sandboxLatency && (
-                        <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-[#3ECF8E] px-2 py-0.5 text-[10px]">
+                        <span className="rounded bg-lime-500/10 border border-lime-500/30 text-[#A3E635] px-2 py-0.5 text-[10px]">
                           HTTP 200 OK • {sandboxLatency}ms
                         </span>
                       )}
                     </div>
                     <div className="flex-1 rounded-xl border border-[#2E2E2E] bg-[#0B0B0D] p-3 overflow-auto">
-                      <pre className="font-mono text-xs text-[#3ECF8E] leading-relaxed">
+                      <pre className="font-mono text-xs text-[#A3E635] leading-relaxed">
                         {sandboxResponse ||
                           `// Click "Test REST Endpoint" to query ${activeProject.restBaseUrl}/${sandboxSelectedTable}`}
                       </pre>
@@ -5471,7 +5447,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             <div className="flex-1 p-6 overflow-y-auto space-y-6">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Activity className="size-4 text-[#3ECF8E]" />
+                  <Activity className="size-4 text-[#A3E635]" />
                   <span>Observability, PgBouncer Pooler &amp; Compute Health</span>
                 </h2>
                 <p className="text-xs text-zinc-400 mt-1">
@@ -5486,9 +5462,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   { label: "Buffer Cache Hit", val: "99.6%", sub: "Shared buffers hot" },
                   { label: "AI pgvector", val: "v0.7.0", sub: "Cosine & HNSW indexed" },
                 ].map((m) => (
-                  <div key={m.label} className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 space-y-1">
+                  <div key={m.label} className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-1">
                     <div className="text-xs text-zinc-400">{m.label}</div>
-                    <div className="text-xl font-bold text-[#3ECF8E] font-mono">{m.val}</div>
+                    <div className="text-xl font-bold text-[#A3E635] font-mono">{m.val}</div>
                     <div className="text-[11px] text-zinc-500 font-mono">{m.sub}</div>
                   </div>
                 ))}
@@ -5512,7 +5488,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <div className="max-w-4xl space-y-8">
                   <div className="space-y-4">
                     <h2 className="text-lg font-semibold text-white">General settings</h2>
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] divide-y divide-[#262626]">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] divide-y divide-[#262626]">
                       <div className="p-4 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                         <div className="md:col-span-5">
                           <div className="text-xs font-medium text-white">Project name</div>
@@ -5523,7 +5499,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             type="text"
                             value={projectDisplayName}
                             onChange={(e) => setProjectDisplayName(e.target.value)}
-                            className="w-full h-9 rounded-md border border-[#2E2E2E] bg-[#121212] px-3 text-xs text-zinc-100 focus:outline-none focus:border-[#3ECF8E]"
+                            className="w-full h-9 rounded-md border border-[#2E2E2E] bg-[#05060A] px-3 text-xs text-zinc-100 focus:outline-none focus:border-[#A3E635]"
                           />
                         </div>
                       </div>
@@ -5538,14 +5514,14 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             type="text"
                             disabled
                             value={activeProject.id}
-                            className="flex-1 h-9 rounded-md border border-[#262626] bg-[#121212] px-3 font-mono text-xs text-zinc-400"
+                            className="flex-1 h-9 rounded-md border border-[#262626] bg-[#05060A] px-3 font-mono text-xs text-zinc-400"
                           />
                           <button
                             type="button"
                             onClick={() => copyText("prj-id", activeProject.id)}
                             className="h-9 px-3 rounded-md border border-[#2E2E2E] bg-[#1D1D20] hover:bg-[#27272B] text-xs text-zinc-200 inline-flex items-center gap-1.5 cursor-pointer"
                           >
-                            {copiedKey === "prj-id" ? <Check className="size-3.5 text-[#3ECF8E]" /> : <Copy className="size-3.5" />}
+                            {copiedKey === "prj-id" ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
                             <span>Copy</span>
                           </button>
                         </div>
@@ -5565,7 +5541,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                 e.target.value as "ap-southeast-1" | "ap-south-1" | "eu-central-1"
                               )
                             }
-                            className="flex-1 h-9 rounded-md border border-[#2E2E2E] bg-[#121212] px-3 font-mono text-xs text-zinc-200"
+                            className="flex-1 h-9 rounded-md border border-[#2E2E2E] bg-[#05060A] px-3 font-mono text-xs text-zinc-200"
                           >
                             <option value="ap-southeast-1">ap-southeast-1 — Southeast Asia (Singapore)</option>
                             <option value="ap-south-1">ap-south-1 — South Asia (Chennai / Mumbai)</option>
@@ -5576,7 +5552,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             onClick={() => copyText("prj-region", projectRegion)}
                             className="h-9 px-3 rounded-md border border-[#2E2E2E] bg-[#1D1D20] hover:bg-[#27272B] text-xs text-zinc-200 inline-flex items-center gap-1.5 cursor-pointer"
                           >
-                            {copiedKey === "prj-region" ? <Check className="size-3.5 text-[#3ECF8E]" /> : <Copy className="size-3.5" />}
+                            {copiedKey === "prj-region" ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
                             <span>Copy</span>
                           </button>
                         </div>
@@ -5597,7 +5573,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                               message: `Saved project settings (${projectDisplayName} in ${projectRegion}).`,
                             });
                           }}
-                          className="px-4 py-1.5 rounded-md bg-[#117A4B] hover:bg-[#3ECF8E] hover:text-[#11181C] text-white font-semibold text-xs border border-[#3ECF8E]/40 cursor-pointer"
+                          className="px-4 py-1.5 rounded-md bg-[#65A30D] hover:bg-[#A3E635] hover:text-[#11181C] text-white font-semibold text-xs border border-[#A3E635]/40 cursor-pointer"
                         >
                           Save changes
                         </button>
@@ -5608,7 +5584,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   {/* Project Access (Screenshot 5) */}
                   <div className="space-y-3">
                     <h3 className="text-base font-semibold text-white">Project access</h3>
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] overflow-hidden">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                       <div className="p-4 border-b border-[#262626] flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <div className="text-xs font-medium text-white">Organization-wide access</div>
@@ -5640,7 +5616,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <h3 className="text-base font-semibold text-white">Custom domains</h3>
-                      <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
                         <div className="space-y-0.5">
                           <div className="text-xs font-semibold text-white">Vanity &amp; Custom Domains</div>
                           <div className="text-[11px] text-zinc-400">
@@ -5650,7 +5626,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <button
                           type="button"
                           onClick={() => setViewMode("landing")}
-                          className="px-3 py-1.5 rounded-md bg-[#117A4B] hover:bg-[#3ECF8E] hover:text-[#11181C] text-white font-semibold text-xs border border-[#3ECF8E]/40 cursor-pointer"
+                          className="px-3 py-1.5 rounded-md bg-[#65A30D] hover:bg-[#A3E635] hover:text-[#11181C] text-white font-semibold text-xs border border-[#A3E635]/40 cursor-pointer"
                         >
                           Upgrade to Pro
                         </button>
@@ -5716,7 +5692,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       onClick={handleRotateStudioApiKey}
                       className="inline-flex items-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#1E1E22] hover:bg-[#27272C] px-3 py-1.5 text-xs font-medium text-white cursor-pointer"
                     >
-                      <Plus className="size-3.5 text-[#3ECF8E]" /> New publishable key
+                      <Plus className="size-3.5 text-[#A3E635]" /> New publishable key
                     </button>
                   </div>
 
@@ -5726,7 +5702,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <p className="text-xs text-zinc-400">
                       Safe to use in a browser when Row Level Security (RLS) policies are active.
                     </p>
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] overflow-hidden">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                       <table className="w-full text-left text-xs">
                         <thead className="bg-[#1C1C1F] border-b border-[#262626] text-[10px] font-mono uppercase text-zinc-500">
                           <tr>
@@ -5743,7 +5719,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                 <div className="text-[11px] text-zinc-500">{pk.description}</div>
                               </td>
                               <td className="p-3 font-mono text-zinc-200">
-                                <span className="px-2.5 py-1 rounded-md border border-[#2E2E2E] bg-[#121212] inline-block max-w-xs truncate align-middle">
+                                <span className="px-2.5 py-1 rounded-md border border-[#2E2E2E] bg-[#05060A] inline-block max-w-xs truncate align-middle">
                                   {pk.value}
                                 </span>
                               </td>
@@ -5751,11 +5727,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                 <button
                                   type="button"
                                   onClick={() => copyText(pk.id, pk.value)}
-                                  className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#3ECF8E] cursor-pointer"
+                                  className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#A3E635] cursor-pointer"
                                   title="Copy Publishable Key"
                                   aria-label="Copy Publishable Key"
                                 >
-                                  {copiedKey === pk.id ? <Check className="size-3.5 text-[#3ECF8E]" /> : <Copy className="size-3.5" />}
+                                  {copiedKey === pk.id ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
                                 </button>
                               </td>
                             </tr>
@@ -5771,13 +5747,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <p className="text-xs text-zinc-400">
                       Allows privileged bypass access to backend APIs. Never expose in client browsers.
                     </p>
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="font-semibold text-xs text-white">default (service_role)</div>
                         <div className="text-[11px] text-zinc-500">Backend &amp; Edge Functions secret key</div>
                       </div>
                       <div className="flex items-center gap-2 font-mono text-xs">
-                        <span className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#121212] text-zinc-200">
+                        <span className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#05060A] text-zinc-200">
                           {showSecretKey ? activeProject.serviceRoleKey : "spx_secret_••••••••••••••••••••"}
                         </span>
                         <button
@@ -5792,18 +5768,18 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <button
                           type="button"
                           onClick={() => copyText("secret-role", activeProject.serviceRoleKey)}
-                          className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#3ECF8E] cursor-pointer"
+                          className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#A3E635] cursor-pointer"
                           title="Copy secret key"
                           aria-label="Copy secret key"
                         >
-                          {copiedKey === "secret-role" ? <Check className="size-3.5 text-[#3ECF8E]" /> : <Copy className="size-3.5" />}
+                          {copiedKey === "secret-role" ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
                         </button>
                       </div>
                     </div>
                   </div>
 
                   {/* Connection URIs & .env Card */}
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 space-y-3">
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h3 className="text-xs font-bold text-white font-mono">
@@ -5819,13 +5795,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             `DATABASE_URL="${activeProject.pooledUri}"\nDIRECT_URL="${activeProject.directUri}"\nSPARROWX_ANON_KEY="${activeProject.anonKey}"\nSPARROWX_SERVICE_ROLE_KEY="${activeProject.serviceRoleKey}"\nSPARROWX_REST_URL="${activeProject.restBaseUrl}"`
                           )
                         }
-                        className="inline-flex items-center gap-1.5 rounded bg-[#3ECF8E] px-3 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer"
+                        className="inline-flex items-center gap-1.5 rounded bg-[#A3E635] px-3 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer"
                       >
                         {copiedKey === "env-file" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                         <span>{copiedKey === "env-file" ? "Copied .env" : "Copy .env"}</span>
                       </button>
                     </div>
-                    <pre className="rounded-md border border-[#262626] bg-[#121212] p-3 font-mono text-[11px] text-[#3ECF8E] overflow-x-auto leading-relaxed">
+                    <pre className="rounded-md border border-[#262626] bg-[#05060A] p-3 font-mono text-[11px] text-[#A3E635] overflow-x-auto leading-relaxed">
 {`DATABASE_URL="${activeProject.pooledUri}"
 DIRECT_URL="${activeProject.directUri}"
 SPARROWX_ANON_KEY="${activeProject.anonKey}"
@@ -5868,7 +5844,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
 
                   {jwtTab === "signing" ? (
                     <div className="space-y-6">
-                      <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
                         <div className="space-y-1 max-w-lg">
                           <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
                             CREATE STANDBY KEY
@@ -5890,23 +5866,23 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                               message: "Standby ECC (P-256) JWT signing key provisioned cleanly.",
                             });
                           }}
-                          className="px-3.5 py-2 rounded-md bg-[#117A4B] hover:bg-[#3ECF8E] hover:text-[#11181C] text-white font-semibold text-xs border border-[#3ECF8E]/40 cursor-pointer"
+                          className="px-3.5 py-2 rounded-md bg-[#65A30D] hover:bg-[#A3E635] hover:text-[#11181C] text-white font-semibold text-xs border border-[#A3E635]/40 cursor-pointer"
                         >
                           Create Standby Key
                         </button>
                       </div>
 
                       {standbyJwtKey && (
-                        <div className="rounded-xl border border-[#3ECF8E]/40 bg-[#141A17] p-4 flex items-center justify-between text-xs font-mono">
+                        <div className="rounded-xl border border-[#A3E635]/40 bg-[#141A17] p-4 flex items-center justify-between text-xs font-mono">
                           <div>
                             <div className="text-white font-semibold">Standby Key (Ready)</div>
-                            <div className="text-[#3ECF8E] text-[11px]">{standbyJwtKey.id}</div>
+                            <div className="text-[#A3E635] text-[11px]">{standbyJwtKey.id}</div>
                           </div>
                           <span className="text-zinc-300">{standbyJwtKey.alg}</span>
                         </div>
                       )}
 
-                      <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] overflow-hidden">
+                      <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                         <table className="w-full text-left text-xs font-mono">
                           <thead className="bg-[#1C1C1F] border-b border-[#262626] text-[10px] text-zinc-500 uppercase">
                             <tr>
@@ -5933,7 +5909,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                         <p className="text-xs text-zinc-400">
                           These JWT signing keys still verify tokens issued prior to rotation until revoked.
                         </p>
-                        <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] overflow-hidden">
+                        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                           <table className="w-full text-left text-xs font-mono">
                             <thead className="bg-[#1C1C1F] border-b border-[#262626] text-[10px] text-zinc-500 uppercase">
                               <tr>
@@ -5975,14 +5951,14 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                       </div>
                     </div>
                   ) : (
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-4 space-y-3 text-xs font-mono">
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3 text-xs font-mono">
                       <div className="text-white font-semibold">Legacy HS256 JWT Signing Secret</div>
-                      <div className="p-3 rounded bg-[#121212] border border-[#262626] text-zinc-300 flex items-center justify-between">
+                      <div className="p-3 rounded bg-[#05060A] border border-[#262626] text-zinc-300 flex items-center justify-between">
                         <span>{showSecretKey ? "spx_jwt_sovereign_hmac_sha256_secret_v1" : "••••••••••••••••••••••••••••••••••••"}</span>
                         <button
                           type="button"
                           onClick={() => setShowSecretKey((s) => !s)}
-                          className="text-[#3ECF8E] hover:underline cursor-pointer"
+                          className="text-[#A3E635] hover:underline cursor-pointer"
                         >
                           {showSecretKey ? "Hide" : "Reveal"}
                         </button>
@@ -6001,7 +5977,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                   <h2 className="text-lg font-semibold text-white capitalize">
                     {effectiveSettingsTab.replace("_", " ")} Configuration
                   </h2>
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#171717] p-5 space-y-3 text-xs">
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3 text-xs">
                     {effectiveSettingsTab === "vault" ? (
                       <p className="text-zinc-300">
                         SparrowX Vault encrypts sensitive credentials at rest using authenticated AES-256 / SHA-256 verification before storage in PostgreSQL 16.
@@ -6010,7 +5986,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-zinc-300">Current Workspace Plan</span>
-                          <span className="px-2.5 py-0.5 rounded bg-[#3ECF8E]/15 text-[#3ECF8E] font-mono font-bold">
+                          <span className="px-2.5 py-0.5 rounded bg-[#A3E635]/15 text-[#A3E635] font-mono font-bold">
                             {selectedPricingPlan.toUpperCase()}
                           </span>
                         </div>
@@ -6076,7 +6052,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                 onClick={() => setConnectTab(tab.id)}
                 className={`px-3 py-1.5 rounded-md cursor-pointer ${
                   connectTab === tab.id
-                    ? "bg-[#3ECF8E] text-[#11181C] font-bold"
+                    ? "bg-[#A3E635] text-[#11181C] font-bold"
                     : "text-zinc-400 hover:text-white hover:bg-[#222226]"
                 }`}
               >
@@ -6098,14 +6074,14 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                       : `SPARROWX_URL="https://db.sparrowx.net"\nSPARROWX_ANON_KEY="${activeProject.anonKey}"\nDATABASE_URL="${activeProject.pooledUri}"`;
             return (
               <div className="space-y-3">
-                <pre className="rounded-lg border border-[#2E2E2E] bg-[#101013] p-4 font-mono text-xs text-[#3ECF8E] overflow-x-auto leading-relaxed">
+                <pre className="rounded-lg border border-[#2E2E2E] bg-[#101013] p-4 font-mono text-xs text-[#A3E635] overflow-x-auto leading-relaxed">
                   {connectSnippet}
                 </pre>
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => copyText("connect-modal-snippet", connectSnippet)}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-[#3ECF8E] text-[#11181C] font-bold text-xs cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
                   >
                     {copiedKey === "connect-modal-snippet" ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
                     <span>{copiedKey === "connect-modal-snippet" ? "Copied" : "Copy snippet"}</span>
@@ -6143,7 +6119,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
             value={jsonDraft}
             onChange={(e) => setJsonDraft(e.target.value)}
             aria-label="Row JSON payload"
-            className="w-full rounded-md border border-[#2E2E2E] bg-[#121212] p-3 font-mono text-xs text-[#3ECF8E] outline-none focus:border-[#3ECF8E]"
+            className="w-full rounded-md border border-[#2E2E2E] bg-[#05060A] p-3 font-mono text-xs text-[#A3E635] outline-none focus:border-[#A3E635]"
           />
           <div className="flex justify-end gap-2">
             <button
@@ -6156,7 +6132,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
             <button
               type="button"
               onClick={handleSaveRow}
-              className="rounded-md bg-[#3ECF8E] px-4 py-1.5 text-xs font-bold text-[#11181C] hover:opacity-95 cursor-pointer"
+              className="rounded-md bg-[#A3E635] px-4 py-1.5 text-xs font-bold text-[#11181C] hover:opacity-95 cursor-pointer"
             >
               Save Row
             </button>
@@ -6174,7 +6150,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
         <div className="p-6 space-y-5 max-h-[85vh] overflow-y-auto">
           <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
             <h2 id={tableDialogTitleId} className="font-bold text-white text-base flex items-center gap-2">
-              <Table2 className="size-4 text-[#3ECF8E]" />
+              <Table2 className="size-4 text-[#A3E635]" />
               <span>Visual Table &amp; Schema Designer</span>
             </h2>
             <button
@@ -6195,7 +6171,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                 placeholder="e.g. ai_knowledge_base"
                 value={newTableName}
                 onChange={(e) => setNewTableName(e.target.value)}
-                className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#121212] px-3 font-mono text-zinc-100 outline-none focus:border-[#3ECF8E]"
+                className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#05060A] px-3 font-mono text-zinc-100 outline-none focus:border-[#A3E635]"
               />
             </div>
 
@@ -6206,7 +6182,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                 placeholder="e.g. Vector embeddings and document metadata"
                 value={newTableDescription}
                 onChange={(e) => setNewTableDescription(e.target.value)}
-                className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#121212] px-3 text-zinc-100 outline-none focus:border-[#3ECF8E]"
+                className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#05060A] px-3 text-zinc-100 outline-none focus:border-[#A3E635]"
               />
             </div>
           </div>
@@ -6228,7 +6204,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                     },
                   ])
                 }
-                className="inline-flex items-center gap-1 text-[11px] text-[#3ECF8E] hover:underline cursor-pointer"
+                className="inline-flex items-center gap-1 text-[11px] text-[#A3E635] hover:underline cursor-pointer"
               >
                 <Plus className="size-3" /> Add Column
               </button>
@@ -6238,7 +6214,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
               {newTableColumns.map((col, idx) => (
                 <div
                   key={idx}
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-[#242424] bg-[#141414] p-2 text-xs"
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-[#242424] bg-[#080A10] p-2 text-xs"
                 >
                   <input
                     type="text"
@@ -6320,7 +6296,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
 
           <div className="space-y-1">
             <span className="text-[11px] font-bold text-zinc-400 font-mono">Live PostgreSQL 16 DDL Preview</span>
-            <pre className="p-3 rounded-lg border border-[#242424] bg-[#0E0E10] text-[#3ECF8E] font-mono text-[11px] overflow-x-auto max-h-32">
+            <pre className="p-3 rounded-lg border border-[#242424] bg-[#0E0E10] text-[#A3E635] font-mono text-[11px] overflow-x-auto max-h-32">
               {generatedTableDdl}
             </pre>
           </div>
@@ -6346,7 +6322,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
               <button
                 type="button"
                 onClick={handleCreateNewTable}
-                className="rounded-lg bg-[#3ECF8E] hover:bg-[#34b27b] text-[#11181C] px-4 py-2 text-xs font-bold cursor-pointer"
+                className="rounded-lg bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-4 py-2 text-xs font-bold cursor-pointer"
               >
                 Create Table &amp; Publish API
               </button>
@@ -6365,7 +6341,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
         <div className="p-5 space-y-4 text-xs">
           <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
             <h2 id={bucketDialogTitleId} className="font-bold text-sm text-white flex items-center gap-2">
-              <FolderPlus className="size-4 text-[#3ECF8E]" />
+              <FolderPlus className="size-4 text-[#A3E635]" />
               <span>Create Storage Bucket</span>
             </h2>
             <button
@@ -6385,7 +6361,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
               placeholder="e.g. model-weights"
               value={newBucketName}
               onChange={(e) => setNewBucketName(e.target.value)}
-              className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#121212] px-3 font-mono text-zinc-100 outline-none focus:border-[#3ECF8E]"
+              className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#05060A] px-3 font-mono text-zinc-100 outline-none focus:border-[#A3E635]"
             />
           </div>
 
@@ -6428,7 +6404,7 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                   message: `Storage bucket "${clean}" initialized with NVMe storage.`,
                 });
               }}
-              className="rounded-md bg-[#3ECF8E] px-4 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer"
+              className="rounded-md bg-[#A3E635] px-4 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer"
             >
               Create Bucket
             </button>

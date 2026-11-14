@@ -18,12 +18,12 @@ const FOUNDER_EMAIL = "founder@sparrowx.net";
 const SECURITY_EMAIL = "security@sparrowx.net";
 
 const inputClass =
-  "w-full px-3.5 py-2.5 rounded bg-[#080808] border border-white/35 text-white placeholder-zinc-500 focus:outline-none focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40 transition-colors aria-[invalid=true]:border-rose-400 aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-rose-400/50";
+  "w-full px-3.5 py-2.5 rounded bg-[#090B10] border border-white/25 text-white placeholder-zinc-500 focus:outline-none focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40 transition-colors aria-[invalid=true]:border-white aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-white/50";
 
 function CopyRow({ label, email }: { label: string; email: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="p-3 rounded bg-[#080808] border border-white/20 flex items-center justify-between gap-2">
+    <div className="p-3 rounded bg-[#090B10] border border-white/15 flex items-center justify-between gap-2">
       <div className="min-w-0">
         <span className="text-[10px] text-zinc-400 block uppercase">{label}</span>
         <a
@@ -45,9 +45,9 @@ function CopyRow({ label, email }: { label: string; email: string }) {
             /* clipboard unavailable; the mailto link still works */
           }
         }}
-        className="size-8 rounded bg-[#141414] border border-white/30 text-zinc-300 hover:text-white grid place-items-center shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-white/40 outline-none"
+        className="size-8 rounded bg-[#0D1017] border border-white/25 text-zinc-300 hover:text-white grid place-items-center shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-white/40 outline-none"
       >
-        {copied ? <Check className="size-3.5 text-emerald-400" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+        {copied ? <Check className="size-3.5 text-white" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
       </button>
     </div>
   );
@@ -113,8 +113,8 @@ export function ContactSection() {
   });
   const err = (key: "name" | "email" | "topic" | "message") =>
     errors[key] ? (
-      <p id={`${uid}-${key}-err`} className="text-[11px] text-rose-300 flex items-center gap-1.5">
-        <AlertCircle className="size-3.5 shrink-0 text-rose-400" aria-hidden="true" />
+      <p id={`${uid}-${key}-err`} className="text-[11px] text-zinc-200 flex items-center gap-1.5">
+        <AlertCircle className="size-3.5 shrink-0 text-white" aria-hidden="true" />
         <span>{errors[key]}</span>
       </p>
     ) : null;
@@ -122,12 +122,12 @@ export function ContactSection() {
   return (
     <section
       id="contact"
-      className="border-t border-white/15 bg-black px-4 sm:px-6 py-16 scroll-mt-24"
+      className="border-t border-white/15 bg-[#05060A] px-4 sm:px-6 py-16 scroll-mt-24"
     >
       <div className="max-w-7xl mx-auto space-y-10">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-300">
-            <Mail className="size-3.5 text-sky-400" aria-hidden="true" />
+            <Mail className="size-3.5 text-white" aria-hidden="true" />
             <span>DIRECT FOUNDER ACCESS</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
@@ -141,16 +141,16 @@ export function ContactSection() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-5 space-y-5">
-            <div className="border border-white/25 bg-[#0A0A0A] rounded-lg p-6 space-y-4 shadow-xl">
+            <div className="border border-white/20 bg-[#090B10] rounded-lg p-6 space-y-4 shadow-xl">
               <h3 className="text-xs font-mono text-white font-bold uppercase tracking-wider border-b border-white/15 pb-2">
                 Direct channels
               </h3>
               <div className="space-y-3 font-mono text-xs">
                 <CopyRow label="Founding team" email={FOUNDER_EMAIL} />
                 <CopyRow label="Security & disclosures" email={SECURITY_EMAIL} />
-                <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
+                <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                   <div className="flex items-center gap-2 text-white font-semibold">
-                    <span className="size-2 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
+                    <span className="size-2 rounded-full bg-white shrink-0" aria-hidden="true" />
                     <span>Target response: within 4 hours</span>
                   </div>
                   <p className="text-[11px] text-zinc-400 leading-relaxed">
@@ -160,7 +160,7 @@ export function ContactSection() {
               </div>
             </div>
 
-            <div className="border border-white/25 bg-[#0A0A0A] rounded-lg p-6 space-y-3 shadow-xl text-xs">
+            <div className="border border-white/20 bg-[#090B10] rounded-lg p-6 space-y-3 shadow-xl text-xs">
               <h3 className="text-xs font-mono text-white font-bold uppercase tracking-wider border-b border-white/15 pb-2">
                 Quick answers
               </h3>
@@ -187,10 +187,10 @@ export function ContactSection() {
             </div>
           </div>
 
-          <div className="lg:col-span-7 border border-white/25 bg-[#0A0A0A] rounded-lg p-6 sm:p-8 space-y-5 shadow-2xl">
+          <div className="lg:col-span-7 border border-white/20 bg-[#090B10] rounded-lg p-6 sm:p-8 space-y-5 shadow-2xl">
             <div className="border-b border-white/15 pb-3 space-y-0.5">
               <h3 className="font-bold text-white text-base font-sans flex items-center gap-2">
-                <MessageSquare className="size-4 text-sky-400" aria-hidden="true" />
+                <MessageSquare className="size-4 text-white" aria-hidden="true" />
                 <span>Send a message</span>
               </h3>
               <p className="text-xs text-zinc-400">
@@ -201,16 +201,16 @@ export function ContactSection() {
             {status === "success" ? (
               <div
                 role="status"
-                className="p-6 rounded-lg bg-[#080808] border border-emerald-500/35 space-y-4 text-left"
+                className="p-6 rounded-lg bg-[#05060A] border border-white/30 space-y-4 text-left"
               >
                 <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-full bg-emerald-500/15 border border-emerald-500/40 grid place-items-center text-emerald-400 shrink-0">
+                  <div className="size-10 rounded-full bg-white/10 border border-white/35 grid place-items-center text-white shrink-0">
                     <CheckCircle2 className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h4 className="text-white font-bold text-sm">Message received</h4>
                     <p className="text-xs text-zinc-400 font-mono">
-                      Ticket: <span className="text-emerald-400 font-bold">{ticketId}</span>
+                      Ticket: <span className="text-white font-bold">{ticketId}</span>
                     </p>
                   </div>
                 </div>
@@ -225,7 +225,7 @@ export function ContactSection() {
                     setStatus("idle");
                     setForm((f) => ({ ...f, message: "" }));
                   }}
-                  className="px-4 py-2 rounded bg-[#141414] border border-white/30 text-zinc-300 hover:text-white transition-colors cursor-pointer font-mono text-xs"
+                  className="px-4 py-2 rounded bg-[#0D1017] border border-white/25 text-zinc-300 hover:text-white transition-colors cursor-pointer font-mono text-xs"
                 >
                   Send another message
                 </button>
@@ -292,7 +292,7 @@ export function ContactSection() {
                     className={`${inputClass} cursor-pointer`}
                   >
                     {CONTACT_TOPICS.map((t) => (
-                      <option key={t} value={t} className="bg-black text-white">
+                      <option key={t} value={t} className="bg-[#05060A] text-white">
                         {t}
                       </option>
                     ))}
@@ -325,8 +325,8 @@ export function ContactSection() {
 
                 <div aria-live="polite">
                   {status === "error" && formError && (
-                    <div className="p-3 rounded bg-rose-500/10 border border-rose-500/35 text-rose-200 text-[11px] flex items-start gap-2">
-                      <AlertCircle className="size-4 shrink-0 mt-px text-rose-400" aria-hidden="true" />
+                    <div className="p-3 rounded bg-white/10 border border-white/35 text-zinc-100 text-[11px] flex items-start gap-2">
+                      <AlertCircle className="size-4 shrink-0 mt-px text-white" aria-hidden="true" />
                       <div className="space-y-1">
                         <p>{formError}</p>
                         <a href={mailto} className="underline hover:text-white">

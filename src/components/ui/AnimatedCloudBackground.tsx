@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
 interface AnimatedCloudBackgroundProps {
-  variant?: "sky" | "emerald" | "monochrome";
+  variant?: "sky" | "emerald" | "monochrome" | "lime" | "purple";
   intensity?: "full" | "subtle";
 }
 
@@ -70,6 +70,42 @@ const PALETTES = {
       "linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.58), transparent)",
     nodeRgb: "255, 255, 255",
     secondaryRgb: "212, 212, 216",
+  },
+  lime: {
+    orb1Full: "rgba(163, 230, 53, 0.14)",
+    orb1Subtle: "rgba(163, 230, 53, 0.06)",
+    orb2Full: "rgba(132, 204, 22, 0.10)",
+    orb2Subtle: "rgba(132, 204, 22, 0.045)",
+    orb3Full: "rgba(255, 255, 255, 0.07)",
+    orb3Subtle: "rgba(255, 255, 255, 0.035)",
+    gridFull: "rgba(163, 230, 53, 0.08)",
+    gridSubtle: "rgba(163, 230, 53, 0.04)",
+    dotFull: "rgba(255, 255, 255, 0.16)",
+    dotSubtle: "rgba(255, 255, 255, 0.08)",
+    beamX:
+      "linear-gradient(90deg, transparent, rgba(163, 230, 53, 0.78), rgba(255, 255, 255, 0.45), transparent)",
+    beamY:
+      "linear-gradient(180deg, transparent, rgba(163, 230, 53, 0.62), transparent)",
+    nodeRgb: "163, 230, 53",
+    secondaryRgb: "255, 255, 255",
+  },
+  purple: {
+    orb1Full: "rgba(168, 85, 247, 0.15)",
+    orb1Subtle: "rgba(168, 85, 247, 0.065)",
+    orb2Full: "rgba(147, 51, 234, 0.11)",
+    orb2Subtle: "rgba(147, 51, 234, 0.05)",
+    orb3Full: "rgba(192, 132, 252, 0.09)",
+    orb3Subtle: "rgba(192, 132, 252, 0.04)",
+    gridFull: "rgba(168, 85, 247, 0.08)",
+    gridSubtle: "rgba(168, 85, 247, 0.04)",
+    dotFull: "rgba(192, 132, 252, 0.18)",
+    dotSubtle: "rgba(192, 132, 252, 0.09)",
+    beamX:
+      "linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.78), rgba(192, 132, 252, 0.48), transparent)",
+    beamY:
+      "linear-gradient(180deg, transparent, rgba(168, 85, 247, 0.62), transparent)",
+    nodeRgb: "168, 85, 247",
+    secondaryRgb: "192, 132, 252",
   },
 } as const;
 
