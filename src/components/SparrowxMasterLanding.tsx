@@ -592,11 +592,6 @@ export function SparrowxMasterLanding({
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
           {/* Left Column: Human, Emotional Pitch */}
           <div className="lg:col-span-7 space-y-5 sm:space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#0E172A] border border-sky-500/30 text-[11px] sm:text-xs font-mono text-sky-300">
-              <span className="size-2 rounded-full bg-sky-400 animate-pulse shrink-0" />
-              <span>PASSIONATE INDEPENDENT STARTUP • ZERO CORPORATE JARGON</span>
-            </div>
-
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans text-balance">
               Simple, Honest Cloud Tools <br />
               <span className="text-sky-400">Built for Real Builders.</span>
@@ -861,37 +856,66 @@ export function SparrowxMasterLanding({
 
       <ComparisonSection />
 
-      {/* SECTION 5: OUR STORY / FOUNDER LETTER */}
-      <section id="story" className="scroll-mt-24 border-t border-sky-500/15 bg-[#090E1D] px-4 sm:px-6 py-16">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="border border-sky-500/25 bg-[#0D1526] rounded-lg p-6 sm:p-10 space-y-5 shadow-2xl relative">
+      {/* SECTION 5: SHORT EMOTIONAL STORY TEASER -> FULL /story PAGE */}
+      <section id="story" className="scroll-mt-24 border-t border-sky-500/15 bg-[#090E1D] px-4 sm:px-6 py-14">
+        <div className="max-w-4xl mx-auto">
+          <div className="border border-sky-500/25 bg-[#0D1526] rounded-lg p-6 sm:p-9 space-y-6 shadow-2xl relative">
             <div className="inline-flex items-center gap-2 text-xs font-mono text-sky-400">
               <Heart className="size-4 text-rose-400" />
               <span>A NOTE FROM OUR TEAM</span>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-              Why We Started SparrowX
-            </h2>
-
-            <div className="space-y-4 text-xs sm:text-sm text-[#A3B1C6] leading-relaxed font-sans">
-              <p>
-                When we were building our first projects as independent developers, we were constantly frustrated by large cloud monopolies. Signing up required navigating through dozens of confusing menus, and at the end of the month, we were hit with unexpected bandwidth and egress charges.
-              </p>
-              <p>
-                We asked ourselves a simple question: <span className="text-white font-semibold">Why can&apos;t cloud tools just be simple, honest, and respectful?</span>
-              </p>
-              <p>
-                If you just need a secure password, you shouldn&apos;t have to register an account. If you want to send a file to a coworker, it should be fast, private, and painless. If you want a database, it should just give you a working connection string without hidden bandwidth taxes.
-              </p>
-              <p>
-                SparrowX is our answer. We are small, passionate, and proudly independent. We don&apos;t answer to corporate shareholders—we answer to you. Thank you for giving us a chance to power your work.
+            <div className="space-y-3">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
+                Why We Started SparrowX
+              </h2>
+              <p className="text-xs sm:text-sm text-[#C2CEE0] leading-relaxed font-sans">
+                We started SparrowX after one too many late nights watching independent projects get punished by surprise cloud bandwidth bills, $2,000/month security paywalls, and everyday tools that demand an account just to send a file. We believe builders deserve infrastructure that feels human—fast, private, and radically affordable.
               </p>
             </div>
 
-            <div className="pt-4 border-t border-sky-500/15 flex items-center justify-between text-xs font-mono">
-              <span className="text-white font-bold">— The SparrowX Team</span>
-              <span className="text-sky-400">Built with passion for builders</span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="rounded-md border border-sky-500/15 bg-[#090F1E] p-3.5 space-y-1">
+                <div className="font-mono font-bold text-orange-300 flex items-center gap-1.5">
+                  <Shield className="size-3.5 shrink-0" />
+                  <span>Honest Security</span>
+                </div>
+                <p className="text-[#A3B1C6] leading-relaxed">
+                  Live L7 DDoS defense &amp; offline CSPRNG keys without enterprise extortion.
+                </p>
+              </div>
+              <div className="rounded-md border border-sky-500/15 bg-[#090F1E] p-3.5 space-y-1">
+                <div className="font-mono font-bold text-emerald-300 flex items-center gap-1.5">
+                  <FileUp className="size-3.5 shrink-0" />
+                  <span>Zero-Login File Drop</span>
+                </div>
+                <p className="text-[#A3B1C6] leading-relaxed">
+                  Browser-sealed AES-256-GCM transfers that burn from RAM—plus a free 10 GB vault.
+                </p>
+              </div>
+              <div className="rounded-md border border-sky-500/15 bg-[#090F1E] p-3.5 space-y-1">
+                <div className="font-mono font-bold text-sky-300 flex items-center gap-1.5">
+                  <Database className="size-3.5 shrink-0" />
+                  <span>Low-Cost Cloud DB</span>
+                </div>
+                <p className="text-[#A3B1C6] leading-relaxed">
+                  Bare-metal NVMe PostgreSQL &amp; $4/mo compute with zero surprise egress fees.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-sky-500/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono">
+              <div>
+                <span className="text-white font-bold">— The SparrowX Team</span>
+                <span className="ml-2 text-[#8795AB] hidden sm:inline">&middot; Built with passion for builders</span>
+              </div>
+              <a
+                href="/story"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold transition-colors shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+              >
+                <span>Read Our Full Story &amp; Manifesto</span>
+                <ArrowRight className="size-3.5" />
+              </a>
             </div>
           </div>
         </div>
@@ -1047,6 +1071,10 @@ export function SparrowxMasterLanding({
             <span className="text-[#475569]">&bull;</span>
             <a href="#comparison" className="text-sky-400 hover:text-sky-300 transition-colors">
               Why Us
+            </a>
+            <span className="text-[#475569]">&bull;</span>
+            <a href="/story" className="text-sky-400 hover:text-sky-300 transition-colors">
+              Read Our Story
             </a>
             <span className="text-[#475569]">&bull;</span>
             <a href="#contact" className="text-sky-400 hover:text-sky-300 transition-colors">
