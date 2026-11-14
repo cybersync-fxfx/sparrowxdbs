@@ -658,21 +658,30 @@ heal_pterodactyl_host_nginx() {
     return 0
   fi
 
+  local ptero_dir="/var/www/pterodactyl"
   local ptero_p="${PTERO_PORT:-8090}"
-  local php_sock
-  php_sock="$(detect_php_fpm_sock)"
+  local php_sock=""
+  local php_bin=""
 
-  # Ensure core Pterodactyl services are running cleanly
+  # Ensure core Pterodactyl services & PHP-FPM are running cleanly
   for dep_svc in mariadb mysql redis-server pteroq; do
     if systemctl list-unit-files "${dep_svc}.service" >/dev/null 2>&1; then
       systemctl enable --now "${dep_svc}" >/dev/null 2>&1 || true
     fi
   done
+  for fpm_svc in php8.4-fpm php8.3-fpm php8.2-fpm php8.1-fpm php8.0-fpm; do
+    if systemctl list-unit-files 2>/dev/null | grep -q "^${fpm_svc}.service"; then
+      systemctl enable "${fpm_svc}" >/dev/null 2>&1 || true
+      systemctl start "${fpm_svc}" >/dev/null 2>&1 || true
+    fi
+  done
   if systemctl list-unit-files wings.service >/dev/null 2>&1 && [ -f /etc/pterodactyl/config.yml ]; then
     systemctl enable --now wings >/dev/null 2>&1 || true
   fi
+  php_sock="$(detect_php_fpm_sock)"
+  php_bin="$(command -v php8.4 || command -v php8.3 || command -v php8.2 || command -v php8.1 || command -v php || true)"
 
-  # Sync MariaDB database/user credentials, admin account & Pterodactyl .env
+  # Sync MariaDB/MySQL database/user credentials, admin account & Pterodactyl .env
   init_ptero_credentials
   local db_cli=""
   if command -v mariadb >/dev/null 2>&1; then
@@ -683,43 +692,65 @@ heal_pterodactyl_host_nginx() {
   if [ -n "${db_cli}" ] && [ -n "${PTERO_DB_PASSWORD:-}" ]; then
     "${db_cli}" -u root -e "
       CREATE DATABASE IF NOT EXISTS \`${PTERO_DB_NAME}\`;
-      CREATE OR REPLACE USER '${PTERO_DB_USER}'@'127.0.0.1' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
-      CREATE OR REPLACE USER '${PTERO_DB_USER}'@'localhost' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
+      CREATE USER IF NOT EXISTS '${PTERO_DB_USER}'@'127.0.0.1' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
+      ALTER USER '${PTERO_DB_USER}'@'127.0.0.1' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
+      CREATE USER IF NOT EXISTS '${PTERO_DB_USER}'@'localhost' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
+      ALTER USER '${PTERO_DB_USER}'@'localhost' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
       GRANT ALL PRIVILEGES ON \`${PTERO_DB_NAME}\`.* TO '${PTERO_DB_USER}'@'127.0.0.1' WITH GRANT OPTION;
       GRANT ALL PRIVILEGES ON \`${PTERO_DB_NAME}\`.* TO '${PTERO_DB_USER}'@'localhost' WITH GRANT OPTION;
       FLUSH PRIVILEGES;
     " >/dev/null 2>&1 || true
   fi
 
-  if [ ! -f /var/www/pterodactyl/.env ] && [ -f /var/www/pterodactyl/.env.example ]; then
-    cp /var/www/pterodactyl/.env.example /var/www/pterodactyl/.env
+  if [ ! -f "${ptero_dir}/.env" ] && [ -f "${ptero_dir}/.env.example" ]; then
+    cp "${ptero_dir}/.env.example" "${ptero_dir}/.env"
   fi
-  if [ -f /var/www/pterodactyl/.env ]; then
+  if [ -f "${ptero_dir}/.env" ]; then
     set_ptero_env_key "APP_URL" "https://${DOMAIN_GAME}"
+    set_ptero_env_key "APP_ENVIRONMENT_ONLY" "false"
     set_ptero_env_key "TRUSTED_PROXIES" "*"
+    set_ptero_env_key "RECAPTCHA_ENABLED" "false"
+    set_ptero_env_key "SESSION_SECURE_COOKIE" "true"
     set_ptero_env_key "DB_HOST" "127.0.0.1"
     set_ptero_env_key "DB_PORT" "3306"
     set_ptero_env_key "DB_DATABASE" "${PTERO_DB_NAME}"
     set_ptero_env_key "DB_USERNAME" "${PTERO_DB_USER}"
     set_ptero_env_key "DB_PASSWORD" "${PTERO_DB_PASSWORD}"
+
+    local existing_salt=""
+    existing_salt="$(awk -F= '/^HASHIDS_SALT=/{sub(/^[^=]*=/,""); print; exit}' "${ptero_dir}/.env" 2>/dev/null | tr -d "\"'\r" || true)"
+    if [ -z "${existing_salt}" ]; then
+      set_ptero_env_key "HASHIDS_SALT" "$(openssl rand -hex 10 2>/dev/null || echo 'spx_hashids_salt_2026')"
+    fi
+    set_ptero_env_key "HASHIDS_LENGTH" "8"
+
+    local redis_ready="false"
+    if command -v redis-cli >/dev/null 2>&1 && redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -qi "PONG"; then
+      if [ -n "${php_bin}" ] && "${php_bin}" -m 2>/dev/null | grep -qi "^redis$"; then
+        redis_ready="true"
+      fi
+    fi
+    if [ "${redis_ready}" = "true" ]; then
+      set_ptero_env_key "REDIS_HOST" "127.0.0.1"
+      set_ptero_env_key "REDIS_PORT" "6379"
+    else
+      set_ptero_env_key "CACHE_DRIVER" "file"
+      set_ptero_env_key "SESSION_DRIVER" "file"
+      set_ptero_env_key "QUEUE_CONNECTION" "sync"
+    fi
   fi
 
-  local php_bin=""
-  php_bin="$(command -v php8.3 || command -v php8.2 || command -v php8.1 || command -v php || true)"
-  if [ -n "${php_bin}" ] && [ -f /var/www/pterodactyl/artisan ]; then
-    if ! grep -q '^APP_KEY=base64:' /var/www/pterodactyl/.env 2>/dev/null; then
-      (cd /var/www/pterodactyl && "${php_bin}" artisan key:generate --force >/dev/null 2>&1 || true)
+  if [ -n "${php_bin}" ] && [ -f "${ptero_dir}/artisan" ]; then
+    if ! grep -q '^APP_KEY=base64:' "${ptero_dir}/.env" 2>/dev/null; then
+      (cd "${ptero_dir}" && "${php_bin}" artisan key:generate --force --no-interaction >/dev/null 2>&1 || true)
     fi
+    (cd "${ptero_dir}" && "${php_bin}" artisan migrate --seed --force --no-interaction >/dev/null 2>&1 || true)
+
     if [ -n "${db_cli}" ]; then
-      local has_users_tbl=""
-      has_users_tbl="$("${db_cli}" -Nse "SHOW TABLES IN \`${PTERO_DB_NAME}\` LIKE 'users';" 2>/dev/null || true)"
-      if [ -z "${has_users_tbl}" ]; then
-        (cd /var/www/pterodactyl && "${php_bin}" artisan migrate --seed --force >/dev/null 2>&1 || true)
-      fi
       local admin_count="0"
       admin_count="$("${db_cli}" -Nse "SELECT COUNT(*) FROM \`${PTERO_DB_NAME}\`.users WHERE root_admin=1;" 2>/dev/null || echo "0")"
       if [ "${admin_count:-0}" -eq 0 ] 2>/dev/null; then
-        (cd /var/www/pterodactyl && "${php_bin}" artisan p:user:make \
+        (cd "${ptero_dir}" && "${php_bin}" artisan p:user:make --no-interaction \
           --email="${PTERO_ADMIN_EMAIL}" \
           --username="${PTERO_ADMIN_USER}" \
           --name-first="${PTERO_ADMIN_FIRSTNAME}" \
@@ -733,25 +764,41 @@ heal_pterodactyl_host_nginx() {
           PTERO_ADMIN_USER="$(echo "${existing_admin_row}" | awk '{print $1}')"
           PTERO_ADMIN_EMAIL="$(echo "${existing_admin_row}" | awk '{print $2}')"
           export PTERO_ADMIN_USER PTERO_ADMIN_EMAIL
-          local bcrypt_pw=""
-          bcrypt_pw="$(SPX_PASS="${PTERO_ADMIN_PASSWORD}" "${php_bin}" -r 'echo password_hash(getenv("SPX_PASS"), PASSWORD_BCRYPT);' 2>/dev/null || true)"
-          if [ -n "${bcrypt_pw}" ]; then
-            "${db_cli}" -u root -e "UPDATE \`${PTERO_DB_NAME}\`.users SET password='${bcrypt_pw}' WHERE username='${PTERO_ADMIN_USER}';" >/dev/null 2>&1 || true
-          fi
         fi
       fi
+
+      local has_root_user="0"
+      has_root_user="$("${db_cli}" -Nse "SELECT COUNT(*) FROM \`${PTERO_DB_NAME}\`.users WHERE username='root';" 2>/dev/null || echo "0")"
+      if [ "${has_root_user:-0}" -eq 0 ] 2>/dev/null; then
+        (cd "${ptero_dir}" && "${php_bin}" artisan p:user:make --no-interaction \
+          --email="root@${DOMAIN_ROOT:-sparrowx.net}" \
+          --username="root" \
+          --name-first="Root" \
+          --name-last="Admin" \
+          --password="${PTERO_ADMIN_PASSWORD}" \
+          --admin=1 >/dev/null 2>&1 || true)
+      fi
+
+      local bcrypt_pw=""
+      bcrypt_pw="$(SPX_PASS="${PTERO_ADMIN_PASSWORD}" "${php_bin}" -r 'echo password_hash(getenv("SPX_PASS"), PASSWORD_BCRYPT);' 2>/dev/null || true)"
+      if [ -n "${bcrypt_pw}" ]; then
+        "${db_cli}" -u root -e "UPDATE \`${PTERO_DB_NAME}\`.users SET password='${bcrypt_pw}', root_admin=1 WHERE username IN ('${PTERO_ADMIN_USER}', 'admin', 'root') OR root_admin=1;" >/dev/null 2>&1 || true
+      fi
     fi
+
+    (cd "${ptero_dir}" && "${php_bin}" artisan config:clear >/dev/null 2>&1 || true)
+    (cd "${ptero_dir}" && "${php_bin}" artisan cache:clear >/dev/null 2>&1 || true)
+    (cd "${ptero_dir}" && "${php_bin}" artisan view:clear >/dev/null 2>&1 || true)
+    (cd "${ptero_dir}" && "${php_bin}" artisan route:clear >/dev/null 2>&1 || true)
+    (cd "${ptero_dir}" && "${php_bin}" artisan queue:restart >/dev/null 2>&1 || true)
   fi
 
+  mkdir -p "${ptero_dir}/storage/logs" "${ptero_dir}/storage/framework/sessions" "${ptero_dir}/storage/framework/views" "${ptero_dir}/storage/framework/cache/data" "${ptero_dir}/bootstrap/cache"
   if id -u www-data >/dev/null 2>&1; then
-    chown -R www-data:www-data /var/www/pterodactyl/storage /var/www/pterodactyl/bootstrap/cache 2>/dev/null || true
+    chown -R www-data:www-data "${ptero_dir}" 2>/dev/null || true
   fi
-
-  if [ -n "${php_bin}" ] && [ -f /var/www/pterodactyl/artisan ]; then
-    "${php_bin}" /var/www/pterodactyl/artisan config:clear >/dev/null 2>&1 || true
-    "${php_bin}" /var/www/pterodactyl/artisan route:clear >/dev/null 2>&1 || true
-    "${php_bin}" /var/www/pterodactyl/artisan view:clear >/dev/null 2>&1 || true
-  fi
+  chmod -R 775 "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" 2>/dev/null || true
+  chmod 640 "${ptero_dir}/.env" 2>/dev/null || true
   write_ptero_credentials_file
 
   # Remove default or any host nginx sites claiming ports 80 / 443
@@ -831,6 +878,40 @@ EOF
     systemctl unmask nginx >/dev/null 2>&1 || true
     systemctl enable nginx >/dev/null 2>&1 || true
     systemctl restart nginx >/dev/null 2>&1 || systemctl reload nginx >/dev/null 2>&1 || true
+  fi
+
+  # Live Laravel /sanctum/csrf-cookie + POST /auth/login verification (falls back to file cache/session if Redis throws 500)
+  local csrf_code="000" login_probe_code="000" raw_xsrf="" xsrf_tok="" ptero_cj=""
+  ptero_cj="$(mktemp)"
+  csrf_code="$(curl -s -c "${ptero_cj}" -o /dev/null -w "%{http_code}" --max-time 5 -H "Host: ${DOMAIN_GAME}" -H "X-Forwarded-Proto: https" "http://127.0.0.1:${ptero_p}/sanctum/csrf-cookie" 2>/dev/null || echo "000")"
+  if echo "${csrf_code}" | grep -qE "^(200|204)$"; then
+    raw_xsrf="$(awk '$6=="XSRF-TOKEN"{print $7; exit}' "${ptero_cj}" 2>/dev/null || true)"
+    if [ -n "${raw_xsrf}" ] && [ -n "${php_bin}" ]; then
+      xsrf_tok="$("${php_bin}" -r 'echo urldecode($argv[1] ?? "");' "${raw_xsrf}" 2>/dev/null || echo "${raw_xsrf}")"
+    else
+      xsrf_tok="${raw_xsrf}"
+    fi
+    if [ -n "${xsrf_tok}" ]; then
+      login_probe_code="$(curl -s -b "${ptero_cj}" -o /dev/null -w "%{http_code}" --max-time 5 -X POST -H "Host: ${DOMAIN_GAME}" -H "X-Forwarded-Proto: https" -H "Accept: application/json" -H "Content-Type: application/json" -H "X-XSRF-TOKEN: ${xsrf_tok}" -d '{"user":"__probe__","password":"__probe__"}' "http://127.0.0.1:${ptero_p}/auth/login" 2>/dev/null || echo "000")"
+    fi
+  fi
+  rm -f "${ptero_cj}"
+  if ! echo "${csrf_code}" | grep -qE "^(200|204)$" || [ "${login_probe_code}" = "500" ]; then
+    log_warn "Pterodactyl auth probe returned CSRF:${csrf_code} / LOGIN:${login_probe_code}; switching session & cache drivers to file driver"
+    if [ -f "${ptero_dir}/.env" ]; then
+      set_ptero_env_key "CACHE_DRIVER" "file"
+      set_ptero_env_key "SESSION_DRIVER" "file"
+      set_ptero_env_key "QUEUE_CONNECTION" "sync"
+    fi
+    if [ -n "${php_bin}" ] && [ -f "${ptero_dir}/artisan" ]; then
+      (cd "${ptero_dir}" && "${php_bin}" artisan config:clear >/dev/null 2>&1 || true)
+      (cd "${ptero_dir}" && "${php_bin}" artisan cache:clear >/dev/null 2>&1 || true)
+    fi
+    if id -u www-data >/dev/null 2>&1; then
+      chown -R www-data:www-data "${ptero_dir}" 2>/dev/null || true
+    fi
+    chmod -R 775 "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" 2>/dev/null || true
+    chmod 640 "${ptero_dir}/.env" 2>/dev/null || true
   fi
   open_ptero_ufw_rules
   log_ok "Host Pterodactyl Nginx shifted cleanly onto port ${ptero_p} (PHP-FPM: ${php_sock})."
