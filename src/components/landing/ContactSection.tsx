@@ -18,17 +18,17 @@ const FOUNDER_EMAIL = "founder@sparrowx.net";
 const SECURITY_EMAIL = "security@sparrowx.net";
 
 const inputClass =
-  "w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus-visible:border-sky-400 focus-visible:ring-2 focus-visible:ring-sky-400/40 transition-colors aria-[invalid=true]:border-rose-400";
+  "w-full px-3.5 py-2.5 rounded bg-[#080808] border border-white/35 text-white placeholder-zinc-500 focus:outline-none focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40 transition-colors aria-[invalid=true]:border-white aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-white";
 
 function CopyRow({ label, email }: { label: string; email: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="p-3 rounded bg-[#070A12] border border-sky-500/15 flex items-center justify-between gap-2">
+    <div className="p-3 rounded bg-[#080808] border border-white/20 flex items-center justify-between gap-2">
       <div className="min-w-0">
-        <span className="text-[10px] text-[#8795AB] block uppercase">{label}</span>
+        <span className="text-[10px] text-zinc-400 block uppercase">{label}</span>
         <a
           href={`mailto:${email}`}
-          className="text-white hover:text-sky-300 font-semibold truncate block"
+          className="text-white hover:text-zinc-300 font-semibold truncate block"
         >
           {email}
         </a>
@@ -45,9 +45,9 @@ function CopyRow({ label, email }: { label: string; email: string }) {
             /* clipboard unavailable; the mailto link still works */
           }
         }}
-        className="size-8 rounded bg-[#111A30] border border-sky-500/20 text-[#94A3B8] hover:text-white grid place-items-center shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-sky-400/40 outline-none"
+        className="size-8 rounded bg-[#141414] border border-white/30 text-zinc-300 hover:text-white grid place-items-center shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-white/40 outline-none"
       >
-        {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+        {copied ? <Check className="size-3.5 text-white" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
       </button>
     </div>
   );
@@ -113,26 +113,27 @@ export function ContactSection() {
   });
   const err = (key: "name" | "email" | "topic" | "message") =>
     errors[key] ? (
-      <p id={`${uid}-${key}-err`} className="text-[11px] text-rose-300">
-        {errors[key]}
+      <p id={`${uid}-${key}-err`} className="text-[11px] text-white flex items-center gap-1.5">
+        <AlertCircle className="size-3.5 shrink-0 text-white" aria-hidden="true" />
+        <span>{errors[key]}</span>
       </p>
     ) : null;
 
   return (
     <section
       id="contact"
-      className="border-t border-sky-500/15 bg-[#080C17] px-4 sm:px-6 py-16 scroll-mt-24"
+      className="border-t border-white/15 bg-black px-4 sm:px-6 py-16 scroll-mt-24"
     >
       <div className="max-w-7xl mx-auto space-y-10">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400">
-            <Mail className="size-3.5" aria-hidden />
+          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-300">
+            <Mail className="size-3.5 text-white" aria-hidden="true" />
             <span>DIRECT FOUNDER ACCESS</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
             Talk directly with our engineering team.
           </h2>
-          <p className="text-xs sm:text-sm text-[#A3B1C6] max-w-2xl">
+          <p className="text-xs sm:text-sm text-zinc-400 max-w-2xl">
             Custom PostgreSQL clusters, dedicated Shield IP blocks, or an architecture question:
             send it here and an engineer replies personally.
           </p>
@@ -140,30 +141,30 @@ export function ContactSection() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           <div className="lg:col-span-5 space-y-5">
-            <div className="border border-sky-500/20 bg-[#0C1222] rounded-lg p-6 space-y-4 shadow-xl">
-              <h3 className="text-xs font-mono text-sky-400 font-bold uppercase tracking-wider border-b border-sky-500/15 pb-2">
+            <div className="border border-white/25 bg-[#0A0A0A] rounded-lg p-6 space-y-4 shadow-xl">
+              <h3 className="text-xs font-mono text-white font-bold uppercase tracking-wider border-b border-white/15 pb-2">
                 Direct channels
               </h3>
               <div className="space-y-3 font-mono text-xs">
                 <CopyRow label="Founding team" email={FOUNDER_EMAIL} />
                 <CopyRow label="Security & disclosures" email={SECURITY_EMAIL} />
-                <div className="p-3 rounded bg-[#070A12] border border-sky-500/15 space-y-1">
+                <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
                   <div className="flex items-center gap-2 text-white font-semibold">
-                    <span className="size-2 rounded-full bg-emerald-400 shrink-0" aria-hidden />
+                    <span className="size-2 rounded-full bg-white shrink-0" aria-hidden="true" />
                     <span>Target response: within 4 hours</span>
                   </div>
-                  <p className="text-[11px] text-[#A3B1C6] leading-relaxed">
+                  <p className="text-[11px] text-zinc-400 leading-relaxed">
                     On-call coverage across Asia-Pacific, Europe and US time zones.
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="border border-sky-500/20 bg-[#0C1222] rounded-lg p-6 space-y-3 shadow-xl text-xs">
-              <h3 className="text-xs font-mono text-sky-400 font-bold uppercase tracking-wider border-b border-sky-500/15 pb-2">
+            <div className="border border-white/25 bg-[#0A0A0A] rounded-lg p-6 space-y-3 shadow-xl text-xs">
+              <h3 className="text-xs font-mono text-white font-bold uppercase tracking-wider border-b border-white/15 pb-2">
                 Quick answers
               </h3>
-              <div className="space-y-3 text-[#A3B1C6]">
+              <div className="space-y-3 text-zinc-400">
                 <div>
                   <h4 className="font-bold text-white mb-0.5">
                     Are the utilities really free with no account?
@@ -186,13 +187,13 @@ export function ContactSection() {
             </div>
           </div>
 
-          <div className="lg:col-span-7 border border-sky-500/20 bg-[#0C1222] rounded-lg p-6 sm:p-8 space-y-5 shadow-2xl">
-            <div className="border-b border-sky-500/15 pb-3 space-y-0.5">
+          <div className="lg:col-span-7 border border-white/25 bg-[#0A0A0A] rounded-lg p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div className="border-b border-white/15 pb-3 space-y-0.5">
               <h3 className="font-bold text-white text-base font-sans flex items-center gap-2">
-                <MessageSquare className="size-4 text-sky-400" aria-hidden />
+                <MessageSquare className="size-4 text-white" aria-hidden="true" />
                 <span>Send a message</span>
               </h3>
-              <p className="text-xs text-[#A3B1C6]">
+              <p className="text-xs text-zinc-400">
                 Tell us about your project. We only use your details to reply.
               </p>
             </div>
@@ -200,22 +201,22 @@ export function ContactSection() {
             {status === "success" ? (
               <div
                 role="status"
-                className="p-6 rounded-lg bg-[#070B14] border border-emerald-500/30 space-y-4 text-left"
+                className="p-6 rounded-lg bg-[#080808] border border-white/35 space-y-4 text-left"
               >
                 <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-full bg-emerald-500/15 border border-emerald-500/40 grid place-items-center text-emerald-400 shrink-0">
-                    <CheckCircle2 className="size-5" aria-hidden />
+                  <div className="size-10 rounded-full bg-white/10 border border-white/40 grid place-items-center text-white shrink-0">
+                    <CheckCircle2 className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h4 className="text-white font-bold text-sm">Message received</h4>
-                    <p className="text-xs text-[#A3B1C6] font-mono">
-                      Ticket: <span className="text-emerald-400 font-bold">{ticketId}</span>
+                    <p className="text-xs text-zinc-400 font-mono">
+                      Ticket: <span className="text-white font-bold">{ticketId}</span>
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-[#CBD5E1] leading-relaxed">
+                <p className="text-xs text-zinc-300 leading-relaxed">
                   Thanks, <strong className="text-white">{form.name}</strong>. We'll reply to{" "}
-                  <span className="text-emerald-400">{form.email}</span>. Quote the ticket number if
+                  <span className="text-white underline underline-offset-4">{form.email}</span>. Quote the ticket number if
                   you follow up.
                 </p>
                 <button
@@ -224,7 +225,7 @@ export function ContactSection() {
                     setStatus("idle");
                     setForm((f) => ({ ...f, message: "" }));
                   }}
-                  className="px-4 py-2 rounded bg-[#111A30] border border-sky-500/25 text-[#94A3B8] hover:text-white transition-colors cursor-pointer font-mono text-xs"
+                  className="px-4 py-2 rounded bg-[#141414] border border-white/30 text-zinc-300 hover:text-white transition-colors cursor-pointer font-mono text-xs"
                 >
                   Send another message
                 </button>
@@ -245,8 +246,8 @@ export function ContactSection() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5 text-left">
-                    <label htmlFor={`${uid}-name`} className="text-[11px] text-[#A3B1C6]">
-                      Your name <span className="text-sky-400">*</span>
+                    <label htmlFor={`${uid}-name`} className="text-[11px] text-zinc-300">
+                      Your name <span className="text-white">*</span>
                     </label>
                     <input
                       {...field("name")}
@@ -262,8 +263,8 @@ export function ContactSection() {
                     {err("name")}
                   </div>
                   <div className="space-y-1.5 text-left">
-                    <label htmlFor={`${uid}-email`} className="text-[11px] text-[#A3B1C6]">
-                      Email <span className="text-sky-400">*</span>
+                    <label htmlFor={`${uid}-email`} className="text-[11px] text-zinc-300">
+                      Email <span className="text-white">*</span>
                     </label>
                     <input
                       {...field("email")}
@@ -281,7 +282,7 @@ export function ContactSection() {
                 </div>
 
                 <div className="space-y-1.5 text-left">
-                  <label htmlFor={`${uid}-topic`} className="text-[11px] text-[#A3B1C6]">
+                  <label htmlFor={`${uid}-topic`} className="text-[11px] text-zinc-300">
                     Topic
                   </label>
                   <select
@@ -291,7 +292,7 @@ export function ContactSection() {
                     className={`${inputClass} cursor-pointer`}
                   >
                     {CONTACT_TOPICS.map((t) => (
-                      <option key={t} value={t}>
+                      <option key={t} value={t} className="bg-black text-white">
                         {t}
                       </option>
                     ))}
@@ -302,12 +303,12 @@ export function ContactSection() {
                 <div className="space-y-1.5 text-left">
                   <label
                     htmlFor={`${uid}-message`}
-                    className="text-[11px] text-[#A3B1C6] flex justify-between"
+                    className="text-[11px] text-zinc-300 flex justify-between"
                   >
                     <span>
-                      Message <span className="text-sky-400">*</span>
+                      Message <span className="text-white">*</span>
                     </span>
-                    <span className="text-[#7C8BA1] tabular-nums">{form.message.length}/4000</span>
+                    <span className="text-zinc-400 tabular-nums">{form.message.length}/4000</span>
                   </label>
                   <textarea
                     {...field("message")}
@@ -324,11 +325,11 @@ export function ContactSection() {
 
                 <div aria-live="polite">
                   {status === "error" && formError && (
-                    <div className="p-3 rounded bg-rose-500/10 border border-rose-500/30 text-rose-200 text-[11px] flex items-start gap-2">
-                      <AlertCircle className="size-4 shrink-0 mt-px" aria-hidden />
+                    <div className="p-3 rounded bg-white/[0.06] border border-white/40 text-white text-[11px] flex items-start gap-2">
+                      <AlertCircle className="size-4 shrink-0 mt-px text-white" aria-hidden="true" />
                       <div className="space-y-1">
                         <p>{formError}</p>
-                        <a href={mailto} className="underline hover:text-white">
+                        <a href={mailto} className="underline hover:text-zinc-300">
                           Email us instead
                         </a>
                       </div>
@@ -337,18 +338,18 @@ export function ContactSection() {
                 </div>
 
                 <div className="pt-1 flex items-center justify-between gap-3">
-                  <span className="text-[10px] text-[#8795AB]">
+                  <span className="text-[10px] text-zinc-400">
                     No tracking. Your IP is stored only as a hash.
                   </span>
                   <button
                     type="submit"
                     disabled={status === "submitting"}
-                    className="px-6 py-2.5 rounded bg-sky-500 hover:bg-sky-400 disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.25)] focus-visible:ring-2 focus-visible:ring-sky-300 outline-none"
+                    className="px-6 py-2.5 rounded bg-white hover:bg-zinc-200 disabled:opacity-60 disabled:cursor-not-allowed text-black font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.16)] focus-visible:ring-2 focus-visible:ring-white/60 outline-none"
                   >
                     {status === "submitting" ? (
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                     ) : (
-                      <Send className="size-3.5" aria-hidden />
+                      <Send className="size-3.5" aria-hidden="true" />
                     )}
                     <span>{status === "submitting" ? "Sending…" : "Send message"}</span>
                   </button>

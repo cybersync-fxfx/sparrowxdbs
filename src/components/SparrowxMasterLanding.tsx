@@ -389,7 +389,7 @@ function OperatorLoginDialog({
 }
 
 // -----------------------------------------------------------------------------
-// Flagship Master Company Portal (sparrowx.net) - Warm, Blue Startup Aesthetic
+// Flagship Master Company Portal (sparrowx.net) - Pure Monochrome Black & White
 // -----------------------------------------------------------------------------
 export function SparrowxMasterLanding({
   onOpenLogin,
@@ -433,7 +433,7 @@ export function SparrowxMasterLanding({
   }, []);
 
   const navLinkClass = (id: string) =>
-    `transition-colors ${activeSection === id ? "text-white font-semibold underline decoration-sky-400 underline-offset-8" : "hover:text-white"}`;
+    `transition-colors ${activeSection === id ? "text-white font-semibold underline decoration-white underline-offset-8" : "hover:text-white"}`;
 
   const vpsPlans = [
     {
@@ -443,7 +443,7 @@ export function SparrowxMasterLanding({
       ram: "2 GB ECC",
       storage: "40 GB Fast NVMe",
       bandwidth: "1 TB Anycast Bandwidth",
-      priceInr: "â‚¹340",
+      priceInr: "₹340",
       priceUsd: "$4",
       period: "/mo",
       tag: "Starter",
@@ -455,7 +455,7 @@ export function SparrowxMasterLanding({
       ram: "4 GB ECC",
       storage: "80 GB Fast NVMe",
       bandwidth: "2 TB Anycast Bandwidth",
-      priceInr: "â‚¹670",
+      priceInr: "₹670",
       priceUsd: "$8",
       period: "/mo",
       tag: "Most Popular",
@@ -467,7 +467,7 @@ export function SparrowxMasterLanding({
       ram: "8 GB ECC",
       storage: "160 GB Fast NVMe",
       bandwidth: "4 TB Anycast Bandwidth",
-      priceInr: "â‚¹1,260",
+      priceInr: "₹1,260",
       priceUsd: "$15",
       period: "/mo",
       tag: "BEST VALUE",
@@ -480,7 +480,7 @@ export function SparrowxMasterLanding({
       ram: "16 GB ECC",
       storage: "400 GB Fast NVMe",
       bandwidth: "8 TB Anycast Bandwidth",
-      priceInr: "â‚¹2,440",
+      priceInr: "₹2,440",
       priceUsd: "$29",
       period: "/mo",
       tag: "Heavy Workloads",
@@ -507,11 +507,11 @@ export function SparrowxMasterLanding({
   };
 
   return (
-    <div className="min-h-screen bg-[#070A12] text-[#F3F4F6] font-sans antialiased selection:bg-sky-500 selection:text-black flex flex-col relative overflow-x-hidden">
-      <AnimatedCloudBackground variant="sky" intensity="full" />
+    <div className="min-h-screen bg-black text-white font-sans antialiased selection:bg-white selection:text-black flex flex-col relative overflow-x-hidden">
+      <AnimatedCloudBackground variant="monochrome" intensity="full" />
 
-      {/* SECTION 1: HEADER (CLEAN BLUE ACCENTS) */}
-      <header className="border-b border-sky-500/15 bg-[#0B1020]/85 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+      {/* SECTION 1: HEADER (MONOCHROME) */}
+      <header className="border-b border-white/15 bg-black/90 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.6)]">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           {/* Left Brand */}
           <div className="flex items-center gap-3">
@@ -519,13 +519,13 @@ export function SparrowxMasterLanding({
               <img
                 src="/sparrowx-logo.png"
                 alt="SparrowX"
-                className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)]"
+                className="size-9 object-contain shrink-0 grayscale contrast-125 drop-shadow-[0_4px_12px_rgba(255,255,255,0.18)]"
               />
               <div>
                 <span className="font-extrabold text-base tracking-tight text-white font-sans">
                   SPARROWX
                 </span>
-                <span className="ml-2 text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30 font-mono font-semibold uppercase">
+                <span className="ml-2 text-[10px] text-zinc-200 bg-white/10 px-2 py-0.5 rounded border border-white/25 font-mono font-semibold uppercase">
                   STARTUP CLOUD
                 </span>
               </div>
@@ -533,7 +533,7 @@ export function SparrowxMasterLanding({
           </div>
 
           {/* Center Navigation Links */}
-          <nav className="hidden md:flex items-center gap-6 text-xs text-[#A3B1C6] font-mono">
+          <nav className="hidden md:flex items-center gap-6 text-xs text-zinc-400 font-mono">
             {/* Products Dropdown */}
             <div className="relative">
               <button
@@ -542,12 +542,12 @@ export function SparrowxMasterLanding({
                 className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer text-white font-semibold"
               >
                 <span>Our Products</span>
-                <ChevronDown className="size-3 text-sky-400" />
+                <ChevronDown className="size-3 text-white" aria-hidden="true" />
               </button>
 
               {productDropdownOpen && (
                 <div
-                  className="absolute left-0 mt-2 w-64 rounded-md bg-[#0D1526] border border-sky-500/25 p-2 shadow-2xl z-50 space-y-1 font-mono text-xs"
+                  className="absolute left-0 mt-2 w-64 rounded-md bg-[#0D0D0D] border border-white/25 p-2 shadow-2xl z-50 space-y-1 font-mono text-xs"
                   onMouseLeave={() => setProductDropdownOpen(false)}
                 >
                   <button
@@ -556,12 +556,12 @@ export function SparrowxMasterLanding({
                       setProductDropdownOpen(false);
                       handleLaunch("db", "https://db.sparrowx.net", "db");
                     }}
-                    className="w-full text-left p-2 rounded hover:bg-sky-500/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Database className="size-4 text-emerald-400 shrink-0" />
+                    <Database className="size-4 text-white shrink-0" aria-hidden="true" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Cloud DB</div>
-                      <div className="text-[10px] text-[#A3B1C6]">PostgreSQL &amp; AI Vector Studio</div>
+                      <div className="text-[10px] text-zinc-400">PostgreSQL &amp; AI Vector Studio</div>
                     </div>
                   </button>
 
@@ -571,12 +571,12 @@ export function SparrowxMasterLanding({
                       setProductDropdownOpen(false);
                       handleLaunch("file", "https://file.sparrowx.net", "file");
                     }}
-                    className="w-full text-left p-2 rounded hover:bg-sky-500/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <FileUp className="size-4 text-sky-400 shrink-0" />
+                    <FileUp className="size-4 text-white shrink-0" aria-hidden="true" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Files</div>
-                      <div className="text-[10px] text-[#A3B1C6]">Zero-Login File Drop &amp; 10GB Vault</div>
+                      <div className="text-[10px] text-zinc-400">Zero-Login File Drop &amp; 10GB Vault</div>
                     </div>
                   </button>
 
@@ -586,12 +586,12 @@ export function SparrowxMasterLanding({
                       setProductDropdownOpen(false);
                       handleLaunch("password", "https://password.sparrowx.net", "password");
                     }}
-                    className="w-full text-left p-2 rounded hover:bg-sky-500/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <KeyRound className="size-4 text-amber-400 shrink-0" />
+                    <KeyRound className="size-4 text-white shrink-0" aria-hidden="true" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Keys</div>
-                      <div className="text-[10px] text-[#A3B1C6]">Offline Password Instrument (No Login)</div>
+                      <div className="text-[10px] text-zinc-400">Offline Password Instrument (No Login)</div>
                     </div>
                   </button>
 
@@ -601,12 +601,12 @@ export function SparrowxMasterLanding({
                       setProductDropdownOpen(false);
                       handleLaunch("sec", "https://sec.sparrowx.net", "shield");
                     }}
-                    className="w-full text-left p-2 rounded hover:bg-sky-500/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Shield className="size-4 text-orange-500 shrink-0" />
+                    <Shield className="size-4 text-white shrink-0" aria-hidden="true" />
                     <div>
                       <div className="font-bold text-xs">SparrowX Shield</div>
-                      <div className="text-[10px] text-[#A3B1C6]">Cyber Threat Map &amp; DDoS Defense</div>
+                      <div className="text-[10px] text-zinc-400">Cyber Threat Map &amp; DDoS Defense</div>
                     </div>
                   </button>
 
@@ -616,12 +616,12 @@ export function SparrowxMasterLanding({
                       setProductDropdownOpen(false);
                       handleLaunch("api", "https://api.sparrowx.net", "api");
                     }}
-                    className="w-full text-left p-2 rounded hover:bg-sky-500/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Terminal className="size-4 text-indigo-400 shrink-0" />
+                    <Terminal className="size-4 text-white shrink-0" aria-hidden="true" />
                     <div>
                       <div className="font-bold text-xs">SparrowX API Gateway</div>
-                      <div className="text-[10px] text-[#A3B1C6]">Instant REST API with cURL &amp; SDKs</div>
+                      <div className="text-[10px] text-zinc-400">Instant REST API with cURL &amp; SDKs</div>
                     </div>
                   </button>
                 </div>
@@ -650,10 +650,10 @@ export function SparrowxMasterLanding({
                   handleLaunch("password", "https://password.sparrowx.net", "password");
                 }
               }}
-              className="text-sky-400 hover:text-sky-300 font-semibold inline-flex items-center gap-1"
+              className="text-white hover:text-zinc-300 font-semibold inline-flex items-center gap-1"
             >
               <span>Offline Keys (Free)</span>
-              <ArrowUpRight className="size-3" />
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </a>
           </nav>
 
@@ -661,25 +661,25 @@ export function SparrowxMasterLanding({
           <div className="flex items-center gap-2 sm:gap-3">
             {sessionUser ? (
               <>
-                <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-xs max-w-[190px] truncate">
-                  <User className="size-3.5 shrink-0" />
+                <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white/10 border border-white/30 text-white font-mono text-xs max-w-[190px] truncate">
+                  <User className="size-3.5 shrink-0" aria-hidden="true" />
                   <span className="truncate">{sessionUser.fullName || sessionUser.email}</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => onOpenLogin()}
-                  className="hidden sm:flex px-3.5 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all items-center gap-1.5 cursor-pointer font-mono shadow-[0_0_15px_rgba(56,189,248,0.25)]"
+                  className="hidden sm:flex px-3.5 py-1.5 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-all items-center gap-1.5 cursor-pointer font-mono shadow-[0_0_15px_rgba(255,255,255,0.2)]"
                 >
                   <span>Open Console</span>
-                  <ArrowUpRight className="size-3.5" />
+                  <ArrowUpRight className="size-3.5" aria-hidden="true" />
                 </button>
                 <button
                   type="button"
                   onClick={handleLandingSignOut}
-                  className="hidden sm:flex px-3 py-1.5 rounded bg-[#111A30] border border-red-500/30 hover:bg-red-500/15 text-xs font-mono text-red-300 transition-colors items-center gap-1.5 cursor-pointer"
+                  className="hidden sm:flex px-3 py-1.5 rounded bg-[#141414] border border-white/30 hover:bg-white/10 text-xs font-mono text-zinc-200 hover:text-white transition-colors items-center gap-1.5 cursor-pointer"
                   title="Sign out of session"
                 >
-                  <LogOut className="size-3" />
+                  <LogOut className="size-3" aria-hidden="true" />
                   <span>Sign Out</span>
                 </button>
               </>
@@ -688,19 +688,19 @@ export function SparrowxMasterLanding({
                 <button
                   type="button"
                   onClick={() => setOperatorModalOpen(true)}
-                  className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#A3B1C6] hover:text-white transition-all items-center gap-1.5 cursor-pointer"
+                  className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#141414] border border-white/30 hover:border-white/60 text-xs font-mono text-zinc-200 hover:text-white transition-all items-center gap-1.5 cursor-pointer"
                 >
-                  <Lock className="size-3 text-sky-400" />
+                  <Lock className="size-3 text-white" aria-hidden="true" />
                   <span>Sign In / Register</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                  className="px-3 sm:px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.25)] font-mono min-h-[36px] sm:min-h-0"
+                  className="px-3 sm:px-4 py-1.5 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_15px_rgba(255,255,255,0.2)] font-mono min-h-[36px] sm:min-h-0"
                 >
                   <span>Launch DB Studio</span>
-                  <ArrowUpRight className="size-3.5" />
+                  <ArrowUpRight className="size-3.5" aria-hidden="true" />
                 </button>
               </>
             )}
@@ -711,18 +711,18 @@ export function SparrowxMasterLanding({
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
               aria-expanded={mobileMenuOpen}
-              className="md:hidden size-9 rounded-md bg-[#111A30] border border-sky-500/30 text-white flex items-center justify-center cursor-pointer min-h-[36px] min-w-[36px]"
+              className="md:hidden size-9 rounded-md bg-[#141414] border border-white/35 text-white flex items-center justify-center cursor-pointer min-h-[36px] min-w-[36px]"
             >
-              {mobileMenuOpen ? <X className="size-5 text-sky-400" /> : <Menu className="size-5 text-white" />}
+              {mobileMenuOpen ? <X className="size-5 text-white" aria-hidden="true" /> : <Menu className="size-5 text-white" aria-hidden="true" />}
             </button>
           </div>
         </div>
 
         {/* Mobile Navigation Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden mt-3 pt-3 border-t border-sky-500/20 space-y-4 max-h-[calc(100vh-80px)] overflow-y-auto no-scrollbar pb-6 animate-in slide-in-from-top duration-200">
+          <div className="md:hidden mt-3 pt-3 border-t border-white/20 space-y-4 max-h-[calc(100vh-80px)] overflow-y-auto no-scrollbar pb-6 animate-in slide-in-from-top duration-200">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-sky-400 uppercase tracking-wider font-bold block px-1">
+              <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-wider font-bold block px-1">
                 SparrowX Cloud Products
               </span>
 
@@ -732,16 +732,16 @@ export function SparrowxMasterLanding({
                   setMobileMenuOpen(false);
                   handleLaunch("db", "https://db.sparrowx.net", "db");
                 }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+                className="w-full text-left p-2.5 rounded-lg bg-[#0D0D0D] border border-white/20 hover:border-white/45 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-emerald-500/10 border border-emerald-500/30 grid place-items-center text-emerald-400 shrink-0">
-                  <Database className="size-4" />
+                <div className="size-8 rounded bg-white/10 border border-white/30 grid place-items-center text-white shrink-0">
+                  <Database className="size-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud DB</div>
-                  <div className="text-[10px] text-[#A3B1C6] truncate">Managed PostgreSQL &amp; Vector Studio</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Managed PostgreSQL &amp; Vector Studio</div>
                 </div>
-                <span className="text-[10px] font-mono text-emerald-400 shrink-0">db.sparrowx.net</span>
+                <span className="text-[10px] font-mono text-zinc-200 shrink-0">db.sparrowx.net</span>
               </button>
 
               <button
@@ -750,16 +750,16 @@ export function SparrowxMasterLanding({
                   setMobileMenuOpen(false);
                   handleLaunch("file", "https://file.sparrowx.net", "file");
                 }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+                className="w-full text-left p-2.5 rounded-lg bg-[#0D0D0D] border border-white/20 hover:border-white/45 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-sky-500/10 border border-sky-500/30 grid place-items-center text-sky-400 shrink-0">
-                  <FileUp className="size-4" />
+                <div className="size-8 rounded bg-white/10 border border-white/30 grid place-items-center text-white shrink-0">
+                  <FileUp className="size-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Files</div>
-                  <div className="text-[10px] text-[#A3B1C6] truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
                 </div>
-                <span className="text-[10px] font-mono text-sky-400 shrink-0">file.sparrowx.net</span>
+                <span className="text-[10px] font-mono text-zinc-200 shrink-0">file.sparrowx.net</span>
               </button>
 
               <button
@@ -768,16 +768,16 @@ export function SparrowxMasterLanding({
                   setMobileMenuOpen(false);
                   handleLaunch("password", "https://password.sparrowx.net", "password");
                 }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+                className="w-full text-left p-2.5 rounded-lg bg-[#0D0D0D] border border-white/20 hover:border-white/45 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-amber-500/10 border border-amber-500/30 grid place-items-center text-amber-400 shrink-0">
-                  <KeyRound className="size-4" />
+                <div className="size-8 rounded bg-white/10 border border-white/30 grid place-items-center text-white shrink-0">
+                  <KeyRound className="size-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Keys (Free)</div>
-                  <div className="text-[10px] text-[#A3B1C6] truncate">Offline Cryptographic Generator (No Login)</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Offline Cryptographic Generator (No Login)</div>
                 </div>
-                <span className="text-[10px] font-mono text-amber-400 shrink-0">password.sparrowx.net</span>
+                <span className="text-[10px] font-mono text-zinc-200 shrink-0">password.sparrowx.net</span>
               </button>
 
               <button
@@ -786,16 +786,16 @@ export function SparrowxMasterLanding({
                   setMobileMenuOpen(false);
                   handleLaunch("sec", "https://sec.sparrowx.net", "shield");
                 }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+                className="w-full text-left p-2.5 rounded-lg bg-[#0D0D0D] border border-white/20 hover:border-white/45 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-orange-500/10 border border-orange-500/30 grid place-items-center text-orange-400 shrink-0">
-                  <Shield className="size-4" />
+                <div className="size-8 rounded bg-white/10 border border-white/30 grid place-items-center text-white shrink-0">
+                  <Shield className="size-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Shield</div>
-                  <div className="text-[10px] text-[#A3B1C6] truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
+                  <div className="text-[10px] text-zinc-400 truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
                 </div>
-                <span className="text-[10px] font-mono text-orange-400 shrink-0">sec.sparrowx.net</span>
+                <span className="text-[10px] font-mono text-zinc-200 shrink-0">sec.sparrowx.net</span>
               </button>
 
               <button
@@ -804,59 +804,59 @@ export function SparrowxMasterLanding({
                   setMobileMenuOpen(false);
                   handleLaunch("api", "https://api.sparrowx.net", "api");
                 }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#0E172A] border border-sky-500/20 hover:border-sky-500/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+                className="w-full text-left p-2.5 rounded-lg bg-[#0D0D0D] border border-white/20 hover:border-white/45 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-indigo-500/10 border border-indigo-500/30 grid place-items-center text-indigo-400 shrink-0">
-                  <Terminal className="size-4" />
+                <div className="size-8 rounded bg-white/10 border border-white/30 grid place-items-center text-white shrink-0">
+                  <Terminal className="size-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX API Gateway</div>
-                  <div className="text-[10px] text-[#A3B1C6] truncate">Instant REST API with cURL &amp; SDKs</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Instant REST API with cURL &amp; SDKs</div>
                 </div>
-                <span className="text-[10px] font-mono text-indigo-400 shrink-0">api.sparrowx.net</span>
+                <span className="text-[10px] font-mono text-zinc-200 shrink-0">api.sparrowx.net</span>
               </button>
             </div>
 
-            <div className="pt-2 border-t border-sky-500/15 flex flex-col gap-2 font-mono text-xs">
+            <div className="pt-2 border-t border-white/15 flex flex-col gap-2 font-mono text-xs">
               <a
                 href="#comparison"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
+                className="p-2.5 rounded bg-[#141414] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
               >
                 <span>Why Switch (Comparison)</span>
-                <ArrowRight className="size-3.5 text-sky-400" />
+                <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
               </a>
 
               <a
                 href="#story"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
+                className="p-2.5 rounded bg-[#141414] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
               >
                 <span>Read Our Story</span>
-                <ArrowRight className="size-3.5 text-sky-400" />
+                <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
               </a>
 
               <a
                 href="#vps"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
+                className="p-2.5 rounded bg-[#141414] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
               >
                 <span>Cloud VPS Pricing</span>
-                <ArrowRight className="size-3.5 text-sky-400" />
+                <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
               </a>
 
               <a
                 href="#contact"
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#111A30] text-[#A3B1C6] hover:text-white flex items-center justify-between"
+                className="p-2.5 rounded bg-[#141414] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
               >
                 <span>Contact Engineers</span>
-                <ArrowRight className="size-3.5 text-sky-400" />
+                <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
               </a>
 
               {sessionUser ? (
                 <div className="space-y-2 pt-1">
-                  <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-xs flex items-center justify-between gap-2">
+                  <div className="p-2.5 rounded bg-white/10 border border-white/30 text-white font-mono text-xs flex items-center justify-between gap-2">
                     <span className="truncate">{sessionUser.fullName || sessionUser.email}</span>
                     <button
                       type="button"
@@ -864,7 +864,7 @@ export function SparrowxMasterLanding({
                         setMobileMenuOpen(false);
                         handleLandingSignOut();
                       }}
-                      className="text-red-300 hover:text-red-200 underline cursor-pointer shrink-0"
+                      className="text-zinc-200 hover:text-white underline cursor-pointer shrink-0"
                     >
                       Sign Out
                     </button>
@@ -875,10 +875,10 @@ export function SparrowxMasterLanding({
                       setMobileMenuOpen(false);
                       onOpenLogin();
                     }}
-                    className="w-full min-h-[44px] rounded bg-sky-500 hover:bg-sky-400 text-black font-bold font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full min-h-[44px] rounded bg-white hover:bg-zinc-200 text-black font-bold font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <span>Open Workspace Console</span>
-                    <ArrowUpRight className="size-3.5" />
+                    <ArrowUpRight className="size-3.5" aria-hidden="true" />
                   </button>
                 </div>
               ) : (
@@ -888,9 +888,9 @@ export function SparrowxMasterLanding({
                     setMobileMenuOpen(false);
                     setOperatorModalOpen(true);
                   }}
-                  className="w-full min-h-[44px] rounded bg-[#111A30] border border-sky-500/30 text-white font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full min-h-[44px] rounded bg-[#141414] border border-white/35 text-white font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Lock className="size-3.5 text-sky-400" />
+                  <Lock className="size-3.5 text-white" aria-hidden="true" />
                   <span>Sign In / Register</span>
                 </button>
               )}
@@ -900,28 +900,28 @@ export function SparrowxMasterLanding({
       </header>
 
       {/* SECTION 2: EMOTIONAL STARTUP HERO */}
-      <section className="border-b border-sky-500/15 bg-gradient-to-b from-[#090E1D]/75 via-[#070A12]/50 to-transparent px-4 sm:px-6 py-10 sm:py-20 relative z-10 overflow-hidden">
+      <section className="border-b border-white/15 bg-gradient-to-b from-black/80 via-black/60 to-transparent px-4 sm:px-6 py-10 sm:py-20 relative z-10 overflow-hidden">
         {/* Soft Animated Ambient Glow */}
-        <div className="animate-spx-orb-1 absolute -top-10 left-1/4 w-96 h-96 bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="animate-spx-orb-2 absolute bottom-0 right-1/5 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="animate-spx-orb-1 absolute -top-10 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="animate-spx-orb-2 absolute bottom-0 right-1/5 w-72 h-72 bg-white/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
           {/* Left Column: Human, Emotional Pitch */}
           <div className="lg:col-span-7 space-y-5 sm:space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 backdrop-blur-sm text-[11px] font-mono text-sky-300 shadow-[0_0_20px_rgba(56,189,248,0.12)]">
-              <span className="relative flex size-2">
-                <span className="animate-spx-pulse-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full size-2 bg-emerald-400" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/25 backdrop-blur-sm text-[11px] font-mono text-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.08)]">
+              <span className="relative flex size-2" aria-hidden="true">
+                <span className="animate-spx-pulse-ring absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+                <span className="relative inline-flex rounded-full size-2 bg-white" />
               </span>
               <span>SOVEREIGN CLOUD MESH • LIVE TELEMETRY &amp; ZERO TRACKERS</span>
             </div>
 
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans text-balance">
               Simple, Honest Cloud Tools <br />
-              <span className="text-sky-400">Built for Real Builders.</span>
+              <span className="text-zinc-300">Built for Real Builders.</span>
             </h1>
 
-            <p className="text-xs sm:text-base text-[#A3B1C6] max-w-2xl leading-relaxed">
+            <p className="text-xs sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
               We&apos;re a small, independent developer team building fast cloud databases, instant encrypted file sharing, hardware-grade offline passwords, and automated DDoS defense.
               No surprise bills, no shady telemetry, and no forced logins for simple utilities.
             </p>
@@ -931,71 +931,71 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => handleLaunch("file", "https://file.sparrowx.net", "file")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.3)] font-mono"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.2)] font-mono"
               >
-                <FileUp className="size-4" />
+                <FileUp className="size-4" aria-hidden="true" />
                 <span>Instant File Drop (No Login)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleLaunch("password", "https://password.sparrowx.net", "password")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-[#111A30]/90 backdrop-blur-md border border-sky-500/30 hover:border-sky-500/60 text-white font-mono text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-[#141414]/90 backdrop-blur-md border border-white/30 hover:border-white/60 text-white font-mono text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
-                <KeyRound className="size-4 text-sky-400" />
+                <KeyRound className="size-4 text-white" aria-hidden="true" />
                 <span>Offline Keys (No Login)</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/10 hover:border-white/25 text-[#A3B1C6] hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer backdrop-blur-sm"
+                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/25 hover:border-white/50 text-zinc-300 hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer backdrop-blur-sm"
               >
-                <Database className="size-4 text-emerald-400" />
+                <Database className="size-4 text-white" aria-hidden="true" />
                 <span>Postgres Studio</span>
               </button>
             </div>
           </div>
 
           {/* Right Column: Why Developers Love Us Card */}
-          <div className="lg:col-span-5 border border-sky-500/20 bg-[#0C1222]/85 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-sky-500/15 pb-3">
-              <span className="text-xs font-mono text-sky-400 font-bold uppercase tracking-wider">
+          <div className="lg:col-span-5 border border-white/25 bg-[#0D0D0D]/90 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/15 pb-3">
+              <span className="text-xs font-mono text-white font-bold uppercase tracking-wider">
                 Why Builders Choose SparrowX
               </span>
-              <span className="text-emerald-400 text-[10px] font-mono flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-zinc-200 text-[10px] font-mono flex items-center gap-1">
+                <span className="size-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
                 ONLINE &amp; ACTIVE
               </span>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3 rounded bg-[#070A12] border border-sky-500/15 space-y-1">
+              <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
-                  <Zap className="size-3.5 text-amber-400" />
+                  <Zap className="size-3.5 text-white" aria-hidden="true" />
                   <span>Zero Forced Sign-Ups</span>
                 </div>
-                <p className="text-[#A3B1C6] text-[11px] leading-relaxed">
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
                   Need a secure 64-character password or to send a file to a client? Just open the link and do it. No account creation required.
                 </p>
               </div>
 
-              <div className="p-3 rounded bg-[#070A12] border border-sky-500/15 space-y-1">
+              <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
-                  <Shield className="size-3.5 text-orange-400" />
+                  <Shield className="size-3.5 text-white" aria-hidden="true" />
                   <span>Tactical DDoS &amp; Origin Defense</span>
                 </div>
-                <p className="text-[#A3B1C6] text-[11px] leading-relaxed">
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
                   We cloak your real server IP and deflect malicious attacks in under 1 second using our live global threat map.
                 </p>
               </div>
 
-              <div className="p-3 rounded bg-[#070A12] border border-sky-500/15 space-y-1">
+              <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
-                  <Heart className="size-3.5 text-rose-400" />
+                  <Heart className="size-3.5 text-white" aria-hidden="true" />
                   <span>Real Human Support</span>
                 </div>
-                <p className="text-[#A3B1C6] text-[11px] leading-relaxed">
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
                   We are a small startup. When you reach out to us, you talk directly to the engineers building the product.
                 </p>
               </div>
@@ -1007,172 +1007,172 @@ export function SparrowxMasterLanding({
       {/* SECTION 3: 6 DEDICATED PRODUCT TOOLS (BENTO GRID) */}
       <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400">
-            <Sparkles className="size-3.5" />
+          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-300">
+            <Sparkles className="size-3.5 text-white" aria-hidden="true" />
             <span>STANDALONE SPECIALIZED EXPERIENCES</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
             Six Focused Tools. Zero Clutter.
           </h2>
-          <p className="text-xs sm:text-sm text-[#A3B1C6]">
+          <p className="text-xs sm:text-sm text-zinc-400">
             Each tool has its own dedicated home with specialized features built for speed and security.
           </p>
         </div>
 
         {/* 6 PRODUCTS GRID */}
-        <div className="border border-sky-500/20 bg-[#0C1222]/85 backdrop-blur-md rounded-lg divide-y md:divide-y-0 divide-sky-500/15 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 overflow-hidden shadow-xl">
+        <div className="border border-white/25 bg-[#0D0D0D]/90 backdrop-blur-md rounded-lg divide-y md:divide-y-0 divide-white/15 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 overflow-hidden shadow-xl">
           {/* 1. SparrowX Cloud DB */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors border-r border-sky-500/15">
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-[#111A30] border border-emerald-500/30 grid place-items-center text-emerald-400">
-                  <Database className="size-4" />
+                <div className="size-9 rounded-md bg-[#141414] border border-white/30 grid place-items-center text-white">
+                  <Database className="size-4" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-[9px] font-mono text-zinc-200 bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   POSTGRES + VECTOR
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Cloud DB</h3>
-              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 Fast, reliable managed PostgreSQL with built-in connection pooling and pgvector search. No sudden $1,000 bandwidth bills.
               </p>
             </div>
             <button
               type="button"
               onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-              className="w-full py-2 rounded bg-[#111A30] hover:bg-white hover:text-black border border-sky-500/20 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2 rounded bg-[#141414] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>db.sparrowx.net</span>
-              <ArrowUpRight className="size-3" />
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </button>
           </div>
 
           {/* 2. SparrowX Files */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors border-r border-sky-500/15">
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-[#111A30] border border-sky-500/30 grid place-items-center text-sky-400">
-                  <FileUp className="size-4" />
+                <div className="size-9 rounded-md bg-[#141414] border border-white/30 grid place-items-center text-white">
+                  <FileUp className="size-4" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-mono text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-[9px] font-mono text-zinc-200 bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   FREE • NO LOGIN
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Files</h3>
-              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 Drop files instantly with zero login (auto-purged from memory for privacy) or unlock your persistent 10GB cloud vault.
               </p>
             </div>
             <button
               type="button"
               onClick={() => handleLaunch("file", "https://file.sparrowx.net", "file")}
-              className="w-full py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono shadow-sm"
+              className="w-full py-2 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono shadow-sm"
             >
               <span>file.sparrowx.net</span>
-              <ArrowUpRight className="size-3" />
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </button>
           </div>
 
           {/* 3. SparrowX Keys */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors">
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-[#111A30] border border-amber-500/30 grid place-items-center text-amber-400">
-                  <KeyRound className="size-4" />
+                <div className="size-9 rounded-md bg-[#141414] border border-white/30 grid place-items-center text-white">
+                  <KeyRound className="size-4" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-mono text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-[9px] font-mono text-zinc-200 bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   FREE • NO LOGIN
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Keys</h3>
-              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 100% offline cryptographic password generator. Press spacebar to regenerate. Runs directly in your browser with zero network calls.
               </p>
             </div>
             <button
               type="button"
               onClick={() => handleLaunch("password", "https://password.sparrowx.net", "password")}
-              className="w-full py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono shadow-sm"
+              className="w-full py-2 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono shadow-sm"
             >
               <span>password.sparrowx.net</span>
-              <ArrowUpRight className="size-3" />
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </button>
           </div>
 
           {/* 4. SparrowX Shield */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors border-r border-sky-500/15 border-t border-sky-500/15">
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-[#111A30] border border-orange-500/30 grid place-items-center text-orange-500">
-                  <Shield className="size-4" />
+                <div className="size-9 rounded-md bg-[#141414] border border-white/30 grid place-items-center text-white">
+                  <Shield className="size-4" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-mono text-orange-400 bg-orange-500/10 border border-orange-500/30 px-2 py-0.5 rounded font-bold">
-                  CYBER ORANGE
+                <span className="text-[9px] font-mono text-zinc-200 bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  EDGE DEFENSE
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Shield</h3>
-              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 Shadowshield defense engine with our iconic 2D Dot-Matrix Threat Map. Sub-second DDoS deflection and complete origin IP cloaking.
               </p>
             </div>
             <button
               type="button"
               onClick={() => handleLaunch("sec", "https://sec.sparrowx.net", "shield")}
-              className="w-full py-2 rounded bg-[#111A30] hover:bg-white hover:text-black border border-sky-500/20 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2 rounded bg-[#141414] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>sec.sparrowx.net</span>
-              <ArrowUpRight className="size-3" />
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </button>
           </div>
 
           {/* 5. SparrowX API Gateway */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors border-r border-sky-500/15 border-t border-sky-500/15">
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-[#111A30] border border-indigo-500/30 grid place-items-center text-indigo-400">
-                  <Terminal className="size-4" />
+                <div className="size-9 rounded-md bg-[#141414] border border-white/30 grid place-items-center text-white">
+                  <Terminal className="size-4" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-mono text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-[9px] font-mono text-zinc-200 bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   REST &amp; SDKs
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX API Gateway</h3>
-              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 Instant RESTful API for your database with one-click code generation in cURL, TypeScript, and Python with ultra-fast latency.
               </p>
             </div>
             <button
               type="button"
               onClick={() => handleLaunch("api", "https://api.sparrowx.net", "api")}
-              className="w-full py-2 rounded bg-[#111A30] hover:bg-white hover:text-black border border-sky-500/20 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2 rounded bg-[#141414] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>api.sparrowx.net</span>
-              <ArrowUpRight className="size-3" />
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </button>
           </div>
 
           {/* 6. SparrowX Cloud VPS */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-sky-500/[0.04] transition-colors border-t border-sky-500/15">
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-t border-white/15">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-[#111A30] border border-sky-500/30 grid place-items-center text-sky-400">
-                  <Cpu className="size-4" />
+                <div className="size-9 rounded-md bg-[#141414] border border-white/30 grid place-items-center text-white">
+                  <Cpu className="size-4" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-mono text-sky-400 bg-sky-500/10 border border-sky-500/30 px-2 py-0.5 rounded font-bold">
+                <span className="text-[9px] font-mono text-zinc-200 bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   FAST NVME
                 </span>
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Compute VPS</h3>
-              <p className="text-xs text-[#A3B1C6] leading-relaxed">
+              <p className="text-xs text-zinc-400 leading-relaxed">
                 Affordable virtual machines with fast ECC RAM and NVMe storage. Predictable flat monthly rates in INR and USD.
               </p>
             </div>
             <a
               href="#vps"
-              className="w-full py-2 rounded bg-[#111A30] hover:bg-white hover:text-black border border-sky-500/20 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2 rounded bg-[#141414] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>View VPS Pricing</span>
-              <ArrowRight className="size-3" />
+              <ArrowRight className="size-3" aria-hidden="true" />
             </a>
           </div>
         </div>
@@ -1183,11 +1183,11 @@ export function SparrowxMasterLanding({
       </div>
 
       {/* SECTION 5: SHORT EMOTIONAL STORY TEASER -> FULL /story PAGE */}
-      <section id="story" className="scroll-mt-24 border-t border-sky-500/15 bg-[#090E1D]/70 backdrop-blur-sm px-4 sm:px-6 py-14 relative z-10">
+      <section id="story" className="scroll-mt-24 border-t border-white/15 bg-black/80 backdrop-blur-sm px-4 sm:px-6 py-14 relative z-10">
         <div className="max-w-4xl mx-auto">
-          <div className="border border-sky-500/25 bg-[#0D1526]/85 backdrop-blur-md rounded-lg p-6 sm:p-9 space-y-6 shadow-2xl relative">
-            <div className="inline-flex items-center gap-2 text-xs font-mono text-sky-400">
-              <Heart className="size-4 text-rose-400" />
+          <div className="border border-white/25 bg-[#0D0D0D]/90 backdrop-blur-md rounded-lg p-6 sm:p-9 space-y-6 shadow-2xl relative">
+            <div className="inline-flex items-center gap-2 text-xs font-mono text-zinc-300">
+              <Heart className="size-4 text-white" aria-hidden="true" />
               <span>A NOTE FROM OUR TEAM</span>
             </div>
 
@@ -1195,52 +1195,52 @@ export function SparrowxMasterLanding({
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
                 Why We Started SparrowX
               </h2>
-              <p className="text-xs sm:text-sm text-[#C2CEE0] leading-relaxed font-sans">
+              <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-sans">
                 We started SparrowX after one too many late nights watching independent projects get punished by surprise cloud bandwidth bills, $2,000/month security paywalls, and everyday tools that demand an account just to send a file. We believe builders deserve infrastructure that feels human—fast, private, and radically affordable.
               </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="rounded-md border border-sky-500/15 bg-[#090F1E] p-3.5 space-y-1">
-                <div className="font-mono font-bold text-orange-300 flex items-center gap-1.5">
-                  <Shield className="size-3.5 shrink-0" />
+              <div className="rounded-md border border-white/20 bg-[#080808] p-3.5 space-y-1">
+                <div className="font-mono font-bold text-white flex items-center gap-1.5">
+                  <Shield className="size-3.5 shrink-0" aria-hidden="true" />
                   <span>Honest Security</span>
                 </div>
-                <p className="text-[#A3B1C6] leading-relaxed">
+                <p className="text-zinc-400 leading-relaxed">
                   Live L7 DDoS defense &amp; offline CSPRNG keys without enterprise extortion.
                 </p>
               </div>
-              <div className="rounded-md border border-sky-500/15 bg-[#090F1E] p-3.5 space-y-1">
-                <div className="font-mono font-bold text-emerald-300 flex items-center gap-1.5">
-                  <FileUp className="size-3.5 shrink-0" />
+              <div className="rounded-md border border-white/20 bg-[#080808] p-3.5 space-y-1">
+                <div className="font-mono font-bold text-white flex items-center gap-1.5">
+                  <FileUp className="size-3.5 shrink-0" aria-hidden="true" />
                   <span>Zero-Login File Drop</span>
                 </div>
-                <p className="text-[#A3B1C6] leading-relaxed">
+                <p className="text-zinc-400 leading-relaxed">
                   Browser-sealed AES-256-GCM transfers that burn from RAM—plus a free 10 GB vault.
                 </p>
               </div>
-              <div className="rounded-md border border-sky-500/15 bg-[#090F1E] p-3.5 space-y-1">
-                <div className="font-mono font-bold text-sky-300 flex items-center gap-1.5">
-                  <Database className="size-3.5 shrink-0" />
+              <div className="rounded-md border border-white/20 bg-[#080808] p-3.5 space-y-1">
+                <div className="font-mono font-bold text-white flex items-center gap-1.5">
+                  <Database className="size-3.5 shrink-0" aria-hidden="true" />
                   <span>Low-Cost Cloud DB</span>
                 </div>
-                <p className="text-[#A3B1C6] leading-relaxed">
+                <p className="text-zinc-400 leading-relaxed">
                   Bare-metal NVMe PostgreSQL &amp; $4/mo compute with zero surprise egress fees.
                 </p>
               </div>
             </div>
 
-            <div className="pt-4 border-t border-sky-500/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono">
+            <div className="pt-4 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono">
               <div>
                 <span className="text-white font-bold">— The SparrowX Team</span>
-                <span className="ml-2 text-[#8795AB] hidden sm:inline">&middot; Built with passion for builders</span>
+                <span className="ml-2 text-zinc-400 hidden sm:inline">&middot; Built with passion for builders</span>
               </div>
               <a
                 href="/story"
-                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold transition-colors shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded bg-white hover:bg-zinc-200 text-black font-bold transition-colors shadow-[0_0_15px_rgba(255,255,255,0.18)]"
               >
                 <span>Read Our Full Story &amp; Manifesto</span>
-                <ArrowRight className="size-3.5" />
+                <ArrowRight className="size-3.5" aria-hidden="true" />
               </a>
             </div>
           </div>
@@ -1248,37 +1248,37 @@ export function SparrowxMasterLanding({
       </section>
 
       {/* SECTION 5: AFFORDABLE CLOUD VPS PLANS */}
-      <section id="vps" className="scroll-mt-24 border-t border-sky-500/15 bg-[#070A12]/65 px-4 sm:px-6 py-16 relative z-10">
+      <section id="vps" className="scroll-mt-24 border-t border-white/15 bg-black/75 px-4 sm:px-6 py-16 relative z-10">
         <div className="max-w-7xl mx-auto space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-sky-500/15 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono text-sky-400 uppercase tracking-wider block font-bold">
+              <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-wider block font-bold">
                 Affordable Cloud Hosting
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
                 Simple, High-Speed Cloud VPS
               </h2>
-              <p className="text-xs text-[#A3B1C6]">
+              <p className="text-xs text-zinc-400">
                 Dedicated performance with fast NVMe storage and zero hidden egress bandwidth fees.
               </p>
             </div>
 
             {/* Currency Switcher */}
-            <div className="flex items-center gap-1 p-1 bg-[#0E172A] rounded-md border border-sky-500/25 text-xs font-mono">
+            <div className="flex items-center gap-1 p-1 bg-[#0D0D0D] rounded-md border border-white/25 text-xs font-mono">
               <button
                 type="button"
                 onClick={() => setVpsCurrency("INR")}
-                className={`px-3 py-1 rounded transition-colors ${
-                  vpsCurrency === "INR" ? "bg-sky-500 text-black font-bold" : "text-[#A3B1C6] hover:text-white"
+                className={`px-3 py-1 rounded transition-colors cursor-pointer ${
+                  vpsCurrency === "INR" ? "bg-white text-black font-bold" : "text-zinc-400 hover:text-white"
                 }`}
               >
-                INR (â‚¹)
+                INR (₹)
               </button>
               <button
                 type="button"
                 onClick={() => setVpsCurrency("USD")}
-                className={`px-3 py-1 rounded transition-colors ${
-                  vpsCurrency === "USD" ? "bg-sky-500 text-black font-bold" : "text-[#A3B1C6] hover:text-white"
+                className={`px-3 py-1 rounded transition-colors cursor-pointer ${
+                  vpsCurrency === "USD" ? "bg-white text-black font-bold" : "text-zinc-400 hover:text-white"
                 }`}
               >
                 USD ($)
@@ -1287,12 +1287,12 @@ export function SparrowxMasterLanding({
           </div>
 
           {/* 4 Plans Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-sky-500/15 border border-sky-500/20 rounded-lg bg-[#0C1222]/85 backdrop-blur-md overflow-hidden shadow-xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/15 border border-white/25 rounded-lg bg-[#0D0D0D]/90 backdrop-blur-md overflow-hidden shadow-xl">
             {vpsPlans.map((plan) => (
               <div
                 key={plan.id}
                 className={`p-6 space-y-5 flex flex-col justify-between ${
-                  plan.highlight ? "bg-sky-500/[0.06] border-t-2 border-t-sky-400" : ""
+                  plan.highlight ? "bg-white/[0.06] border-t-2 border-t-white" : ""
                 }`}
               >
                 <div className="space-y-3 font-mono">
@@ -1301,8 +1301,8 @@ export function SparrowxMasterLanding({
                     <span
                       className={`text-[9px] px-2 py-0.5 rounded font-bold ${
                         plan.highlight
-                          ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
-                          : "bg-white/10 text-[#A3B1C6]"
+                          ? "bg-white text-black border border-white"
+                          : "bg-white/10 text-zinc-300 border border-white/20"
                       }`}
                     >
                       {plan.tag}
@@ -1313,25 +1313,25 @@ export function SparrowxMasterLanding({
                     <span className="text-2xl font-bold text-white tabular-nums">
                       {vpsCurrency === "INR" ? plan.priceInr : plan.priceUsd}
                     </span>
-                    <span className="text-xs text-[#A3B1C6]">{plan.period}</span>
+                    <span className="text-xs text-zinc-400">{plan.period}</span>
                   </div>
 
-                  <div className="space-y-2 text-xs text-[#A3B1C6] pt-2 border-t border-sky-500/15">
+                  <div className="space-y-2 text-xs text-zinc-300 pt-2 border-t border-white/15">
                     <div className="flex justify-between">
-                      <span className="text-[#8795AB]">CPU:</span>
+                      <span className="text-zinc-400">CPU:</span>
                       <span className="text-white font-semibold">{plan.vCpu}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8795AB]">RAM:</span>
+                      <span className="text-zinc-400">RAM:</span>
                       <span className="text-white font-semibold">{plan.ram}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8795AB]">Disk:</span>
+                      <span className="text-zinc-400">Disk:</span>
                       <span className="text-white font-semibold">{plan.storage}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8795AB]">Egress:</span>
-                      <span className="text-sky-400 font-semibold">{plan.bandwidth}</span>
+                      <span className="text-zinc-400">Egress:</span>
+                      <span className="text-white font-semibold">{plan.bandwidth}</span>
                     </div>
                   </div>
                 </div>
@@ -1341,8 +1341,8 @@ export function SparrowxMasterLanding({
                   onClick={() => setOperatorModalOpen(true)}
                   className={`w-full py-2.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
                     plan.highlight
-                      ? "bg-sky-500 hover:bg-sky-400 text-black shadow-[0_0_15px_rgba(56,189,248,0.3)]"
-                      : "bg-[#111A30] hover:bg-white hover:text-black border border-sky-500/25 text-white"
+                      ? "bg-white hover:bg-zinc-200 text-black shadow-[0_0_15px_rgba(255,255,255,0.25)]"
+                      : "bg-[#141414] hover:bg-white hover:text-black border border-white/30 text-white"
                   }`}
                 >
                   Deploy {plan.name}
@@ -1358,25 +1358,25 @@ export function SparrowxMasterLanding({
       </div>
 
       {/* FOOTER */}
-      <footer className="relative z-10 border-t border-sky-500/15 bg-[#05070D]/85 backdrop-blur-md px-6 py-10 text-[#A3B1C6] text-xs font-mono mt-auto">
+      <footer className="relative z-10 border-t border-white/15 bg-black/90 backdrop-blur-md px-6 py-10 text-zinc-400 text-xs font-mono mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="text-left space-y-1">
             <div className="font-extrabold text-white text-sm flex items-center gap-2">
               <span>SPARROWX TECHNOLOGIES</span>
-              <span className="text-[9px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30">
+              <span className="text-[9px] text-zinc-200 bg-white/10 px-2 py-0.5 rounded border border-white/25">
                 INDEPENDENT STARTUP
               </span>
             </div>
-            <p className="text-[11px] text-[#8795AB]">
+            <p className="text-[11px] text-zinc-400">
               Built with care for developers, startups, and privacy-conscious builders.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-[#A3B1C6]">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-zinc-400">
             <a href="https://sparrowx.net" className="hover:text-white transition-colors">
               sparrowx.net
             </a>
-            <span className="text-[#475569]">&bull;</span>
+            <span className="text-zinc-600">&bull;</span>
             <a
               href="https://db.sparrowx.net"
               target="_blank"
@@ -1391,7 +1391,7 @@ export function SparrowxMasterLanding({
             >
               db.sparrowx.net
             </a>
-            <span className="text-[#475569]">&bull;</span>
+            <span className="text-zinc-600">&bull;</span>
             <a
               href="https://sec.sparrowx.net"
               target="_blank"
@@ -1406,7 +1406,7 @@ export function SparrowxMasterLanding({
             >
               sec.sparrowx.net
             </a>
-            <span className="text-[#475569]">&bull;</span>
+            <span className="text-zinc-600">&bull;</span>
             <a
               href="https://file.sparrowx.net"
               target="_blank"
@@ -1421,7 +1421,7 @@ export function SparrowxMasterLanding({
             >
               file.sparrowx.net
             </a>
-            <span className="text-[#475569]">&bull;</span>
+            <span className="text-zinc-600">&bull;</span>
             <a
               href="https://password.sparrowx.net"
               target="_blank"
@@ -1436,7 +1436,7 @@ export function SparrowxMasterLanding({
             >
               password.sparrowx.net
             </a>
-            <span className="text-[#475569]">&bull;</span>
+            <span className="text-zinc-600">&bull;</span>
             <a
               href="https://api.sparrowx.net"
               target="_blank"
@@ -1451,31 +1451,31 @@ export function SparrowxMasterLanding({
             >
               api.sparrowx.net
             </a>
-            <span className="text-[#475569]">&bull;</span>
-            <a href="#comparison" className="text-sky-400 hover:text-sky-300 transition-colors">
+            <span className="text-zinc-600">&bull;</span>
+            <a href="#comparison" className="text-white hover:text-zinc-300 transition-colors">
               Why Us
             </a>
-            <span className="text-[#475569]">&bull;</span>
-            <a href="/story" className="text-sky-400 hover:text-sky-300 transition-colors">
+            <span className="text-zinc-600">&bull;</span>
+            <a href="/story" className="text-white hover:text-zinc-300 transition-colors">
               Read Our Story
             </a>
-            <span className="text-[#475569]">&bull;</span>
-            <a href="#contact" className="text-sky-400 hover:text-sky-300 transition-colors">
+            <span className="text-zinc-600">&bull;</span>
+            <a href="#contact" className="text-white hover:text-zinc-300 transition-colors">
               Contact
             </a>
           </div>
 
           <div className="flex items-center gap-3 text-[11px]">
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-[10px]">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/25 text-white font-mono text-[10px]">
+              <span className="size-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
               <span>All Systems Operational</span>
             </div>
-            <span className="text-[#475569]">&bull;</span>
+            <span className="text-zinc-600">&bull;</span>
             {sessionUser ? (
               <button
                 type="button"
                 onClick={handleLandingSignOut}
-                className="text-red-300 hover:text-red-200 transition-colors cursor-pointer"
+                className="text-zinc-200 hover:text-white transition-colors cursor-pointer"
               >
                 Sign Out
               </button>
@@ -1483,13 +1483,13 @@ export function SparrowxMasterLanding({
               <button
                 type="button"
                 onClick={() => setOperatorModalOpen(true)}
-                className="text-[#A3B1C6] hover:text-white transition-colors cursor-pointer"
+                className="text-zinc-300 hover:text-white transition-colors cursor-pointer"
               >
                 Sign In
               </button>
             )}
-            <span className="text-[#475569]">&bull;</span>
-            <span className="text-[#8795AB]">
+            <span className="text-zinc-600">&bull;</span>
+            <span className="text-zinc-400">
               &copy; {new Date().getFullYear()} SparrowX
             </span>
           </div>

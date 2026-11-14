@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 
 interface AnimatedCloudBackgroundProps {
-  variant?: "sky" | "emerald";
+  variant?: "sky" | "emerald" | "monochrome";
   intensity?: "full" | "subtle";
 }
 
@@ -52,6 +52,24 @@ const PALETTES = {
       "linear-gradient(180deg, transparent, rgba(62, 207, 142, 0.60), transparent)",
     nodeRgb: "62, 207, 142",
     secondaryRgb: "6, 182, 212",
+  },
+  monochrome: {
+    orb1Full: "rgba(255, 255, 255, 0.08)",
+    orb1Subtle: "rgba(255, 255, 255, 0.04)",
+    orb2Full: "rgba(228, 228, 231, 0.06)",
+    orb2Subtle: "rgba(228, 228, 231, 0.03)",
+    orb3Full: "rgba(161, 161, 170, 0.05)",
+    orb3Subtle: "rgba(161, 161, 170, 0.025)",
+    gridFull: "rgba(255, 255, 255, 0.06)",
+    gridSubtle: "rgba(255, 255, 255, 0.03)",
+    dotFull: "rgba(255, 255, 255, 0.16)",
+    dotSubtle: "rgba(255, 255, 255, 0.08)",
+    beamX:
+      "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), rgba(212, 212, 216, 0.42), transparent)",
+    beamY:
+      "linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.58), transparent)",
+    nodeRgb: "255, 255, 255",
+    secondaryRgb: "212, 212, 216",
   },
 } as const;
 
@@ -142,8 +160,7 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
       if (!ctx) return;
       ctx.clearRect(0, 0, width, height);
 
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
+      for (const node of nodes) {
         node.pulsePhase += node.pulseSpeed;
 
         if (pointer.active) {
@@ -179,8 +196,10 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
       const lineAlphaBase = isSubtle ? 0.08 : 0.14;
       for (let i = 0; i < nodes.length; i++) {
         const a = nodes[i];
+        if (!a) continue;
         for (let j = i + 1; j < nodes.length; j++) {
           const b = nodes[j];
+          if (!b) continue;
           const dx = a.x - b.x;
           const dy = a.y - b.y;
           const distSq = dx * dx + dy * dy;
@@ -212,8 +231,7 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
       }
 
       // Draw pulsing nodes
-      for (let i = 0; i < nodes.length; i++) {
-        const node = nodes[i];
+      for (const node of nodes) {
         const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(node.pulsePhase));
         const alpha = (isSubtle ? 0.35 : 0.65) * pulse;
         const rgb = node.useSecondary ? palette.secondaryRgb : palette.nodeRgb;
