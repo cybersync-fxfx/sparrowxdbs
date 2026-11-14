@@ -87,35 +87,103 @@ for d in "${CANDIDATE_DOMAINS[@]}"; do
 done
 
 if [ "${#VALID_DOMAINS[@]}" -eq 0 ]; then
-  log_ssl "No domains resolve to ${SPARROWX_PUBLIC_IP} yet. Retaining SAN fallback cert until DNS propagates."
-  exit 0
+  log_ssl "No domains resolve to ${SPARROWX_PUBLIC_IP} via dig yet. Retaining SAN fallback cert until DNS propagates."
+else
+  log_ssl "Requesting/renewing Let's Encrypt SSL for: ${VALID_DOMAINS[*]}"
+
+  if certbot certonly \
+    --webroot -w "${WEBROOT}" \
+    --non-interactive \
+    --agree-tos \
+    --expand \
+    --keep-until-expiring \
+    --cert-name "${DOMAIN_ROOT}" \
+    -m "${SPARROWX_ADMIN_EMAIL}" \
+    "${CERTBOT_ARGS[@]}" >> "${LOG_FILE}" 2>&1; then
+
+    LIVE_DIR="/etc/letsencrypt/live/${DOMAIN_ROOT}"
+    if [ -f "${LIVE_DIR}/fullchain.pem" ] && [ -f "${LIVE_DIR}/privkey.pem" ]; then
+      cp -fL "${LIVE_DIR}/fullchain.pem" "${SSL_DIR}/fullchain.pem"
+      cp -fL "${LIVE_DIR}/privkey.pem" "${SSL_DIR}/privkey.pem"
+      chmod 644 "${SSL_DIR}/fullchain.pem"
+      chmod 600 "${SSL_DIR}/privkey.pem"
+      for proxy_name in sparrowx-nginx sparrowx_edge_proxy; do
+        if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${proxy_name}"; then
+          docker exec "${proxy_name}" nginx -s reload >/dev/null 2>&1 || true
+        fi
+      done
+      log_ssl "SUCCESS: Live Let's Encrypt SSL active for ${VALID_DOMAINS[*]}"
+    fi
+  else
+    log_ssl "WARN: Multi-domain webroot issuance/renewal deferred (check ${LOG_FILE})."
+  fi
 fi
 
-log_ssl "Requesting/renewing Let's Encrypt SSL for: ${VALID_DOMAINS[*]}"
+# Dedicated issuance/renewal for Pterodactyl Game Panel (${DOMAIN_GAME}) via port 80
+if [ -n "${DOMAIN_GAME}" ] && [[ "${DOMAIN_GAME}" != *.local ]] && { [ -f /var/www/pterodactyl/artisan ] || [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAME} " ]]; }; then
+  GAME_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN_GAME}"
+  GAME_EMAIL="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}}"
 
-if certbot certonly \
-  --webroot -w "${WEBROOT}" \
-  --non-interactive \
-  --agree-tos \
-  --expand \
-  --keep-until-expiring \
-  --cert-name "${DOMAIN_ROOT}" \
-  -m "${SPARROWX_ADMIN_EMAIL}" \
-  "${CERTBOT_ARGS[@]}" >> "${LOG_FILE}" 2>&1; then
+  if [ -s "${GAME_LIVE_DIR}/fullchain.pem" ] && [ -s "${GAME_LIVE_DIR}/privkey.pem" ]; then
+    certbot certonly \
+      --webroot -w "${WEBROOT}" \
+      --non-interactive \
+      --agree-tos \
+      --keep-until-expiring \
+      --cert-name "${DOMAIN_GAME}" \
+      -m "${GAME_EMAIL}" \
+      -d "${DOMAIN_GAME}" >> "${LOG_FILE}" 2>&1 || true
+  else
+    log_ssl "Requesting Let's Encrypt SSL for ${DOMAIN_GAME} (port 80 webroot -> standalone fallback)..."
+    if ! certbot certonly \
+      --webroot -w "${WEBROOT}" \
+      --non-interactive \
+      --agree-tos \
+      --cert-name "${DOMAIN_GAME}" \
+      -m "${GAME_EMAIL}" \
+      -d "${DOMAIN_GAME}" >> "${LOG_FILE}" 2>&1; then
+      docker stop sparrowx-nginx >/dev/null 2>&1 || true
+      systemctl stop nginx >/dev/null 2>&1 || true
+      command -v fuser >/dev/null 2>&1 && fuser -k 80/tcp >/dev/null 2>&1 || true
+      sleep 1
+      certbot certonly \
+        --standalone --preferred-challenges http \
+        --non-interactive \
+        --agree-tos \
+        --cert-name "${DOMAIN_GAME}" \
+        -m "${GAME_EMAIL}" \
+        -d "${DOMAIN_GAME}" >> "${LOG_FILE}" 2>&1 || true
+      [ -f /var/www/pterodactyl/artisan ] && systemctl start nginx >/dev/null 2>&1 || true
+      docker start sparrowx-nginx >/dev/null 2>&1 || true
+    fi
+  fi
 
-  LIVE_DIR="/etc/letsencrypt/live/${DOMAIN_ROOT}"
-  if [ -f "${LIVE_DIR}/fullchain.pem" ] && [ -f "${LIVE_DIR}/privkey.pem" ]; then
-    cp -fL "${LIVE_DIR}/fullchain.pem" "${SSL_DIR}/fullchain.pem"
-    cp -fL "${LIVE_DIR}/privkey.pem" "${SSL_DIR}/privkey.pem"
-    chmod 644 "${SSL_DIR}/fullchain.pem"
-    chmod 600 "${SSL_DIR}/privkey.pem"
+  if [ -s "${GAME_LIVE_DIR}/fullchain.pem" ] && [ -s "${GAME_LIVE_DIR}/privkey.pem" ]; then
+    cp -fL "${GAME_LIVE_DIR}/fullchain.pem" "${SSL_DIR}/ptero-fullchain.pem"
+    cp -fL "${GAME_LIVE_DIR}/privkey.pem" "${SSL_DIR}/ptero-privkey.pem"
+    chmod 644 "${SSL_DIR}/ptero-fullchain.pem"
+    chmod 600 "${SSL_DIR}/ptero-privkey.pem"
+    mkdir -p /etc/ssl
+    ln -sf "${GAME_LIVE_DIR}/fullchain.pem" "/etc/ssl/${DOMAIN_GAME}.pem" 2>/dev/null || true
+    ln -sf "${GAME_LIVE_DIR}/privkey.pem" "/etc/ssl/${DOMAIN_GAME}.key" 2>/dev/null || true
+
+    if [ -f "${INSTALL_DIR}/ovh/nginx.conf" ] && grep -q "${DOMAIN_GAME}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
+      TMP_CONF="$(mktemp)"
+      awk '
+        /# 4\. Pterodactyl Game Panel/ { in_ptero=1 }
+        in_ptero && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/ptero-fullchain.pem;") }
+        in_ptero && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/ptero-privkey.pem;") }
+        in_ptero && /^}/ { in_ptero=0 }
+        { print }
+      ' "${INSTALL_DIR}/ovh/nginx.conf" > "${TMP_CONF}" && cat "${TMP_CONF}" > "${INSTALL_DIR}/ovh/nginx.conf"
+      rm -f "${TMP_CONF}"
+    fi
+
     for proxy_name in sparrowx-nginx sparrowx_edge_proxy; do
       if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${proxy_name}"; then
-        docker exec "${proxy_name}" nginx -s reload >/dev/null 2>&1 || true
+        docker restart "${proxy_name}" >/dev/null 2>&1 || docker exec "${proxy_name}" nginx -s reload >/dev/null 2>&1 || true
       fi
     done
-    log_ssl "SUCCESS: Live Let's Encrypt SSL active for ${VALID_DOMAINS[*]}"
+    log_ssl "SUCCESS: Live Let's Encrypt SSL wired for ${DOMAIN_GAME}"
   fi
-else
-  log_ssl "WARN: Certbot issuance/renewal deferred (check ${LOG_FILE})."
 fi

@@ -642,8 +642,10 @@ server {
     client_max_body_size 100M;
     server_tokens off;
 
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
     }
 
 ${ptero_backend_block}
@@ -764,6 +766,7 @@ heal_pterodactyl_host_nginx() {
     fi
   done
 
+  mkdir -p "${INSTALL_DIR}/ovh/certbot-www/.well-known/acme-challenge" 2>/dev/null || true
   cat > /etc/nginx/sites-available/pterodactyl.conf <<EOF
 server {
     listen ${ptero_p} default_server;
@@ -779,6 +782,12 @@ server {
     client_max_body_size 100m;
     client_body_timeout 120s;
     sendfile off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root ${INSTALL_DIR}/ovh/certbot-www;
+        default_type "text/plain";
+        allow all;
+    }
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -825,6 +834,95 @@ EOF
   fi
   open_ptero_ufw_rules
   log_ok "Host Pterodactyl Nginx shifted cleanly onto port ${ptero_p} (PHP-FPM: ${php_sock})."
+}
+
+ensure_game_letsencrypt_ssl() {
+  local root_domain="${DOMAIN_ROOT:-${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local game_domain="${DOMAIN_GAME:-game.${root_domain}}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
+  local live_dir="/etc/letsencrypt/live/${game_domain}"
+  local ssl_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${root_domain}}}"
+
+  if [ -z "${game_domain}" ] || [[ "${game_domain}" == *.local ]] || [ "${game_domain}" = "localhost" ]; then
+    return 0
+  fi
+
+  if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
+    ssl_email="admin@${root_domain}"
+  fi
+
+  mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow 80/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    retry_pkg_install certbot
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for ${game_domain}"
+    return 0
+  fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+    log_info "Requesting Let's Encrypt SSL for ${game_domain} via HTTP-01 port 80..."
+
+    if certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos \
+      -m "${ssl_email}" \
+      --cert-name "${game_domain}" \
+      -d "${game_domain}" >/dev/null 2>&1; then
+      log_ok "Issued Let's Encrypt SSL for ${game_domain} via port 80 webroot"
+    else
+      log_warn "Webroot challenge deferred; retrying ${game_domain} via standalone port 80 listener..."
+      docker stop sparrowx-nginx >/dev/null 2>&1 || true
+      systemctl stop nginx >/dev/null 2>&1 || true
+      if command -v fuser >/dev/null 2>&1; then
+        fuser -k 80/tcp >/dev/null 2>&1 || true
+      fi
+      sleep 1
+
+      if certbot certonly \
+        --standalone --preferred-challenges http \
+        --non-interactive --agree-tos \
+        -m "${ssl_email}" \
+        --cert-name "${game_domain}" \
+        -d "${game_domain}" >/dev/null 2>&1; then
+        log_ok "Issued Let's Encrypt SSL for ${game_domain} via standalone port 80 challenge"
+      else
+        log_warn "Let's Encrypt HTTP-01 challenge failed for ${game_domain} (verify DNS A record & external port 80)"
+      fi
+
+      if is_pterodactyl_installed; then
+        systemctl start nginx >/dev/null 2>&1 || true
+      fi
+      docker start sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
+    fi
+  else
+    certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos --keep-until-expiring \
+      -m "${ssl_email}" \
+      --cert-name "${game_domain}" \
+      -d "${game_domain}" >/dev/null 2>&1 || true
+  fi
+
+  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${game_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
+    render_sparrowx_nginx_conf
+    docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+    log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
+  fi
 }
 
 heal_pterodactyl_port_flow() {
@@ -1418,7 +1516,7 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
     # Re-render nginx.conf after sparrowx-nginx is up so DOCKER_HOST_IP matches live bridge gateway
     if is_pterodactyl_installed; then
       render_sparrowx_nginx_conf
-      docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+      docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
     fi
 
     log_info "Verifying PostgreSQL 16 readiness & schema..."
@@ -1520,6 +1618,9 @@ EOF
   log_ok "Autonomous cron jobs installed (/etc/cron.d/sparrowx-automation)."
 
   log_info "Checking DNS propagation & requesting Let's Encrypt SSL certificates..."
+  if is_pterodactyl_installed; then
+    ensure_game_letsencrypt_ssl
+  fi
   bash "${INSTALL_DIR}/deploy/ssl-renew.sh" || true
 fi
 

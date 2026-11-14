@@ -268,6 +268,7 @@ heal_pterodactyl_host_nginx() {
     fi
   done
 
+  mkdir -p "${INSTALL_DIR}/ovh/certbot-www/.well-known/acme-challenge" 2>/dev/null || true
   cat > /etc/nginx/sites-available/pterodactyl.conf <<PTEROEOF
 server {
     listen ${ptero_p} default_server;
@@ -280,6 +281,12 @@ server {
     client_max_body_size 100m;
     client_body_timeout 120s;
     sendfile off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root ${INSTALL_DIR}/ovh/certbot-www;
+        default_type "text/plain";
+        allow all;
+    }
 
     location / {
         try_files \$uri \$uri/ /index.php?\$query_string;
@@ -325,6 +332,107 @@ PTEROEOF
     systemctl restart nginx >/dev/null 2>&1 || systemctl reload nginx >/dev/null 2>&1 || true
   fi
   log_warn "Aligned host Pterodactyl Nginx onto internal port ${ptero_p} (preserving :80/:443 for SparrowX Edge)"
+}
+
+ensure_game_letsencrypt_ssl() {
+  local game_domain="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
+  local live_dir="/etc/letsencrypt/live/${game_domain}"
+  local ssl_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${SPARROWX_DOMAIN}}}"
+
+  if [ -z "${game_domain}" ] || [[ "${game_domain}" == *.local ]] || [ "${game_domain}" = "localhost" ]; then
+    return 0
+  fi
+
+  if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
+    ssl_email="admin@${SPARROWX_DOMAIN}"
+  fi
+
+  mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow 80/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y certbot >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for ${game_domain}"
+    return 0
+  fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+    log_info "Requesting Let's Encrypt SSL for ${game_domain} via HTTP-01 port 80..."
+
+    if certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos \
+      -m "${ssl_email}" \
+      --cert-name "${game_domain}" \
+      -d "${game_domain}" >/dev/null 2>&1; then
+      log_ok "Issued Let's Encrypt SSL for ${game_domain} via port 80 webroot"
+    else
+      log_warn "Webroot challenge deferred; retrying ${game_domain} via standalone port 80 listener..."
+      docker stop sparrowx-nginx >/dev/null 2>&1 || true
+      systemctl stop nginx >/dev/null 2>&1 || true
+      if command -v fuser >/dev/null 2>&1; then
+        fuser -k 80/tcp >/dev/null 2>&1 || true
+      fi
+      sleep 1
+
+      if certbot certonly \
+        --standalone --preferred-challenges http \
+        --non-interactive --agree-tos \
+        -m "${ssl_email}" \
+        --cert-name "${game_domain}" \
+        -d "${game_domain}" >/dev/null 2>&1; then
+        log_ok "Issued Let's Encrypt SSL for ${game_domain} via standalone port 80 challenge"
+      else
+        log_warn "Let's Encrypt HTTP-01 challenge failed for ${game_domain} (verify DNS A record & external port 80)"
+      fi
+
+      if is_pterodactyl_installed; then
+        systemctl start nginx >/dev/null 2>&1 || true
+      fi
+      docker start sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
+    fi
+  else
+    certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos --keep-until-expiring \
+      -m "${ssl_email}" \
+      --cert-name "${game_domain}" \
+      -d "${game_domain}" >/dev/null 2>&1 || true
+  fi
+
+  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${game_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
+
+    if [ -f "${INSTALL_DIR}/ovh/nginx.conf" ] && grep -q "${game_domain}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
+      local tmp_nginx=""
+      tmp_nginx="$(mktemp)"
+      awk '
+        /# 4\. Pterodactyl Game Panel/ { in_ptero=1 }
+        in_ptero && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/ptero-fullchain.pem;") }
+        in_ptero && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/ptero-privkey.pem;") }
+        in_ptero && /^}/ { in_ptero=0 }
+        { print }
+      ' "${INSTALL_DIR}/ovh/nginx.conf" > "${tmp_nginx}" && cat "${tmp_nginx}" > "${INSTALL_DIR}/ovh/nginx.conf"
+      rm -f "${tmp_nginx}"
+      docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+    fi
+    log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
+  fi
 }
 
 compose_cmd() {
@@ -798,8 +906,10 @@ server {
     client_max_body_size 100M;
     server_tokens off;
 
-    location /.well-known/acme-challenge/ {
+    location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
     }
 
 ${ptero_backend}
@@ -1001,6 +1111,12 @@ if [ "${HAS_DOCKER}" = "true" ]; then
       render_sparrowx_nginx_conf
     fi
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    if is_pterodactyl_installed; then
+      ensure_game_letsencrypt_ssl
+    fi
+    if [ -x "${INSTALL_DIR}/deploy/ssl-renew.sh" ]; then
+      bash "${INSTALL_DIR}/deploy/ssl-renew.sh" >/dev/null 2>&1 || true
+    fi
   fi
 
   if [ "${BUILD_FAILED}" = "true" ] && [ -x "${INSTALL_DIR}/fix.sh" ]; then
