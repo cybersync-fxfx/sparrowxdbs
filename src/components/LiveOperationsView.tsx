@@ -8,7 +8,6 @@ import {
   Globe2,
   Layers3,
   LockKeyhole,
-  Radio,
   RefreshCw,
   Server,
   ShieldAlert,
@@ -19,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SparrowxSentraSocWorkbench } from "@/components/SparrowxSentraSocWorkbench";
 import {
   type Incident,
   type ThreatIndicator,
@@ -88,18 +88,22 @@ export function LiveOperationsView({
   const blockedThreats = threats.filter((t) => t.blocked);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-soc">
+      {/* Sentra-Style Interactive Incident Triage & Attack Path Workbench */}
+      <SparrowxSentraSocWorkbench
+        incidents={incidents}
+        assets={assets}
+        onResolveIncident={onResolveIncident}
+        onToggleAssetIsolation={onToggleAssetIsolation}
+      />
+
       {/* Top Banner */}
-      <section className="flex flex-col justify-between gap-4 border border-border bg-card p-5 sm:flex-row sm:items-center">
+      <section className="flex flex-col justify-between gap-4 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-5 sm:flex-row sm:items-center">
         <div>
-          <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-primary tracking-wider">
-            <Radio className="size-4 animate-pulse" />
-            Live Security Operations Command
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-[28px]">
+          <h2 className="text-xl font-medium tracking-tight text-[#F4F6FA] sm:text-2xl">
             Live Operational Monitoring
-          </h1>
-          <p className="mt-1 text-xs text-muted-foreground max-w-2xl leading-relaxed">
+          </h2>
+          <p className="mt-1 text-xs text-[#F4F6FA]/60 max-w-2xl leading-relaxed">
             Real-time operational status, perimeter threat drops, active on-duty personnel, and
             direct latency telemetry to the SparrowX Sovereign Cloud Engine.
           </p>

@@ -10,7 +10,6 @@ import {
   Lock,
   Mail,
   RefreshCw,
-  Search,
   Shield,
   Terminal,
   User,
