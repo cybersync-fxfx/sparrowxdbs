@@ -1398,20 +1398,34 @@ install_and_heal_wings() {
       *) wings_arch="amd64" ;;
     esac
     local wings_url="https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_${wings_arch}"
-    log_fix "Downloading Pterodactyl Wings binary (${wings_arch})..."
-    if curl -fsSL -o /usr/local/bin/wings.tmp "${wings_url}" 2>/dev/null; then
-      chmod u+x /usr/local/bin/wings.tmp
-      if /usr/local/bin/wings.tmp --version >/dev/null 2>&1; then
+    local wings_fallback_url="https://github.com/pterodactyl/wings/releases/download/v1.13.5/wings_linux_${wings_arch}"
+    local dl_err=""
+    log_scan "Downloading Pterodactyl Wings binary (${wings_arch})..."
+    rm -f /usr/local/bin/wings.tmp
+    if ! dl_err="$(curl -fSL4 --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 180 -o /usr/local/bin/wings.tmp "${wings_url}" 2>&1)"; then
+      if ! dl_err="$(curl -fSL --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 180 -o /usr/local/bin/wings.tmp "${wings_url}" 2>&1)"; then
+        if ! dl_err="$(curl -fSL4 --retry 2 --connect-timeout 15 --max-time 180 -o /usr/local/bin/wings.tmp "${wings_fallback_url}" 2>&1)"; then
+          if command -v wget >/dev/null 2>&1; then
+            dl_err="$(wget -q -O /usr/local/bin/wings.tmp "${wings_url}" 2>&1 || true)"
+          fi
+        fi
+      fi
+    fi
+
+    if [ -s /usr/local/bin/wings.tmp ]; then
+      chmod 755 /usr/local/bin/wings.tmp
+      local ver_out=""
+      if ver_out="$(/usr/local/bin/wings.tmp --version 2>&1)"; then
         mv -f /usr/local/bin/wings.tmp /usr/local/bin/wings
-        log_fix "Installed Pterodactyl Wings $(/usr/local/bin/wings --version 2>/dev/null | head -n 1 || echo binary)"
+        log_fix "Installed Pterodactyl Wings ($(echo "${ver_out}" | head -n 1))"
       else
         rm -f /usr/local/bin/wings.tmp
-        log_warn "Downloaded Wings binary failed version check"
+        log_warn "Downloaded Wings binary failed version check (${ver_out:0:180})"
         return 0
       fi
     else
       rm -f /usr/local/bin/wings.tmp
-      log_warn "Could not download Wings binary from ${wings_url}"
+      log_warn "Could not download Wings binary from ${wings_url} (${dl_err:0:180})"
       return 0
     fi
   fi
