@@ -17,11 +17,13 @@ LOG_FILE="/var/log/sparrowx-install.log"
 
 AUTO_MODE="false"
 INSTALL_PTERO="ask"
+INTERACTIVE_PTERO="false"
 
 for arg in "$@"; do
   case "${arg}" in
     --auto|-y|--yes) AUTO_MODE="true" ;;
     --ptero|--with-ptero|--pterodactyl) INSTALL_PTERO="yes" ;;
+    --interactive-ptero) INSTALL_PTERO="yes"; INTERACTIVE_PTERO="true" ;;
     --no-ptero) INSTALL_PTERO="no" ;;
     --help|-h)
       cat <<'HELP'
@@ -32,7 +34,8 @@ Usage:
 
 Options:
   --ptero             Install or heal Pterodactyl Game Panel (game.<domain>)
-  --no-ptero          Skip interactive Pterodactyl installer prompt
+  --interactive-ptero Launch upstream interactive pterodactyl-installer prompts
+  --no-ptero          Skip automatic Pterodactyl installation
   --auto, -y          Non-interactive mode (accept saved .env / smart defaults)
   --help, -h          Show this help screen
 HELP
@@ -296,7 +299,123 @@ free_docker_port_conflicts() {
 }
 
 is_pterodactyl_installed() {
-  [ -f /var/www/pterodactyl/artisan ] || [ -d /var/www/pterodactyl/public ]
+  [ -f /var/www/pterodactyl/artisan ]
+}
+
+set_ptero_env_key() {
+  local key="$1"
+  local val="$2"
+  local ptero_env="/var/www/pterodactyl/.env"
+  [ -f "${ptero_env}" ] || return 0
+  awk -v k="${key}" -v v="${val}" '
+    BEGIN { found=0 }
+    index($0, k "=") == 1 { print k "=" v; found=1; next }
+    { print }
+    END { if (!found) print k "=" v }
+  ' "${ptero_env}" > "${ptero_env}.tmp" && mv "${ptero_env}.tmp" "${ptero_env}"
+}
+
+init_ptero_credentials() {
+  local existing_db="" existing_user="" existing_pass=""
+  if [ -f "/var/www/pterodactyl/.env" ]; then
+    existing_db="$(awk -F= '/^DB_DATABASE=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+    existing_user="$(awk -F= '/^DB_USERNAME=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+    existing_pass="$(awk -F= '/^DB_PASSWORD=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+  fi
+
+  PTERO_ADMIN_EMAIL="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT:-sparrowx.net}}}"
+  if ! echo "${PTERO_ADMIN_EMAIL}" | grep -qE '^[A-Za-z0-9_+-]+(\.[A-Za-z0-9_+-]+)*@([A-Za-z0-9-]+\.)+[A-Za-z]{2,63}$'; then
+    PTERO_ADMIN_EMAIL="admin@sparrowx.net"
+  fi
+  PTERO_ADMIN_USER="${PTERO_ADMIN_USER:-admin}"
+  PTERO_ADMIN_FIRSTNAME="${PTERO_ADMIN_FIRSTNAME:-SparrowX}"
+  PTERO_ADMIN_LASTNAME="${PTERO_ADMIN_LASTNAME:-Admin}"
+  PTERO_ADMIN_PASSWORD="${PTERO_ADMIN_PASSWORD:-SpxPanel_$(openssl rand -hex 6 2>/dev/null || echo '9a8b7c6d5e4f')}"
+  PTERO_DB_NAME="${existing_db:-${PTERO_DB_NAME:-panel}}"
+  PTERO_DB_USER="${existing_user:-${PTERO_DB_USER:-pterodactyl}}"
+  PTERO_DB_PASSWORD="${existing_pass:-${PTERO_DB_PASSWORD:-$(openssl rand -hex 16 2>/dev/null || echo 'spx_ptero_db_pass_2026')}}"
+  PTERO_TIMEZONE="${PTERO_TIMEZONE:-UTC}"
+  export PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE
+}
+
+write_ptero_credentials_file() {
+  local cred_file="/root/.sparrowx-ptero-credentials.txt"
+  {
+    echo "# ======================================================================"
+    echo "# SPARROWX + PTERODACTYL GAME PANEL CREDENTIALS"
+    echo "# Generated / Verified: $(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date)"
+    echo "# ======================================================================"
+    echo "PANEL_URL=https://${DOMAIN_GAME}"
+    echo "PANEL_INTERNAL_PORT=${PTERO_PORT:-8090}"
+    echo "PANEL_ADMIN_EMAIL=${PTERO_ADMIN_EMAIL:-admin@sparrowx.net}"
+    echo "PANEL_ADMIN_USER=${PTERO_ADMIN_USER:-admin}"
+    echo "PANEL_ADMIN_PASSWORD=${PTERO_ADMIN_PASSWORD:-}"
+    echo "PTERO_MYSQL_HOST=127.0.0.1"
+    echo "PTERO_MYSQL_PORT=3306"
+    echo "PTERO_MYSQL_DATABASE=${PTERO_DB_NAME:-panel}"
+    echo "PTERO_MYSQL_USER=${PTERO_DB_USER:-pterodactyl}"
+    echo "PTERO_MYSQL_PASSWORD=${PTERO_DB_PASSWORD:-}"
+    echo "SPARROWX_PG_HOST=127.0.0.1"
+    echo "SPARROWX_PG_PORT=${PG_HOST_PORT:-5432}"
+    echo "SPARROWX_PG_DATABASE=${POSTGRES_DB:-sparrowx_db}"
+    echo "SPARROWX_PG_USER=${POSTGRES_USER:-sparrowx}"
+    echo "SPARROWX_PG_PASSWORD=${POSTGRES_PASSWORD:-}"
+  } > "${cred_file}" 2>/dev/null || true
+  chmod 600 "${cred_file}" 2>/dev/null || true
+}
+
+install_pterodactyl_unattended() {
+  if [ -d "/var/www/pterodactyl" ] && [ ! -f "/var/www/pterodactyl/artisan" ]; then
+    log_warn "Removing incomplete /var/www/pterodactyl directory before fresh install..."
+    rm -rf /var/www/pterodactyl
+  fi
+
+  init_ptero_credentials
+  log_info "Running unattended Pterodactyl installer for ${DOMAIN_GAME} (Email: ${PTERO_ADMIN_EMAIL}, DB: ${PTERO_DB_NAME})..."
+
+  if (
+    set -e -o pipefail
+    export GITHUB_SOURCE="v1.4.0"
+    export SCRIPT_RELEASE="v1.4.0"
+    export GITHUB_BASE_URL="https://raw.githubusercontent.com/pterodactyl-installer/pterodactyl-installer"
+    export GITHUB_URL="${GITHUB_BASE_URL}/${GITHUB_SOURCE}"
+    export PANEL_MAJOR_VERSION="1"
+    export FQDN="${DOMAIN_GAME}"
+    export MYSQL_DB="${PTERO_DB_NAME}"
+    export MYSQL_USER="${PTERO_DB_USER}"
+    export MYSQL_PASSWORD="${PTERO_DB_PASSWORD}"
+    export timezone="${PTERO_TIMEZONE}"
+    export email="${PTERO_ADMIN_EMAIL}"
+    export user_email="${PTERO_ADMIN_EMAIL}"
+    export user_username="${PTERO_ADMIN_USER}"
+    export user_firstname="${PTERO_ADMIN_FIRSTNAME}"
+    export user_lastname="${PTERO_ADMIN_LASTNAME}"
+    export user_password="${PTERO_ADMIN_PASSWORD}"
+    export ASSUME_SSL="false"
+    export CONFIGURE_LETSENCRYPT="false"
+    export CONFIGURE_FIREWALL="false"
+    export telemetry="false"
+
+    rm -f /tmp/lib.sh
+    if ! curl -fsSL -o /tmp/lib.sh "${GITHUB_BASE_URL}/v1.4.0/lib/lib.sh"; then
+      export GITHUB_SOURCE="master"
+      export SCRIPT_RELEASE="canary"
+      export GITHUB_URL="${GITHUB_BASE_URL}/${GITHUB_SOURCE}"
+      curl -fsSL -o /tmp/lib.sh "${GITHUB_BASE_URL}/master/lib/lib.sh"
+    fi
+
+    sed -i 's/CREATE USER /CREATE OR REPLACE USER /g' /tmp/lib.sh
+    sed -i 's/CREATE DATABASE /CREATE DATABASE IF NOT EXISTS /g' /tmp/lib.sh
+
+    # shellcheck disable=SC1091
+    source /tmp/lib.sh
+    bash -e -o pipefail -c "$(curl -fsSL "${GITHUB_URL}/installers/panel.sh")"
+  ); then
+    log_ok "Unattended Pterodactyl Panel installed for ${DOMAIN_GAME}."
+  else
+    log_warn "Unattended Pterodactyl installer exited early; running deep port & database reconciliation..."
+  fi
+  rm -f /tmp/lib.sh 2>/dev/null || true
 }
 
 detect_php_fpm_sock() {
@@ -551,13 +670,74 @@ heal_pterodactyl_host_nginx() {
     systemctl enable --now wings >/dev/null 2>&1 || true
   fi
 
-  # Update /var/www/pterodactyl/.env for reverse proxy HTTPS connectivity
+  # Sync MariaDB database/user credentials, admin account & Pterodactyl .env
+  init_ptero_credentials
+  local db_cli=""
+  if command -v mariadb >/dev/null 2>&1; then
+    db_cli="mariadb"
+  elif command -v mysql >/dev/null 2>&1; then
+    db_cli="mysql"
+  fi
+  if [ -n "${db_cli}" ] && [ -n "${PTERO_DB_PASSWORD:-}" ]; then
+    "${db_cli}" -u root -e "
+      CREATE DATABASE IF NOT EXISTS \`${PTERO_DB_NAME}\`;
+      CREATE OR REPLACE USER '${PTERO_DB_USER}'@'127.0.0.1' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
+      CREATE OR REPLACE USER '${PTERO_DB_USER}'@'localhost' IDENTIFIED BY '${PTERO_DB_PASSWORD}';
+      GRANT ALL PRIVILEGES ON \`${PTERO_DB_NAME}\`.* TO '${PTERO_DB_USER}'@'127.0.0.1' WITH GRANT OPTION;
+      GRANT ALL PRIVILEGES ON \`${PTERO_DB_NAME}\`.* TO '${PTERO_DB_USER}'@'localhost' WITH GRANT OPTION;
+      FLUSH PRIVILEGES;
+    " >/dev/null 2>&1 || true
+  fi
+
+  if [ ! -f /var/www/pterodactyl/.env ] && [ -f /var/www/pterodactyl/.env.example ]; then
+    cp /var/www/pterodactyl/.env.example /var/www/pterodactyl/.env
+  fi
   if [ -f /var/www/pterodactyl/.env ]; then
-    sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN_GAME}|" /var/www/pterodactyl/.env 2>/dev/null || true
-    if grep -q "^TRUSTED_PROXIES=" /var/www/pterodactyl/.env 2>/dev/null; then
-      sed -i "s|^TRUSTED_PROXIES=.*|TRUSTED_PROXIES=*|" /var/www/pterodactyl/.env 2>/dev/null || true
-    else
-      echo "TRUSTED_PROXIES=*" >> /var/www/pterodactyl/.env 2>/dev/null || true
+    set_ptero_env_key "APP_URL" "https://${DOMAIN_GAME}"
+    set_ptero_env_key "TRUSTED_PROXIES" "*"
+    set_ptero_env_key "DB_HOST" "127.0.0.1"
+    set_ptero_env_key "DB_PORT" "3306"
+    set_ptero_env_key "DB_DATABASE" "${PTERO_DB_NAME}"
+    set_ptero_env_key "DB_USERNAME" "${PTERO_DB_USER}"
+    set_ptero_env_key "DB_PASSWORD" "${PTERO_DB_PASSWORD}"
+  fi
+
+  local php_bin=""
+  php_bin="$(command -v php8.3 || command -v php8.2 || command -v php8.1 || command -v php || true)"
+  if [ -n "${php_bin}" ] && [ -f /var/www/pterodactyl/artisan ]; then
+    if ! grep -q '^APP_KEY=base64:' /var/www/pterodactyl/.env 2>/dev/null; then
+      (cd /var/www/pterodactyl && "${php_bin}" artisan key:generate --force >/dev/null 2>&1 || true)
+    fi
+    if [ -n "${db_cli}" ]; then
+      local has_users_tbl=""
+      has_users_tbl="$("${db_cli}" -Nse "SHOW TABLES IN \`${PTERO_DB_NAME}\` LIKE 'users';" 2>/dev/null || true)"
+      if [ -z "${has_users_tbl}" ]; then
+        (cd /var/www/pterodactyl && "${php_bin}" artisan migrate --seed --force >/dev/null 2>&1 || true)
+      fi
+      local admin_count="0"
+      admin_count="$("${db_cli}" -Nse "SELECT COUNT(*) FROM \`${PTERO_DB_NAME}\`.users WHERE root_admin=1;" 2>/dev/null || echo "0")"
+      if [ "${admin_count:-0}" -eq 0 ] 2>/dev/null; then
+        (cd /var/www/pterodactyl && "${php_bin}" artisan p:user:make \
+          --email="${PTERO_ADMIN_EMAIL}" \
+          --username="${PTERO_ADMIN_USER}" \
+          --name-first="${PTERO_ADMIN_FIRSTNAME}" \
+          --name-last="${PTERO_ADMIN_LASTNAME}" \
+          --password="${PTERO_ADMIN_PASSWORD}" \
+          --admin=1 >/dev/null 2>&1 || true)
+      else
+        local existing_admin_row=""
+        existing_admin_row="$("${db_cli}" -Nse "SELECT username, email FROM \`${PTERO_DB_NAME}\`.users WHERE root_admin=1 ORDER BY id ASC LIMIT 1;" 2>/dev/null || true)"
+        if [ -n "${existing_admin_row}" ]; then
+          PTERO_ADMIN_USER="$(echo "${existing_admin_row}" | awk '{print $1}')"
+          PTERO_ADMIN_EMAIL="$(echo "${existing_admin_row}" | awk '{print $2}')"
+          export PTERO_ADMIN_USER PTERO_ADMIN_EMAIL
+          local bcrypt_pw=""
+          bcrypt_pw="$(SPX_PASS="${PTERO_ADMIN_PASSWORD}" "${php_bin}" -r 'echo password_hash(getenv("SPX_PASS"), PASSWORD_BCRYPT);' 2>/dev/null || true)"
+          if [ -n "${bcrypt_pw}" ]; then
+            "${db_cli}" -u root -e "UPDATE \`${PTERO_DB_NAME}\`.users SET password='${bcrypt_pw}' WHERE username='${PTERO_ADMIN_USER}';" >/dev/null 2>&1 || true
+          fi
+        fi
+      fi
     fi
   fi
 
@@ -565,11 +745,12 @@ heal_pterodactyl_host_nginx() {
     chown -R www-data:www-data /var/www/pterodactyl/storage /var/www/pterodactyl/bootstrap/cache 2>/dev/null || true
   fi
 
-  if command -v php >/dev/null 2>&1 && [ -f /var/www/pterodactyl/artisan ]; then
-    php /var/www/pterodactyl/artisan config:clear >/dev/null 2>&1 || true
-    php /var/www/pterodactyl/artisan route:clear >/dev/null 2>&1 || true
-    php /var/www/pterodactyl/artisan view:clear >/dev/null 2>&1 || true
+  if [ -n "${php_bin}" ] && [ -f /var/www/pterodactyl/artisan ]; then
+    "${php_bin}" /var/www/pterodactyl/artisan config:clear >/dev/null 2>&1 || true
+    "${php_bin}" /var/www/pterodactyl/artisan route:clear >/dev/null 2>&1 || true
+    "${php_bin}" /var/www/pterodactyl/artisan view:clear >/dev/null 2>&1 || true
   fi
+  write_ptero_credentials_file
 
   # Remove default or any host nginx sites claiming ports 80 / 443
   rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
@@ -813,7 +994,7 @@ else
   elif [ "${INSTALL_PTERO}" = "no" ]; then
     PTERO_ACTION="skip"
   else
-    ANS_PTERO="$(ask_prompt "7/7 Launch Pterodactyl Game Panel quick installer (${DOMAIN_GAME}) now? (yes/no)" "no")"
+    ANS_PTERO="$(ask_prompt "7/7 Install & auto-configure Pterodactyl Game Panel (${DOMAIN_GAME}) unattended? (yes/no)" "yes")"
     if [[ "$(echo "${ANS_PTERO}" | tr '[:upper:]' '[:lower:]')" == "y"* ]]; then
       PTERO_ACTION="install"
     else
@@ -821,6 +1002,8 @@ else
     fi
   fi
 fi
+
+init_ptero_credentials
 
 echo ""
 log_ok "Blueprint Locked: ${DOMAIN_ROOT} (db / sec / file / password / api / ${DOMAIN_GAME}) @ ${SPARROWX_PUBLIC_IP}"
@@ -873,21 +1056,28 @@ fi
 mkdir -p ./ovh/dns ./ovh/ssl ./ovh/certbot-www/.well-known/acme-challenge ./data/storage ./data/users ./data/backups ./backups
 chmod +x ./setup.sh ./update.sh ./fix.sh ./manage-db.sh ./ovh/*.sh ./deploy/*.sh ./init-scripts/*.sh 2>/dev/null || true
 
-# Launch bash <(curl -s https://pterodactyl-installer.se) if requested
+# Launch Pterodactyl installer (unattended by default, or interactive if --interactive-ptero)
 if [ "${PTERO_ACTION}" = "install" ] || [ "${PTERO_ACTION}" = "reinstall" ]; then
   echo ""
   log_info "Preparing ports 80/443 temporarily for Pterodactyl installer (${DOMAIN_GAME})..."
   if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
     docker stop sparrowx-nginx sparrowx_edge_proxy >/dev/null 2>&1 || true
   fi
-  echo -e "${C_CYAN}  Suggested answers inside pterodactyl-installer.se:${C_RESET}"
-  echo -e "    • FQDN / Domain : ${C_BOLD}${DOMAIN_GAME}${C_RESET}"
-  echo -e "    • Admin Email   : ${C_BOLD}${SPARROWX_ADMIN_EMAIL}${C_RESET}"
-  echo ""
-  if [ -e /dev/tty ]; then
-    bash <(curl -s https://pterodactyl-installer.se) < /dev/tty || log_warn "Pterodactyl installer exited; running port-flow reconciliation..."
+  if [ "${PTERO_ACTION}" = "reinstall" ] && [ -d /var/www/pterodactyl ]; then
+    rm -rf /var/www/pterodactyl
+  fi
+  if [ "${INTERACTIVE_PTERO}" = "true" ]; then
+    echo -e "${C_CYAN}  Suggested answers inside pterodactyl-installer.se:${C_RESET}"
+    echo -e "    • FQDN / Domain : ${C_BOLD}${DOMAIN_GAME}${C_RESET}"
+    echo -e "    • Admin Email   : ${C_BOLD}${PTERO_ADMIN_EMAIL}${C_RESET}"
+    echo ""
+    if [ -e /dev/tty ]; then
+      bash <(curl -s https://pterodactyl-installer.se) < /dev/tty || log_warn "Pterodactyl installer exited; running port-flow reconciliation..."
+    else
+      bash <(curl -s https://pterodactyl-installer.se) || log_warn "Pterodactyl installer exited; running port-flow reconciliation..."
+    fi
   else
-    bash <(curl -s https://pterodactyl-installer.se) || log_warn "Pterodactyl installer exited; running port-flow reconciliation..."
+    install_pterodactyl_unattended
   fi
 fi
 
@@ -1115,6 +1305,15 @@ ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
 ensure_env_key "SPARROWX_NS1" "${SPARROWX_NS1}"
 ensure_env_key "SPARROWX_NS2" "${SPARROWX_NS2}"
 ensure_env_key "SPARROWX_ADMIN_EMAIL" "${SPARROWX_ADMIN_EMAIL}"
+ensure_env_key "PTERO_ADMIN_EMAIL" "${PTERO_ADMIN_EMAIL}"
+ensure_env_key "PTERO_ADMIN_USER" "${PTERO_ADMIN_USER}"
+ensure_env_key "PTERO_ADMIN_FIRSTNAME" "${PTERO_ADMIN_FIRSTNAME}"
+ensure_env_key "PTERO_ADMIN_LASTNAME" "${PTERO_ADMIN_LASTNAME}"
+ensure_env_key "PTERO_ADMIN_PASSWORD" "${PTERO_ADMIN_PASSWORD}"
+ensure_env_key "PTERO_DB_NAME" "${PTERO_DB_NAME}"
+ensure_env_key "PTERO_DB_USER" "${PTERO_DB_USER}"
+ensure_env_key "PTERO_DB_PASSWORD" "${PTERO_DB_PASSWORD}"
+ensure_env_key "PTERO_TIMEZONE" "${PTERO_TIMEZONE}"
 ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
 ensure_env_key "HTTPS_PORT" "${HTTPS_PORT}"
 ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
@@ -1387,9 +1586,26 @@ echo -e "    • API Gateway    : ${C_CYAN}https://${DOMAIN_API}${HTTPS_SUFFIX}$
 if is_pterodactyl_installed; then
   echo -e "    • Game Panel     : ${C_GREEN}https://${DOMAIN_GAME}${HTTPS_SUFFIX}${C_RESET} -> Host Nginx :${PTERO_PORT}"
 else
-  echo -e "    • Game Panel     : ${C_DIM}https://${DOMAIN_GAME}${HTTPS_SUFFIX} (run './setup.sh --ptero' anytime to install)${C_RESET}"
+  echo -e "    • Game Panel     : ${C_DIM}https://${DOMAIN_GAME}${HTTPS_SUFFIX} (run './setup.sh --ptero' or './fix.sh' anytime to install)${C_RESET}"
 fi
 echo -e "    • Direct IP      : ${C_WHITE}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}${C_RESET}"
+write_ptero_credentials_file
+echo ""
+echo -e "  ${C_YELLOW}${C_BOLD}ALL CREDENTIALS & DATABASE INFO USED:${C_RESET}"
+if is_pterodactyl_installed; then
+  echo -e "    • Panel Login URL  : ${C_WHITE}https://${DOMAIN_GAME}${HTTPS_SUFFIX}${C_RESET}"
+  echo -e "    • Panel Admin Email: ${C_CYAN}${PTERO_ADMIN_EMAIL}${C_RESET}"
+  echo -e "    • Panel Admin User : ${C_CYAN}${PTERO_ADMIN_USER}${C_RESET}"
+  echo -e "    • Panel Admin Pass : ${C_YELLOW}${PTERO_ADMIN_PASSWORD}${C_RESET}"
+  echo -e "    • Ptero MySQL Host : ${C_WHITE}127.0.0.1:3306${C_RESET}"
+  echo -e "    • Ptero MySQL DB   : ${C_WHITE}${PTERO_DB_NAME}${C_RESET}"
+  echo -e "    • Ptero MySQL User : ${C_WHITE}${PTERO_DB_USER}${C_RESET}"
+  echo -e "    • Ptero MySQL Pass : ${C_YELLOW}${PTERO_DB_PASSWORD}${C_RESET}"
+fi
+echo -e "    • Postgres Host    : ${C_WHITE}127.0.0.1:${PG_HOST_PORT}${C_RESET}"
+echo -e "    • Postgres DB/User : ${C_WHITE}${POSTGRES_DB} / ${POSTGRES_USER}${C_RESET}"
+echo -e "    • Postgres Pass    : ${C_YELLOW}${POSTGRES_PASSWORD}${C_RESET}"
+echo -e "    • Saved Creds File : ${C_WHITE}/root/.sparrowx-ptero-credentials.txt${C_RESET}"
 echo ""
 echo -e "  ${C_BOLD}CLI TOOLS:${C_RESET}"
 echo -e "    • Watchdog (2m)  : ${C_DIM}${INSTALL_DIR}/deploy/watchdog.sh${C_RESET} (or ${C_BOLD}sparrowx-heal${C_RESET})"

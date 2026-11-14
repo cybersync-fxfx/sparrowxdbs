@@ -430,6 +430,32 @@ POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
 SPARROWX_JWT_SECRET="${SPARROWX_JWT_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_jwt_secret_key_32_characters_2026')}"
 SPARROWX_REDIS_SECRET="${SPARROWX_REDIS_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo 'sparrowx_redis_secret_2026')}"
 
+if [ -f "/root/.sparrowx-ptero-credentials.txt" ]; then
+  # shellcheck disable=SC1091
+  source "/root/.sparrowx-ptero-credentials.txt" 2>/dev/null || true
+fi
+if [ -f "/var/www/pterodactyl/.env" ]; then
+  _EX_DB="$(awk -F= '/^DB_DATABASE=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+  _EX_USER="$(awk -F= '/^DB_USERNAME=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+  _EX_PASS="$(awk -F= '/^DB_PASSWORD=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+  [ -n "${_EX_DB}" ] && PTERO_DB_NAME="${_EX_DB}"
+  [ -n "${_EX_USER}" ] && PTERO_DB_USER="${_EX_USER}"
+  [ -n "${_EX_PASS}" ] && PTERO_DB_PASSWORD="${_EX_PASS}"
+fi
+PTERO_DB_NAME="${PTERO_DB_NAME:-panel}"
+PTERO_DB_USER="${PTERO_DB_USER:-pterodactyl}"
+PTERO_DB_PASSWORD="${PTERO_DB_PASSWORD:-}"
+PTERO_ADMIN_EMAIL="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${SPARROWX_DOMAIN}}}"
+PTERO_ADMIN_USER="${PTERO_ADMIN_USER:-admin}"
+PTERO_ADMIN_PASSWORD="${PTERO_ADMIN_PASSWORD:-}"
+if is_pterodactyl_installed && command -v mariadb >/dev/null 2>&1; then
+  _ADMIN_ROW="$(mariadb -Nse "SELECT username, email FROM \`${PTERO_DB_NAME}\`.users WHERE root_admin=1 ORDER BY id ASC LIMIT 1;" 2>/dev/null || true)"
+  if [ -n "${_ADMIN_ROW}" ]; then
+    PTERO_ADMIN_USER="$(echo "${_ADMIN_ROW}" | awk '{print $1}')"
+    PTERO_ADMIN_EMAIL="$(echo "${_ADMIN_ROW}" | awk '{print $2}')"
+  fi
+fi
+
 ensure_env_key "SPARROWX_DOMAIN" "${SPARROWX_DOMAIN}"
 ensure_env_key "DOMAIN_ROOT" "${SPARROWX_DOMAIN}"
 ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
@@ -447,7 +473,13 @@ ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET
+[ -n "${PTERO_ADMIN_EMAIL}" ] && ensure_env_key "PTERO_ADMIN_EMAIL" "${PTERO_ADMIN_EMAIL}"
+[ -n "${PTERO_ADMIN_USER}" ] && ensure_env_key "PTERO_ADMIN_USER" "${PTERO_ADMIN_USER}"
+[ -n "${PTERO_ADMIN_PASSWORD}" ] && ensure_env_key "PTERO_ADMIN_PASSWORD" "${PTERO_ADMIN_PASSWORD}"
+[ -n "${PTERO_DB_NAME}" ] && ensure_env_key "PTERO_DB_NAME" "${PTERO_DB_NAME}"
+[ -n "${PTERO_DB_USER}" ] && ensure_env_key "PTERO_DB_USER" "${PTERO_DB_USER}"
+[ -n "${PTERO_DB_PASSWORD}" ] && ensure_env_key "PTERO_DB_PASSWORD" "${PTERO_DB_PASSWORD}"
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -1056,6 +1088,21 @@ printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : $
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
 fi
+echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
+echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}${C_YELLOW}Credentials & Database Info Used:${C_RESET}"
+if is_pterodactyl_installed; then
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Panel Login URL  : ${C_WHITE}https://${DOMAIN_GAME}${C_RESET} ${C_DIM}(Internal :${PTERO_PORT})${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Panel Admin Email: ${C_CYAN}${PTERO_ADMIN_EMAIL}${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Panel Admin User : ${C_CYAN}${PTERO_ADMIN_USER}${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Panel Admin Pass : ${C_YELLOW}${PTERO_ADMIN_PASSWORD:-(run ./fix.sh to sync/reset)}${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Ptero MySQL Host : ${C_WHITE}127.0.0.1:3306${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Ptero MySQL DB   : ${C_WHITE}${PTERO_DB_NAME}${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Ptero MySQL User : ${C_WHITE}${PTERO_DB_USER}${C_RESET}"
+  echo -e "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Ptero MySQL Pass : ${C_YELLOW}${PTERO_DB_PASSWORD:-(check /var/www/pterodactyl/.env)}${C_RESET}"
+fi
+echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres Host    : ${C_WHITE}127.0.0.1:${PG_HOST_PORT}${C_RESET}"
+echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres DB/User : ${C_WHITE}${POSTGRES_DB} / ${POSTGRES_USER}${C_RESET}"
+echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres Pass    : ${C_YELLOW}${POSTGRES_PASSWORD}${C_RESET}"
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}Quick Operations CLI:${C_RESET}                                                   ${C_GREEN}║${C_RESET}"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Full Update      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./update.sh  (or: sparrowx-update)"
