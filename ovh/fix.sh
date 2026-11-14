@@ -63,21 +63,24 @@ if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
   exec sudo -E bash "$0" "$@"
 fi
 
-# Prevent concurrent fix.sh runs using a clean PID lock (never inherited by child daemons)
+# Prevent concurrent fix.sh runs without ever killing an active run
 LOCK_PID_FILE="/var/run/sparrowx-fix.pid"
 if [ -f "${LOCK_PID_FILE}" ]; then
   OLD_PID="$(cat "${LOCK_PID_FILE}" 2>/dev/null || true)"
-  if [ -n "${OLD_PID}" ] && [ "${OLD_PID}" != "$$" ] && kill -0 "${OLD_PID}" 2>/dev/null && grep -q "fix\.sh" "/proc/${OLD_PID}/cmdline" 2>/dev/null; then
-    echo "Another fix.sh (PID ${OLD_PID}) is running; waiting up to 15s..."
-    _w=0
-    while [ "${_w}" -lt 15 ] && kill -0 "${OLD_PID}" 2>/dev/null; do
-      sleep 1
-      _w=$((_w + 1))
-    done
-    if kill -0 "${OLD_PID}" 2>/dev/null; then
-      echo "Stopping stalled fix.sh (PID ${OLD_PID}) so this run can proceed..."
+  if [ -n "${OLD_PID}" ] && [ "${OLD_PID}" != "$$" ] && [ "${OLD_PID}" != "${PPID:-0}" ] && kill -0 "${OLD_PID}" 2>/dev/null && grep -q "fix\.sh" "/proc/${OLD_PID}/cmdline" 2>/dev/null; then
+    # Only treat as stalled if lockfile is older than 10 minutes
+    if [ -n "$(find "${LOCK_PID_FILE}" -mmin +10 2>/dev/null || true)" ]; then
+      echo "Removing stale fix.sh lock (>10m old, PID ${OLD_PID})..."
       kill -TERM "${OLD_PID}" >/dev/null 2>&1 || true
       sleep 1
+    elif [ ! -t 0 ]; then
+      # Non-interactive/cron caller: exit immediately so it never interrupts an active run
+      exit 0
+    else
+      echo "Another fix.sh (PID ${OLD_PID}) is actively running; waiting for it to finish..."
+      while kill -0 "${OLD_PID}" 2>/dev/null; do
+        sleep 2
+      done
     fi
   fi
 fi
