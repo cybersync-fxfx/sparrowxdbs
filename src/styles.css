@@ -438,6 +438,25 @@ html { scroll-behavior: smooth; }
   animation: spx-radar-sweep 7s linear infinite;
 }
 
+@keyframes spx-file-laser {
+  0% {
+    top: 0%;
+    opacity: 0.9;
+  }
+  50% {
+    top: 96%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.9;
+  }
+}
+
+.animate-spx-laser {
+  animation: spx-file-laser 2.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }

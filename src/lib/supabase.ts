@@ -1351,6 +1351,7 @@ export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
             admin: user.admin,
             tenant_id: user.tenantId,
           }),
+          signal: AbortSignal.timeout(1200),
         },
       );
       return patchRes.ok;
@@ -1369,6 +1370,7 @@ export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
         admin: user.admin,
         tenant_id: user.tenantId,
       }),
+      signal: AbortSignal.timeout(1200),
     });
     return response.ok;
   } catch {
@@ -1405,6 +1407,7 @@ export async function authenticateAppUserFromBackend(
       const response = await fetch(`${supabaseUrl}/rest/v1/app_users?select=*`, {
         headers: getSupabaseHeaders(),
         cache: "no-store",
+        signal: AbortSignal.timeout(1200),
       });
       if (response.ok) {
         const rows = (await response.json()) as Array<Record<string, unknown>>;
@@ -1442,6 +1445,7 @@ export async function authenticateAppUserFromBackend(
           {
             headers: getSupabaseHeaders(),
             cache: "no-store",
+            signal: AbortSignal.timeout(1200),
           },
         );
         if (filteredRes.ok) {
@@ -1538,6 +1542,7 @@ export async function fetchAppUserByEmailFromBackend(email: string): Promise<App
         {
           headers: getSupabaseHeaders(),
           cache: "no-store",
+          signal: AbortSignal.timeout(1200),
         },
       );
       if (response.ok) {

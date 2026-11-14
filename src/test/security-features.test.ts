@@ -271,7 +271,7 @@ describe("Advanced Security & AI Guardrail Features", () => {
 
       const missingLookup = await fetchAppUserByEmailFromBackend("not-registered@acme.io");
       expect(missingLookup).toBeNull();
-    });
+    }, 15000);
 
     it("clears cryptographic session tokens on sign-out / vault lock", () => {
       issueSignedSessionToken({

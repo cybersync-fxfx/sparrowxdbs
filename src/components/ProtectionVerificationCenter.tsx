@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
+  Shield,
   ShieldCheck,
   ShieldAlert,
   CheckCircle2,
@@ -55,6 +56,7 @@ import {
   deleteVerificationProofFromBackend,
   persistAuditLogToBackend,
 } from "@/lib/supabase";
+import { SparrowXVirusFileScanner } from "./SparrowXVirusFileScanner";
 
 interface ProtectionVerificationCenterProps {
   tenants: ClientTenant[];
@@ -78,7 +80,7 @@ export function ProtectionVerificationCenter({
   showToast,
 }: ProtectionVerificationCenterProps) {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "coverage" | "delivery_proof" | "soc_admin"
+    "overview" | "coverage" | "delivery_proof" | "virus_scan" | "soc_admin"
   >("overview");
   const [proofs, setProofs] = useState<AssetVerificationProof[]>([]);
   const [loading, setLoading] = useState(true);
@@ -704,6 +706,17 @@ export function ProtectionVerificationCenter({
         >
           <Workflow className="size-3" /> End-to-End SOC Delivery Proof
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("virus_scan")}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors flex items-center gap-1.5 ${
+            activeTab === "virus_scan"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+          }`}
+        >
+          <Shield className="size-3 text-cyan-400" /> SparrowX Shield Virus Scan
+        </button>
         {(currentUserRole === "admin" || currentUserRole === "SOC Operator") && (
           <button
             type="button"
@@ -1190,6 +1203,13 @@ export function ProtectionVerificationCenter({
               ))}
             </div>
           </div>
+        </section>
+      )}
+
+      {/* TAB: SPARROWX SHIELD FILE & VIRUS MALWARE SCANNER */}
+      {activeTab === "virus_scan" && (
+        <section className="mt-4">
+          <SparrowXVirusFileScanner />
         </section>
       )}
 

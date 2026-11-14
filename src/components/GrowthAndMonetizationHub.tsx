@@ -53,6 +53,8 @@ import {
   type ServiceModuleId,
   persistAuditLogToBackend,
 } from "@/lib/supabase";
+import { SparrowXVirusFileScanner } from "./SparrowXVirusFileScanner";
+export { SparrowXVirusFileScanner };
 
 // ============================================================================
 // SSRF, DNS REBINDING & RATE-LIMITING PROTECTION
@@ -1048,6 +1050,7 @@ export function LandingLiveSecurityScanner({
   const [shareCopied, setShareCopied] = useState(false);
   const [findingsFilter, setFindingsFilter] = useState<"all" | "vulnerabilities" | "passed">("all");
   const [copiedEvidenceId, setCopiedEvidenceId] = useState<string | null>(null);
+  const [scannerMode, setScannerMode] = useState<"domain" | "file">("domain");
 
   // Lead Capture state after scan
   const [leadName, setLeadName] = useState("");
@@ -1059,6 +1062,9 @@ export function LandingLiveSecurityScanner({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
+    if (params.get("scan_type") === "file" || params.get("mode") === "file" || params.get("tab") === "virus") {
+      setScannerMode("file");
+    }
     const sharedScan = params.get("scan") || params.get("prospect_report");
     if (sharedScan) {
       setDomainInput(sharedScan);
@@ -1188,26 +1194,73 @@ export function LandingLiveSecurityScanner({
       id="free-scanner"
       className="rounded-2xl border border-primary/40 bg-gradient-to-b from-[#120A07] via-[#0A0A0A] to-[#080808] p-4 sm:p-6 shadow-[0_0_45px_rgba(240,90,40,0.18)]"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
-          <Radar className="size-4 animate-spin" style={{ animationDuration: "6s" }} />
-          <span>Free 15-Second Live Domain, DNS, TLS, CORS & AI API Scanner</span>
+      {/* Top Scanner Mode Switcher: Domain Posture vs SparrowX Shield Virus Scan */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+        <div className="inline-flex items-center gap-1.5 p-1 rounded-xl bg-black/70 border border-white/10 shadow-inner">
+          <button
+            type="button"
+            onClick={() => setScannerMode("domain")}
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              scannerMode === "domain"
+                ? "bg-primary text-white shadow-[0_0_15px_rgba(240,90,40,0.35)]"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Globe2 className="size-3.5" />
+            <span>Domain & Cloud Posture</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setScannerMode("file")}
+            className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+              scannerMode === "file"
+                ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(0,229,255,0.35)]"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Shield className="size-3.5 text-cyan-400" />
+            <span>SparrowX Shield Virus & File Scan</span>
+            <span className="rounded bg-cyan-400/20 px-1.5 py-0.2 text-[9px] font-mono text-cyan-300 font-bold uppercase">
+              Live
+            </span>
+          </button>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-400">
-            SSRF & REBINDING PROTECTED
-          </span>
-          <span className="rounded-full border border-[#262626] bg-black px-2.5 py-0.5 text-[10px] font-mono text-zinc-400">
-            NO SIGNUP REQUIRED
-          </span>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 rounded-full border border-primary/40 bg-gradient-to-r from-primary/20 via-orange-500/10 to-transparent px-3 py-1 shadow-[0_0_10px_rgba(249,115,22,0.2)]">
+            <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span className="text-[10px] font-mono font-bold tracking-wider text-orange-200 uppercase">
+              POWERED BY SPARROWX SECURITY
+            </span>
+          </div>
         </div>
       </div>
 
-      <p className="text-xs text-zinc-300 mb-3.5">
-        Enter any public website, SaaS domain, or API endpoint to run a live non-intrusive check on
-        HTTPS/TLS, DNS A/AAAA/CAA/TXT records, CORS & Security Headers, `security.txt`, and AI
-        endpoint exposure:
-      </p>
+      {scannerMode === "file" ? (
+        <SparrowXVirusFileScanner />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+              <Radar className="size-4 animate-spin" style={{ animationDuration: "6s" }} />
+              <span>Free 15-Second Live Domain, DNS, TLS, CORS & AI API Scanner</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-emerald-400">
+                SSRF & REBINDING PROTECTED
+              </span>
+              <span className="rounded-full border border-[#262626] bg-black px-2.5 py-0.5 text-[10px] font-mono text-zinc-400">
+                NO SIGNUP REQUIRED
+              </span>
+            </div>
+          </div>
+
+          <p className="text-xs text-zinc-300 mb-3.5">
+            Enter any public website, SaaS domain, or API endpoint to run a live non-intrusive check on
+            HTTPS/TLS, DNS A/AAAA/CAA/TXT records, CORS & Security Headers, `security.txt`, and AI
+            endpoint exposure:
+          </p>
 
       <form
         onSubmit={(e) => {
@@ -2074,6 +2127,8 @@ export function LandingLiveSecurityScanner({
           </div>
         );
       })()}
+        </>
+      )}
     </div>
   );
 }

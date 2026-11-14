@@ -2009,20 +2009,20 @@ export function SparrowxDropEngine() {
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-white">$9</span>
+                  <span className="text-3xl font-bold text-white">$2.99</span>
                   <span className="text-xs text-zinc-400 font-mono">/month</span>
                 </div>
                 <p className="text-xs text-zinc-300">
                   High-capacity encrypted file delivery for freelancers and indie studios.
                 </p>
                 <ul className="space-y-2 pt-2 text-xs text-zinc-200">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />250 GB persistent vault storage</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />500 GB persistent vault storage</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Up to 5 GB single-file transfers</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Custom link expiry & download caps</li>
                 </ul>
               </div>
               <a
-                href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Pro%20Vault%20(250%20GB)"
+                href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Pro%20Vault%20(500%20GB)"
                 className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg bg-purple-500 hover:bg-purple-400 py-2.5 text-xs font-bold text-white transition-colors"
               >
                 <span>Upgrade to Pro Vault</span>
@@ -2033,29 +2033,29 @@ export function SparrowxDropEngine() {
             <div className="rounded-xl border border-white/[0.08] bg-[#090B12] p-6 flex flex-col justify-between space-y-6">
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Team Compliance</span>
+                  <span className="text-xs font-mono uppercase tracking-wider text-zinc-400">Pro Max</span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/[0.06] text-zinc-300 border border-white/10">
-                    2 TB
+                    1 TB
                   </span>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-white">$29</span>
+                  <span className="text-3xl font-bold text-white">$5.99</span>
                   <span className="text-xs text-zinc-500 font-mono">/month</span>
                 </div>
                 <p className="text-xs text-zinc-400">
                   Shared encrypted dropboxes, audit trails, and priority edge throughput.
                 </p>
                 <ul className="space-y-2 pt-2 text-xs text-zinc-300">
-                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />2 TB pooled organization storage</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />1 TB pooled organization storage</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Audit logs & IP-locked share links</li>
                   <li className="flex items-center gap-2"><CheckCircle2 className="size-3.5 text-purple-400 shrink-0" />Dedicated AP-Southeast NVMe nodes</li>
                 </ul>
               </div>
               <a
-                href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Team%20Vault%20(2%20TB)"
+                href="mailto:files@sparrowx.net?subject=SparrowX%20Drop%20Pro%20Max%20Vault%20(1%20TB)"
                 className="w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] py-2.5 text-xs font-semibold text-white transition-colors"
               >
-                <span>Request Team Workspace</span>
+                <span>Upgrade to Pro Max</span>
                 <ArrowRight className="size-3.5" />
               </a>
             </div>
@@ -2079,7 +2079,7 @@ export function SparrowxDropEngine() {
           <div className="rounded-lg border border-white/[0.06] bg-[#090B12]/70 p-4 space-y-1.5">
             <h4 className="text-xs font-semibold text-white">How do I upgrade beyond 10 GB?</h4>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Start free with 10 GB in Vault Mode and contact <span className="font-mono text-zinc-300">files@sparrowx.net</span> whenever your team needs 250 GB or 2 TB.
+              Start free with 10 GB in Vault Mode and contact <span className="font-mono text-zinc-300">files@sparrowx.net</span> whenever your team needs 500 GB or 1 TB.
             </p>
           </div>
         </div>
