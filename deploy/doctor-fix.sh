@@ -13,6 +13,7 @@ FORCE_DB="false"
 REBUILD_APP="false"
 SKIP_PTERO="false"
 REINSTALL_PTERO="false"
+SKIP_WINGS="false"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -21,6 +22,7 @@ for arg in "$@"; do
     --rebuild) REBUILD_APP="true" ;;
     --skip-ptero|--no-ptero) SKIP_PTERO="true" ;;
     --reinstall-ptero) REINSTALL_PTERO="true" ;;
+    --skip-wings|--no-wings) SKIP_WINGS="true" ;;
     --help|-h)
       cat <<'HELP'
 SparrowX Autonomous Error-Healing Doctor (fix.sh)
@@ -34,6 +36,7 @@ Options:
   --reinstall-db    Force re-sync of Local OVH PostgreSQL & per-user folders
   --skip-ptero      Skip unattended Pterodactyl install if not already installed
   --reinstall-ptero Remove and freshly reinstall Pterodactyl Game Panel
+  --skip-wings      Skip unattended Pterodactyl Wings node install/registration
   --help, -h        Show this help screen
 HELP
       exit 0
@@ -312,6 +315,9 @@ write_ptero_credentials_file() {
     echo "# ======================================================================"
     echo "PANEL_URL=https://${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
     echo "PANEL_INTERNAL_PORT=${PTERO_PORT:-8090}"
+    echo "NODE_FQDN=${DOMAIN_NODE:-node.${SPARROWX_DOMAIN}}"
+    echo "WINGS_DAEMON_PORT=${WINGS_PORT:-8080}"
+    echo "WINGS_SFTP_PORT=${WINGS_SFTP_PORT:-2022}"
     echo "PANEL_ADMIN_EMAIL=${PTERO_ADMIN_EMAIL:-admin@sparrowx.net}"
     echo "PANEL_ADMIN_USER=${PTERO_ADMIN_USER:-admin}"
     echo "PANEL_ADMIN_PASSWORD=${PTERO_ADMIN_PASSWORD:-}"
@@ -1033,7 +1039,7 @@ ensure_game_letsencrypt_ssl() {
       local tmp_nginx=""
       tmp_nginx="$(mktemp)"
       awk -v dom="${game_domain}" '
-        /# 4\. Pterodactyl Game Panel/ { in_ptero=1 }
+        /(# 4\. Pterodactyl Game Panel|# 4\. Game Panel Domain)/ { in_ptero=1 }
         in_ptero && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/ptero-fullchain.pem;") }
         in_ptero && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/ptero-privkey.pem;") }
         in_ptero && /^}/ { in_ptero=0 }
@@ -1043,6 +1049,427 @@ ensure_game_letsencrypt_ssl() {
       docker restart "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || docker exec "${EDGE_CTR:-sparrowx-nginx}" nginx -s reload >/dev/null 2>&1 || true
     fi
     log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
+  fi
+}
+
+is_wings_installed() {
+  [ -x "/usr/local/bin/wings" ]
+}
+
+pick_free_wings_subnet() {
+  local used_subnets=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    local net_ids=""
+    net_ids="$(docker network ls -q 2>/dev/null || true)"
+    if [ -n "${net_ids}" ]; then
+      used_subnets="$(docker network inspect ${net_ids} --format '{{range .IPAM.Config}}{{.Subnet}} {{end}}' 2>/dev/null || true)"
+    fi
+  fi
+  for oct in 25 26 27 28 29 30 31; do
+    local cand="172.${oct}.0.0/16"
+    if ! echo " ${used_subnets} " | grep -qF " ${cand} "; then
+      echo "${cand}|172.${oct}.0.1"
+      return 0
+    fi
+  done
+  echo "172.25.0.0/16|172.25.0.1"
+}
+
+NODE_SSL_CERT="/etc/pterodactyl/ssl/fullchain.pem"
+NODE_SSL_KEY="/etc/pterodactyl/ssl/privkey.pem"
+
+ensure_node_letsencrypt_ssl() {
+  local node_domain="${DOMAIN_NODE:-node.${SPARROWX_DOMAIN}}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local live_dir="/etc/letsencrypt/live/${node_domain}"
+  local ssl_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${SPARROWX_DOMAIN}}}"
+  local wings_ssl_dir="/etc/pterodactyl/ssl"
+
+  mkdir -p "${webroot}/.well-known/acme-challenge" "${wings_ssl_dir}" /etc/ssl
+
+  if [ -n "${node_domain}" ] && [[ "${node_domain}" != *.local ]] && [ "${node_domain}" != "localhost" ]; then
+    if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
+      ssl_email="admin@${SPARROWX_DOMAIN}"
+    fi
+
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+      ufw allow 80/tcp >/dev/null 2>&1 || true
+      ufw allow 443/tcp >/dev/null 2>&1 || true
+      ufw allow "${WINGS_PORT:-8080}/tcp" >/dev/null 2>&1 || true
+      ufw allow "${WINGS_SFTP_PORT:-2022}/tcp" >/dev/null 2>&1 || true
+    fi
+
+    if ! command -v certbot >/dev/null 2>&1; then
+      DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true
+      DEBIAN_FRONTEND=noninteractive apt-get install -y certbot >/dev/null 2>&1 || true
+    fi
+
+    if command -v certbot >/dev/null 2>&1; then
+      if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+        log_scan "Requesting Let's Encrypt SSL for Wings node ${node_domain} via HTTP-01..."
+        if certbot certonly \
+          --webroot -w "${webroot}" \
+          --non-interactive --agree-tos \
+          -m "${ssl_email}" \
+          --cert-name "${node_domain}" \
+          -d "${node_domain}" >/dev/null 2>&1; then
+          log_fix "Issued Let's Encrypt SSL for Wings node ${node_domain} via port 80 webroot"
+        else
+          log_scan "Webroot challenge deferred; retrying ${node_domain} via standalone port 80 listener..."
+          docker stop "${EDGE_CTR:-sparrowx-nginx}" sparrowx-nginx sparrowx_edge_proxy >/dev/null 2>&1 || true
+          systemctl stop nginx >/dev/null 2>&1 || true
+          if command -v fuser >/dev/null 2>&1; then
+            fuser -k 80/tcp >/dev/null 2>&1 || true
+          fi
+          sleep 1
+
+          if certbot certonly \
+            --standalone --preferred-challenges http \
+            --non-interactive --agree-tos \
+            -m "${ssl_email}" \
+            --cert-name "${node_domain}" \
+            -d "${node_domain}" >/dev/null 2>&1; then
+            log_fix "Issued Let's Encrypt SSL for Wings node ${node_domain} via standalone challenge"
+          else
+            log_warn "Let's Encrypt HTTP-01 failed for ${node_domain}; using self-signed TLS fallback until DNS propagates"
+          fi
+
+          if is_pterodactyl_installed; then
+            systemctl start nginx >/dev/null 2>&1 || true
+          fi
+          docker start "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build "${EDGE_SVC:-nginx}" >/dev/null 2>&1 || true
+        fi
+      else
+        certbot certonly \
+          --webroot -w "${webroot}" \
+          --non-interactive --agree-tos --keep-until-expiring \
+          -m "${ssl_email}" \
+          --cert-name "${node_domain}" \
+          -d "${node_domain}" >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ] && openssl x509 -in "${live_dir}/fullchain.pem" -noout >/dev/null 2>&1; then
+    cp -fL "${live_dir}/fullchain.pem" "${wings_ssl_dir}/fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${wings_ssl_dir}/privkey.pem" 2>/dev/null || true
+    chmod 644 "${wings_ssl_dir}/fullchain.pem" 2>/dev/null || true
+    chmod 600 "${wings_ssl_dir}/privkey.pem" 2>/dev/null || true
+    NODE_SSL_CERT="${live_dir}/fullchain.pem"
+    NODE_SSL_KEY="${live_dir}/privkey.pem"
+    log_ok "Live Let's Encrypt SSL wired for Wings node https://${node_domain}:${WINGS_PORT:-8080}"
+  else
+    if [ ! -s "${wings_ssl_dir}/fullchain.pem" ] || [ ! -s "${wings_ssl_dir}/privkey.pem" ] || ! openssl x509 -in "${wings_ssl_dir}/fullchain.pem" -noout >/dev/null 2>&1; then
+      if ! openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+        -keyout "${wings_ssl_dir}/privkey.pem" \
+        -out "${wings_ssl_dir}/fullchain.pem" \
+        -subj "/CN=${node_domain}" \
+        -addext "subjectAltName=DNS:${node_domain},IP:${SPARROWX_PUBLIC_IP:-127.0.0.1}" >/dev/null 2>&1; then
+        openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
+          -keyout "${wings_ssl_dir}/privkey.pem" \
+          -out "${wings_ssl_dir}/fullchain.pem" \
+          -subj "/CN=${node_domain}" >/dev/null 2>&1 || true
+      fi
+      chmod 644 "${wings_ssl_dir}/fullchain.pem" 2>/dev/null || true
+      chmod 600 "${wings_ssl_dir}/privkey.pem" 2>/dev/null || true
+      log_fix "Generated fallback TLS certificate for Wings node ${node_domain}"
+    fi
+    NODE_SSL_CERT="${wings_ssl_dir}/fullchain.pem"
+    NODE_SSL_KEY="${wings_ssl_dir}/privkey.pem"
+  fi
+}
+
+register_pterodactyl_wings_node() {
+  local ptero_dir="/var/www/pterodactyl"
+  local node_domain="${DOMAIN_NODE:-node.${SPARROWX_DOMAIN}}"
+  local game_domain="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+  local wings_port="${WINGS_PORT:-8080}"
+  local sftp_port="${WINGS_SFTP_PORT:-2022}"
+  local node_name="${WINGS_NODE_NAME:-SparrowX Node 01}"
+  local loc_short="${WINGS_LOCATION_SHORT:-OVH}"
+  local loc_long="${WINGS_LOCATION_LONG:-SparrowX Sovereign Datacenter}"
+  local php_bin=""
+
+  [ -f "${ptero_dir}/artisan" ] || return 1
+  for cand in "$(command -v php 2>/dev/null || true)" /usr/bin/php8.4 /usr/bin/php8.3 /usr/bin/php8.2 /usr/bin/php8.1 /usr/bin/php8.0; do
+    if [ -n "${cand}" ] && [ -x "${cand}" ]; then
+      php_bin="${cand}"
+      break
+    fi
+  done
+  if [ -z "${php_bin}" ]; then
+    log_warn "PHP CLI not found; skipping automatic Wings node registration in Panel"
+    return 1
+  fi
+
+  local mem_mb="4096"
+  if [ -r /proc/meminfo ]; then
+    mem_mb="$(awk '/^MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 4096)"
+  fi
+  [ "${mem_mb:-0}" -lt 1024 ] 2>/dev/null && mem_mb="1024"
+
+  local disk_mb="51200"
+  local disk_target="/var/lib/pterodactyl"
+  [ -d "${disk_target}" ] || disk_target="/"
+  disk_mb="$(df -Pm "${disk_target}" 2>/dev/null | awk 'NR==2 {print $2}' || echo 51200)"
+  [ "${disk_mb:-0}" -lt 10240 ] 2>/dev/null && disk_mb="10240"
+
+  local subnet_pair=""
+  subnet_pair="$(pick_free_wings_subnet)"
+  local docker_subnet="${subnet_pair%%|*}"
+  local docker_gw="${subnet_pair##*|}"
+
+  mkdir -p /etc/pterodactyl
+
+  local php_err=""
+  if ! php_err="$(
+    SPX_PTERO_DIR="${ptero_dir}" \
+    SPX_NODE_FQDN="${node_domain}" \
+    SPX_NODE_NAME="${node_name}" \
+    SPX_LOC_SHORT="${loc_short}" \
+    SPX_LOC_LONG="${loc_long}" \
+    SPX_WINGS_PORT="${wings_port}" \
+    SPX_SFTP_PORT="${sftp_port}" \
+    SPX_PANEL_URL="https://${game_domain}" \
+    SPX_SSL_CERT="${NODE_SSL_CERT}" \
+    SPX_SSL_KEY="${NODE_SSL_KEY}" \
+    SPX_DOCKER_SUBNET="${docker_subnet}" \
+    SPX_DOCKER_GW="${docker_gw}" \
+    SPX_MEM_MB="${mem_mb}" \
+    SPX_DISK_MB="${disk_mb}" \
+    "${php_bin}" -r '
+      error_reporting(E_ALL);
+      $dir = getenv("SPX_PTERO_DIR");
+      require $dir . "/vendor/autoload.php";
+      $app = require $dir . "/bootstrap/app.php";
+      $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+      $kernel->bootstrap();
+
+      $locShort = getenv("SPX_LOC_SHORT") ?: "OVH";
+      $locLong  = getenv("SPX_LOC_LONG") ?: "SparrowX Sovereign Datacenter";
+      $nodeFqdn = getenv("SPX_NODE_FQDN");
+      $nodeName = getenv("SPX_NODE_NAME") ?: "SparrowX Node 01";
+      $wingsPort = (int)(getenv("SPX_WINGS_PORT") ?: 8080);
+      $sftpPort  = (int)(getenv("SPX_SFTP_PORT") ?: 2022);
+      $panelUrl  = getenv("SPX_PANEL_URL");
+      $sslCert   = getenv("SPX_SSL_CERT");
+      $sslKey    = getenv("SPX_SSL_KEY");
+      $subnet    = getenv("SPX_DOCKER_SUBNET") ?: "172.25.0.0/16";
+      $gw        = getenv("SPX_DOCKER_GW") ?: "172.25.0.1";
+      $memMb     = max(1024, (int)getenv("SPX_MEM_MB"));
+      $diskMb    = max(10240, (int)getenv("SPX_DISK_MB"));
+
+      $loc = \Pterodactyl\Models\Location::where("short", $locShort)->first();
+      if (!$loc) {
+          $loc = new \Pterodactyl\Models\Location();
+          $loc->short = $locShort;
+          $loc->long = $locLong;
+          $loc->save();
+      }
+
+      $node = \Pterodactyl\Models\Node::where("fqdn", $nodeFqdn)->first();
+      if (!$node) {
+          $payload = [
+              "name" => $nodeName,
+              "description" => "Auto-provisioned SparrowX Wings Node",
+              "location_id" => $loc->id,
+              "fqdn" => $nodeFqdn,
+              "scheme" => "https",
+              "behind_proxy" => false,
+              "public" => true,
+              "maintenance_mode" => false,
+              "memory" => $memMb,
+              "memory_overallocate" => 0,
+              "disk" => $diskMb,
+              "disk_overallocate" => 0,
+              "upload_size" => 100,
+              "daemonBase" => "/var/lib/pterodactyl/volumes",
+              "daemonSFTP" => $sftpPort,
+              "daemonListen" => $wingsPort,
+          ];
+          try {
+              $svc = $app->make(\Pterodactyl\Services\Nodes\NodeCreationService::class);
+              $node = $svc->handle($payload);
+          } catch (\Throwable $e) {
+              $node = new \Pterodactyl\Models\Node();
+              $node->fill($payload);
+              $node->uuid = \Ramsey\Uuid\Uuid::uuid4()->toString();
+              $node->daemon_token_id = \Illuminate\Support\Str::random(16);
+              $node->daemon_token = $app->make("encrypter")->encrypt(\Illuminate\Support\Str::random(64));
+              $node->save();
+          }
+          echo "CREATED_NODE=" . $node->id . "\n";
+      } else {
+          $changed = false;
+          if ($node->scheme !== "https") { $node->scheme = "https"; $changed = true; }
+          if ((int)$node->daemonListen !== $wingsPort) { $node->daemonListen = $wingsPort; $changed = true; }
+          if ((int)$node->daemonSFTP !== $sftpPort) { $node->daemonSFTP = $sftpPort; $changed = true; }
+          if ((bool)$node->behind_proxy !== false) { $node->behind_proxy = false; $changed = true; }
+          if ($changed) { $node->save(); }
+          echo "UPDATED_NODE=" . $node->id . "\n";
+      }
+
+      $cfg = [];
+      if (method_exists($node, "getYamlConfiguration") && class_exists(\Symfony\Component\Yaml\Yaml::class)) {
+          $yamlStr = $node->getYamlConfiguration();
+          $cfg = \Symfony\Component\Yaml\Yaml::parse($yamlStr) ?: [];
+      } else {
+          $token = $app->make("encrypter")->decrypt($node->daemon_token);
+          $cfg = [
+              "debug" => false,
+              "uuid" => $node->uuid,
+              "token_id" => $node->daemon_token_id,
+              "token" => $token,
+              "api" => [
+                  "host" => "0.0.0.0",
+                  "port" => $wingsPort,
+                  "ssl" => [
+                      "enabled" => true,
+                      "cert" => $sslCert,
+                      "key" => $sslKey,
+                  ],
+                  "upload_limit" => 100,
+              ],
+              "system" => [
+                  "data" => "/var/lib/pterodactyl/volumes",
+                  "sftp" => ["bind_port" => $sftpPort],
+              ],
+              "allowed_mounts" => [],
+              "remote" => $panelUrl,
+          ];
+      }
+
+      $cfg["remote"] = $panelUrl;
+      $cfg["api"]["host"] = "0.0.0.0";
+      $cfg["api"]["port"] = $wingsPort;
+      $cfg["api"]["ssl"]["enabled"] = true;
+      $cfg["api"]["ssl"]["cert"] = $sslCert;
+      $cfg["api"]["ssl"]["key"] = $sslKey;
+      $cfg["system"]["data"] = "/var/lib/pterodactyl/volumes";
+      $cfg["system"]["sftp"]["bind_port"] = $sftpPort;
+      $cfg["docker"]["network"]["interface"] = $gw;
+      $cfg["docker"]["network"]["interfaces"]["v4"]["subnet"] = $subnet;
+      $cfg["docker"]["network"]["interfaces"]["v4"]["gateway"] = $gw;
+
+      if (class_exists(\Symfony\Component\Yaml\Yaml::class)) {
+          $out = \Symfony\Component\Yaml\Yaml::dump($cfg, 6, 2);
+      } else {
+          $out = json_encode($cfg, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+      }
+      file_put_contents("/etc/pterodactyl/config.yml.tmp", $out);
+      chmod("/etc/pterodactyl/config.yml.tmp", 0600);
+      rename("/etc/pterodactyl/config.yml.tmp", "/etc/pterodactyl/config.yml");
+    ' 2>&1
+  )"; then
+    log_warn "Panel node auto-registration hit an error (${php_err:0:200})"
+    return 1
+  fi
+
+  if [ -s /etc/pterodactyl/config.yml ]; then
+    chmod 600 /etc/pterodactyl/config.yml 2>/dev/null || true
+    log_fix "Registered & synced Wings node ${node_domain} in Pterodactyl Panel (/etc/pterodactyl/config.yml)"
+    return 0
+  fi
+  return 1
+}
+
+install_and_heal_wings() {
+  local node_domain="${DOMAIN_NODE:-node.${SPARROWX_DOMAIN}}"
+  local wings_port="${WINGS_PORT:-8080}"
+
+  if [ "${SKIP_WINGS:-false}" = "true" ] || ! is_pterodactyl_installed; then
+    return 0
+  fi
+
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+    log_warn "Docker unavailable; skipping Wings node setup for ${node_domain}"
+    return 0
+  fi
+
+  log_scan "Configuring Pterodactyl Wings node (${node_domain} on :${wings_port})..."
+  mkdir -p /etc/pterodactyl /etc/pterodactyl/ssl /var/lib/pterodactyl/volumes /var/log/pterodactyl /var/run/wings
+
+  if ! is_wings_installed || ! /usr/local/bin/wings --version >/dev/null 2>&1; then
+    local raw_arch=""
+    raw_arch="$(uname -m 2>/dev/null || echo x86_64)"
+    local wings_arch="amd64"
+    case "${raw_arch}" in
+      aarch64|arm64) wings_arch="arm64" ;;
+      *) wings_arch="amd64" ;;
+    esac
+    local wings_url="https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_${wings_arch}"
+    log_fix "Downloading Pterodactyl Wings binary (${wings_arch})..."
+    if curl -fsSL -o /usr/local/bin/wings.tmp "${wings_url}" 2>/dev/null; then
+      chmod u+x /usr/local/bin/wings.tmp
+      if /usr/local/bin/wings.tmp --version >/dev/null 2>&1; then
+        mv -f /usr/local/bin/wings.tmp /usr/local/bin/wings
+        log_fix "Installed Pterodactyl Wings $(/usr/local/bin/wings --version 2>/dev/null | head -n 1 || echo binary)"
+      else
+        rm -f /usr/local/bin/wings.tmp
+        log_warn "Downloaded Wings binary failed version check"
+        return 0
+      fi
+    else
+      rm -f /usr/local/bin/wings.tmp
+      log_warn "Could not download Wings binary from ${wings_url}"
+      return 0
+    fi
+  fi
+
+  cat > /etc/systemd/system/wings.service <<'EOF_WINGS'
+[Unit]
+Description=Pterodactyl Wings Daemon
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+User=root
+WorkingDirectory=/etc/pterodactyl
+LimitNOFILE=4096
+PIDFile=/var/run/wings/daemon.pid
+ExecStart=/usr/local/bin/wings
+Restart=on-failure
+StartLimitInterval=180
+StartLimitBurst=30
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOF_WINGS
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable wings >/dev/null 2>&1 || true
+
+  ensure_node_letsencrypt_ssl
+  if ! register_pterodactyl_wings_node; then
+    return 0
+  fi
+
+  # Remove stale pterodactyl_nw if Wings is stopped so it recreates cleanly with the non-overlapping subnet
+  if ! systemctl is-active --quiet wings 2>/dev/null; then
+    docker network rm pterodactyl_nw >/dev/null 2>&1 || true
+  fi
+
+  systemctl restart wings >/dev/null 2>&1 || true
+  local wings_ok="false"
+  for _w in 1 2 3 4 5; do
+    if systemctl is-active --quiet wings 2>/dev/null; then
+      local w_code=""
+      w_code="$(curl -kso /dev/null -w "%{http_code}" --max-time 2 "https://127.0.0.1:${wings_port}/" 2>/dev/null || echo "000")"
+      if echo "${w_code}" | grep -qE "^(200|401|403|404)$"; then
+        wings_ok="true"
+        break
+      fi
+    fi
+    sleep 2
+  done
+
+  if [ "${wings_ok}" = "true" ]; then
+    log_ok "Pterodactyl Wings daemon active for ${node_domain} (HTTPS :${wings_port}, SFTP :${WINGS_SFTP_PORT:-2022})"
+  else
+    local w_err=""
+    w_err="$(journalctl -u wings -n 10 --no-pager 2>/dev/null | tr '\n' ' ' || true)"
+    log_warn "Wings service did not respond on :${wings_port} yet (${w_err:0:180})"
   fi
 }
 
@@ -1253,7 +1680,13 @@ APP_HOST_PORT="${APP_HOST_PORT:-3000}"
 PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 DOMAIN_GAME="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+DOMAIN_NODE="${DOMAIN_NODE:-${NODE_FQDN:-node.${SPARROWX_DOMAIN}}}"
 PTERO_PORT="${PTERO_PORT:-8090}"
+WINGS_PORT="${WINGS_PORT:-8080}"
+WINGS_SFTP_PORT="${WINGS_SFTP_PORT:-2022}"
+WINGS_NODE_NAME="${WINGS_NODE_NAME:-SparrowX Node 01}"
+WINGS_LOCATION_SHORT="${WINGS_LOCATION_SHORT:-OVH}"
+WINGS_LOCATION_LONG="${WINGS_LOCATION_LONG:-SparrowX Sovereign Datacenter}"
 POSTGRES_USER="${POSTGRES_USER:-sparrowx}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}"
 POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
@@ -1286,7 +1719,10 @@ PTERO_TIMEZONE="${PTERO_TIMEZONE:-UTC}"
 ensure_env_key "SPARROWX_DOMAIN" "${SPARROWX_DOMAIN}"
 ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
 ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
+ensure_env_key "DOMAIN_NODE" "${DOMAIN_NODE}"
 ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
+ensure_env_key "WINGS_PORT" "${WINGS_PORT}"
+ensure_env_key "WINGS_SFTP_PORT" "${WINGS_SFTP_PORT}"
 ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
 ensure_env_key "SPARROWX_ADMIN_EMAIL" "${SPARROWX_ADMIN_EMAIL}"
 ensure_env_key "PTERO_ADMIN_EMAIL" "${PTERO_ADMIN_EMAIL}"
@@ -1308,7 +1744,7 @@ ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_NODE PTERO_PORT WINGS_PORT WINGS_SFTP_PORT WINGS_NODE_NAME WINGS_LOCATION_SHORT WINGS_LOCATION_LONG SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET
 
 log_ok "Verified .env (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -1546,7 +1982,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME},DNS:${DOMAIN_NODE},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -1962,9 +2398,10 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     ensure_native_fallback_running || true
   fi
 
-  # Ensure Let's Encrypt SSL certificates via port 80 (webroot + standalone fallback for game.<domain>)
+  # Ensure Let's Encrypt SSL certificates via port 80 (webroot + standalone fallback for game.<domain> & node.<domain>)
   if is_pterodactyl_installed; then
     ensure_game_letsencrypt_ssl
+    install_and_heal_wings
   fi
   if [ -x "${INSTALL_DIR}/deploy/ssl-renew.sh" ]; then
     bash "${INSTALL_DIR}/deploy/ssl-renew.sh" >/dev/null 2>&1 || true
@@ -2104,6 +2541,8 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow 8080/tcp >/dev/null 2>&1 || true
   ufw allow 8443/tcp >/dev/null 2>&1 || true
   ufw allow 2022/tcp >/dev/null 2>&1 || true
+  ufw allow "${WINGS_PORT:-8080}"/tcp >/dev/null 2>&1 || true
+  ufw allow "${WINGS_SFTP_PORT:-2022}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow from 127.0.0.1 to any port "${APP_HOST_PORT:-3000}" proto tcp >/dev/null 2>&1 || true
@@ -2311,6 +2750,16 @@ if is_pterodactyl_installed; then
   fi
 fi
 
+WINGS_HEALTH="NOT INSTALLED"
+if is_wings_installed; then
+  WINGS_CODE="$(curl -kso /dev/null -w "%{http_code}" --max-time 3 "https://127.0.0.1:${WINGS_PORT:-8080}/" 2>/dev/null || echo "000")"
+  if systemctl is-active --quiet wings 2>/dev/null && echo "${WINGS_CODE}" | grep -qE "^(200|401|403|404)$"; then
+    WINGS_HEALTH="ONLINE (${DOMAIN_NODE}:${WINGS_PORT:-8080})"
+  else
+    WINGS_HEALTH="CHECK WINGS (HTTP ${WINGS_CODE})"
+  fi
+fi
+
 echo ""
 echo -e "${C_GREEN}╔══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}${C_WHITE}✅ SPARROWX DIAGNOSTIC & AUTO-HEAL COMPLETE${C_RESET}                             ${C_GREEN}║${C_RESET}"
@@ -2327,6 +2776,9 @@ printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║$
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Nginx Edge HTTP / HTTPS" "${EDGE_HTTP_HEALTH} / ${EDGE_HTTPS_HEALTH}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Pterodactyl Game Panel" "${PTERO_HEALTH}"
+fi
+if is_wings_installed; then
+  printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Pterodactyl Wings Node" "${WINGS_HEALTH}"
 fi
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
 if [ "${#FIXED_LOG[@]}" -gt 0 ]; then
@@ -2345,6 +2797,9 @@ printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
+fi
+if is_wings_installed; then
+  printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Wings Node       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_NODE}:${WINGS_PORT:-8080}"
 fi
 write_ptero_credentials_file
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
@@ -2377,6 +2832,9 @@ echo -e "${C_GREEN}╚═══════════════════�
 [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Nginx Edge HTTPS DOWN on :${HTTPS_PORT}")
 if is_pterodactyl_installed && [[ "${PTERO_HEALTH}" == CHECK* ]]; then
   UNFIXED_LOG+=("Pterodactyl Game Panel unhealthy (${PTERO_HEALTH})")
+fi
+if is_wings_installed && [[ "${WINGS_HEALTH}" == CHECK* ]]; then
+  UNFIXED_LOG+=("Pterodactyl Wings Node unhealthy (${WINGS_HEALTH})")
 fi
 for s in mariadb redis-server nginx pteroq docker; do
   if systemctl list-unit-files 2>/dev/null | grep -q "^${s}.service"; then
