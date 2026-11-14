@@ -2037,11 +2037,8 @@ export function SovereignDatabaseStudio({
                 className="size-8 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(62,207,142,0.3)]"
               />
               <div className="flex items-center gap-2">
-                <span className="font-bold text-base tracking-tight text-white">
-                  sparrowx
-                </span>
-                <span className="rounded bg-[#3ECF8E]/10 border border-[#3ECF8E]/30 text-[#3ECF8E] px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider">
-                  CLOUD DB
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                  SPARROWX <span className="text-[#3ECF8E]">//</span> CLOUD DB
                 </span>
               </div>
             </div>
@@ -2154,18 +2151,13 @@ export function SovereignDatabaseStudio({
           {/* HERO + STRICT AUTH CARD */}
           <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start border border-[#262626] bg-[#141416]/90 backdrop-blur-md rounded-xl p-6 sm:p-8 shadow-2xl">
             <div className="lg:col-span-7 space-y-5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1C1C1F] border border-[#2E2E2E] text-[11px] font-mono text-[#3ECF8E]">
-                <span className="size-1.5 rounded-full bg-[#3ECF8E] animate-pulse" />
-                <span>POSTGRESQL 16 • PGVECTOR • STRICT RLS ISOLATION</span>
-              </div>
-
               <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white leading-[1.12]">
                 Build in a weekend. <br />
                 <span className="text-[#3ECF8E]">Scale to millions.</span>
               </h1>
 
               <p className="text-sm sm:text-base text-zinc-400 leading-relaxed max-w-2xl">
-                SparrowX Cloud DB is the sovereign Postgres developer platform. Start every project with a full PostgreSQL database, Authentication with Row Level Security, Instant Data APIs, Storage, Edge Functions, and Vector embeddings — with flat, transparent pricing.
+                SparrowX Cloud DB is a managed PostgreSQL developer platform. Start every project with a full PostgreSQL database, Authentication with Row Level Security, Instant Data APIs, Storage, Edge Functions, and Vector embeddings — with flat, transparent pricing.
               </p>
 
               <div className="pt-1 flex flex-wrap gap-3">
@@ -2233,9 +2225,6 @@ export function SovereignDatabaseStudio({
                     Create Account
                   </button>
                 </div>
-                <span className="text-[10px] font-mono text-[#3ECF8E] font-bold uppercase tracking-wider">
-                  RLS PROTECTED
-                </span>
               </div>
 
               {landingAuthError && (
@@ -2906,9 +2895,6 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   Total transparency on what makes SparrowX Cloud DB strong and where we focus.
                 </p>
               </div>
-              <span className="text-[10px] font-mono text-[#3ECF8E] border border-[#3ECF8E]/30 px-2.5 py-0.5 rounded bg-[#3ECF8E]/10">
-                FOUNDER COMMITMENT
-              </span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">

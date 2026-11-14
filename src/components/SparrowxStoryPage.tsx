@@ -5,7 +5,6 @@ import {
   Cpu,
   Database,
   FileUp,
-  Heart,
   KeyRound,
   Lock,
   Shield,
@@ -27,9 +26,6 @@ export function SparrowxStoryPage() {
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm sm:text-base tracking-tight text-white">
                 SPARROWX
-              </span>
-              <span className="hidden sm:inline text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30 font-mono font-semibold uppercase">
-                OUR STORY &amp; MANIFESTO
               </span>
             </div>
           </a>
@@ -72,11 +68,6 @@ export function SparrowxStoryPage() {
           className="scroll-mt-24 px-4 sm:px-6 pt-14 pb-12 border-b border-sky-500/15 bg-gradient-to-b from-[#0B1122] to-[#070A12]"
         >
           <div className="max-w-4xl mx-auto space-y-8">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/25 text-xs font-mono text-rose-300">
-              <Heart className="size-3.5 text-rose-400" />
-              <span>A LETTER FROM THE FOUNDERS</span>
-            </div>
-
             <div className="space-y-4">
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white tracking-tight leading-[1.12]">
                 Why We Started SparrowX: Cloud Infrastructure Built with Heart, Not Billing Traps

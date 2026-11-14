@@ -13,7 +13,6 @@ import {
   Search,
   Sliders,
   ChevronRight,
-  Radio,
   Flame,
   Layers,
   ArrowRight,
@@ -274,29 +273,14 @@ export function SparrowxShieldEngine({
               alt="SparrowX Shield"
               className="size-10 object-contain shrink-0 drop-shadow-[0_4px_14px_rgba(255,107,0,0.35)]"
             />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                  SPARROWX <span className="text-[#FF6B00]">//</span> SHIELD
-                </span>
-                <span className="rounded bg-[#FF6B00]/15 border border-[#FF6B00]/40 text-[#FF8533] px-2 py-0.5 text-[9px] font-mono font-bold tracking-wider">
-                  SHADOWSHIELD DEFENSE ENGINE
-                </span>
-              </div>
-              <p className="text-[10px] text-[#A3A3A3] font-mono">
-                sec.sparrowx.net • Tactical Origin Cloaking, DDoS Deflection &amp; Threat Radar
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                SPARROWX <span className="text-[#FF6B00]">//</span> SHIELD
+              </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded bg-[#161311] border border-[#FF6B00]/30 text-xs font-mono text-[#FF8533]">
-              <span className="relative flex size-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF6B00] opacity-75" />
-                <span className="relative inline-flex rounded-full size-2 bg-[#FF6B00]" />
-              </span>
-              <span>TACTICAL RADAR ACTIVE</span>
-            </div>
 
             {activeUser ? (
               <div className="flex items-center gap-2">
@@ -344,18 +328,13 @@ export function SparrowxShieldEngine({
           <div className="absolute top-0 right-0 w-80 h-80 bg-[#FF6B00]/5 rounded-full blur-3xl pointer-events-none" />
           
           <div className="space-y-3 relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-[#1C140C] border border-[#FF6B00]/40 text-xs font-mono text-[#FF8533]">
-              <Radio className="size-3.5 text-[#FF6B00] animate-pulse" />
-              <span>Shadowshield Perimeter Engine • Real-Time Packet Scrubbing</span>
-            </div>
-
             <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white font-sans">
               Instant Website Protection. <br />
-              <span className="text-[#FF8533]">Zero Hackers. Zero Downtime.</span>
+              <span className="text-[#FF8533]">DDoS Mitigation &amp; Origin IP Protection.</span>
             </h1>
 
             <p className="text-xs sm:text-sm text-[#CCCCCC] max-w-2xl leading-relaxed">
-              SparrowX Shield (Shadowshield) stands between your website and malicious attackers. We cloak your real server IP address, block DDoS floods in under a second, and stop malicious scrapers before they reach your database.
+              SparrowX Shield stands between your website and malicious traffic. We proxy your origin server IP address, filter DDoS floods, and block automated scrapers before they reach your application.
             </p>
 
             {/* Quick Stats Banner */}
@@ -390,9 +369,6 @@ export function SparrowxShieldEngine({
               </span>
               <span className="font-bold text-white uppercase tracking-wider text-xs">
                 Live Global Threat Defense Map
-              </span>
-              <span className="rounded bg-[#FF6B00]/20 text-[#FF8533] text-[10px] px-2 py-0.5 border border-[#FF6B00]/40 font-bold">
-                SHADOWSHIELD RADAR
               </span>
             </div>
             
@@ -561,7 +537,6 @@ export function SparrowxShieldEngine({
               <span className="font-bold text-white text-xs uppercase tracking-wider">
                 Why Builders Choose Shield
               </span>
-              <span className="text-[#FF8533] text-[10px] font-bold">STARTUP ADVANTAGE</span>
             </div>
 
             <div className="space-y-3 text-xs">
@@ -797,10 +772,6 @@ export function SparrowxShieldEngine({
             <div className="flex items-center gap-3">
               <div className="size-10 rounded-xl bg-[#FF6B00]/15 border border-[#FF6B00]/30 text-[#FF8533] grid place-items-center shrink-0 shadow-[0_0_20px_rgba(255,107,0,0.15)]">
                 <Shield className="size-5" />
-              </div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FF6B00]/10 border border-[#FF6B00]/25 px-2.5 py-0.5 text-[10px] font-mono text-[#FF8533] font-semibold tracking-wider">
-                <span className="size-1.5 rounded-full bg-[#FF6B00] animate-pulse" />
-                <span>SHADOWSHIELD OPERATOR GATEWAY</span>
               </div>
             </div>
 

@@ -1,4 +1,4 @@
-import { Check, Layers, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 
 export function ComparisonSection() {
   return (

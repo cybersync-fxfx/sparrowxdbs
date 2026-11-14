@@ -717,18 +717,10 @@ export function SparrowxDropEngine() {
               alt="SparrowX Files"
               className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(34,211,238,0.3)]"
             />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                  SPARROWX // FILES
-                </span>
-                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
-                  DUAL-PHYSICS TRANSFER DECK
-                </span>
-              </div>
-              <p className="text-[10px] text-[#64748B] font-mono">
-                file.sparrowx.net • Ephemeral Zero-Disk Drop &amp; 10GB Sovereign Vault
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                SPARROWX // FILES
+              </span>
             </div>
           </div>
 
@@ -770,11 +762,6 @@ export function SparrowxDropEngine() {
 
           {/* Right Vault Account & Node Controls */}
           <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
-            <div className="hidden sm:flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1.5 rounded-sm text-[#9CA3AF] text-[10px]">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>NVMe RAID-1</span>
-            </div>
-
             {isVaultAuthenticated && vaultUser ? (
               <>
                 <button
@@ -919,11 +906,6 @@ export function SparrowxDropEngine() {
 
                 {/* Hero Greeting */}
                 <div className="text-center space-y-3 relative z-10">
-                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1 text-xs font-mono text-emerald-400 font-semibold">
-                    <ShieldCheck className="size-4" />
-                    <span>SparrowX Sovereign Vault • Verified Transfer</span>
-                  </div>
-
                   <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
                     You've Received a Shared File
                   </h1>

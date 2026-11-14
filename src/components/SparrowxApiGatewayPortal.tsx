@@ -319,18 +319,10 @@ print(response.json())`;
                 alt="SparrowX Private Database API"
                 className="size-9 object-contain shrink-0"
               />
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                    SPARROWX // PRIVATE DATABASE API
-                  </span>
-                  <span className="rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
-                    AUTH REQUIRED
-                  </span>
-                </div>
-                <p className="text-[10px] text-[#64748B] font-mono">
-                  Zero-Trust Endpoint • Sign in to access your personal hosted DB API &amp; keys
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                  SPARROWX // PRIVATE DATABASE API
+                </span>
               </div>
             </div>
 
@@ -479,21 +471,14 @@ print(response.json())`;
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
                   SPARROWX // HOSTED DB API
                 </span>
-                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
-                  AUTHENTICATED
-                </span>
               </div>
               <p className="text-[10px] text-[#64748B] font-mono">
-                Signed in as {sessionUser.email} • Private Database REST &amp; Key Console
+                Signed in as {sessionUser.email}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono">
-            <div className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm text-[#9CA3AF]">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>PERSONAL KEY ACTIVE</span>
-            </div>
             <button
               type="button"
               onClick={handleSignOut}

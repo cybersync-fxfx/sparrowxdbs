@@ -281,18 +281,10 @@ export function SparrowxKeysEngine() {
               alt="SparrowX Keys"
               className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(245,158,11,0.3)]"
             />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
-                  SPARROWX // KEYS
-                </span>
-                <span className="rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 text-[9px] font-mono font-semibold tracking-wider">
-                  NO LOGIN REQUIRED
-                </span>
-              </div>
-              <p className="text-[10px] text-[#64748B] font-mono">
-                password.sparrowx.net • Native Client-Side CSPRNG Instrument
-              </p>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
+                SPARROWX // KEYS
+              </span>
             </div>
           </div>
 

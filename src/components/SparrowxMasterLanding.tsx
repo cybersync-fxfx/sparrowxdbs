@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Globe,
   Heart,
-  Sparkles,
   Zap,
   Server,
   Layers,
@@ -213,10 +212,6 @@ function OperatorLoginDialog({
               }`}
             >
               <Lock className="size-5" aria-hidden="true" />
-            </div>
-            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/10 border border-white/25 px-2.5 py-0.5 text-[10px] font-mono text-zinc-200 font-semibold tracking-wider">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
-              <span>SPARROWX CLOUD IDENTITY</span>
             </div>
           </div>
 
@@ -911,14 +906,6 @@ export function SparrowxMasterLanding({
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
           {/* Left Column: Human, Emotional Pitch */}
           <div className="lg:col-span-7 space-y-5 sm:space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/25 backdrop-blur-sm text-[11px] font-mono text-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.08)]">
-              <span className="relative flex size-2" aria-hidden="true">
-                <span className="animate-spx-pulse-ring absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full size-2 bg-emerald-400" />
-              </span>
-              <span>SOVEREIGN CLOUD MESH • LIVE TELEMETRY &amp; ZERO TRACKERS</span>
-            </div>
-
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans text-balance">
               Simple, Honest Cloud Tools <br />
               <span className="text-zinc-300">Built for Real Builders.</span>
@@ -986,10 +973,10 @@ export function SparrowxMasterLanding({
               <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
                   <Shield className="size-3.5 text-orange-400" aria-hidden="true" />
-                  <span>Tactical DDoS &amp; Origin Defense</span>
+                  <span>DDoS Mitigation &amp; Origin Protection</span>
                 </div>
                 <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  We cloak your real server IP and deflect malicious attacks in under 1 second using our live global threat map.
+                  Proxy your origin server IP behind our reverse proxy to filter DDoS floods and inspect traffic in real time.
                 </p>
               </div>
 
@@ -1010,10 +997,6 @@ export function SparrowxMasterLanding({
       {/* SECTION 3: 6 DEDICATED PRODUCT TOOLS (BENTO GRID) */}
       <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-300">
-            <Sparkles className="size-3.5 text-amber-400" aria-hidden="true" />
-            <span>STANDALONE SPECIALIZED EXPERIENCES</span>
-          </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
             Six Focused Tools. Zero Clutter.
           </h2>
