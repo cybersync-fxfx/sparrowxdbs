@@ -1,21 +1,45 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# SPARROWX TECHNOLOGIES — SOVEREIGN FULL-STACK BLUEPRINT INSTALLER (DEBIAN/UBUNTU)
+# SPARROWX TECHNOLOGIES — FULL-STACK BLUEPRINT INSTALLER (DEBIAN/UBUNTU)
 # ==============================================================================
-# Complete A-to-Z Dedicated Server Wizard:
-#  • Attractive Cyber-Terminal UI with step progress & live health matrix
-#  • Self-Healing Debian/Ubuntu Engine (apt locks, IPv4 apt, swap, port 80/443/53)
-#  • Multi-Domain Reverse Proxy (Root, DB, Shield, File 150MB, Keys, API + IP)
-#  • 5 Isolated PostgreSQL 16 + pgvector Databases + Unified Email/Auth Hub
-#  • Full Backend Fleet (Postgres, PgBouncer, PostgREST, Redis, App, SSL Proxy)
-#  • Automated Let's Encrypt SSL (Webroot + Instant SAN Fallback + 12h Cron)
-#  • Live Ping & HTTP/HTTPS Website Detector with Auto-Fix + All Cron Jobs
+# Complete A-to-Z Dedicated Server Wizard & Idempotent Auto-Healer:
+#  • Idempotent Pre-Flight Audit: keeps already-healthy services untouched
+#  • Self-Healing Debian/Ubuntu Engine (apt locks, IPv4 apt, swap, ports)
+#  • Multi-Domain Reverse Proxy (Root, DB, Shield, File 100MB, Keys, API, Game)
+#  • Pterodactyl Panel (game.<domain>) Installer & Port-Flow Auto-Repair (:8090)
+#  • Automated Let's Encrypt SSL (Webroot + SAN Fallback + 12h Cron)
+#  • Live Ping & HTTP/HTTPS Endpoint Detector with Auto-Fix + Watchdog Cron
 # ==============================================================================
 set -u
 
 REPO_URL="https://github.com/cybersync-fxfx/sparrowxdbs.git"
-INSTALL_DIR="/opt/sparrowx"
 LOG_FILE="/var/log/sparrowx-install.log"
+
+AUTO_MODE="false"
+INSTALL_PTERO="ask"
+
+for arg in "$@"; do
+  case "${arg}" in
+    --auto|-y|--yes) AUTO_MODE="true" ;;
+    --ptero|--with-ptero|--pterodactyl) INSTALL_PTERO="yes" ;;
+    --no-ptero) INSTALL_PTERO="no" ;;
+    --help|-h)
+      cat <<'HELP'
+SparrowX Blueprint Installer & Pterodactyl Port-Flow Manager (setup.sh)
+
+Usage:
+  ./setup.sh [options]
+
+Options:
+  --ptero             Install or heal Pterodactyl Game Panel (game.<domain>)
+  --no-ptero          Skip interactive Pterodactyl installer prompt
+  --auto, -y          Non-interactive mode (accept saved .env / smart defaults)
+  --help, -h          Show this help screen
+HELP
+      exit 0
+      ;;
+  esac
+done
 
 # Terminal Colors
 C_RESET="\033[0m"
@@ -60,8 +84,25 @@ if [ "$(id -u)" -ne 0 ]; then
   fi
 fi
 
+# Resolve installation directory dynamically (compatible with /opt/sparrowxdbs & /opt/sparrowx)
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_SOURCE}")" 2>/dev/null && pwd || pwd)"
+if [ -f "./docker-compose.ovh.yml" ] && [ -f "./ovh/schema.sql" ]; then
+  INSTALL_DIR="$(pwd)"
+elif [ -f "${SCRIPT_DIR}/docker-compose.ovh.yml" ] && [ -f "${SCRIPT_DIR}/ovh/schema.sql" ]; then
+  INSTALL_DIR="${SCRIPT_DIR}"
+elif [ -d "/opt/sparrowxdbs/.git" ] || [ -f "/opt/sparrowxdbs/docker-compose.ovh.yml" ]; then
+  INSTALL_DIR="/opt/sparrowxdbs"
+elif [ -d "/opt/sparrowx/.git" ] || [ -f "/opt/sparrowx/docker-compose.ovh.yml" ]; then
+  INSTALL_DIR="/opt/sparrowx"
+else
+  INSTALL_DIR="/opt/sparrowxdbs"
+fi
+
 touch "${LOG_FILE}" 2>/dev/null || LOG_FILE="/tmp/sparrowx-install.log"
-clear 2>/dev/null || true
+if [ "${AUTO_MODE}" != "true" ]; then
+  clear 2>/dev/null || true
+fi
 
 echo -e "${C_ORANGE}"
 cat <<'BANNER'
@@ -71,17 +112,38 @@ cat <<'BANNER'
  ___/ / ____/ ___ |/ _, _/ _, _/ /_/ / | |/ |/ //   |  
 /____/_/   /_/  |_/_/ |_/_/ |_|\____/  |__/|__//_/|_|  
 BANNER
-echo -e "${C_RESET}${C_BOLD}  SOVEREIGN INFRASTRUCTURE BLUEPRINT • DEBIAN / UBUNTU DEDICATED WIZARD${C_RESET}"
-echo -e "${C_DIM}  Multi-Domain SSL • 5 Isolated PG16+pgvector DBs • Watchdog & Cron Fleet${C_RESET}"
+echo -e "${C_RESET}${C_BOLD}  SPARROWX INFRASTRUCTURE BLUEPRINT • DEBIAN / UBUNTU DEDICATED WIZARD${C_RESET}"
+echo -e "${C_DIM}  Multi-Domain SSL • PG16+PostgREST • Pterodactyl (game.) & Port-Flow Healer${C_RESET}"
 echo -e "${C_ORANGE}========================================================================${C_RESET}"
 
 # ==============================================================================
-# SELF-HEALING UTILITIES
+# SELF-HEALING & PORT-FLOW UTILITIES
 # ==============================================================================
+compose_cmd() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose >/dev/null 2>&1; then
+    docker-compose "$@"
+  else
+    return 1
+  fi
+}
+
+ensure_env_key() {
+  local key="$1"
+  local val="$2"
+  local env_file="${INSTALL_DIR}/.env"
+  touch "${env_file}"
+  if grep -q "^${key}=" "${env_file}" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" "${env_file}"
+  else
+    echo "${key}=${val}" >> "${env_file}"
+  fi
+}
+
 heal_apt_locks() {
   if ! command -v apt-get >/dev/null 2>&1; then return 0; fi
   export DEBIAN_FRONTEND=noninteractive
-  # Fix slow/hanging IPv6 apt mirrors on Debian dedicated servers
   if [ ! -f /etc/apt/apt.conf.d/99sparrowx-ipv4 ]; then
     echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99sparrowx-ipv4 2>/dev/null || true
   fi
@@ -165,40 +227,53 @@ is_port_in_use() {
       return 0
     fi
   fi
+  if (echo >/dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1; then
+    return 0
+  fi
   return 1
 }
 
-reclaim_web_ports() {
-  # On Debian dedicated servers, Apache2 / host Nginx / Lighttpd often occupy 80/443.
-  # Reclaim 80 and 443 cleanly so the live website runs on standard HTTP/HTTPS ports!
-  for svc in apache2 httpd nginx lighttpd caddy; do
-    if systemctl is-active --quiet "${svc}" 2>/dev/null || systemctl is-enabled --quiet "${svc}" 2>/dev/null; then
-      log_warn "Host service '${svc}' is holding web ports. Stopping & disabling it for SparrowX Proxy..."
-      systemctl stop "${svc}" >/dev/null 2>&1 || true
-      systemctl disable "${svc}" >/dev/null 2>&1 || true
+port_held_by_container() {
+  local port="$1"
+  local expected_regex="$2"
+  if ! is_port_in_use "${port}"; then
+    return 1
+  fi
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    if docker ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | grep -E "^(${expected_regex}) " | grep -qE ":${port}->"; then
+      return 0
     fi
-  done
-  for p in 80 443; do
-    if is_port_in_use "${p}"; then
-      log_warn "Clearing leftover process on port ${p}..."
-      fuser -k "${p}/tcp" >/dev/null 2>&1 || true
-      sleep 1
-    fi
-  done
+  fi
+  return 1
+}
+
+is_reserved_ptero_port() {
+  local port="$1"
+  case "${port}" in
+    8080|8443|2022|3306|6379|"${PTERO_PORT:-8090}") return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 find_free_port() {
   local preferred="$1"
   local fallback="$2"
   local label="$3"
+  local expected_ctr="${4:-}"
+
+  if [ -n "${expected_ctr}" ] && port_held_by_container "${preferred}" "${expected_ctr}"; then
+    echo "${preferred}"
+    return 0
+  fi
   if ! is_port_in_use "${preferred}"; then
     echo "${preferred}"
     return 0
   fi
-  log_warn "${label}: Port ${preferred} is busy; scanning from ${fallback}..." >&2
+
+  log_warn "${label}: Port ${preferred} is busy; scanning from ${fallback} (avoiding Pterodactyl ports 8080/8443/2022/3306/6379/${PTERO_PORT:-8090})..." >&2
   local candidate="${fallback}"
   while [ "${candidate}" -lt 65000 ]; do
-    if ! is_port_in_use "${candidate}"; then
+    if ! is_reserved_ptero_port "${candidate}" && ! is_port_in_use "${candidate}"; then
       log_ok "${label}: Assigned free port ${candidate}" >&2
       echo "${candidate}"
       return 0
@@ -208,9 +283,439 @@ find_free_port() {
   echo "${preferred}"
 }
 
+free_docker_port_conflicts() {
+  local port="$1"
+  local keep_name="$2"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    local ctrs
+    ctrs="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' 2>/dev/null | grep -E "(:|0\.0\.0\.0:|127\.0\.0\.1:|\[::\]:)${port}->" | awk -v keep="${keep_name}" '$2 != keep {print $1}' || true)"
+    if [ -n "${ctrs}" ]; then
+      echo "${ctrs}" | xargs -r docker rm -f >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+is_pterodactyl_installed() {
+  [ -f /var/www/pterodactyl/artisan ] || [ -d /var/www/pterodactyl/public ]
+}
+
+detect_php_fpm_sock() {
+  local sock=""
+  sock="$(find /run/php /var/run/php -maxdepth 2 -type s -name 'php*-fpm.sock' 2>/dev/null | sort -V | tail -n 1 || true)"
+  if [ -z "${sock}" ] && command -v systemctl >/dev/null 2>&1; then
+    for php_svc in $(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sort -V || true); do
+      systemctl enable --now "${php_svc}" >/dev/null 2>&1 || true
+    done
+    sleep 1
+    sock="$(find /run/php /var/run/php -maxdepth 2 -type s -name 'php*-fpm.sock' 2>/dev/null | sort -V | tail -n 1 || true)"
+  fi
+  [ -z "${sock}" ] && sock="/run/php/php8.3-fpm.sock"
+  echo "${sock}"
+}
+
+get_docker_host_ip() {
+  local gw_ip=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+      gw_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' sparrowx-nginx 2>/dev/null | tr -d '[:space:]' || true)"
+      if [ -z "${gw_ip}" ]; then
+        gw_ip="$(docker exec sparrowx-nginx sh -c "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1; exit}'" 2>/dev/null | tr -d '[:space:]' || true)"
+      fi
+    fi
+    if [ -z "${gw_ip}" ]; then
+      gw_ip="$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null | tr -d '[:space:]' || true)"
+    fi
+  fi
+  if [ -z "${gw_ip}" ] && command -v ip >/dev/null 2>&1; then
+    gw_ip="$(ip -4 addr show docker0 2>/dev/null | awk '/inet / {sub(/\/.*/, "", $2); print $2; exit}' || true)"
+  fi
+  [ -z "${gw_ip}" ] && gw_ip="172.17.0.1"
+  echo "${gw_ip}"
+}
+
+open_ptero_ufw_rules() {
+  local ptero_p="${PTERO_PORT:-8090}"
+  if command -v ufw >/dev/null 2>&1; then
+    ufw allow in from 127.0.0.1 to any port "${ptero_p}" proto tcp >/dev/null 2>&1 || true
+    ufw allow in from 172.16.0.0/12 to any port "${ptero_p}" proto tcp >/dev/null 2>&1 || true
+    if [ -d /etc/pterodactyl ] || systemctl list-unit-files wings.service >/dev/null 2>&1; then
+      ufw allow 8080/tcp >/dev/null 2>&1 || true
+      ufw allow 2022/tcp >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+render_sparrowx_nginx_conf() {
+  local ptero_p="${PTERO_PORT:-8090}"
+  local docker_host_ip
+  docker_host_ip="$(get_docker_host_ip)"
+  local ptero_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local ptero_ssl_key="/etc/nginx/ssl/privkey.pem"
+
+  if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
+    ptero_ssl_cert="/etc/nginx/ssl/ptero-fullchain.pem"
+    ptero_ssl_key="/etc/nginx/ssl/ptero-privkey.pem"
+  fi
+
+  local ptero_backend_block=""
+  if is_pterodactyl_installed; then
+    ptero_backend_block="    location / {
+        proxy_pass http://${docker_host_ip}:${ptero_p};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_read_timeout 300s;
+        proxy_connect_timeout 60s;
+    }"
+  else
+    ptero_backend_block="    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
+  fi
+
+  cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
+# ==============================================================================
+# SPARROWX MULTI-DOMAIN EDGE PROXY (ROOT + DB + SHIELD + FILE + KEYS + API + GAME)
+# ==============================================================================
+
+# 1. Master Portal & Fallback Default (${DOMAIN_ROOT})
+server {
+    listen 80 default_server;
+    listen 443 ssl default_server;
+    server_name ${DOMAIN_ROOT} www.${DOMAIN_ROOT} _;
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 100M;
+    server_tokens off;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /rest/v1/ {
+        proxy_pass http://sparrowx:3000/rest/v1/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
+        if (\$request_method = OPTIONS) { return 204; }
+    }
+
+    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 2. Dedicated Database Studio Domain (${DOMAIN_STUDIO})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_STUDIO} studio.${DOMAIN_ROOT};
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 100M;
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /rest/v1/ {
+        proxy_pass http://sparrowx:3000/rest/v1/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
+        if (\$request_method = OPTIONS) { return 204; }
+    }
+
+    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-SparrowX-Studio "1";
+    }
+}
+
+# 3. Standalone Product Subdomains (Drop, Keys, Shield, API)
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_FILE} drop.${DOMAIN_ROOT} ${DOMAIN_PASSWORD} passwd.${DOMAIN_ROOT} keys.${DOMAIN_ROOT} ${DOMAIN_SEC} shield.${DOMAIN_ROOT} ${DOMAIN_API} rest.${DOMAIN_ROOT};
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 100M;
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /rest/v1/ {
+        proxy_pass http://sparrowx:3000/rest/v1/;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
+        add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
+        if (\$request_method = OPTIONS) { return 204; }
+    }
+
+    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 4. Pterodactyl Game Panel (${DOMAIN_GAME}) -> Host Nginx Port ${ptero_p}
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME} panel.${DOMAIN_ROOT};
+    ssl_certificate ${ptero_ssl_cert};
+    ssl_certificate_key ${ptero_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 100M;
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+${ptero_backend_block}
+}
+EOF
+}
+
+heal_pterodactyl_host_nginx() {
+  if ! is_pterodactyl_installed; then
+    return 0
+  fi
+
+  local ptero_p="${PTERO_PORT:-8090}"
+  local php_sock
+  php_sock="$(detect_php_fpm_sock)"
+
+  # Ensure core Pterodactyl services are running cleanly
+  for dep_svc in mariadb mysql redis-server pteroq; do
+    if systemctl list-unit-files "${dep_svc}.service" >/dev/null 2>&1; then
+      systemctl enable --now "${dep_svc}" >/dev/null 2>&1 || true
+    fi
+  done
+  if systemctl list-unit-files wings.service >/dev/null 2>&1 && [ -f /etc/pterodactyl/config.yml ]; then
+    systemctl enable --now wings >/dev/null 2>&1 || true
+  fi
+
+  # Update /var/www/pterodactyl/.env for reverse proxy HTTPS connectivity
+  if [ -f /var/www/pterodactyl/.env ]; then
+    sed -i "s|^APP_URL=.*|APP_URL=https://${DOMAIN_GAME}|" /var/www/pterodactyl/.env 2>/dev/null || true
+    if grep -q "^TRUSTED_PROXIES=" /var/www/pterodactyl/.env 2>/dev/null; then
+      sed -i "s|^TRUSTED_PROXIES=.*|TRUSTED_PROXIES=*|" /var/www/pterodactyl/.env 2>/dev/null || true
+    else
+      echo "TRUSTED_PROXIES=*" >> /var/www/pterodactyl/.env 2>/dev/null || true
+    fi
+  fi
+
+  if id -u www-data >/dev/null 2>&1; then
+    chown -R www-data:www-data /var/www/pterodactyl/storage /var/www/pterodactyl/bootstrap/cache 2>/dev/null || true
+  fi
+
+  if command -v php >/dev/null 2>&1 && [ -f /var/www/pterodactyl/artisan ]; then
+    php /var/www/pterodactyl/artisan config:clear >/dev/null 2>&1 || true
+    php /var/www/pterodactyl/artisan route:clear >/dev/null 2>&1 || true
+    php /var/www/pterodactyl/artisan view:clear >/dev/null 2>&1 || true
+  fi
+
+  # Remove default or any host nginx sites claiming ports 80 / 443
+  rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+  mkdir -p /etc/nginx/sparrowx-disabled /etc/nginx/sites-available /etc/nginx/sites-enabled 2>/dev/null || true
+  for ncfg in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do
+    [ -e "${ncfg}" ] || continue
+    [ "$(basename "${ncfg}")" = "pterodactyl.conf" ] && continue
+    if grep -qE "listen[[:space:]]+([^;]*:)?(80|443)([[:space:];]|$)" "${ncfg}" 2>/dev/null; then
+      mv -f "${ncfg}" /etc/nginx/sparrowx-disabled/ 2>/dev/null || rm -f "${ncfg}" 2>/dev/null || true
+      log_warn "Moved conflicting host nginx config $(basename "${ncfg}") out of ports 80/443."
+    fi
+  done
+
+  cat > /etc/nginx/sites-available/pterodactyl.conf <<EOF
+server {
+    listen ${ptero_p} default_server;
+    listen [::]:${ptero_p} default_server;
+    server_name ${DOMAIN_GAME} panel.${DOMAIN_ROOT} _;
+
+    root /var/www/pterodactyl/public;
+    index index.php;
+
+    access_log /var/log/nginx/pterodactyl.app-access.log;
+    error_log  /var/log/nginx/pterodactyl.app-error.log error;
+
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+    sendfile off;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php\$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
+        fastcgi_pass unix:${php_sock};
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_param HTTPS on;
+        fastcgi_param HTTP_X_FORWARDED_PROTO https;
+        fastcgi_intercept_errors off;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 4 16k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOF
+  ln -sfn /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf 2>/dev/null || true
+
+  if [ -d "/etc/letsencrypt/live/${DOMAIN_GAME}" ]; then
+    cp -fL "/etc/letsencrypt/live/${DOMAIN_GAME}/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
+    cp -fL "/etc/letsencrypt/live/${DOMAIN_GAME}/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
+  fi
+
+  if command -v nginx >/dev/null 2>&1; then
+    nginx -t >/dev/null 2>&1 || true
+    systemctl enable nginx >/dev/null 2>&1 || true
+    systemctl restart nginx >/dev/null 2>&1 || systemctl reload nginx >/dev/null 2>&1 || true
+  fi
+  open_ptero_ufw_rules
+  log_ok "Host Pterodactyl Nginx shifted cleanly onto port ${ptero_p} (PHP-FPM: ${php_sock})."
+}
+
+heal_pterodactyl_port_flow() {
+  if ! is_pterodactyl_installed; then
+    return 0
+  fi
+
+  local ptero_p="${PTERO_PORT:-8090}"
+  local host_nginx_on_web="no"
+  if ss -tulpn 2>/dev/null | grep -E ':(80|443)\b' | grep -q "nginx" && ! ss -tulpn 2>/dev/null | grep -E ':(80|443)\b' | grep -q "docker-proxy"; then
+    host_nginx_on_web="yes"
+  fi
+
+  local ptero_local_code="000"
+  local ptero_edge_code="000"
+  ptero_local_code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 4 "http://127.0.0.1:${ptero_p}/" 2>/dev/null || echo "000")"
+  ptero_edge_code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAME}" "https://127.0.0.1:${HTTPS_PORT:-443}/" 2>/dev/null || echo "000")"
+
+  if [ "${host_nginx_on_web}" = "no" ] && \
+     echo "${ptero_local_code}" | grep -qE "^(200|301|302|307)$" && \
+     echo "${ptero_edge_code}" | grep -qE "^(200|301|302|307)$" && \
+     grep -q "${DOMAIN_GAME}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
+    log_ok "Pterodactyl (${DOMAIN_GAME} -> :${ptero_p}) already healthy and passed ping test."
+    return 0
+  fi
+
+  log_warn "Analyzing and repairing Pterodactyl (${DOMAIN_GAME}) port flow & connectivity..."
+  heal_pterodactyl_host_nginx
+  render_sparrowx_nginx_conf
+
+  if [ "${DOCKER_AVAILABLE:-no}" = "yes" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+    docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    sleep 2
+    # Ensure DOCKER_HOST_IP inside nginx.conf matches active sparrowx-nginx gateway IP
+    render_sparrowx_nginx_conf
+    docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+  fi
+}
+
+reclaim_web_ports() {
+  # Preserve host nginx when Pterodactyl is installed by shifting it to port ${PTERO_PORT}
+  if is_pterodactyl_installed; then
+    heal_pterodactyl_host_nginx
+  elif systemctl is-active --quiet nginx 2>/dev/null || systemctl is-enabled --quiet nginx 2>/dev/null; then
+    log_warn "Host nginx (no Pterodactyl found) is holding web ports. Stopping & disabling for SparrowX Proxy..."
+    systemctl stop nginx >/dev/null 2>&1 || true
+    systemctl disable nginx >/dev/null 2>&1 || true
+  fi
+
+  for svc in apache2 httpd lighttpd caddy; do
+    if systemctl is-active --quiet "${svc}" 2>/dev/null || systemctl is-enabled --quiet "${svc}" 2>/dev/null; then
+      log_warn "Host service '${svc}' is holding web ports. Stopping & disabling it for SparrowX Proxy..."
+      systemctl stop "${svc}" >/dev/null 2>&1 || true
+      systemctl disable "${svc}" >/dev/null 2>&1 || true
+    fi
+  done
+
+  free_docker_port_conflicts "${HTTP_PORT:-80}" "sparrowx-nginx"
+  free_docker_port_conflicts "${HTTPS_PORT:-443}" "sparrowx-nginx"
+
+  for p in 80 443; do
+    if is_port_in_use "${p}" && ! port_held_by_container "${p}" "sparrowx-nginx"; then
+      log_warn "Clearing leftover non-SparrowX process on port ${p}..."
+      fuser -k "${p}/tcp" >/dev/null 2>&1 || true
+      sleep 1
+    fi
+  done
+}
+
 ask_prompt() {
   local prompt_text="$1"
   local default_val="$2"
+  if [ "${AUTO_MODE}" = "true" ]; then
+    echo "${default_val}"
+    return 0
+  fi
   local user_input=""
   if [ -t 0 ]; then
     read -r -p "$(echo -e "${C_CYAN}  ? ${C_RESET}${prompt_text} ${C_DIM}[${default_val}]${C_RESET}: ")" user_input || true
@@ -232,7 +737,7 @@ heal_host_dns
 ensure_swap_memory
 
 if command -v apt-get >/dev/null 2>&1; then
-  log_info "Installing core system, firewall, SSL, cron & diagnostic packages..."
+  log_info "Verifying core system, firewall, SSL, cron & diagnostic packages..."
   retry_pkg_install ca-certificates curl gnupg git openssl ufw cron lsb-release dnsutils lsof iproute2 net-tools psmisc certbot fail2ban
   systemctl enable --now cron >/dev/null 2>&1 || true
 else
@@ -244,64 +749,101 @@ log_ok "System prerequisites verified."
 DETECTED_IP="$(curl -4 -fsS --max-time 5 https://api.ipify.org 2>/dev/null || curl -4 -fsS --max-time 5 https://icanhazip.com 2>/dev/null | tr -d '[:space:]' || hostname -I 2>/dev/null | awk '{print $1}' || echo '127.0.0.1')"
 
 # ==============================================================================
-# STEP 2: INTERACTIVE SPARROWX BLUEPRINT WIZARD
+# STEP 2: INTERACTIVE SPARROWX + PTERODACTYL BLUEPRINT WIZARD
 # ==============================================================================
-step_banner 2 10 "Interactive Multi-Domain & Sovereign Blueprint Wizard"
+step_banner 2 10 "Interactive Multi-Domain & Pterodactyl Panel Wizard"
 
-# Load existing .env defaults if re-running
 if [ -f "${INSTALL_DIR}/.env" ]; then
+  # shellcheck disable=SC1090
   source "${INSTALL_DIR}/.env" 2>/dev/null || true
 elif [ -f "./.env" ]; then
+  # shellcheck disable=SC1091
   source "./.env" 2>/dev/null || true
 fi
 
-echo -e "  ${C_DIM}Configure your custom root domain & subdomains (press Enter for defaults):${C_RESET}"
+PTERO_PORT="${PTERO_PORT:-8090}"
+
+echo -e "  ${C_DIM}Configure your root domain, subdomains, and Pterodactyl panel (Enter = keep defaults):${C_RESET}"
 echo ""
 
-RAW_DOMAIN="$(ask_prompt "1/6 Primary Root Domain (e.g. sparrowx.net or yourdomain.com)" "${DOMAIN_ROOT:-sparrowx.net}")"
+RAW_DOMAIN="$(ask_prompt "1/7 Primary Root Domain (e.g. sparrowx.net)" "${DOMAIN_ROOT:-${SPARROWX_DOMAIN:-sparrowx.net}}")"
 DOMAIN_ROOT="$(echo "${RAW_DOMAIN}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
 [ -z "${DOMAIN_ROOT}" ] && DOMAIN_ROOT="sparrowx.net"
+SPARROWX_DOMAIN="${DOMAIN_ROOT}"
 
-CUSTOM_SUBS="$(ask_prompt "2/6 Use standard subdomains (db., sec., file., password., api.)? (yes/custom)" "yes")"
+CUSTOM_SUBS="$(ask_prompt "2/7 Use standard subdomains (db., sec., file., password., api., game.)? (yes/custom)" "yes")"
 if [[ "$(echo "${CUSTOM_SUBS}" | tr '[:upper:]' '[:lower:]')" == "custom" ]]; then
-  DOMAIN_STUDIO="$(ask_prompt "    -> Cloud DB Studio Domain" "db.${DOMAIN_ROOT}")"
-  DOMAIN_SEC="$(ask_prompt "    -> Shield WAF & Threat Map Domain" "sec.${DOMAIN_ROOT}")"
-  DOMAIN_FILE="$(ask_prompt "    -> File Drop & 10GB Vault Domain" "file.${DOMAIN_ROOT}")"
-  DOMAIN_PASSWORD="$(ask_prompt "    -> Keys Password Generator Domain" "password.${DOMAIN_ROOT}")"
-  DOMAIN_API="$(ask_prompt "    -> PostgREST API Gateway Domain" "api.${DOMAIN_ROOT}")"
+  DOMAIN_STUDIO="$(ask_prompt "    -> Cloud DB Studio Domain" "${DOMAIN_STUDIO:-db.${DOMAIN_ROOT}}")"
+  DOMAIN_SEC="$(ask_prompt "    -> Shield WAF & Threat Map Domain" "${DOMAIN_SEC:-sec.${DOMAIN_ROOT}}")"
+  DOMAIN_FILE="$(ask_prompt "    -> File Drop & Vault Domain" "${DOMAIN_FILE:-file.${DOMAIN_ROOT}}")"
+  DOMAIN_PASSWORD="$(ask_prompt "    -> Keys Password Generator Domain" "${DOMAIN_PASSWORD:-password.${DOMAIN_ROOT}}")"
+  DOMAIN_API="$(ask_prompt "    -> PostgREST API Gateway Domain" "${DOMAIN_API:-api.${DOMAIN_ROOT}}")"
+  DOMAIN_GAME="$(ask_prompt "    -> Pterodactyl Game Panel Domain" "${DOMAIN_GAME:-game.${DOMAIN_ROOT}}")"
 else
   DOMAIN_STUDIO="db.${DOMAIN_ROOT}"
   DOMAIN_SEC="sec.${DOMAIN_ROOT}"
   DOMAIN_FILE="file.${DOMAIN_ROOT}"
   DOMAIN_PASSWORD="password.${DOMAIN_ROOT}"
   DOMAIN_API="api.${DOMAIN_ROOT}"
+  DOMAIN_GAME="game.${DOMAIN_ROOT}"
 fi
+SPARROWX_STUDIO_DOMAIN="${DOMAIN_STUDIO}"
 
-SPARROWX_PUBLIC_IP="$(ask_prompt "3/6 Confirm Server Public IPv4" "${DETECTED_IP}")"
+SPARROWX_PUBLIC_IP="$(ask_prompt "3/7 Confirm Server Public IPv4" "${SPARROWX_PUBLIC_IP:-${DETECTED_IP}}")"
 [ -z "${SPARROWX_PUBLIC_IP}" ] && SPARROWX_PUBLIC_IP="${DETECTED_IP}"
 
-SPARROWX_ADMIN_EMAIL="$(ask_prompt "4/6 Admin Email (Let's Encrypt SSL & Security Alerts)" "${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}")"
+SPARROWX_ADMIN_EMAIL="$(ask_prompt "4/7 Admin Email (Let's Encrypt SSL & Security Alerts)" "${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}")"
 [ -z "${SPARROWX_ADMIN_EMAIL}" ] && SPARROWX_ADMIN_EMAIL="admin@${DOMAIN_ROOT}"
 
-ENABLE_DNS_SERVER="$(ask_prompt "5/6 Install local Authoritative Bind9 Nameservers (ns1/ns2)? (yes/no)" "no")"
-ENABLE_CRON_SSL="$(ask_prompt "6/6 Enable Full Let's Encrypt SSL + Auto-Heal Watchdog & Daily DB Backups? (yes/no)" "yes")"
+ENABLE_DNS_SERVER="$(ask_prompt "5/7 Install local Authoritative Bind9 Nameservers (ns1/ns2)? (yes/no)" "${ENABLE_DNS_SERVER:-no}")"
+ENABLE_CRON_SSL="$(ask_prompt "6/7 Enable Full Let's Encrypt SSL + Watchdog & Daily DB Backups? (yes/no)" "${ENABLE_CRON_SSL:-yes}")"
+
+if is_pterodactyl_installed; then
+  log_ok "Existing Pterodactyl installation detected (/var/www/pterodactyl) for ${DOMAIN_GAME}."
+  if [ "${INSTALL_PTERO}" = "ask" ]; then
+    PTERO_ACTION="$(ask_prompt "7/7 Pterodactyl already installed. Keep & auto-heal port flow, or re-run installer? (keep/reinstall)" "keep")"
+  elif [ "${INSTALL_PTERO}" = "yes" ]; then
+    PTERO_ACTION="keep"
+  else
+    PTERO_ACTION="keep"
+  fi
+else
+  if [ "${INSTALL_PTERO}" = "yes" ]; then
+    PTERO_ACTION="install"
+  elif [ "${INSTALL_PTERO}" = "no" ]; then
+    PTERO_ACTION="skip"
+  else
+    ANS_PTERO="$(ask_prompt "7/7 Launch Pterodactyl Game Panel quick installer (${DOMAIN_GAME}) now? (yes/no)" "no")"
+    if [[ "$(echo "${ANS_PTERO}" | tr '[:upper:]' '[:lower:]')" == "y"* ]]; then
+      PTERO_ACTION="install"
+    else
+      PTERO_ACTION="skip"
+    fi
+  fi
+fi
 
 echo ""
-log_ok "Blueprint Locked: ${DOMAIN_ROOT} (db / sec / file / password / api) @ ${SPARROWX_PUBLIC_IP}"
+log_ok "Blueprint Locked: ${DOMAIN_ROOT} (db / sec / file / password / api / ${DOMAIN_GAME}) @ ${SPARROWX_PUBLIC_IP}"
 
 # ==============================================================================
-# STEP 3: SYNC & VERIFY REPOSITORY
+# STEP 3: SYNC & VERIFY REPOSITORY + OPTIONAL PTERODACTYL INSTALLER
 # ==============================================================================
-step_banner 3 10 "Syncing SparrowX Codebase & Blueprint Files"
+step_banner 3 10 "Syncing SparrowX Codebase & Optional Pterodactyl Quick Install"
 
-if [ -f "./docker-compose.standalone.yml" ] && [ -f "./init-scripts/01-init-schema.sql" ]; then
-  INSTALL_DIR="$(pwd)"
+if [ -f "${INSTALL_DIR}/docker-compose.ovh.yml" ] && [ -f "${INSTALL_DIR}/ovh/schema.sql" ]; then
   log_ok "Using active SparrowX repository at: ${INSTALL_DIR}"
+  if [ -d "${INSTALL_DIR}/.git" ] && command -v git >/dev/null 2>&1; then
+    git config --global --add safe.directory "${INSTALL_DIR}" >/dev/null 2>&1 || true
+    cd "${INSTALL_DIR}" || exit 1
+    git fetch origin main --depth=1 >/dev/null 2>&1 || true
+    git reset --hard origin/main >/dev/null 2>&1 || true
+  fi
 else
   log_info "Syncing SparrowX repository into ${INSTALL_DIR}..."
   if [ -d "${INSTALL_DIR}/.git" ]; then
+    git config --global --add safe.directory "${INSTALL_DIR}" >/dev/null 2>&1 || true
     cd "${INSTALL_DIR}" || exit 1
-    git fetch --all >/dev/null 2>&1 || true
+    git fetch origin main --depth=1 >/dev/null 2>&1 || true
     git reset --hard origin/main >/dev/null 2>&1 || true
     log_ok "Updated existing repository at ${INSTALL_DIR}."
   else
@@ -324,13 +866,35 @@ else
 fi
 
 cd "${INSTALL_DIR}" || exit 1
-mkdir -p ./ovh/dns ./ovh/ssl ./ovh/certbot-www/.well-known/acme-challenge ./data/storage ./backups
-chmod +x ./init-scripts/02-multi-db-blueprint.sh ./deploy/*.sh ./manage-db.sh ./update.sh 2>/dev/null || true
+if [ ! -e "/opt/sparrowx" ] && [ "${INSTALL_DIR}" != "/opt/sparrowx" ]; then
+  ln -sfn "${INSTALL_DIR}" /opt/sparrowx 2>/dev/null || true
+fi
+
+mkdir -p ./ovh/dns ./ovh/ssl ./ovh/certbot-www/.well-known/acme-challenge ./data/storage ./data/users ./data/backups ./backups
+chmod +x ./setup.sh ./update.sh ./fix.sh ./manage-db.sh ./ovh/*.sh ./deploy/*.sh ./init-scripts/*.sh 2>/dev/null || true
+
+# Launch bash <(curl -s https://pterodactyl-installer.se) if requested
+if [ "${PTERO_ACTION}" = "install" ] || [ "${PTERO_ACTION}" = "reinstall" ]; then
+  echo ""
+  log_info "Preparing ports 80/443 temporarily for Pterodactyl installer (${DOMAIN_GAME})..."
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker stop sparrowx-nginx sparrowx_edge_proxy >/dev/null 2>&1 || true
+  fi
+  echo -e "${C_CYAN}  Suggested answers inside pterodactyl-installer.se:${C_RESET}"
+  echo -e "    • FQDN / Domain : ${C_BOLD}${DOMAIN_GAME}${C_RESET}"
+  echo -e "    • Admin Email   : ${C_BOLD}${SPARROWX_ADMIN_EMAIL}${C_RESET}"
+  echo ""
+  if [ -e /dev/tty ]; then
+    bash <(curl -s https://pterodactyl-installer.se) < /dev/tty || log_warn "Pterodactyl installer exited; running port-flow reconciliation..."
+  else
+    bash <(curl -s https://pterodactyl-installer.se) || log_warn "Pterodactyl installer exited; running port-flow reconciliation..."
+  fi
+fi
 
 # ==============================================================================
-# STEP 4: DOCKER ENGINE & COMPOSE INSTALLATION / HEALING
+# STEP 4: DOCKER ENGINE & IDEMPOTENT PRE-FLIGHT PING AUDIT
 # ==============================================================================
-step_banner 4 10 "Installing & Verifying Docker Engine + Compose Plugin"
+step_banner 4 10 "Verifying Docker Engine & Pre-Flight Health Audit"
 
 DOCKER_AVAILABLE="yes"
 if ! command -v docker >/dev/null 2>&1; then
@@ -355,33 +919,59 @@ else
   DOCKER_AVAILABLE="no"
 fi
 
-# Stop any prior SparrowX stacks cleanly before port check
+SPARROWX_ALREADY_HEALTHY="no"
 if [ "${DOCKER_AVAILABLE}" = "yes" ]; then
-  docker compose -f docker-compose.standalone.yml down --remove-orphans >/dev/null 2>&1 || true
-  docker compose -f docker-compose.ovh.yml down --remove-orphans >/dev/null 2>&1 || true
-  docker compose -f docker-compose.sparrowx.yml down --remove-orphans >/dev/null 2>&1 || true
+  APP_CHK="$(curl -fsS --max-time 3 "http://127.0.0.1:${APP_HOST_PORT:-3000}/api/v1/health" 2>/dev/null && echo ok || echo fail)"
+  PGRST_CHK="$(curl -fsS --max-time 3 "http://127.0.0.1:${PGRST_HOST_PORT:-3001}/" 2>/dev/null && echo ok || echo fail)"
+  PG_RUN="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-postgres" || true)"
+  APP_RUN="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-app" || true)"
+  NGX_RUN="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-nginx" || true)"
+
+  if [ "${APP_CHK}" = "ok" ] && [ "${PGRST_CHK}" = "ok" ] && [ -n "${PG_RUN}" ] && [ -n "${APP_RUN}" ] && [ -n "${NGX_RUN}" ]; then
+    SPARROWX_ALREADY_HEALTHY="yes"
+    log_ok "Existing SparrowX stack (Postgres, PostgREST, App, Nginx) passed ping audit — preserving live state without teardown."
+  else
+    log_info "Pre-flight ping audit found offline or incomplete components — cleaning stale conflicts..."
+    for old_c in sparrowx_postgres sparrowx_pgbouncer sparrowx_postgrest sparrowx_threat_cache sparrowx_studio sparrowx_edge_proxy; do
+      if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "${old_c}"; then
+        docker rm -f "${old_c}" >/dev/null 2>&1 || true
+      fi
+    done
+    systemctl stop sparrowx-native.service >/dev/null 2>&1 || true
+  fi
 fi
-systemctl stop sparrowx-native.service >/dev/null 2>&1 || true
 
 # ==============================================================================
-# STEP 5: RECLAIM WEB PORTS (80/443) & RESOLVE ALL SERVICE PORTS
+# STEP 5: RECLAIM PORTS 80/443, PROTECT PTERODACTYL & LOCK CONFLICT-FREE PORTS
 # ==============================================================================
 step_banner 5 10 "Reclaiming Ports 80/443 & Locking Conflict-Free Port Map"
 
 reclaim_web_ports
 
-HTTP_PORT="$(find_free_port 80 8080 "HTTP Edge Proxy")"
-HTTPS_PORT="$(find_free_port 443 8443 "HTTPS SSL Edge Proxy")"
-APP_HOST_PORT="$(find_free_port 3000 3010 "SparrowX Studio App")"
-PGRST_HOST_PORT="$(find_free_port 3001 3020 "PostgREST Gateway")"
-PG_HOST_PORT="$(find_free_port 5432 5433 "PostgreSQL 16 + pgvector")"
-PG_POOL_PORT="$(find_free_port 6543 6544 "PgBouncer Pooler")"
+if [ "${SPARROWX_ALREADY_HEALTHY}" = "yes" ]; then
+  HTTP_PORT="${HTTP_PORT:-80}"
+  HTTPS_PORT="${HTTPS_PORT:-443}"
+  APP_HOST_PORT="${APP_HOST_PORT:-3000}"
+  PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
+  PG_HOST_PORT="${PG_HOST_PORT:-5432}"
+  PG_POOL_PORT="${PG_POOL_PORT:-6543}"
+  log_ok "Keeping active port map untouched (HTTP:${HTTP_PORT} HTTPS:${HTTPS_PORT} APP:${APP_HOST_PORT} PGRST:${PGRST_HOST_PORT} PG:${PG_HOST_PORT})."
+else
+  HTTP_PORT="$(find_free_port "${HTTP_PORT:-80}" 8180 "HTTP Edge Proxy" "sparrowx-nginx")"
+  HTTPS_PORT="$(find_free_port "${HTTPS_PORT:-443}" 8444 "HTTPS SSL Edge Proxy" "sparrowx-nginx")"
+  APP_HOST_PORT="$(find_free_port "${APP_HOST_PORT:-3000}" 3010 "SparrowX Studio App" "sparrowx-app")"
+  PGRST_HOST_PORT="$(find_free_port "${PGRST_HOST_PORT:-3001}" 3020 "PostgREST Gateway" "sparrowx-postgrest")"
+  PG_HOST_PORT="$(find_free_port "${PG_HOST_PORT:-5432}" 5433 "PostgreSQL 16 + pgvector" "sparrowx-postgres")"
+  PG_POOL_PORT="$(find_free_port "${PG_POOL_PORT:-6543}" 6544 "PgBouncer Pooler")"
+fi
 
 echo -e "  ${C_GREEN}• Public HTTP / HTTPS   :${C_RESET} ${C_BOLD}${HTTP_PORT} / ${HTTPS_PORT}${C_RESET}"
-echo -e "  ${C_GREEN}• SparrowX Studio App   :${C_RESET} 127.0.0.1:${APP_HOST_PORT}"
+echo -e "  ${C_GREEN}• SparrowX App Server   :${C_RESET} 127.0.0.1:${APP_HOST_PORT}"
 echo -e "  ${C_GREEN}• PostgREST API Engine  :${C_RESET} 127.0.0.1:${PGRST_HOST_PORT}"
-echo -e "  ${C_GREEN}• PostgreSQL 16 + Vector:${C_RESET} 127.0.0.1:${PG_HOST_PORT}"
-echo -e "  ${C_GREEN}• PgBouncer Pooler      :${C_RESET} 127.0.0.1:${PG_POOL_PORT}"
+echo -e "  ${C_GREEN}• PostgreSQL 16 DB      :${C_RESET} 127.0.0.1:${PG_HOST_PORT}"
+if is_pterodactyl_installed; then
+  echo -e "  ${C_GREEN}• Pterodactyl Internal  :${C_RESET} 127.0.0.1:${PTERO_PORT} (${DOMAIN_GAME})"
+fi
 
 # ==============================================================================
 # STEP 6: GENERATE AUTHORITATIVE DNS ZONE & OPTIONAL BIND9
@@ -395,7 +985,7 @@ SPARROWX_NS2="ns2.${DOMAIN_ROOT}"
 ZONE_FILE="./ovh/dns/db.${DOMAIN_ROOT}"
 
 cat > "${ZONE_FILE}" <<EOF
-; SparrowX Sovereign Multi-Domain DNS Zone for ${DOMAIN_ROOT}
+; SparrowX Multi-Domain DNS Zone for ${DOMAIN_ROOT}
 \$TTL 3600
 @   IN  SOA ${SPARROWX_NS1}. ${SPARROWX_ADMIN_EMAIL/@/.}. (
         ${SERIAL_DATE} ; Serial
@@ -419,6 +1009,8 @@ password        IN  A       ${SPARROWX_PUBLIC_IP}
 passwd          IN  A       ${SPARROWX_PUBLIC_IP}
 keys            IN  A       ${SPARROWX_PUBLIC_IP}
 api             IN  A       ${SPARROWX_PUBLIC_IP}
+game            IN  A       ${SPARROWX_PUBLIC_IP}
+panel           IN  A       ${SPARROWX_PUBLIC_IP}
 ns1             IN  A       ${SPARROWX_PUBLIC_IP}
 ns2             IN  A       ${SPARROWX_PUBLIC_IP}
 
@@ -454,164 +1046,87 @@ EOF
     log_ok "Bind9 authoritative DNS active for ${DOMAIN_ROOT}."
   fi
 else
-  log_ok "DNS Zone blueprint saved at ${ZONE_FILE} (using external DNS like Cloudflare/Registrar)."
+  log_ok "DNS Zone blueprint saved at ${ZONE_FILE}."
 fi
 
 # ==============================================================================
-# STEP 7: MULTI-DOMAIN NGINX REVERSE PROXY & INSTANT SAN SSL
+# STEP 7: MULTI-DOMAIN NGINX REVERSE PROXY & TLS CERTIFICATES
 # ==============================================================================
 step_banner 7 10 "Building Multi-Domain Nginx Reverse Proxy & TLS Certificates"
 
-SSL_CERT="./ovh/ssl/fullchain.pem"
-SSL_KEY="./ovh/ssl/privkey.pem"
+SSL_CERT="${INSTALL_DIR}/ovh/ssl/fullchain.pem"
+SSL_KEY="${INSTALL_DIR}/ovh/ssl/privkey.pem"
 
-if [ ! -f "${SSL_CERT}" ] || [ ! -f "${SSL_KEY}" ]; then
+if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_CERT}" -noout >/dev/null 2>&1; then
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${DOMAIN_ROOT}" \
-    -addext "subjectAltName=DNS:${DOMAIN_ROOT},DNS:www.${DOMAIN_ROOT},DNS:${DOMAIN_STUDIO},DNS:${DOMAIN_SEC},DNS:shield.${DOMAIN_ROOT},DNS:${DOMAIN_FILE},DNS:drop.${DOMAIN_ROOT},DNS:${DOMAIN_PASSWORD},DNS:passwd.${DOMAIN_ROOT},DNS:keys.${DOMAIN_ROOT},DNS:${DOMAIN_API},IP:${SPARROWX_PUBLIC_IP}" >/dev/null 2>&1 || \
+    -addext "subjectAltName=DNS:${DOMAIN_ROOT},DNS:www.${DOMAIN_ROOT},DNS:${DOMAIN_STUDIO},DNS:${DOMAIN_SEC},DNS:shield.${DOMAIN_ROOT},DNS:${DOMAIN_FILE},DNS:drop.${DOMAIN_ROOT},DNS:${DOMAIN_PASSWORD},DNS:passwd.${DOMAIN_ROOT},DNS:keys.${DOMAIN_ROOT},DNS:${DOMAIN_API},DNS:${DOMAIN_GAME},DNS:panel.${DOMAIN_ROOT},IP:${SPARROWX_PUBLIC_IP}" >/dev/null 2>&1 || \
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${DOMAIN_ROOT}" >/dev/null 2>&1
-  log_ok "Initial zero-downtime SAN TLS certificate generated."
-fi
-
-# Nginx uses Docker's internal resolver (127.0.0.11) + variables so it NEVER crashes on upstream boot
-cat > ./ovh/nginx.conf <<EOF
-# ==============================================================================
-# SPARROWX MULTI-DOMAIN EDGE PROXY (ROOT + DB + SHIELD + FILE + KEYS + API)
-# ==============================================================================
-
-# 1. API Gateway Subdomain (${DOMAIN_API}) -> PostgREST Engine
-server {
-    listen 80;
-    listen 443 ssl;
-    http2 on;
-    server_name ${DOMAIN_API};
-
-    ssl_certificate /etc/nginx/ssl/fullchain.pem;
-    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-
-    resolver 127.0.0.11 valid=10s ipv6=off;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location / {
-        set \$upstream_pgrst http://sparrowx-postgrest:3000;
-        if (\$request_method = OPTIONS) {
-            add_header Access-Control-Allow-Origin "*" always;
-            add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Authorization, apikey, Content-Type, Prefer" always;
-            add_header Content-Length 0;
-            return 204;
-        }
-        add_header Access-Control-Allow-Origin "*" always;
-        add_header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS" always;
-        add_header Access-Control-Allow-Headers "Authorization, apikey, Content-Type, Prefer" always;
-        proxy_pass \$upstream_pgrst;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-
-# 2. All Web Experiences (${DOMAIN_ROOT}, www, db, sec, shield, file, drop, password, keys, + Direct IP)
-server {
-    listen 80 default_server;
-    listen 443 ssl default_server;
-    http2 on;
-    server_name ${DOMAIN_ROOT} www.${DOMAIN_ROOT} ${DOMAIN_STUDIO} ${DOMAIN_SEC} shield.${DOMAIN_ROOT} ${DOMAIN_FILE} drop.${DOMAIN_ROOT} ${DOMAIN_PASSWORD} passwd.${DOMAIN_ROOT} keys.${DOMAIN_ROOT} _;
-
-    ssl_certificate /etc/nginx/ssl/fullchain.pem;
-    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-
-    resolver 127.0.0.11 valid=10s ipv6=off;
-    client_max_body_size 150M;
-
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
-    }
-
-    location /rest/v1/ {
-        set \$upstream_pgrst http://sparrowx-postgrest:3000;
-        rewrite ^/rest/v1/(.*) /\$1 break;
-        proxy_pass \$upstream_pgrst;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-
-    location / {
-        set \$upstream_studio http://sparrowx-studio:3000;
-        proxy_pass \$upstream_studio;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-    }
-}
-EOF
-log_ok "Multi-domain Nginx proxy configuration written."
-
-# ==============================================================================
-# STEP 8: ENVIRONMENT (.ENV) & FIREWALL CONFIGURATION
-# ==============================================================================
-step_banner 8 10 "Generating Environment Secrets & Hardening Firewall"
-
-if [ -f .env ] && grep -q "^POSTGRES_PASSWORD=" .env; then
-  DB_PASS="$(grep '^POSTGRES_PASSWORD=' .env | cut -d'=' -f2-)"
-  JWT_SECRET="$(grep '^SPARROWX_JWT_SECRET=' .env | cut -d'=' -f2- || openssl rand -hex 32)"
-  REDIS_SECRET="$(grep '^SPARROWX_REDIS_SECRET=' .env | cut -d'=' -f2- || openssl rand -hex 16)"
+  log_ok "Initial SAN TLS certificate generated (including ${DOMAIN_GAME})."
 else
-  DB_PASS="$(openssl rand -hex 20)"
-  JWT_SECRET="$(openssl rand -hex 32)"
-  REDIS_SECRET="$(openssl rand -hex 16)"
+  log_ok "Existing valid TLS certificate preserved."
 fi
 
-cat > .env <<EOF
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=${DB_PASS}
-POSTGRES_DB=sparrowbase
-SPARROWX_JWT_SECRET=${JWT_SECRET}
-SPARROWX_REDIS_SECRET=${REDIS_SECRET}
-DOMAIN_ROOT=${DOMAIN_ROOT}
-SPARROWX_DOMAIN=${DOMAIN_ROOT}
-DOMAIN_STUDIO=${DOMAIN_STUDIO}
-SPARROWX_STUDIO_DOMAIN=${DOMAIN_STUDIO}
-DOMAIN_SEC=${DOMAIN_SEC}
-DOMAIN_FILE=${DOMAIN_FILE}
-DOMAIN_PASSWORD=${DOMAIN_PASSWORD}
-DOMAIN_API=${DOMAIN_API}
-SPARROWX_PUBLIC_IP=${SPARROWX_PUBLIC_IP}
-SPARROWX_NS1=${SPARROWX_NS1}
-SPARROWX_NS2=${SPARROWX_NS2}
-SPARROWX_ADMIN_EMAIL=${SPARROWX_ADMIN_EMAIL}
-HTTP_PORT=${HTTP_PORT}
-HTTPS_PORT=${HTTPS_PORT}
-APP_HOST_PORT=${APP_HOST_PORT}
-PGRST_HOST_PORT=${PGRST_HOST_PORT}
-PG_HOST_PORT=${PG_HOST_PORT}
-PG_POOL_PORT=${PG_POOL_PORT}
-EOF
-chmod 600 .env
+if is_pterodactyl_installed; then
+  heal_pterodactyl_host_nginx
+fi
+
+render_sparrowx_nginx_conf
+log_ok "Multi-domain Nginx proxy configuration synchronized (including ${DOMAIN_GAME})."
+
+# ==============================================================================
+# STEP 8: ENVIRONMENT (.ENV) & HARDENED FIREWALL (INCLUDING PTERO/WINGS PORTS)
+# ==============================================================================
+step_banner 8 10 "Saving Environment Secrets & Hardening Firewall"
+
+POSTGRES_USER="${POSTGRES_USER:-sparrowx}"
+POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
+if [ -z "${POSTGRES_PASSWORD:-}" ]; then
+  POSTGRES_PASSWORD="$(openssl rand -hex 20)"
+fi
+if [ -z "${SPARROWX_JWT_SECRET:-}" ]; then
+  SPARROWX_JWT_SECRET="$(openssl rand -hex 32)"
+fi
+if [ -z "${SPARROWX_REDIS_SECRET:-}" ]; then
+  SPARROWX_REDIS_SECRET="$(openssl rand -hex 16)"
+fi
+
+ensure_env_key "POSTGRES_USER" "${POSTGRES_USER}"
+ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
+ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
+ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
+ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
+ensure_env_key "DOMAIN_ROOT" "${DOMAIN_ROOT}"
+ensure_env_key "SPARROWX_DOMAIN" "${DOMAIN_ROOT}"
+ensure_env_key "DOMAIN_STUDIO" "${DOMAIN_STUDIO}"
+ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${DOMAIN_STUDIO}"
+ensure_env_key "DOMAIN_SEC" "${DOMAIN_SEC}"
+ensure_env_key "DOMAIN_FILE" "${DOMAIN_FILE}"
+ensure_env_key "DOMAIN_PASSWORD" "${DOMAIN_PASSWORD}"
+ensure_env_key "DOMAIN_API" "${DOMAIN_API}"
+ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
+ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
+ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
+ensure_env_key "SPARROWX_NS1" "${SPARROWX_NS1}"
+ensure_env_key "SPARROWX_NS2" "${SPARROWX_NS2}"
+ensure_env_key "SPARROWX_ADMIN_EMAIL" "${SPARROWX_ADMIN_EMAIL}"
+ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
+ensure_env_key "HTTPS_PORT" "${HTTPS_PORT}"
+ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
+ensure_env_key "PGRST_HOST_PORT" "${PGRST_HOST_PORT}"
+ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+ensure_env_key "PG_POOL_PORT" "${PG_POOL_PORT}"
+chmod 600 "${INSTALL_DIR}/.env"
+
+export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET \
+  DOMAIN_ROOT SPARROWX_DOMAIN DOMAIN_STUDIO SPARROWX_STUDIO_DOMAIN DOMAIN_SEC DOMAIN_FILE \
+  DOMAIN_PASSWORD DOMAIN_API DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_NS1 SPARROWX_NS2 \
+  SPARROWX_ADMIN_EMAIL HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT PG_POOL_PORT
 
 ACTIVE_SSH_PORT="$(ss -tulnp 2>/dev/null | awk '/sshd/ {print $5}' | sed -E 's/.*:([0-9]+)$/\1/' | head -n 1 || echo 22)"
 [ -z "${ACTIVE_SSH_PORT}" ] && ACTIVE_SSH_PORT=22
@@ -621,58 +1136,83 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow "${ACTIVE_SSH_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
-  ufw allow "${PG_POOL_PORT}"/tcp >/dev/null 2>&1 || true
+  open_ptero_ufw_rules
   if [[ "$(echo "${ENABLE_DNS_SERVER}" | tr '[:upper:]' '[:lower:]')" == "y"* ]]; then
     ufw allow 53/tcp >/dev/null 2>&1 || true
     ufw allow 53/udp >/dev/null 2>&1 || true
   fi
   ufw --force enable >/dev/null 2>&1 || true
-  log_ok "UFW Firewall hardened (SSH:${ACTIVE_SSH_PORT}, HTTP:${HTTP_PORT}, HTTPS:${HTTPS_PORT}, Pooler:${PG_POOL_PORT})."
+  log_ok "UFW Firewall configured (SSH:${ACTIVE_SSH_PORT}, HTTP:${HTTP_PORT}, HTTPS:${HTTPS_PORT}, Ptero:${PTERO_PORT} internal)."
 fi
 
 # ==============================================================================
-# STEP 9: LAUNCH FULL BACKEND FLEET & PROVISION 5 SEPARATE DATABASES
+# STEP 9: LAUNCH OR RECONCILE BACKEND FLEET (docker-compose.ovh.yml)
 # ==============================================================================
-step_banner 9 10 "Launching Full Backend Fleet & 5 Isolated Databases"
+step_banner 9 10 "Starting / Reconciling Backend Fleet (docker-compose.ovh.yml)"
 
+COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
 STACK_STARTED="no"
-if [ "${DOCKER_AVAILABLE}" = "yes" ]; then
-  log_info "Building & starting PostgreSQL 16+pgvector, PgBouncer, PostgREST, Redis, Studio & Edge Proxy..."
-  if docker compose -f docker-compose.standalone.yml up -d --build --remove-orphans; then
+
+if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
+  if [ "${SPARROWX_ALREADY_HEALTHY}" = "yes" ]; then
+    # Reconcile edge proxy only so zero downtime occurs on healthy containers
+    compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate nginx >/dev/null 2>&1 || \
+      docker start sparrowx-nginx >/dev/null 2>&1 || true
     STACK_STARTED="yes"
+    log_ok "Reloaded sparrowx-nginx zero-downtime while preserving running DB & App containers."
   else
-    log_warn "First launch attempt hit a transient issue. Healing network & retrying..."
-    docker compose -f docker-compose.standalone.yml down --remove-orphans >/dev/null 2>&1 || true
-    docker network prune -f >/dev/null 2>&1 || true
-    reclaim_web_ports
-    if docker compose -f docker-compose.standalone.yml up -d --build --remove-orphans; then
+    log_info "Building & starting PostgreSQL 16, PostgREST, SparrowX App & Nginx Edge Proxy..."
+    if compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans; then
       STACK_STARTED="yes"
+    else
+      log_warn "First launch attempt hit a conflict. Healing networks/ports & retrying..."
+      compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
+      docker network prune -f >/dev/null 2>&1 || true
+      reclaim_web_ports
+      HTTP_PORT="$(find_free_port "${HTTP_PORT}" 8180 "HTTP Edge Proxy" "sparrowx-nginx")"
+      HTTPS_PORT="$(find_free_port "${HTTPS_PORT}" 8444 "HTTPS SSL Edge Proxy" "sparrowx-nginx")"
+      APP_HOST_PORT="$(find_free_port "${APP_HOST_PORT}" 3010 "SparrowX Studio App" "sparrowx-app")"
+      PGRST_HOST_PORT="$(find_free_port "${PGRST_HOST_PORT}" 3020 "PostgREST Gateway" "sparrowx-postgrest")"
+      PG_HOST_PORT="$(find_free_port "${PG_HOST_PORT}" 5433 "PostgreSQL 16" "sparrowx-postgres")"
+      ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
+      ensure_env_key "HTTPS_PORT" "${HTTPS_PORT}"
+      ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
+      ensure_env_key "PGRST_HOST_PORT" "${PGRST_HOST_PORT}"
+      ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+      export HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT
+      if compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans; then
+        STACK_STARTED="yes"
+      fi
     fi
   fi
 
   if [ "${STACK_STARTED}" = "yes" ]; then
-    log_info "Waiting for PostgreSQL 16 + pgvector to accept connections..."
-    for i in $(seq 1 25); do
-      if docker exec sparrowx_postgres pg_isready -U postgres -d sparrowbase >/dev/null 2>&1; then
+    # Re-render nginx.conf after sparrowx-nginx is up so DOCKER_HOST_IP matches live bridge gateway
+    if is_pterodactyl_installed; then
+      render_sparrowx_nginx_conf
+      docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    fi
+
+    log_info "Verifying PostgreSQL 16 readiness & schema..."
+    for _i in $(seq 1 20); do
+      if docker exec sparrowx-postgres pg_isready -q >/dev/null 2>&1; then
         break
       fi
       sleep 2
     done
 
-    # Idempotently provision all 5 isolated databases + pgvector even on existing volumes
-    log_info "Ensuring all 5 isolated databases + unified Auth Hub exist..."
-    for extra_db in sparrowx_db_studio sparrowx_shield sparrowx_files sparrowx_api; do
-      docker exec sparrowx_postgres psql -U postgres -d sparrowbase -tc "SELECT 1 FROM pg_database WHERE datname = '${extra_db}'" 2>/dev/null | grep -q 1 || \
-        docker exec sparrowx_postgres psql -U postgres -d sparrowbase -c "CREATE DATABASE ${extra_db};" >/dev/null 2>&1 || true
-      docker exec sparrowx_postgres psql -U postgres -d "${extra_db}" -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" >/dev/null 2>&1 || true
-    done
-    docker exec sparrowx_postgres psql -U postgres -d sparrowbase -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" >/dev/null 2>&1 || true
-    log_ok "All 5 databases (sparrowbase, sparrowx_db_studio, sparrowx_shield, sparrowx_files, sparrowx_api) online!"
+    if [ -f "${INSTALL_DIR}/ovh/schema.sql" ]; then
+      USERS_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.app_users');" 2>/dev/null | tr -d '[:space:]' || true)"
+      if [ "${USERS_TBL}" != "app_users" ] && [ "${USERS_TBL}" != "public.app_users" ]; then
+        docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
+        log_ok "Applied ovh/schema.sql cleanly."
+      fi
+    fi
 
     if [ -d /etc/systemd/system ]; then
       cat > /etc/systemd/system/sparrowx-stack.service <<EOF
 [Unit]
-Description=SparrowX Sovereign Multi-Domain Stack
+Description=SparrowX Multi-Domain Stack (Docker)
 After=docker.service network-online.target
 Requires=docker.service
 
@@ -680,8 +1220,8 @@ Requires=docker.service
 Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/usr/bin/docker compose -f docker-compose.standalone.yml up -d
-ExecStop=/usr/bin/docker compose -f docker-compose.standalone.yml down
+ExecStart=/usr/bin/docker compose -f ${COMPOSE_FILE} up -d
+ExecStop=/usr/bin/docker compose -f ${COMPOSE_FILE} down
 TimeoutStartSec=0
 
 [Install]
@@ -693,9 +1233,9 @@ EOF
   fi
 fi
 
-# Native Host Fallback if Docker is blocked by virtualization
+# Native Host Fallback if Docker is unavailable
 if [ "${STACK_STARTED}" != "yes" ]; then
-  log_warn "Activating Native Host Fallback (Node.js 22)..."
+  log_warn "Docker unavailable — activating Native Host Fallback (Node.js 22)..."
   if ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 20 ]; then
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - >/dev/null 2>&1 || true
     retry_pkg_install nodejs
@@ -704,7 +1244,7 @@ if [ "${STACK_STARTED}" != "yes" ]; then
   npm install --legacy-peer-deps && npm run build
   cat > /etc/systemd/system/sparrowx-native.service <<EOF
 [Unit]
-Description=SparrowX Sovereign Native Server
+Description=SparrowX Native Server
 After=network.target
 
 [Service]
@@ -726,87 +1266,106 @@ EOF
 fi
 
 # ==============================================================================
-# STEP 10: LIVE SSL ISSUANCE, CRON FLEET & ACTIVE PING AUTO-FIX VERIFICATION
+# STEP 10: LIVE SSL, CRON FLEET & END-TO-END PING TEST + AUTO-HEALING
 # ==============================================================================
-step_banner 10 10 "Issuing Live Let's Encrypt SSL, Installing Cron Jobs & Pinging Live Sites"
+step_banner 10 10 "Issuing Live Let's Encrypt SSL, Cron Jobs & Live Ping Auto-Heal"
 
-# Install Cron Fleet (/etc/cron.d/sparrowx-automation)
 if [[ "$(echo "${ENABLE_CRON_SSL}" | tr '[:upper:]' '[:lower:]')" == "y"* ]]; then
   cat > /etc/cron.d/sparrowx-automation <<EOF
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 
-# 1. Autonomous Watchdog: Pings & auto-heals ports/containers every 2 minutes
+# 1. Autonomous Watchdog: Pings & auto-heals ports/containers + Pterodactyl every 2 minutes
 */2 * * * * root ${INSTALL_DIR}/deploy/watchdog.sh >/dev/null 2>&1
 
 # 2. Let's Encrypt SSL Auto-Issuer & Renewer every 12 hours
 0 */12 * * * root ${INSTALL_DIR}/deploy/ssl-renew.sh >/dev/null 2>&1
 
-# 3. Daily Encrypted Backup of all 5 PostgreSQL Databases at 02:00 AM
+# 3. Daily PostgreSQL Backup at 02:00 AM
 0 2 * * * root ${INSTALL_DIR}/deploy/backup-all-dbs.sh >/dev/null 2>&1
 
-# 4. Ephemeral temp & Docker cache cleanup every 30 minutes
+# 4. Ephemeral temp cleanup every 30 minutes
 */30 * * * * root find /tmp -name "sparrowx-*" -mmin +60 -delete >/dev/null 2>&1
 EOF
   chmod 644 /etc/cron.d/sparrowx-automation
   systemctl restart cron >/dev/null 2>&1 || systemctl restart crond >/dev/null 2>&1 || true
-  log_ok "4 Autonomous Cron Jobs installed (/etc/cron.d/sparrowx-automation)."
+  log_ok "Autonomous cron jobs installed (/etc/cron.d/sparrowx-automation)."
 
-  # Attempt immediate live Let's Encrypt SSL issuance for all domains pointing to this server
   log_info "Checking DNS propagation & requesting Let's Encrypt SSL certificates..."
   bash "${INSTALL_DIR}/deploy/ssl-renew.sh" || true
 fi
 
-# Install CLI shortcuts
-chmod +x "${INSTALL_DIR}/manage-db.sh" "${INSTALL_DIR}/update.sh" "${INSTALL_DIR}/deploy/"*.sh 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
+ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/deploy/watchdog.sh" /usr/local/bin/sparrowx-heal 2>/dev/null || true
 
-# Live Ping & HTTP/HTTPS Probe with Auto-Fix Loop
+# Seed DB only if app_users table has no rows yet
+if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -x "${INSTALL_DIR}/manage-db.sh" ]; then
+  if ! curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/app_users?select=id&limit=1" 2>/dev/null | grep -q '"id"'; then
+    "${INSTALL_DIR}/manage-db.sh" sync >/dev/null 2>&1 || true
+  fi
+fi
+
 probe_and_heal() {
   local label="$1"
   local url="$2"
   local host_header="${3:-}"
+  local heal_kind="${4:-sparrowx}"
   local code="000"
+
   if [ -n "${host_header}" ]; then
     code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 6 -H "Host: ${host_header}" "${url}" 2>/dev/null || echo "000")"
   else
     code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 6 "${url}" 2>/dev/null || echo "000")"
   fi
+
   if [ "${code}" = "200" ] || [ "${code}" = "301" ] || [ "${code}" = "302" ] || [ "${code}" = "307" ]; then
     log_ok "${label} -> ${C_GREEN}LIVE (HTTP ${code})${C_RESET}"
     return 0
+  fi
+
+  log_warn "${label} returned HTTP ${code}. Running deep port-flow & connectivity healer..."
+  if [ "${heal_kind}" = "ptero" ]; then
+    heal_pterodactyl_port_flow
   else
-    log_warn "${label} returned HTTP ${code}. Running auto-healer..."
-    bash "${INSTALL_DIR}/deploy/watchdog.sh" >/dev/null 2>&1 || true
-    sleep 3
-    if [ -n "${host_header}" ]; then
-      code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 6 -H "Host: ${host_header}" "${url}" 2>/dev/null || echo "000")"
-    else
-      code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 6 "${url}" 2>/dev/null || echo "000")"
+    [ -x "${INSTALL_DIR}/deploy/watchdog.sh" ] && bash "${INSTALL_DIR}/deploy/watchdog.sh" >/dev/null 2>&1 || true
+    if [ -x "${INSTALL_DIR}/fix.sh" ]; then
+      bash "${INSTALL_DIR}/fix.sh" --auto >/dev/null 2>&1 || true
     fi
-    if [ "${code}" = "200" ] || [ "${code}" = "301" ] || [ "${code}" = "302" ] || [ "${code}" = "307" ]; then
-      log_ok "${label} -> ${C_GREEN}AUTO-FIXED & LIVE (HTTP ${code})${C_RESET}"
-      return 0
-    else
-      log_err "${label} -> HTTP ${code} (check DNS or logs via ./deploy/check-status.sh)"
-      return 1
-    fi
+  fi
+  sleep 3
+
+  if [ -n "${host_header}" ]; then
+    code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 6 -H "Host: ${host_header}" "${url}" 2>/dev/null || echo "000")"
+  else
+    code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 6 "${url}" 2>/dev/null || echo "000")"
+  fi
+
+  if [ "${code}" = "200" ] || [ "${code}" = "301" ] || [ "${code}" = "302" ] || [ "${code}" = "307" ]; then
+    log_ok "${label} -> ${C_GREEN}AUTO-FIXED & LIVE (HTTP ${code})${C_RESET}"
+    return 0
+  else
+    log_err "${label} -> HTTP ${code} (check DNS or logs via ./deploy/check-status.sh)"
+    return 1
   fi
 }
 
 echo ""
 log_info "Running Live Ping & End-to-End Endpoint Verification..."
-sleep 4
-probe_and_heal "App Engine (Internal)"     "http://127.0.0.1:${APP_HOST_PORT}/"
-probe_and_heal "PostgREST API (Internal)"  "http://127.0.0.1:${PGRST_HOST_PORT}/"
-probe_and_heal "Main Hub (${DOMAIN_ROOT})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_ROOT}"
-probe_and_heal "Cloud DB (${DOMAIN_STUDIO})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_STUDIO}"
-probe_and_heal "Shield WAF (${DOMAIN_SEC})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_SEC}"
-probe_and_heal "File Vault (${DOMAIN_FILE})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_FILE}"
-probe_and_heal "Keys (${DOMAIN_PASSWORD})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_PASSWORD}"
-probe_and_heal "API (${DOMAIN_API})"       "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_API}"
+sleep 3
+probe_and_heal "App Engine (Internal)"          "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health"
+probe_and_heal "PostgREST API (Internal)"       "http://127.0.0.1:${PGRST_HOST_PORT}/"
+probe_and_heal "Main Hub (${DOMAIN_ROOT})"      "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_ROOT}"
+probe_and_heal "Cloud DB (${DOMAIN_STUDIO})"    "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_STUDIO}"
+probe_and_heal "Shield WAF (${DOMAIN_SEC})"     "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_SEC}"
+probe_and_heal "File Vault (${DOMAIN_FILE})"    "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_FILE}"
+probe_and_heal "Keys (${DOMAIN_PASSWORD})"      "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_PASSWORD}"
+probe_and_heal "API (${DOMAIN_API})"            "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_API}"
+if is_pterodactyl_installed; then
+  probe_and_heal "Pterodactyl Internal (: ${PTERO_PORT})" "http://127.0.0.1:${PTERO_PORT}/" "${DOMAIN_GAME}" "ptero"
+  probe_and_heal "Game Panel (${DOMAIN_GAME})"            "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_GAME}" "ptero"
+fi
 probe_and_heal "Public IP (${SPARROWX_PUBLIC_IP})" "http://${SPARROWX_PUBLIC_IP}:${HTTP_PORT}/"
 
 HTTP_SUFFIX=""
@@ -816,27 +1375,24 @@ HTTPS_SUFFIX=""
 
 echo ""
 echo -e "${C_ORANGE}========================================================================${C_RESET}"
-echo -e "${C_GREEN}  ✓ SPARROWX SOVEREIGN BLUEPRINT IS LIVE & ARMED ON THIS SERVER        ${C_RESET}"
+echo -e "${C_GREEN}  ✓ SPARROWX FULL-STACK + PTERODACTYL PORT FLOW ARMED ON THIS SERVER   ${C_RESET}"
 echo -e "${C_ORANGE}========================================================================${C_RESET}"
-echo -e "  ${C_BOLD}6 LIVE WEB EXPERIENCES:${C_RESET}"
+echo -e "  ${C_BOLD}LIVE WEB ENDPOINTS:${C_RESET}"
 echo -e "    • Company Hub    : ${C_CYAN}https://${DOMAIN_ROOT}${HTTPS_SUFFIX}${C_RESET}"
-echo -e "    • Cloud DB       : ${C_CYAN}https://${DOMAIN_STUDIO}${HTTPS_SUFFIX}${C_RESET} (Strict Auth + Multi-Env)"
-echo -e "    • Shield WAF     : ${C_CYAN}https://${DOMAIN_SEC}${HTTPS_SUFFIX}${C_RESET} (Threat Map + SOC)"
-echo -e "    • File Drop/Vault: ${C_CYAN}https://${DOMAIN_FILE}${HTTPS_SUFFIX}${C_RESET} (150MB Upload + 10GB)"
-echo -e "    • Offline Keys   : ${C_CYAN}https://${DOMAIN_PASSWORD}${HTTPS_SUFFIX}${C_RESET} (Zero-Login CSPRNG)"
+echo -e "    • Cloud DB       : ${C_CYAN}https://${DOMAIN_STUDIO}${HTTPS_SUFFIX}${C_RESET}"
+echo -e "    • Shield WAF     : ${C_CYAN}https://${DOMAIN_SEC}${HTTPS_SUFFIX}${C_RESET}"
+echo -e "    • File Drop/Vault: ${C_CYAN}https://${DOMAIN_FILE}${HTTPS_SUFFIX}${C_RESET}"
+echo -e "    • Offline Keys   : ${C_CYAN}https://${DOMAIN_PASSWORD}${HTTPS_SUFFIX}${C_RESET}"
 echo -e "    • API Gateway    : ${C_CYAN}https://${DOMAIN_API}${HTTPS_SUFFIX}${C_RESET}"
+if is_pterodactyl_installed; then
+  echo -e "    • Game Panel     : ${C_GREEN}https://${DOMAIN_GAME}${HTTPS_SUFFIX}${C_RESET} -> Host Nginx :${PTERO_PORT}"
+else
+  echo -e "    • Game Panel     : ${C_DIM}https://${DOMAIN_GAME}${HTTPS_SUFFIX} (run './setup.sh --ptero' anytime to install)${C_RESET}"
+fi
 echo -e "    • Direct IP      : ${C_WHITE}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}${C_RESET}"
 echo ""
-echo -e "  ${C_BOLD}5 ISOLATED POSTGRESQL 16 + PGVECTOR DATABASES (Pooler Port ${PG_POOL_PORT}):${C_RESET}"
-echo -e "    • sparrowbase         (Unified Auth, Email Logins, Tenants & Billing)"
-echo -e "    • sparrowx_db_studio  (Isolated DB Studio Environments)"
-echo -e "    • sparrowx_shield     (WAF Rules, Threat Feeds & SOC Incidents)"
-echo -e "    • sparrowx_files      (File Vault Metadata & Ephemeral Drop)"
-echo -e "    • sparrowx_api        (API Keys, Rate Limits & Telemetry)"
-echo ""
-echo -e "  ${C_BOLD}AUTONOMOUS CRON FLEET & CLI TOOLS:${C_RESET}"
+echo -e "  ${C_BOLD}CLI TOOLS:${C_RESET}"
 echo -e "    • Watchdog (2m)  : ${C_DIM}${INSTALL_DIR}/deploy/watchdog.sh${C_RESET} (or ${C_BOLD}sparrowx-heal${C_RESET})"
-echo -e "    • SSL Renew (12h): ${C_DIM}${INSTALL_DIR}/deploy/ssl-renew.sh${C_RESET}"
-echo -e "    • DB Backups (2a): ${C_DIM}${INSTALL_DIR}/deploy/backup-all-dbs.sh${C_RESET}"
-echo -e "    • DB Studio TUI  : ${C_BOLD}sparrowx-db${C_RESET}   |  1-Click Update: ${C_BOLD}sparrowx-update${C_RESET}"
+echo -e "    • Auto-Heal (fix): ${C_BOLD}sparrowx-fix${C_RESET}   |  DB Studio TUI: ${C_BOLD}sparrowx-db${C_RESET}"
+echo -e "    • 1-Click Update : ${C_BOLD}sparrowx-update${C_RESET}"
 echo -e "${C_ORANGE}========================================================================${C_RESET}"

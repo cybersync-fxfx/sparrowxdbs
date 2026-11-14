@@ -76,12 +76,15 @@ services:
     depends_on:
       - sparrowx
       - postgrest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
     volumes:
       - ./ovh/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./ovh/ssl:/etc/nginx/ssl:ro
+      - ./ovh/certbot-www:/var/www/certbot:ro
 
 volumes:
   sparrowx_pgdata:

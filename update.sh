@@ -169,15 +169,158 @@ port_held_by_other() {
   return 0
 }
 
+is_reserved_ptero_port() {
+  local port="$1"
+  case "${port}" in
+    8080|8443|2022|3306|6379|"${PTERO_PORT:-8090}") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 find_next_free_port() {
   local port="$1"
-  local max_tries=30
+  local max_tries=60
   local i=0
-  while [ "${i}" -lt "${max_tries}" ] && is_port_busy "${port}"; do
+  while [ "${i}" -lt "${max_tries}" ] && { is_reserved_ptero_port "${port}" || is_port_busy "${port}"; }; do
     port=$((port + 1))
     i=$((i + 1))
   done
   echo "${port}"
+}
+
+detect_php_fpm_sock() {
+  local sock=""
+  sock="$(find /run/php /var/run/php -maxdepth 2 -type s -name 'php*-fpm.sock' 2>/dev/null | sort -V | tail -n 1 || true)"
+  if [ -z "${sock}" ] && command -v systemctl >/dev/null 2>&1; then
+    for php_svc in $(systemctl list-unit-files 'php*-fpm.service' --no-legend 2>/dev/null | awk '{print $1}' | sort -V || true); do
+      systemctl enable --now "${php_svc}" >/dev/null 2>&1 || true
+    done
+    sleep 1
+    sock="$(find /run/php /var/run/php -maxdepth 2 -type s -name 'php*-fpm.sock' 2>/dev/null | sort -V | tail -n 1 || true)"
+  fi
+  [ -z "${sock}" ] && sock="/run/php/php8.3-fpm.sock"
+  echo "${sock}"
+}
+
+is_pterodactyl_installed() {
+  [ -f /var/www/pterodactyl/artisan ] || [ -d /var/www/pterodactyl/public ]
+}
+
+get_docker_host_ip() {
+  local gw_ip=""
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+      gw_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}}{{end}}' sparrowx-nginx 2>/dev/null | tr -d '[:space:]' || true)"
+      if [ -z "${gw_ip}" ]; then
+        gw_ip="$(docker exec sparrowx-nginx sh -c "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1; exit}'" 2>/dev/null | tr -d '[:space:]' || true)"
+      fi
+    fi
+    if [ -z "${gw_ip}" ]; then
+      gw_ip="$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}' 2>/dev/null | tr -d '[:space:]' || true)"
+    fi
+  fi
+  if [ -z "${gw_ip}" ] && command -v ip >/dev/null 2>&1; then
+    gw_ip="$(ip -4 addr show docker0 2>/dev/null | awk '/inet / {sub(/\/.*/, "", $2); print $2; exit}' || true)"
+  fi
+  [ -z "${gw_ip}" ] && gw_ip="172.17.0.1"
+  echo "${gw_ip}"
+}
+
+heal_pterodactyl_host_nginx() {
+  if ! is_pterodactyl_installed; then
+    return 0
+  fi
+  local ptero_p="${PTERO_PORT:-8090}"
+  local ptero_dom="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+  local php_sock
+  php_sock="$(detect_php_fpm_sock)"
+
+  for dep_svc in mariadb mysql redis-server pteroq; do
+    if systemctl list-unit-files "${dep_svc}.service" >/dev/null 2>&1; then
+      systemctl enable --now "${dep_svc}" >/dev/null 2>&1 || true
+    fi
+  done
+  if systemctl list-unit-files wings.service >/dev/null 2>&1 && [ -f /etc/pterodactyl/config.yml ]; then
+    systemctl enable --now wings >/dev/null 2>&1 || true
+  fi
+
+  if [ -f /var/www/pterodactyl/.env ]; then
+    sed -i "s|^APP_URL=.*|APP_URL=https://${ptero_dom}|" /var/www/pterodactyl/.env 2>/dev/null || true
+    if grep -q "^TRUSTED_PROXIES=" /var/www/pterodactyl/.env 2>/dev/null; then
+      sed -i "s|^TRUSTED_PROXIES=.*|TRUSTED_PROXIES=*|" /var/www/pterodactyl/.env 2>/dev/null || true
+    else
+      echo "TRUSTED_PROXIES=*" >> /var/www/pterodactyl/.env 2>/dev/null || true
+    fi
+  fi
+  id -u www-data >/dev/null 2>&1 && chown -R www-data:www-data /var/www/pterodactyl/storage /var/www/pterodactyl/bootstrap/cache 2>/dev/null || true
+  if command -v php >/dev/null 2>&1 && [ -f /var/www/pterodactyl/artisan ]; then
+    php /var/www/pterodactyl/artisan config:clear >/dev/null 2>&1 || true
+    php /var/www/pterodactyl/artisan route:clear >/dev/null 2>&1 || true
+  fi
+
+  rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true
+  mkdir -p /etc/nginx/sparrowx-disabled /etc/nginx/sites-available /etc/nginx/sites-enabled 2>/dev/null || true
+  for ncfg in /etc/nginx/sites-enabled/* /etc/nginx/conf.d/*.conf; do
+    [ -e "${ncfg}" ] || continue
+    [ "$(basename "${ncfg}")" = "pterodactyl.conf" ] && continue
+    if grep -qE "listen[[:space:]]+([^;]*:)?(80|443)([[:space:];]|$)" "${ncfg}" 2>/dev/null; then
+      mv -f "${ncfg}" /etc/nginx/sparrowx-disabled/ 2>/dev/null || rm -f "${ncfg}" 2>/dev/null || true
+    fi
+  done
+
+  cat > /etc/nginx/sites-available/pterodactyl.conf <<PTEROEOF
+server {
+    listen ${ptero_p} default_server;
+    listen [::]:${ptero_p} default_server;
+    server_name ${ptero_dom} panel.${SPARROWX_DOMAIN} _;
+
+    root /var/www/pterodactyl/public;
+    index index.php;
+
+    client_max_body_size 100m;
+    client_body_timeout 120s;
+    sendfile off;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php\$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
+        fastcgi_pass unix:${php_sock};
+        fastcgi_index index.php;
+        include fastcgi_params;
+        fastcgi_param PHP_VALUE "upload_max_filesize = 100M \n post_max_size=100M";
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_param HTTP_PROXY "";
+        fastcgi_param HTTPS on;
+        fastcgi_param HTTP_X_FORWARDED_PROTO https;
+        fastcgi_intercept_errors off;
+        fastcgi_buffer_size 16k;
+        fastcgi_buffers 4 16k;
+        fastcgi_connect_timeout 300;
+        fastcgi_send_timeout 300;
+        fastcgi_read_timeout 300;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+PTEROEOF
+  ln -sfn /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf 2>/dev/null || true
+
+  if [ -d "/etc/letsencrypt/live/${ptero_dom}" ]; then
+    cp -fL "/etc/letsencrypt/live/${ptero_dom}/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
+    cp -fL "/etc/letsencrypt/live/${ptero_dom}/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
+  fi
+
+  if command -v nginx >/dev/null 2>&1; then
+    nginx -t >/dev/null 2>&1 || true
+    systemctl enable nginx >/dev/null 2>&1 || true
+    systemctl restart nginx >/dev/null 2>&1 || systemctl reload nginx >/dev/null 2>&1 || true
+  fi
+  log_warn "Aligned host Pterodactyl Nginx onto internal port ${ptero_p} (preserving :80/:443 for SparrowX Edge)"
 }
 
 compose_cmd() {
@@ -279,6 +422,8 @@ HTTPS_PORT="${HTTPS_PORT:-443}"
 APP_HOST_PORT="${APP_HOST_PORT:-3000}"
 PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
+DOMAIN_GAME="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+PTERO_PORT="${PTERO_PORT:-8090}"
 POSTGRES_USER="${POSTGRES_USER:-sparrowx}"
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}"
 POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
@@ -286,7 +431,11 @@ SPARROWX_JWT_SECRET="${SPARROWX_JWT_SECRET:-$(openssl rand -hex 32 2>/dev/null |
 SPARROWX_REDIS_SECRET="${SPARROWX_REDIS_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo 'sparrowx_redis_secret_2026')}"
 
 ensure_env_key "SPARROWX_DOMAIN" "${SPARROWX_DOMAIN}"
+ensure_env_key "DOMAIN_ROOT" "${SPARROWX_DOMAIN}"
 ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
+ensure_env_key "DOMAIN_STUDIO" "${SPARROWX_STUDIO_DOMAIN}"
+ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
+ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
 ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
 ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
 ensure_env_key "HTTPS_PORT" "${HTTPS_PORT}"
@@ -298,7 +447,7 @@ ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -408,7 +557,13 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow 443/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
-  log_ok "UFW ports opened (22, 80, 443, ${HTTP_PORT}, ${HTTPS_PORT})"
+  ufw allow in from 127.0.0.1 to any port "${PTERO_PORT}" proto tcp >/dev/null 2>&1 || true
+  ufw allow in from 172.16.0.0/12 to any port "${PTERO_PORT}" proto tcp >/dev/null 2>&1 || true
+  if [ -d /etc/pterodactyl ] || systemctl list-unit-files wings.service >/dev/null 2>&1; then
+    ufw allow 8080/tcp >/dev/null 2>&1 || true
+    ufw allow 2022/tcp >/dev/null 2>&1 || true
+  fi
+  log_ok "UFW ports opened (22, 80, 443, ${HTTP_PORT}, ${HTTPS_PORT}, Ptero:${PTERO_PORT})"
 fi
 
 # ==============================================================================
@@ -416,7 +571,7 @@ fi
 # ==============================================================================
 draw_progress 4 7 "SSL & Multi-Domain Nginx"
 
-mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/data/users" "${INSTALL_DIR}/data/backups"
+mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/ovh/certbot-www/.well-known/acme-challenge" "${INSTALL_DIR}/data/users" "${INSTALL_DIR}/data/backups"
 
 SSL_CERT="${INSTALL_DIR}/ovh/ssl/fullchain.pem"
 SSL_KEY="${INSTALL_DIR}/ovh/ssl/privkey.pem"
@@ -426,7 +581,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -434,7 +589,48 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
   fi
 fi
 
-cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
+if is_pterodactyl_installed; then
+  heal_pterodactyl_host_nginx
+fi
+
+render_sparrowx_nginx_conf() {
+  local docker_host_ip
+  docker_host_ip="$(get_docker_host_ip)"
+  local ptero_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local ptero_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
+    ptero_ssl_cert="/etc/nginx/ssl/ptero-fullchain.pem"
+    ptero_ssl_key="/etc/nginx/ssl/ptero-privkey.pem"
+  fi
+  local ptero_backend=""
+  if is_pterodactyl_installed; then
+    ptero_backend="    location / {
+        proxy_pass http://${docker_host_ip}:${PTERO_PORT};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_read_timeout 300s;
+    }"
+  else
+    ptero_backend="    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
+  fi
+
+  cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 # 1. Master SparrowX Command Center & Default Fallback (${SPARROWX_DOMAIN})
 server {
     listen 80 default_server;
@@ -449,6 +645,10 @@ server {
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
 
     location /rest/v1/ {
         proxy_pass http://sparrowx:3000/rest/v1/;
@@ -486,6 +686,10 @@ server {
     client_max_body_size 100M;
     server_tokens off;
 
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
     location /rest/v1/ {
         proxy_pass http://sparrowx:3000/rest/v1/;
         proxy_http_version 1.1;
@@ -520,6 +724,10 @@ server {
     client_max_body_size 100M;
     server_tokens off;
 
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
     location /rest/v1/ {
         proxy_pass http://sparrowx:3000/rest/v1/;
         proxy_http_version 1.1;
@@ -542,8 +750,29 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
+
+# 4. Pterodactyl Game Panel (${DOMAIN_GAME})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME} panel.${SPARROWX_DOMAIN};
+    ssl_certificate ${ptero_ssl_cert};
+    ssl_certificate_key ${ptero_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 100M;
+    server_tokens off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+${ptero_backend}
+}
 EOF
-log_ok "Nginx reverse proxy configured for all 6 SparrowX domains"
+}
+
+render_sparrowx_nginx_conf
+log_ok "Nginx reverse proxy configured for all SparrowX domains & ${DOMAIN_GAME}"
 
 # ==============================================================================
 # STEP 5/7: Auto-Upgrade Systemd Daemon & CLI Symlinks
@@ -606,13 +835,19 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 if [ "${HAS_DOCKER}" = "true" ]; then
-  # Stop conflicting host daemons
-  for svc in sparrowx-native.service postgresql pgbouncer apache2 nginx caddy; do
+  # Stop conflicting host daemons (keep host nginx alive if Pterodactyl Panel is installed)
+  for svc in sparrowx-native.service postgresql pgbouncer apache2 caddy; do
     if systemctl is-active --quiet "${svc}" 2>/dev/null; then
       systemctl stop "${svc}" >/dev/null 2>&1 || true
       log_warn "Stopped conflicting host service: ${svc}"
     fi
   done
+  if is_pterodactyl_installed; then
+    heal_pterodactyl_host_nginx
+  elif systemctl is-active --quiet nginx 2>/dev/null; then
+    systemctl stop nginx >/dev/null 2>&1 || true
+    log_warn "Stopped conflicting host service: nginx"
+  fi
   for pg_unit in $(systemctl list-units --type=service --state=active --no-legend 'postgresql@*' 2>/dev/null | awk '{print $1}' || true); do
     systemctl stop "${pg_unit}" >/dev/null 2>&1 || true
     log_warn "Stopped conflicting versioned PostgreSQL unit: ${pg_unit}"
@@ -703,6 +938,9 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     fi
     compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps sparrowx nginx >/dev/null 2>&1 || true
     docker start sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+    if is_pterodactyl_installed; then
+      render_sparrowx_nginx_conf
+    fi
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 
@@ -783,6 +1021,18 @@ fi
 
 PGRST_STATUS="$(curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/" >/dev/null 2>&1 && echo "ONLINE" || echo "STARTING")"
 EDGE_STATUS="$(curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${HTTP_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$" && echo "ONLINE" || echo "CHECK")"
+PTERO_STATUS="NOT INSTALLED"
+if is_pterodactyl_installed; then
+  PTERO_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAME}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+  if ! echo "${PTERO_EDGE_CODE}" | grep -qE "^(200|301|302)$"; then
+    heal_pterodactyl_host_nginx
+    render_sparrowx_nginx_conf
+    docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    sleep 2
+    PTERO_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAME}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+  fi
+  PTERO_STATUS="$(echo "${PTERO_EDGE_CODE}" | grep -qE "^(200|301|302)$" && echo "ONLINE (:${PTERO_PORT})" || echo "CHECK (HTTP ${PTERO_EDGE_CODE})")"
+fi
 
 echo ""
 echo -e "${C_GREEN}╔══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
@@ -791,6 +1041,9 @@ echo -e "${C_GREEN}╠═══════════════════�
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Git Commit" "$(git rev-parse --short HEAD 2>/dev/null || echo local) (origin/main)"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Auto-Healed Fixes" "${HEALED_COUNT} issue(s) resolved automatically"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Web / PostgREST / Edge" "$([ "${HEALTH_OK}" = "true" ] && echo "ONLINE" || echo "WARN") / ${PGRST_STATUS} / ${EDGE_STATUS}"
+if is_pterodactyl_installed; then
+  printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Pterodactyl Panel" "${PTERO_STATUS}"
+fi
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Port Bindings" "PG:${PG_HOST_PORT} PGRST:${PGRST_HOST_PORT} APP:${APP_HOST_PORT} WEB:${HTTP_PORT}/${HTTPS_PORT}"
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}Dedicated Service Websites:${C_RESET}                                             ${C_GREEN}║${C_RESET}"
@@ -800,6 +1053,9 @@ printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Drop Vault       : ${C_
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Password Vault   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://password.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://sec.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
+if is_pterodactyl_installed; then
+  printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
+fi
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}Quick Operations CLI:${C_RESET}                                                   ${C_GREEN}║${C_RESET}"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Full Update      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./update.sh  (or: sparrowx-update)"

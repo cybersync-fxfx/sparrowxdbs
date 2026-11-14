@@ -6,8 +6,18 @@
 # ==============================================================================
 set -u
 
-INSTALL_DIR="/opt/sparrowx"
-[ -f "./docker-compose.standalone.yml" ] && INSTALL_DIR="$(pwd)"
+INSTALL_DIR="/opt/sparrowxdbs"
+if [ -f "./docker-compose.ovh.yml" ]; then
+  INSTALL_DIR="$(pwd)"
+elif [ -f "/opt/sparrowxdbs/docker-compose.ovh.yml" ]; then
+  INSTALL_DIR="/opt/sparrowxdbs"
+elif [ -f "/opt/sparrowx/docker-compose.ovh.yml" ]; then
+  INSTALL_DIR="/opt/sparrowx"
+elif [ -f "./docker-compose.standalone.yml" ]; then
+  INSTALL_DIR="$(pwd)"
+elif [ -f "/opt/sparrowx/docker-compose.standalone.yml" ]; then
+  INSTALL_DIR="/opt/sparrowx"
+fi
 cd "${INSTALL_DIR}" 2>/dev/null || exit 0
 
 [ -f "${INSTALL_DIR}/.env" ] && source "${INSTALL_DIR}/.env" 2>/dev/null || true
@@ -18,6 +28,7 @@ DOMAIN_SEC="${DOMAIN_SEC:-sec.${DOMAIN_ROOT}}"
 DOMAIN_FILE="${DOMAIN_FILE:-file.${DOMAIN_ROOT}}"
 DOMAIN_PASSWORD="${DOMAIN_PASSWORD:-password.${DOMAIN_ROOT}}"
 DOMAIN_API="${DOMAIN_API:-api.${DOMAIN_ROOT}}"
+DOMAIN_GAME="${DOMAIN_GAME:-game.${DOMAIN_ROOT}}"
 SPARROWX_ADMIN_EMAIL="${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}"
 SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP:-}"
 WEBROOT="${INSTALL_DIR}/ovh/certbot-www"
@@ -51,6 +62,8 @@ CANDIDATE_DOMAINS=(
   "passwd.${DOMAIN_ROOT}"
   "keys.${DOMAIN_ROOT}"
   "${DOMAIN_API}"
+  "${DOMAIN_GAME}"
+  "panel.${DOMAIN_ROOT}"
 )
 
 CERTBOT_ARGS=()
@@ -96,9 +109,11 @@ if certbot certonly \
     cp -fL "${LIVE_DIR}/privkey.pem" "${SSL_DIR}/privkey.pem"
     chmod 644 "${SSL_DIR}/fullchain.pem"
     chmod 600 "${SSL_DIR}/privkey.pem"
-    if docker ps --format '{{.Names}}' | grep -qx "sparrowx_edge_proxy"; then
-      docker exec sparrowx_edge_proxy nginx -s reload >/dev/null 2>&1 || true
-    fi
+    for proxy_name in sparrowx-nginx sparrowx_edge_proxy; do
+      if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${proxy_name}"; then
+        docker exec "${proxy_name}" nginx -s reload >/dev/null 2>&1 || true
+      fi
+    done
     log_ssl "SUCCESS: Live Let's Encrypt SSL active for ${VALID_DOMAINS[*]}"
   fi
 else
