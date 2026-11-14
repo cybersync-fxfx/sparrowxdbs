@@ -254,6 +254,18 @@ port_held_by_other() {
   return 0
 }
 
+ALLOCATED_PORTS=""
+
+reserve_port() {
+  local p="$1"
+  ALLOCATED_PORTS="${ALLOCATED_PORTS} ${p} "
+}
+
+is_port_allocated() {
+  local p="$1"
+  [[ " ${ALLOCATED_PORTS} " == *" ${p} "* ]]
+}
+
 is_reserved_ptero_port() {
   local p="$1"
   case "${p}" in
@@ -264,12 +276,13 @@ is_reserved_ptero_port() {
 
 find_next_free_port() {
   local port="$1"
-  local max_tries=50
+  local max_tries=100
   local i=0
-  while [ "${i}" -lt "${max_tries}" ] && { is_port_busy "${port}" || is_reserved_ptero_port "${port}"; }; do
+  while [ "${i}" -lt "${max_tries}" ] && { is_port_busy "${port}" || is_reserved_ptero_port "${port}" || is_port_allocated "${port}"; }; do
     port=$((port + 1))
     i=$((i + 1))
   done
+  reserve_port "${port}"
   echo "${port}"
 }
 
@@ -885,9 +898,9 @@ ensure_game_letsencrypt_ssl() {
       -d "${game_domain}" >/dev/null 2>&1; then
       log_fix "Issued Let's Encrypt SSL for ${game_domain} via port 80 webroot"
     else
-      # Attempt 2: Briefly yield port 80 from sparrowx-nginx for Certbot standalone challenge
+      # Attempt 2: Briefly yield port 80 from ${EDGE_CTR:-sparrowx-nginx} for Certbot standalone challenge
       log_scan "Webroot challenge deferred; retrying ${game_domain} via standalone port 80 listener..."
-      docker stop sparrowx-nginx >/dev/null 2>&1 || true
+      docker stop "${EDGE_CTR:-sparrowx-nginx}" sparrowx-nginx sparrowx_edge_proxy >/dev/null 2>&1 || true
       systemctl stop nginx >/dev/null 2>&1 || true
       if command -v fuser >/dev/null 2>&1; then
         fuser -k 80/tcp >/dev/null 2>&1 || true
@@ -908,7 +921,7 @@ ensure_game_letsencrypt_ssl() {
       if is_pterodactyl_installed; then
         systemctl start nginx >/dev/null 2>&1 || true
       fi
-      docker start sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
+      docker start "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${EDGE_SVC:-nginx}" >/dev/null 2>&1 || true
     fi
   else
     # Keep certificate current and migrate any prior nginx authenticator to webroot
@@ -939,7 +952,7 @@ ensure_game_letsencrypt_ssl() {
         { print }
       ' "${INSTALL_DIR}/ovh/nginx.conf" > "${tmp_nginx}" && cat "${tmp_nginx}" > "${INSTALL_DIR}/ovh/nginx.conf"
       rm -f "${tmp_nginx}"
-      docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+      docker restart "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || docker exec "${EDGE_CTR:-sparrowx-nginx}" nginx -s reload >/dev/null 2>&1 || true
     fi
     log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
   fi
@@ -1240,10 +1253,49 @@ fi
 # ==============================================================================
 draw_progress 7 12 "Ports & Legacy Containers"
 
-COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
-if [ ! -f "${COMPOSE_FILE}" ] && [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
-  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
+if [ -f "${INSTALL_DIR}/docker-compose.standalone.yml" ]; then
+  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.standalone.yml"
+  STACK_MODE="standalone"
+  PG_CTR="sparrowx_postgres"
+  PG_SVC="sparrowx-postgres"
+  PGB_CTR="sparrowx_pgbouncer"
+  PGB_SVC="sparrowx-pgbouncer"
+  PGRST_CTR="sparrowx_postgrest"
+  PGRST_SVC="sparrowx-postgrest"
+  REDIS_CTR="sparrowx_threat_cache"
+  REDIS_SVC="sparrowx-threat-cache"
+  APP_CTR="sparrowx_studio"
+  APP_SVC="sparrowx-studio"
+  EDGE_CTR="sparrowx_edge_proxy"
+  EDGE_SVC="sparrowx-edge-proxy"
+  UPSTREAM_APP_HOST="sparrowx-studio"
+  UPSTREAM_PGRST_HOST="sparrowx-postgrest"
+  COMPOSE_SERVICES=("sparrowx-postgres" "sparrowx-pgbouncer" "sparrowx-postgrest" "sparrowx-threat-cache" "sparrowx-studio" "sparrowx-edge-proxy")
+  # Remove any legacy OVH-named containers so they never fight standalone containers on ports
+  docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+else
+  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
+  if [ ! -f "${COMPOSE_FILE}" ] && [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
+    COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
+  fi
+  STACK_MODE="ovh"
+  PG_CTR="sparrowx-postgres"
+  PG_SVC="postgres"
+  PGB_CTR=""
+  PGB_SVC=""
+  PGRST_CTR="sparrowx-postgrest"
+  PGRST_SVC="postgrest"
+  REDIS_CTR=""
+  REDIS_SVC=""
+  APP_CTR="sparrowx-app"
+  APP_SVC="sparrowx"
+  EDGE_CTR="sparrowx-nginx"
+  EDGE_SVC="nginx"
+  UPSTREAM_APP_HOST="sparrowx"
+  UPSTREAM_PGRST_HOST="sparrowx"
+  COMPOSE_SERVICES=("postgres" "postgrest" "sparrowx" "nginx")
 fi
+log_scan "Active stack blueprint: ${STACK_MODE} ($(basename "${COMPOSE_FILE}"))"
 
 if [ "${HAS_DOCKER}" = "true" ]; then
   # Stop & disable conflicting host daemons that fight over ports 5432, 80, 443, 3000
@@ -1283,80 +1335,111 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   fi
   [ "${LEGACY_FOUND}" -gt 0 ] && log_fix "Cleaned up stale/duplicate SparrowX containers"
 
-  # Remove crashed/non-running sparrowx-postgres or orphaned docker-proxy/postgres processes holding 5432
-  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
-    docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+  # Remove crashed/non-running Postgres or orphaned docker-proxy/postgres processes holding 5432
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "${PG_CTR}"; then
+    docker rm -f "${PG_CTR}" >/dev/null 2>&1 || true
     pkill -9 -x postgres >/dev/null 2>&1 || true
     pkill -9 -f "docker-proxy.*-host-port ${PG_HOST_PORT}( |$)" >/dev/null 2>&1 || true
     command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT}/tcp" >/dev/null 2>&1 || true
   fi
 
   install_pterodactyl_unattended
+  # Allocate non-conflicting internal Pterodactyl port BEFORE writing host nginx & edge nginx configs
   if is_pterodactyl_installed; then
+    PTERO_PORT="${PTERO_PORT:-8090}"
+    if is_port_busy "${PTERO_PORT}" && ! ss -tulpn 2>/dev/null | grep -E "(:|\.|\])${PTERO_PORT}[[:space:]]" | grep -qi "nginx"; then
+      PTERO_PORT="$(find_next_free_port 8091)"
+      ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
+      export PTERO_PORT
+      log_fix "Reallocated Pterodactyl internal port to free port ${PTERO_PORT}"
+    else
+      reserve_port "${PTERO_PORT}"
+    fi
     heal_pterodactyl_host_nginx
   elif systemctl is-active --quiet nginx 2>/dev/null; then
     systemctl stop nginx >/dev/null 2>&1 || true
     log_fix "Stopped conflicting host daemon: nginx"
   fi
 
-  # Remove orphaned docker-proxy listeners on 80/443 if sparrowx-nginx is not running
-  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+  # Remove orphaned docker-proxy listeners on 80/443 if edge proxy is not running
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "${EDGE_CTR}"; then
     pkill -9 -f "docker-proxy.*-host-port ${HTTP_PORT}( |$)" >/dev/null 2>&1 || true
     pkill -9 -f "docker-proxy.*-host-port ${HTTPS_PORT}( |$)" >/dev/null 2>&1 || true
   fi
 
-  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 3000, 3001)
-  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
-  free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
-  free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
+  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 6543, 3000, 3001)
+  free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
+  free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
+  free_docker_port_conflicts "${PG_HOST_PORT}" "${PG_CTR}"
+  [ -n "${PGB_CTR}" ] && free_docker_port_conflicts "${PG_POOL_PORT:-6543}" "${PGB_CTR}"
+  free_docker_port_conflicts "${PGRST_HOST_PORT}" "${PGRST_CTR}"
+  free_docker_port_conflicts "${APP_HOST_PORT}" "${APP_CTR}"
 
-  # Heal HTTP/HTTPS port conflicts (ports 80 / 443 must remain clean for Nginx edge)
+  # Heal HTTP/HTTPS port conflicts (ports 80 / 443 must remain clean for Edge Proxy)
   for web_p in "${HTTP_PORT}" "${HTTPS_PORT}"; do
-    if port_held_by_other "${web_p}" "sparrowx-nginx"; then
-      log_fix "Port ${web_p}/tcp held by foreign process — clearing for sparrowx-nginx"
+    if port_held_by_other "${web_p}" "${EDGE_CTR}"; then
+      log_fix "Port ${web_p}/tcp held by foreign process — clearing for ${EDGE_CTR}"
       command -v fuser >/dev/null 2>&1 && fuser -k "${web_p}/tcp" >/dev/null 2>&1 || true
+      pkill -9 -f "docker-proxy.*-host-port ${web_p}( |$)" >/dev/null 2>&1 || true
       sleep 1
     fi
+    reserve_port "${web_p}"
   done
 
   # Heal PostgreSQL port conflict (clear stray non-Docker listener on 5432, then auto-shift to 5433+ if still held)
-  if port_held_by_other "${PG_HOST_PORT}" "sparrowx-postgres"; then
+  if port_held_by_other "${PG_HOST_PORT}" "${PG_CTR}"; then
     log_fix "Host port ${PG_HOST_PORT}/tcp busy — clearing stray non-Docker listeners"
     command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT}/tcp" >/dev/null 2>&1 || true
     sleep 1
   fi
-  if port_held_by_other "${PG_HOST_PORT}" "sparrowx-postgres"; then
+  if port_held_by_other "${PG_HOST_PORT}" "${PG_CTR}"; then
     NEW_PG_PORT="$(find_next_free_port 5433)"
     ensure_env_key "PG_HOST_PORT" "${NEW_PG_PORT}"
     PG_HOST_PORT="${NEW_PG_PORT}"
     export PG_HOST_PORT
-    log_fix "Host port 5432 still busy; switched PG_HOST_PORT=${PG_HOST_PORT} in .env"
+    log_fix "Host port 5432 still busy; allocated free PG_HOST_PORT=${PG_HOST_PORT} in .env"
   else
-    log_ok "PostgreSQL port ${PG_HOST_PORT} clear for sparrowx-postgres"
+    reserve_port "${PG_HOST_PORT}"
+    log_ok "PostgreSQL port ${PG_HOST_PORT} clear for ${PG_CTR}"
+  fi
+
+  # Heal PgBouncer pool port conflict (6543 -> auto-shift if held in standalone mode)
+  if [ "${STACK_MODE}" = "standalone" ]; then
+    PG_POOL_PORT="${PG_POOL_PORT:-6543}"
+    if port_held_by_other "${PG_POOL_PORT}" "${PGB_CTR}"; then
+      NEW_POOL_PORT="$(find_next_free_port 6544)"
+      ensure_env_key "PG_POOL_PORT" "${NEW_POOL_PORT}"
+      PG_POOL_PORT="${NEW_POOL_PORT}"
+      export PG_POOL_PORT
+      log_fix "Host port 6543 busy; allocated free PG_POOL_PORT=${PG_POOL_PORT} in .env"
+    else
+      reserve_port "${PG_POOL_PORT}"
+      log_ok "PgBouncer pool port ${PG_POOL_PORT} clear for ${PGB_CTR}"
+    fi
   fi
 
   # Heal PostgREST port conflict (3001 -> auto-shift if held by other process)
-  if port_held_by_other "${PGRST_HOST_PORT}" "sparrowx-postgrest"; then
+  if port_held_by_other "${PGRST_HOST_PORT}" "${PGRST_CTR}"; then
     NEW_PGRST_PORT="$(find_next_free_port 3002)"
     ensure_env_key "PGRST_HOST_PORT" "${NEW_PGRST_PORT}"
     PGRST_HOST_PORT="${NEW_PGRST_PORT}"
     export PGRST_HOST_PORT
-    log_fix "Host port 3001 busy; switched PGRST_HOST_PORT=${PGRST_HOST_PORT} in .env"
+    log_fix "Host port 3001 busy; allocated free PGRST_HOST_PORT=${PGRST_HOST_PORT} in .env"
   else
-    log_ok "PostgREST port ${PGRST_HOST_PORT} clear for sparrowx-postgrest"
+    reserve_port "${PGRST_HOST_PORT}"
+    log_ok "PostgREST port ${PGRST_HOST_PORT} clear for ${PGRST_CTR}"
   fi
 
   # Heal App port conflict (3000 -> auto-shift if held by other process)
-  if port_held_by_other "${APP_HOST_PORT}" "sparrowx-app"; then
+  if port_held_by_other "${APP_HOST_PORT}" "${APP_CTR}"; then
     NEW_APP_PORT="$(find_next_free_port 3010)"
     ensure_env_key "APP_HOST_PORT" "${NEW_APP_PORT}"
     APP_HOST_PORT="${NEW_APP_PORT}"
     export APP_HOST_PORT
-    log_fix "Host port 3000 busy; switched APP_HOST_PORT=${APP_HOST_PORT} in .env"
+    log_fix "Host port 3000 busy; allocated free APP_HOST_PORT=${APP_HOST_PORT} in .env"
   else
-    log_ok "App port ${APP_HOST_PORT} clear for sparrowx-app"
+    reserve_port "${APP_HOST_PORT}"
+    log_ok "App port ${APP_HOST_PORT} clear for ${APP_CTR}"
   fi
 fi
 
@@ -1412,7 +1495,7 @@ server {
     }
 
     location /rest/v1/ {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -1426,7 +1509,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -1457,7 +1540,7 @@ server {
     }
 
     location /rest/v1/ {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -1468,7 +1551,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -1500,7 +1583,7 @@ server {
     }
 
     location /rest/v1/ {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -1512,7 +1595,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -1578,37 +1661,50 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   for pg_vol in $(docker volume ls -q 2>/dev/null | grep 'sparrowx_pgdata' || true); do
     vol_mp="$(docker volume inspect -f '{{.Mountpoint}}' "${pg_vol}" 2>/dev/null || true)"
     if [ -n "${vol_mp}" ] && [ -d "${vol_mp}" ] && [ ! -f "${vol_mp}/PG_VERSION" ] && [ -n "$(ls -A "${vol_mp}" 2>/dev/null)" ]; then
-      docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+      docker rm -f "${PG_CTR}" >/dev/null 2>&1 || true
       rm -rf "${vol_mp:?}"/* "${vol_mp:?}"/.[!.]* "${vol_mp:?}"/..?* 2>/dev/null || true
       log_fix "Cleared uninitialized/corrupted PostgreSQL volume ${pg_vol} (missing PG_VERSION)"
     fi
   done
 
   COMPOSE_ARGS=(-d --remove-orphans)
-  if [ "${REBUILD_APP}" = "true" ] || ! docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-app"; then
+  if [ "${REBUILD_APP}" = "true" ] || ! docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${APP_CTR}"; then
     COMPOSE_ARGS=(-d --build --remove-orphans)
   fi
 
-  log_scan "Starting container stack via $(basename "${COMPOSE_FILE}")..."
-  local compose_err_file
+  log_scan "Starting container stack via $(basename "${COMPOSE_FILE}") (${STACK_MODE} mode)..."
   compose_err_file="$(mktemp)"
   if ! compose_cmd -f "${COMPOSE_FILE}" up "${COMPOSE_ARGS[@]}" >"${compose_err_file}" 2>&1; then
-    local c_err_tail
     c_err_tail="$(tail -n 10 "${compose_err_file}" 2>/dev/null | tr '\n' ' ' || true)"
     log_fix "Compose startup hit an error (${c_err_tail:0:180}) — tearing down conflicting containers/networks & healing ports"
     compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
-    docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+    docker rm -f "${PG_CTR}" "${PGRST_CTR}" "${APP_CTR}" "${EDGE_CTR}" sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+    [ -n "${PGB_CTR}" ] && docker rm -f "${PGB_CTR}" >/dev/null 2>&1 || true
+    [ -n "${REDIS_CTR}" ] && docker rm -f "${REDIS_CTR}" >/dev/null 2>&1 || true
     docker network prune -f >/dev/null 2>&1 || true
-    free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
-    free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
-    free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
-    command -v fuser >/dev/null 2>&1 && fuser -k 5432/tcp >/dev/null 2>&1 || true
+    free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
+    free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
+    free_docker_port_conflicts "${PG_HOST_PORT}" "${PG_CTR}"
+    free_docker_port_conflicts "${PGRST_HOST_PORT}" "${PGRST_CTR}"
+    free_docker_port_conflicts "${APP_HOST_PORT}" "${APP_CTR}"
+    if [ "${STACK_MODE}" = "standalone" ] && [ -n "${PGB_CTR}" ]; then
+      free_docker_port_conflicts "${PG_POOL_PORT}" "${PGB_CTR}"
+    fi
+    if port_held_by_other "${PG_HOST_PORT}" "${PG_CTR}"; then
+      command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT}/tcp" >/dev/null 2>&1 || true
+    fi
 
     if is_port_busy "${PG_HOST_PORT}"; then
       PG_HOST_PORT="$(find_next_free_port 5433)"
       ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
       export PG_HOST_PORT
       log_fix "Reassigned PG_HOST_PORT=${PG_HOST_PORT} after cleanup"
+    fi
+    if [ "${STACK_MODE}" = "standalone" ] && is_port_busy "${PG_POOL_PORT}"; then
+      PG_POOL_PORT="$(find_next_free_port 6544)"
+      ensure_env_key "PG_POOL_PORT" "${PG_POOL_PORT}"
+      export PG_POOL_PORT
+      log_fix "Reassigned PG_POOL_PORT=${PG_POOL_PORT} after cleanup"
     fi
     if is_port_busy "${PGRST_HOST_PORT}"; then
       PGRST_HOST_PORT="$(find_next_free_port 3002)"
@@ -1626,7 +1722,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     if ! compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans >"${compose_err_file}" 2>&1; then
       c_err_tail="$(tail -n 10 "${compose_err_file}" 2>/dev/null | tr '\n' ' ' || true)"
       log_warn "Compose recovery up failed (${c_err_tail:0:180}); starting services individually"
-      for svc in postgres postgrest sparrowx nginx; do
+      for svc in "${COMPOSE_SERVICES[@]}"; do
         compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${svc}" >/dev/null 2>&1 || true
       done
     else
@@ -1638,10 +1734,12 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   rm -f "${compose_err_file}"
 
   # Ensure every individual service is created & running (fixes 'Created' or missing containers)
-  for svc in postgres postgrest sparrowx nginx; do
+  for svc in "${COMPOSE_SERVICES[@]}"; do
     compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${svc}" >/dev/null 2>&1 || true
   done
-  docker start sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+  docker start "${PG_CTR}" "${PGRST_CTR}" "${APP_CTR}" "${EDGE_CTR}" >/dev/null 2>&1 || true
+  [ -n "${PGB_CTR}" ] && docker start "${PGB_CTR}" >/dev/null 2>&1 || true
+  [ -n "${REDIS_CTR}" ] && docker start "${REDIS_CTR}" >/dev/null 2>&1 || true
 
   if is_pterodactyl_installed; then
     DOCKER_HOST_IP="$(get_docker_host_ip)"
@@ -1653,14 +1751,14 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     fi
   fi
 
-  if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
-    if ! docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
-      docker restart sparrowx-nginx >/dev/null 2>&1 || true
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${EDGE_CTR}"; then
+    if ! docker exec "${EDGE_CTR}" nginx -t >/dev/null 2>&1; then
+      docker restart "${EDGE_CTR}" >/dev/null 2>&1 || true
     fi
-    if ! docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
+    if ! docker exec "${EDGE_CTR}" nginx -t >/dev/null 2>&1; then
       log_warn "Nginx syntax test flagged an issue; regenerating minimal fallback config"
     else
-      docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+      docker restart "${EDGE_CTR}" >/dev/null 2>&1 || docker exec "${EDGE_CTR}" nginx -s reload >/dev/null 2>&1 || true
     fi
   fi
 
@@ -1691,9 +1789,9 @@ draw_progress 10 12 "Postgres Schema & PostgREST"
 PG_READY="false"
 PGRST_READY="false"
 
-if [ "${HAS_DOCKER}" = "true" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
-  for _i in $(seq 1 20); do
-    if docker exec sparrowx-postgres pg_isready -q >/dev/null 2>&1; then
+if [ "${HAS_DOCKER}" = "true" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${PG_CTR}"; then
+  for _i in $(seq 1 40); do
+    if docker exec "${PG_CTR}" pg_isready -q >/dev/null 2>&1; then
       PG_READY="true"
       break
     fi
@@ -1703,7 +1801,7 @@ if [ "${HAS_DOCKER}" = "true" ] && docker ps --format '{{.Names}}' 2>/dev/null |
   if [ "${PG_READY}" = "true" ]; then
     PG_SUPER=""
     for cand_user in "${POSTGRES_USER}" "postgres" "sparrowx"; do
-      if docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${cand_user}" -d postgres -tAc "SELECT 1;" >/dev/null 2>&1; then
+      if docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${cand_user}" -d postgres -tAc "SELECT 1;" >/dev/null 2>&1; then
         PG_SUPER="${cand_user}"
         break
       fi
@@ -1711,35 +1809,46 @@ if [ "${HAS_DOCKER}" = "true" ] && docker ps --format '{{.Names}}' 2>/dev/null |
 
     if [ -n "${PG_SUPER}" ]; then
       ESC_PASS="${POSTGRES_PASSWORD//\'/\'\'}"
-      ROLE_EXISTS="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${PG_SUPER}" -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}';" 2>/dev/null | tr -d '[:space:]')"
+      ROLE_EXISTS="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname='${POSTGRES_USER}';" 2>/dev/null | tr -d '[:space:]')"
       if [ "${ROLE_EXISTS}" != "1" ]; then
-        docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${PG_SUPER}" -d postgres -c "CREATE ROLE \"${POSTGRES_USER}\" WITH SUPERUSER LOGIN PASSWORD '${ESC_PASS}';" >/dev/null 2>&1 || true
+        docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -c "CREATE ROLE \"${POSTGRES_USER}\" WITH SUPERUSER LOGIN PASSWORD '${ESC_PASS}';" >/dev/null 2>&1 || true
         log_fix "Created missing PostgreSQL role '${POSTGRES_USER}'"
       else
-        docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${PG_SUPER}" -d postgres -c "ALTER ROLE \"${POSTGRES_USER}\" WITH PASSWORD '${ESC_PASS}';" >/dev/null 2>&1 || true
+        docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -c "ALTER ROLE \"${POSTGRES_USER}\" WITH PASSWORD '${ESC_PASS}';" >/dev/null 2>&1 || true
       fi
 
-      DB_EXISTS="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${PG_SUPER}" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}';" 2>/dev/null | tr -d '[:space:]')"
+      DB_EXISTS="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${POSTGRES_DB}';" 2>/dev/null | tr -d '[:space:]')"
       if [ "${DB_EXISTS}" != "1" ]; then
-        docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${PG_SUPER}" -d postgres -c "CREATE DATABASE \"${POSTGRES_DB}\" OWNER \"${POSTGRES_USER}\";" >/dev/null 2>&1 || true
+        docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -c "CREATE DATABASE \"${POSTGRES_DB}\" OWNER \"${POSTGRES_USER}\";" >/dev/null 2>&1 || true
         log_fix "Created missing PostgreSQL database '${POSTGRES_DB}'"
       fi
 
+      if [ "${STACK_MODE}" = "standalone" ]; then
+        for bp_db in sparrowbase sparrowx_db_studio sparrowx_shield sparrowx_files sparrowx_api; do
+          bp_exists="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='${bp_db}';" 2>/dev/null | tr -d '[:space:]')"
+          if [ "${bp_exists}" != "1" ]; then
+            docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d postgres -c "CREATE DATABASE \"${bp_db}\" OWNER \"${POSTGRES_USER}\";" >/dev/null 2>&1 || true
+            log_fix "Provisioned missing 5-DB blueprint database '${bp_db}'"
+          fi
+          docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${PG_SUPER}" -d "${bp_db}" -c "CREATE EXTENSION IF NOT EXISTS vector; CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";" >/dev/null 2>&1 || true
+        done
+      fi
+
       if [ -f "${INSTALL_DIR}/ovh/schema.sql" ]; then
-        USERS_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.app_users');" 2>/dev/null | tr -d '[:space:]')"
-        INQ_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.contact_inquiries');" 2>/dev/null | tr -d '[:space:]')"
+        USERS_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.app_users');" 2>/dev/null | tr -d '[:space:]')"
+        INQ_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.contact_inquiries');" 2>/dev/null | tr -d '[:space:]')"
         if { [ "${USERS_TBL}" != "app_users" ] && [ "${USERS_TBL}" != "public.app_users" ]; } || { [ "${INQ_TBL}" != "contact_inquiries" ] && [ "${INQ_TBL}" != "public.contact_inquiries" ]; }; then
-          docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
+          docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" "${PG_CTR}" psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
           log_fix "Applied ovh/schema.sql (tables + web_anon/authenticator roles)"
         else
           log_ok "PostgreSQL schema verified (${POSTGRES_DB} tables active)"
         fi
       fi
     else
-      log_warn "Could not auto-verify superuser socket access inside sparrowx-postgres"
+      log_warn "Could not auto-verify superuser socket access inside ${PG_CTR}"
     fi
   else
-    log_err "sparrowx-postgres did not become ready within 20s"
+    log_err "${PG_CTR} did not become ready within 40s"
   fi
 
   # Verify PostgREST responds & reload schema cache if needed
@@ -1751,8 +1860,8 @@ if [ "${HAS_DOCKER}" = "true" ] && docker ps --format '{{.Names}}' 2>/dev/null |
     sleep 1
   done
   if [ "${PGRST_READY}" != "true" ]; then
-    log_fix "PostgREST not responding on :${PGRST_HOST_PORT} — restarting sparrowx-postgrest"
-    docker restart sparrowx-postgrest >/dev/null 2>&1 || true
+    log_fix "PostgREST not responding on :${PGRST_HOST_PORT} — restarting ${PGRST_CTR}"
+    docker restart "${PGRST_CTR}" >/dev/null 2>&1 || true
     sleep 4
     curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/" >/dev/null 2>&1 && PGRST_READY="true"
   fi
@@ -1856,13 +1965,13 @@ for _h in $(seq 1 15); do
 done
 
 if [ "${APP_HEALTH}" = "DOWN" ] && [ "${HAS_DOCKER}" = "true" ]; then
-  log_fix "App server unhealthy on :${APP_HOST_PORT}; bouncing sparrowx-app and checking logs"
-  docker restart sparrowx-app >/dev/null 2>&1 || true
+  log_fix "App server unhealthy on :${APP_HOST_PORT}; bouncing ${APP_CTR} and checking logs"
+  docker restart "${APP_CTR}" >/dev/null 2>&1 || true
   sleep 5
   if curl -fsS "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
     APP_HEALTH="RECOVERED (200 OK)"
   else
-    docker logs --tail 25 sparrowx-app 2>&1 || true
+    docker logs --tail 25 "${APP_CTR}" 2>&1 || true
   fi
 fi
 
@@ -1880,7 +1989,7 @@ fi
 
 # Guaranteed Edge Proxy Recovery if port 80 or 443 is refusing connections
 if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; } && [ "${HAS_DOCKER}" = "true" ]; then
-  log_fix "Edge proxy down (HTTP=${EDGE_HTTP_HEALTH}, HTTPS=${EDGE_HTTPS_HEALTH}); running guaranteed sparrowx-nginx recovery"
+  log_fix "Edge proxy down (HTTP=${EDGE_HTTP_HEALTH}, HTTPS=${EDGE_HTTPS_HEALTH}); running guaranteed ${EDGE_CTR} recovery"
   if [ ! -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ] || [ ! -s "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
     mkdir -p "${INSTALL_DIR}/ovh/ssl"
     openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
@@ -1894,22 +2003,22 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
   fi
 
   # Ensure nothing else on host is holding 80/443
-  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
+  free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
   for web_p in "${HTTP_PORT}" "${HTTPS_PORT}"; do
-    if port_held_by_other "${web_p}" "sparrowx-nginx"; then
+    if port_held_by_other "${web_p}" "${EDGE_CTR}"; then
       command -v fuser >/dev/null 2>&1 && fuser -k "${web_p}/tcp" >/dev/null 2>&1 || true
       pkill -9 -f "docker-proxy.*-host-port ${web_p}( |$)" >/dev/null 2>&1 || true
     fi
   done
 
-  compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps nginx >/dev/null 2>&1 || true
-  docker start sparrowx-nginx >/dev/null 2>&1 || true
+  compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps "${EDGE_SVC}" >/dev/null 2>&1 || true
+  docker start "${EDGE_CTR}" >/dev/null 2>&1 || true
   sleep 3
 
-  if ! docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
-    nginx_err="$(docker exec sparrowx-nginx nginx -t 2>&1 || docker logs --tail 20 sparrowx-nginx 2>&1 || true)"
-    log_warn "sparrowx-nginx config failed (${nginx_err:0:180}); writing clean fallback ovh/nginx.conf"
+  if ! docker exec "${EDGE_CTR}" nginx -t >/dev/null 2>&1; then
+    nginx_err="$(docker exec "${EDGE_CTR}" nginx -t 2>&1 || docker logs --tail 20 "${EDGE_CTR}" 2>&1 || true)"
+    log_warn "${EDGE_CTR} config failed (${nginx_err:0:180}); writing clean fallback ovh/nginx.conf"
     cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF_MIN_NGINX
 server {
     listen 80 default_server;
@@ -1922,12 +2031,12 @@ server {
     resolver 127.0.0.11 valid=10s ipv6=off;
     location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; allow all; }
     location /rest/v1/ {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_set_header Host \$host;
     }
     location / {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -1939,7 +2048,7 @@ server {
     }
 }
 EOF_MIN_NGINX
-    docker restart sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps nginx >/dev/null 2>&1 || true
+    docker restart "${EDGE_CTR}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps "${EDGE_SVC}" >/dev/null 2>&1 || true
     sleep 3
   fi
 
@@ -1948,6 +2057,23 @@ EOF_MIN_NGINX
   fi
   if curl -kfsS -o /dev/null -w "%{http_code}" "https://127.0.0.1:${HTTPS_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$"; then
     EDGE_HTTPS_HEALTH="RECOVERED (:${HTTPS_PORT})"
+  fi
+fi
+
+PGB_HEALTH="N/A"
+REDIS_HEALTH="N/A"
+if [ "${STACK_MODE}" = "standalone" ] && [ "${HAS_DOCKER}" = "true" ]; then
+  if [ -n "${PGB_CTR}" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${PGB_CTR}"; then
+    PGB_HEALTH="ONLINE (:${PG_POOL_PORT})"
+  else
+    PGB_HEALTH="DOWN"
+    [ -n "${PGB_CTR}" ] && docker start "${PGB_CTR}" >/dev/null 2>&1 || true
+  fi
+  if [ -n "${REDIS_CTR}" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${REDIS_CTR}"; then
+    REDIS_HEALTH="ONLINE"
+  else
+    REDIS_HEALTH="DOWN"
+    [ -n "${REDIS_CTR}" ] && docker start "${REDIS_CTR}" >/dev/null 2>&1 || true
   fi
 fi
 
@@ -1965,8 +2091,13 @@ echo ""
 echo -e "${C_GREEN}╔══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}${C_WHITE}✅ SPARROWX DIAGNOSTIC & AUTO-HEAL COMPLETE${C_RESET}                             ${C_GREEN}║${C_RESET}"
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
+printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Stack Architecture" "${STACK_MODE} ($(basename "${COMPOSE_FILE}"))"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Issues Auto-Fixed" "${FIXED_COUNT} issue(s) healed (${WARN_COUNT} warnings)"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "PostgreSQL 16" "$([ "${PG_READY}" = "true" ] && echo "ONLINE (127.0.0.1:${PG_HOST_PORT})" || echo "CHECK LOGS")"
+if [ "${STACK_MODE}" = "standalone" ]; then
+  printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "PgBouncer Pooler" "${PGB_HEALTH}"
+  printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Threat Cache (Redis)" "${REDIS_HEALTH}"
+fi
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "PostgREST API" "${PGRST_HEALTH}"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "SparrowX Web App" "${APP_HEALTH}"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Nginx Edge HTTP / HTTPS" "${EDGE_HTTP_HEALTH} / ${EDGE_HTTPS_HEALTH}"
@@ -2014,6 +2145,8 @@ echo -e "${C_GREEN}╚═══════════════════�
 
 # Collect any services/checks that remained unfixed after all healing passes
 [ "${PG_READY:-false}" != "true" ] && UNFIXED_LOG+=("PostgreSQL 16 not ready on 127.0.0.1:${PG_HOST_PORT}")
+[ "${STACK_MODE}" = "standalone" ] && [ "${PGB_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("PgBouncer Pooler DOWN on 127.0.0.1:${PG_POOL_PORT}")
+[ "${STACK_MODE}" = "standalone" ] && [ "${REDIS_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Threat Cache (Redis) container ${REDIS_CTR} DOWN")
 [ "${PGRST_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("PostgREST API DOWN on 127.0.0.1:${PGRST_HOST_PORT}")
 [ "${APP_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("SparrowX Web App DOWN on 127.0.0.1:${APP_HOST_PORT}")
 [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Nginx Edge HTTP DOWN on :${HTTP_PORT}")
