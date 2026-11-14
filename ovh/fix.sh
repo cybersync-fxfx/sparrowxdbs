@@ -63,14 +63,26 @@ if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
   exec sudo -E bash "$0" "$@"
 fi
 
-# Prevent concurrent fix.sh runs (e.g. cron/watchdog + manual) from colliding on Docker containers
-if command -v flock >/dev/null 2>&1; then
-  exec 9>/var/run/sparrowx-fix.lock
-  if ! flock -w 120 9; then
-    echo "Another fix.sh instance is currently running; exiting cleanly."
-    exit 0
+# Prevent concurrent fix.sh runs using a clean PID lock (never inherited by child daemons)
+LOCK_PID_FILE="/var/run/sparrowx-fix.pid"
+if [ -f "${LOCK_PID_FILE}" ]; then
+  OLD_PID="$(cat "${LOCK_PID_FILE}" 2>/dev/null || true)"
+  if [ -n "${OLD_PID}" ] && [ "${OLD_PID}" != "$$" ] && kill -0 "${OLD_PID}" 2>/dev/null && grep -q "fix\.sh" "/proc/${OLD_PID}/cmdline" 2>/dev/null; then
+    echo "Another fix.sh (PID ${OLD_PID}) is running; waiting up to 15s..."
+    _w=0
+    while [ "${_w}" -lt 15 ] && kill -0 "${OLD_PID}" 2>/dev/null; do
+      sleep 1
+      _w=$((_w + 1))
+    done
+    if kill -0 "${OLD_PID}" 2>/dev/null; then
+      echo "Stopping stalled fix.sh (PID ${OLD_PID}) so this run can proceed..."
+      kill -TERM "${OLD_PID}" >/dev/null 2>&1 || true
+      sleep 1
+    fi
   fi
 fi
+echo "$$" > "${LOCK_PID_FILE}" 2>/dev/null || true
+trap 'rm -f "${LOCK_PID_FILE}" 2>/dev/null || true' EXIT
 
 # ------------------------------------------------------------------------------
 # Cyber CLI Colors & Visual Formatting
