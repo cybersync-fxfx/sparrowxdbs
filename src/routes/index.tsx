@@ -1747,13 +1747,16 @@ function Dashboard() {
             onUserAuthenticated={handleUserAuthenticated}
             onDirectNav={(target) => {
               if (typeof window === "undefined") return;
-              const url = new URL(window.location.href);
+              const url = new URL(window.location.origin + "/");
               if (target === "db") url.searchParams.set("db", "1");
               else if (target === "file") url.searchParams.set("file", "1");
               else if (target === "password") url.searchParams.set("password", "1");
               else if (target === "sec") url.searchParams.set("shield", "1");
               else if (target === "api") url.searchParams.set("api", "1");
-              window.location.href = url.toString();
+              const opened = window.open(url.toString(), "_blank", "noopener,noreferrer");
+              if (!opened) {
+                window.location.href = url.toString();
+              }
             }}
           />
           <BackgroundEngineToaster />

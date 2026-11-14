@@ -278,6 +278,8 @@ export function SparrowxStoryPage() {
                 </a>
                 <a
                   href="https://db.sparrowx.net"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded bg-[#111A30] border border-sky-500/30 hover:border-sky-400 text-white transition-colors inline-flex items-center gap-1"
                 >
                   <span>Cloud DB</span>
@@ -285,6 +287,8 @@ export function SparrowxStoryPage() {
                 </a>
                 <a
                   href="https://file.sparrowx.net"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded bg-[#111A30] border border-emerald-500/30 hover:border-emerald-400 text-white transition-colors inline-flex items-center gap-1"
                 >
                   <span>Drop</span>
@@ -292,6 +296,8 @@ export function SparrowxStoryPage() {
                 </a>
                 <a
                   href="https://sec.sparrowx.net"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded bg-[#111A30] border border-orange-500/30 hover:border-orange-400 text-white transition-colors inline-flex items-center gap-1"
                 >
                   <span>Shield</span>

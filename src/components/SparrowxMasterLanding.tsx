@@ -21,6 +21,8 @@ import {
   ChevronDown,
   Menu,
   X,
+  User,
+  LogOut,
 } from "lucide-react";
 import { ComparisonSection } from "./landing/ComparisonSection";
 import { ContactSection } from "./landing/ContactSection";
@@ -31,9 +33,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { authenticateAppUserFromBackend } from "@/lib/supabase";
-import type { AppUser } from "@/lib/supabase";
-import { issueSignedSessionToken } from "@/lib/advanced-features";
+import {
+  authenticateAppUserFromBackend,
+  fetchAppUserByEmailFromBackend,
+  generateSecureSparrowKey,
+  persistAppUserToBackend,
+  persistClientTenantToBackend,
+  type AppUser,
+  type ClientTenant,
+} from "@/lib/supabase";
+import {
+  clearSessionToken,
+  issueSignedSessionToken,
+  verifySessionToken,
+} from "@/lib/advanced-features";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 
 interface SparrowxMasterLandingProps {
@@ -42,32 +55,44 @@ interface SparrowxMasterLandingProps {
   onUserAuthenticated?: (user: AppUser) => void;
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // -----------------------------------------------------------------------------
-// Workspace Sign In Modal
+// Workspace Sign In & Account Creation Modal
 // -----------------------------------------------------------------------------
 function OperatorLoginDialog({
   open,
   onOpenChange,
   onSuccess,
-  onRequestRegister,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (user: AppUser) => void;
-  onRequestRegister?: () => void;
 }) {
+  const [authTab, setAuthTab] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [orgName, setOrgName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const emailClean = email.trim().toLowerCase();
+    if (!EMAIL_PATTERN.test(emailClean)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
     setLoading(true);
 
     try {
-      const res = await authenticateAppUserFromBackend(email.trim(), password);
+      const res = await authenticateAppUserFromBackend(emailClean, password);
       setLoading(false);
 
       if (res.user) {
@@ -91,21 +116,124 @@ function OperatorLoginDialog({
     }
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const emailClean = email.trim().toLowerCase();
+    if (!fullName.trim()) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(emailClean)) {
+      setError("Please enter a valid developer email address.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const existingUser = await fetchAppUserByEmailFromBackend(emailClean);
+      if (existingUser) {
+        setError("An account with this email already exists. Please sign in instead.");
+        setLoading(false);
+        return;
+      }
+
+      const tenantId = `TNT-${Date.now().toString().slice(-4)}`;
+      const cleanOrg = orgName.trim() || `${fullName.trim()} Workspace`;
+      const newTenant: ClientTenant = {
+        id: tenantId,
+        name: cleanOrg,
+        contactEmail: emailClean,
+        primaryDomain: `${tenantId.toLowerCase()}.sparrowx.net`,
+        planTier: "Developer Starter",
+        status: "Active",
+        enabledModules: ["cloud_security", "web_security", "ai_shield"],
+        apiKey: generateSecureSparrowKey("spx_live"),
+        sdkVerified: true,
+        guardrailsActive: true,
+        requestsPerMin: 0,
+        blockedThreats: 0,
+        avgLatencyMs: 0.8,
+        quotaUsedPct: 1,
+      };
+      await persistClientTenantToBackend(newTenant);
+
+      const newUser: AppUser = {
+        id: `USR-${Date.now().toString().slice(-4)}`,
+        email: emailClean,
+        password,
+        fullName: fullName.trim(),
+        admin: "no",
+        tenantId,
+      };
+      await persistAppUserToBackend(newUser);
+
+      const safeUser: AppUser = { ...newUser, password: "" };
+      issueSignedSessionToken({
+        id: safeUser.id,
+        email: safeUser.email,
+        fullName: safeUser.fullName,
+        role: "client",
+        tenantId,
+      });
+      setLoading(false);
+      onOpenChange(false);
+      if (onSuccess) {
+        onSuccess(safeUser);
+      }
+    } catch {
+      setLoading(false);
+      setError("Unable to create account in database. Please retry.");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#0D1526] border border-sky-500/20 text-white max-w-md p-6 font-sans shadow-2xl">
         <DialogHeader className="text-left space-y-1.5 mb-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-mono text-sky-400 mb-1">
             <span className="size-1.5 rounded-full bg-sky-400 animate-pulse" />
-            SPARROWX CLOUD SIGN-IN
+            SPARROWX CLOUD IDENTITY
           </div>
           <DialogTitle className="text-xl font-bold text-white tracking-tight font-sans">
-            Access Developer Workspace
+            {authTab === "signin" ? "Access Developer Workspace" : "Create SparrowX Account"}
           </DialogTitle>
           <DialogDescription className="text-xs text-[#A3B1C6] leading-relaxed">
-            Enter your credentials to manage your databases, security shields, and persistent vaults.
+            {authTab === "signin"
+              ? "Sign in with your verified credentials to manage your databases, shields, and vault."
+              : "Provision an isolated database tenant, API key, and encrypted vault account."}
           </DialogDescription>
         </DialogHeader>
+
+        <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3 font-mono text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setAuthTab("signin");
+              setError("");
+            }}
+            className={`px-3 py-1.5 rounded font-bold transition-colors cursor-pointer ${
+              authTab === "signin" ? "bg-sky-500 text-black" : "text-[#A3B1C6] hover:text-white"
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthTab("register");
+              setError("");
+            }}
+            className={`px-3 py-1.5 rounded font-bold transition-colors cursor-pointer ${
+              authTab === "register" ? "bg-emerald-500 text-black" : "text-[#A3B1C6] hover:text-white"
+            }`}
+          >
+            Create Account
+          </button>
+        </div>
 
         {error && (
           <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
@@ -113,8 +241,34 @@ function OperatorLoginDialog({
           </div>
         )}
 
-        <form onSubmit={handleSignIn} className="space-y-4 pt-1 font-mono text-xs">
-          <div className="space-y-1.5 text-left">
+        <form onSubmit={authTab === "signin" ? handleSignIn : handleRegister} className="space-y-3.5 pt-1 font-mono text-xs">
+          {authTab === "register" && (
+            <>
+              <div className="space-y-1 text-left">
+                <label className="text-[11px] text-[#A3B1C6]">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Alex Turner"
+                  className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
+                />
+              </div>
+              <div className="space-y-1 text-left">
+                <label className="text-[11px] text-[#A3B1C6]">Workspace / Organization (Optional)</label>
+                <input
+                  type="text"
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  placeholder="Acme Cloud Lab"
+                  className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="space-y-1 text-left">
             <label className="text-[11px] text-[#A3B1C6]">Account Email</label>
             <input
               type="email"
@@ -122,19 +276,20 @@ function OperatorLoginDialog({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@yourdomain.com"
-              className="w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
+              className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
             />
           </div>
 
-          <div className="space-y-1.5 text-left">
-            <label className="text-[11px] text-[#A3B1C6]">Password</label>
+          <div className="space-y-1 text-left">
+            <label className="text-[11px] text-[#A3B1C6]">Password (min 6 chars)</label>
             <input
               type="password"
               required
+              minLength={6}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
-              className="w-full px-3.5 py-2.5 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
+              className="w-full px-3.5 py-2 rounded bg-[#070B14] border border-sky-500/20 text-white placeholder-[#7C8BA1] focus:outline-none focus:border-sky-400"
             />
           </div>
 
@@ -152,24 +307,15 @@ function OperatorLoginDialog({
               className="px-5 py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.3)]"
             >
               {loading && <RefreshCw className="size-3 animate-spin" />}
-              <span>{loading ? "Authenticating..." : "Sign In"}</span>
+              <span>
+                {loading
+                  ? "Verifying..."
+                  : authTab === "signin"
+                    ? "Sign In"
+                    : "Create Account"}
+              </span>
             </button>
           </div>
-
-          {onRequestRegister && (
-            <div className="pt-3 border-t border-white/[0.08] text-center">
-              <button
-                type="button"
-                onClick={() => {
-                  onOpenChange(false);
-                  onRequestRegister();
-                }}
-                className="text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
-              >
-                Need a new workspace? Create an account →
-              </button>
-            </div>
-          )}
         </form>
       </DialogContent>
     </Dialog>
@@ -181,7 +327,6 @@ function OperatorLoginDialog({
 // -----------------------------------------------------------------------------
 export function SparrowxMasterLanding({
   onOpenLogin,
-  onDirectNav,
   onUserAuthenticated,
 }: SparrowxMasterLandingProps) {
   const [operatorModalOpen, setOperatorModalOpen] = useState(false);
@@ -189,6 +334,18 @@ export function SparrowxMasterLanding({
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => {
+    const verified = verifySessionToken();
+    if (!verified) return null;
+    return {
+      id: verified.sub,
+      email: verified.email,
+      fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
+      password: "",
+      admin: verified.role === "admin" ? "yes" : "no",
+      tenantId: verified.tenantId,
+    };
+  });
 
   // Highlight the nav link for the section currently in view.
   useEffect(() => {
@@ -264,19 +421,23 @@ export function SparrowxMasterLanding({
     },
   ];
 
-  const handleLaunch = (targetId: string, url: string, param: string) => {
-    if (typeof window !== "undefined" && window.location.hostname.includes("sparrowx.net")) {
-      window.location.href = url;
-    } else if (onDirectNav) {
-      onDirectNav(targetId);
-    } else if (typeof window !== "undefined") {
-      const u = new URL(window.location.href);
-      ["db", "file", "drop", "password", "keys", "shield", "sec", "api"].forEach((k) =>
-        u.searchParams.delete(k)
-      );
+  const handleLaunch = (_targetId: string, url: string, param: string) => {
+    if (typeof window === "undefined") return;
+    let targetUrl = url;
+    if (!window.location.hostname.includes("sparrowx.net")) {
+      const u = new URL(window.location.origin + "/");
       u.searchParams.set(param, "1");
-      window.location.href = u.toString();
+      targetUrl = u.toString();
     }
+    const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      window.location.href = targetUrl;
+    }
+  };
+
+  const handleLandingSignOut = () => {
+    clearSessionToken();
+    setSessionUser(null);
   };
 
   return (
@@ -415,37 +576,68 @@ export function SparrowxMasterLanding({
             </a>
             <a
               href="https://password.sparrowx.net"
+              target="_blank"
+              rel="noopener noreferrer"
               onClick={(e) => {
                 if (!window.location.hostname.includes("sparrowx.net")) {
                   e.preventDefault();
                   handleLaunch("password", "https://password.sparrowx.net", "password");
                 }
               }}
-              className="text-sky-400 hover:text-sky-300 font-semibold"
+              className="text-sky-400 hover:text-sky-300 font-semibold inline-flex items-center gap-1"
             >
-              Offline Keys (Free)
+              <span>Offline Keys (Free)</span>
+              <ArrowUpRight className="size-3" />
             </a>
           </nav>
 
           {/* Right Action Bar */}
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => setOperatorModalOpen(true)}
-              className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#A3B1C6] hover:text-white transition-all items-center gap-1.5 cursor-pointer"
-            >
-              <Lock className="size-3 text-sky-400" />
-              <span>Workspace Sign-In</span>
-            </button>
+            {sessionUser ? (
+              <>
+                <span className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-xs max-w-[190px] truncate">
+                  <User className="size-3.5 shrink-0" />
+                  <span className="truncate">{sessionUser.fullName || sessionUser.email}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenLogin()}
+                  className="hidden sm:flex px-3.5 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all items-center gap-1.5 cursor-pointer font-mono shadow-[0_0_15px_rgba(56,189,248,0.25)]"
+                >
+                  <span>Open Console</span>
+                  <ArrowUpRight className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLandingSignOut}
+                  className="hidden sm:flex px-3 py-1.5 rounded bg-[#111A30] border border-red-500/30 hover:bg-red-500/15 text-xs font-mono text-red-300 transition-colors items-center gap-1.5 cursor-pointer"
+                  title="Sign out of session"
+                >
+                  <LogOut className="size-3" />
+                  <span>Sign Out</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setOperatorModalOpen(true)}
+                  className="hidden sm:flex px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-500/50 text-xs font-mono text-[#A3B1C6] hover:text-white transition-all items-center gap-1.5 cursor-pointer"
+                >
+                  <Lock className="size-3 text-sky-400" />
+                  <span>Sign In / Register</span>
+                </button>
 
-            <button
-              type="button"
-              onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-              className="px-3 sm:px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.25)] font-mono min-h-[36px] sm:min-h-0"
-            >
-              <span>Launch Studio</span>
-              <ArrowUpRight className="size-3.5" />
-            </button>
+                <button
+                  type="button"
+                  onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
+                  className="px-3 sm:px-4 py-1.5 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold text-xs transition-all flex items-center gap-1 cursor-pointer shadow-[0_0_15px_rgba(56,189,248,0.25)] font-mono min-h-[36px] sm:min-h-0"
+                >
+                  <span>Launch DB Studio</span>
+                  <ArrowUpRight className="size-3.5" />
+                </button>
+              </>
+            )}
 
             {/* Mobile Hamburger Menu Button */}
             <button
@@ -596,17 +788,46 @@ export function SparrowxMasterLanding({
                 <ArrowRight className="size-3.5 text-sky-400" />
               </a>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  setOperatorModalOpen(true);
-                }}
-                className="w-full min-h-[44px] rounded bg-[#111A30] border border-sky-500/30 text-white font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Lock className="size-3.5 text-sky-400" />
-                <span>Workspace Sign-In</span>
-              </button>
+              {sessionUser ? (
+                <div className="space-y-2 pt-1">
+                  <div className="p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-xs flex items-center justify-between gap-2">
+                    <span className="truncate">{sessionUser.fullName || sessionUser.email}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        handleLandingSignOut();
+                      }}
+                      className="text-red-300 hover:text-red-200 underline cursor-pointer shrink-0"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onOpenLogin();
+                    }}
+                    className="w-full min-h-[44px] rounded bg-sky-500 hover:bg-sky-400 text-black font-bold font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Open Workspace Console</span>
+                    <ArrowUpRight className="size-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setOperatorModalOpen(true);
+                  }}
+                  className="w-full min-h-[44px] rounded bg-[#111A30] border border-sky-500/30 text-white font-mono text-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Lock className="size-3.5 text-sky-400" />
+                  <span>Sign In / Register</span>
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1090,23 +1311,78 @@ export function SparrowxMasterLanding({
               sparrowx.net
             </a>
             <span className="text-[#475569]">&bull;</span>
-            <a href="https://db.sparrowx.net" className="hover:text-white transition-colors">
+            <a
+              href="https://db.sparrowx.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!window.location.hostname.includes("sparrowx.net")) {
+                  e.preventDefault();
+                  handleLaunch("db", "https://db.sparrowx.net", "db");
+                }
+              }}
+              className="hover:text-white transition-colors"
+            >
               db.sparrowx.net
             </a>
             <span className="text-[#475569]">&bull;</span>
-            <a href="https://sec.sparrowx.net" className="hover:text-white transition-colors">
+            <a
+              href="https://sec.sparrowx.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!window.location.hostname.includes("sparrowx.net")) {
+                  e.preventDefault();
+                  handleLaunch("sec", "https://sec.sparrowx.net", "shield");
+                }
+              }}
+              className="hover:text-white transition-colors"
+            >
               sec.sparrowx.net
             </a>
             <span className="text-[#475569]">&bull;</span>
-            <a href="https://file.sparrowx.net" className="hover:text-white transition-colors">
+            <a
+              href="https://file.sparrowx.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!window.location.hostname.includes("sparrowx.net")) {
+                  e.preventDefault();
+                  handleLaunch("file", "https://file.sparrowx.net", "file");
+                }
+              }}
+              className="hover:text-white transition-colors"
+            >
               file.sparrowx.net
             </a>
             <span className="text-[#475569]">&bull;</span>
-            <a href="https://password.sparrowx.net" className="hover:text-white transition-colors">
+            <a
+              href="https://password.sparrowx.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!window.location.hostname.includes("sparrowx.net")) {
+                  e.preventDefault();
+                  handleLaunch("password", "https://password.sparrowx.net", "password");
+                }
+              }}
+              className="hover:text-white transition-colors"
+            >
               password.sparrowx.net
             </a>
             <span className="text-[#475569]">&bull;</span>
-            <a href="https://api.sparrowx.net" className="hover:text-white transition-colors">
+            <a
+              href="https://api.sparrowx.net"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (!window.location.hostname.includes("sparrowx.net")) {
+                  e.preventDefault();
+                  handleLaunch("api", "https://api.sparrowx.net", "api");
+                }
+              }}
+              className="hover:text-white transition-colors"
+            >
               api.sparrowx.net
             </a>
             <span className="text-[#475569]">&bull;</span>
@@ -1129,13 +1405,23 @@ export function SparrowxMasterLanding({
               <span>All Systems Operational</span>
             </div>
             <span className="text-[#475569]">&bull;</span>
-            <button
-              type="button"
-              onClick={() => setOperatorModalOpen(true)}
-              className="text-[#A3B1C6] hover:text-white transition-colors cursor-pointer"
-            >
-              Sign In
-            </button>
+            {sessionUser ? (
+              <button
+                type="button"
+                onClick={handleLandingSignOut}
+                className="text-red-300 hover:text-red-200 transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setOperatorModalOpen(true)}
+                className="text-[#A3B1C6] hover:text-white transition-colors cursor-pointer"
+              >
+                Sign In
+              </button>
+            )}
             <span className="text-[#475569]">&bull;</span>
             <span className="text-[#8795AB]">
               &copy; {new Date().getFullYear()} SparrowX
@@ -1144,18 +1430,18 @@ export function SparrowxMasterLanding({
         </div>
       </footer>
 
-      {/* Operator Sign In Dialog */}
+      {/* Operator Sign In & Account Creation Dialog */}
       <OperatorLoginDialog
         open={operatorModalOpen}
         onOpenChange={setOperatorModalOpen}
         onSuccess={(user) => {
+          setSessionUser(user);
           if (onUserAuthenticated) {
             onUserAuthenticated(user);
           } else {
             onOpenLogin();
           }
         }}
-        onRequestRegister={onOpenLogin}
       />
     </div>
   );

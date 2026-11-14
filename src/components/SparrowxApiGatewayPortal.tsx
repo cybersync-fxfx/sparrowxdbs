@@ -23,7 +23,9 @@ import {
 } from "lucide-react";
 import {
   authenticateAppUserFromBackend,
+  fetchAppUserByEmailFromBackend,
   generateSecureSparrowKey,
+  persistAppUserToBackend,
   type AppUser,
 } from "@/lib/supabase";
 import {
@@ -31,6 +33,8 @@ import {
   issueSignedSessionToken,
   clearSessionToken,
 } from "@/lib/advanced-features";
+
+const API_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface EndpointMeta {
   path: string;
@@ -103,6 +107,8 @@ export function SparrowxApiGatewayPortal() {
     };
   });
 
+  const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
+  const [fullName, setFullName] = useState("");
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -136,25 +142,60 @@ export function SparrowxApiGatewayPortal() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    if (!loginEmail.trim() || !loginPassword) {
-      setLoginError("Please enter your account email and password.");
+    const emailClean = loginEmail.trim().toLowerCase();
+    if (!API_EMAIL_PATTERN.test(emailClean)) {
+      setLoginError("Please enter a valid account email address.");
+      return;
+    }
+    if (!loginPassword || loginPassword.length < 6) {
+      setLoginError("Password must be at least 6 characters.");
       return;
     }
     setLoggingIn(true);
     try {
-      const user = await authenticateAppUserFromBackend(loginEmail.trim(), loginPassword);
-      if (!user) {
-        setLoginError("Invalid email or password. Sign in with your registered SparrowX account.");
-        return;
+      if (authMode === "signin") {
+        const res = await authenticateAppUserFromBackend(emailClean, loginPassword);
+        if (!res.user) {
+          setLoginError(res.error || "Invalid email or password. Sign in with your registered SparrowX account.");
+          return;
+        }
+        issueSignedSessionToken({
+          id: res.user.id,
+          email: res.user.email,
+          fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
+          role: res.user.admin === "yes" ? "admin" : "client",
+          tenantId: res.user.tenantId,
+        });
+        setSessionUser(res.user);
+      } else {
+        if (!fullName.trim()) {
+          setLoginError("Please enter your full name to register an API account.");
+          return;
+        }
+        const existing = await fetchAppUserByEmailFromBackend(emailClean);
+        if (existing) {
+          setLoginError("An account with this email already exists. Please sign in instead.");
+          return;
+        }
+        const newUser: AppUser = {
+          id: `USR-${Date.now().toString().slice(-4)}`,
+          email: emailClean,
+          password: loginPassword,
+          fullName: fullName.trim(),
+          admin: "no",
+          tenantId: `TENANT-API-${Date.now().toString().slice(-4)}`,
+        };
+        await persistAppUserToBackend(newUser);
+        const safeUser: AppUser = { ...newUser, password: "" };
+        issueSignedSessionToken({
+          id: safeUser.id,
+          email: safeUser.email,
+          fullName: safeUser.fullName,
+          role: "client",
+          tenantId: safeUser.tenantId,
+        });
+        setSessionUser(safeUser);
       }
-      issueSignedSessionToken(
-        user.id,
-        user.email,
-        user.admin === "yes" ? "admin" : "tenant_user",
-        user.tenantId,
-        user.fullName,
-      );
-      setSessionUser(user);
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : "Authentication failed.");
     } finally {
@@ -317,9 +358,52 @@ print(response.json())`;
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">
+              <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3 font-mono text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("signin");
+                    setLoginError(null);
+                  }}
+                  className={`px-3 py-1 rounded font-bold transition-colors cursor-pointer ${
+                    authMode === "signin" ? "bg-white text-black" : "text-[#9CA3AF] hover:text-white"
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthMode("register");
+                    setLoginError(null);
+                  }}
+                  className={`px-3 py-1 rounded font-bold transition-colors cursor-pointer ${
+                    authMode === "register" ? "bg-emerald-500 text-black" : "text-[#9CA3AF] hover:text-white"
+                  }`}
+                >
+                  Create API Account
+                </button>
+              </div>
+
               {loginError && (
                 <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-mono">
                   {loginError}
+                </div>
+              )}
+
+              {authMode === "register" && (
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
+                    Full Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Alex Turner"
+                    className="w-full h-10 rounded border border-white/10 bg-[#08090C] px-3 text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-emerald-500/50"
+                  />
                 </div>
               )}
 
@@ -339,11 +423,12 @@ print(response.json())`;
 
               <div className="space-y-1.5">
                 <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
-                  Password
+                  Password (min 6 chars)
                 </label>
                 <input
                   type="password"
                   required
+                  minLength={6}
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
                   placeholder="••••••••••••"
@@ -356,7 +441,11 @@ print(response.json())`;
                 disabled={loggingIn}
                 className="w-full h-10 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors cursor-pointer disabled:opacity-50"
               >
-                {loggingIn ? "Verifying Credentials..." : "Sign In to Access Your DB API"}
+                {loggingIn
+                  ? "Verifying Credentials..."
+                  : authMode === "signin"
+                    ? "Sign In to Access Your DB API"
+                    : "Create API Account & Generate Key"}
               </button>
             </form>
 

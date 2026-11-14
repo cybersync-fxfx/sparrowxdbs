@@ -61,7 +61,13 @@ import {
   Sliders,
   FileCode,
   UploadCloud,
+  LogOut,
+  UserPlus,
+  UserCheck,
+  Save,
 } from "lucide-react";
+
+const DB_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const LOCAL_SEED_TABLES = migratedSeedData as Record<
   string,
@@ -652,6 +658,24 @@ export function SovereignDatabaseStudio({
   const [landingAuthPassword, setLandingAuthPassword] = useState<string>("");
   const [landingAuthLoading, setLandingAuthLoading] = useState<boolean>(false);
   const [landingAuthError, setLandingAuthError] = useState<string>("");
+
+  // Authenticated Account & Database User Provisioning States
+  const [accountDisplayName, setAccountDisplayName] = useState<string>("");
+  const [accountNewPassword, setAccountNewPassword] = useState<string>("");
+  const [savingAccount, setSavingAccount] = useState<boolean>(false);
+  const [newUserFullName, setNewUserFullName] = useState<string>("");
+  const [newUserEmail, setNewUserEmail] = useState<string>("");
+  const [newUserPassword, setNewUserPassword] = useState<string>("");
+  const [newUserRole, setNewUserRole] = useState<"no" | "yes">("no");
+  const [newUserTenantId, setNewUserTenantId] = useState<string>("");
+  const [creatingAccount, setCreatingAccount] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (sessionUser) {
+      setAccountDisplayName(sessionUser.fullName || "");
+      setNewUserTenantId((prev) => prev || sessionUser.tenantId || "TENANT-SPARROWX");
+    }
+  }, [sessionUser]);
   const [newTableEnableRls, setNewTableEnableRls] = useState<boolean>(true);
   const [newTableColumns, setNewTableColumns] = useState<
     Array<{ name: string; type: string; isPrimary: boolean; isNullable: boolean; defaultValue: string }>
@@ -864,6 +888,121 @@ export function SovereignDatabaseStudio({
     }
   };
 
+  // Account Management: Update current user's display name and/or password in database + session
+  const handleUpdateOwnAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sessionUser) return;
+    const cleanName = accountDisplayName.trim();
+    if (!cleanName) {
+      setStatusBanner({ type: "error", message: "Display name cannot be empty." });
+      return;
+    }
+    if (accountNewPassword && accountNewPassword.length < 6) {
+      setStatusBanner({
+        type: "error",
+        message: "New password must be at least 6 characters.",
+      });
+      return;
+    }
+
+    setSavingAccount(true);
+    try {
+      const updatedUser: AppUser = {
+        id: sessionUser.id,
+        email: sessionUser.email.trim().toLowerCase(),
+        fullName: cleanName,
+        password: accountNewPassword,
+        admin: sessionUser.admin,
+        tenantId: sessionUser.tenantId,
+      };
+      const syncedToPg = await persistAppUserToBackend(updatedUser);
+      const safeUser: AppUser = { ...updatedUser, password: "" };
+      setSessionUser(safeUser);
+      issueSignedSessionToken({
+        id: safeUser.id,
+        email: safeUser.email,
+        fullName: safeUser.fullName,
+        role: safeUser.admin === "yes" ? "admin" : "client",
+        tenantId: safeUser.tenantId,
+      });
+      if (onUserAuthenticated) {
+        onUserAuthenticated(safeUser);
+      }
+      setAccountNewPassword("");
+      await fetchTableRows("app_users");
+      await refreshAllCounts();
+      setStatusBanner({
+        type: "success",
+        message: syncedToPg
+          ? "Account credentials saved and synced to PostgreSQL app_users."
+          : "Account credentials updated in local workspace cache.",
+      });
+    } catch {
+      setStatusBanner({ type: "error", message: "Failed to save account changes." });
+    } finally {
+      setSavingAccount(false);
+    }
+  };
+
+  // Account Management: Provision a new database account with strict email/password validation & hashing
+  const handleProvisionDatabaseUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = newUserEmail.trim().toLowerCase();
+    const cleanName = newUserFullName.trim();
+    if (!cleanName) {
+      setStatusBanner({ type: "error", message: "Full name is required for the new database user." });
+      return;
+    }
+    if (!DB_EMAIL_PATTERN.test(cleanEmail)) {
+      setStatusBanner({ type: "error", message: "Please provide a valid developer email address." });
+      return;
+    }
+    if (newUserPassword.length < 6) {
+      setStatusBanner({
+        type: "error",
+        message: "Initial password must be at least 6 characters.",
+      });
+      return;
+    }
+
+    setCreatingAccount(true);
+    try {
+      const duplicate = await fetchAppUserByEmailFromBackend(cleanEmail);
+      if (duplicate) {
+        setStatusBanner({
+          type: "error",
+          message: `Account ${cleanEmail} already exists in app_users.`,
+        });
+        return;
+      }
+
+      const createdUser: AppUser = {
+        id: `USR-${Date.now().toString().slice(-4)}`,
+        email: cleanEmail,
+        password: newUserPassword,
+        fullName: cleanName,
+        admin: newUserRole,
+        tenantId: newUserTenantId.trim() || sessionUser?.tenantId || "TENANT-SPARROWX",
+      };
+      const synced = await persistAppUserToBackend(createdUser);
+      setNewUserFullName("");
+      setNewUserEmail("");
+      setNewUserPassword("");
+      await fetchTableRows("app_users");
+      await refreshAllCounts();
+      setStatusBanner({
+        type: "success",
+        message: synced
+          ? `Provisioned verified user ${cleanEmail} into PostgreSQL app_users (SHA-256 hashed).`
+          : `Provisioned user ${cleanEmail} into local workspace store.`,
+      });
+    } catch {
+      setStatusBanner({ type: "error", message: "Unable to create database user." });
+    } finally {
+      setCreatingAccount(false);
+    }
+  };
+
   // Insert or Update Row
   const handleSaveRow = async () => {
     let parsed: Record<string, unknown>;
@@ -871,6 +1010,58 @@ export function SovereignDatabaseStudio({
       parsed = JSON.parse(jsonDraft);
     } catch {
       setStatusBanner({ type: "error", message: "Invalid JSON format." });
+      return;
+    }
+
+    if (selectedTable === "app_users") {
+      const rawEmail = String(parsed.email ?? "").trim().toLowerCase();
+      if (!DB_EMAIL_PATTERN.test(rawEmail)) {
+        setStatusBanner({ type: "error", message: "app_users requires a valid email address." });
+        return;
+      }
+      const rawPassword = String(parsed.password ?? "");
+      if (!editingRow && rawPassword.length < 6) {
+        setStatusBanner({
+          type: "error",
+          message: "New app_users records require a password of at least 6 characters.",
+        });
+        return;
+      }
+      if (!editingRow) {
+        const existing = await fetchAppUserByEmailFromBackend(rawEmail);
+        if (existing) {
+          setStatusBanner({
+            type: "error",
+            message: `An account with email ${rawEmail} already exists.`,
+          });
+          return;
+        }
+      }
+      const passwordChanged =
+        !editingRow || (rawPassword.length > 0 && rawPassword !== String(editingRow.password ?? ""));
+      const userPayload: AppUser = {
+        id: String(parsed.id ?? editingRow?.id ?? `USR-${Date.now().toString().slice(-4)}`),
+        email: rawEmail,
+        password: passwordChanged ? rawPassword : "",
+        fullName: String(parsed.full_name ?? parsed.fullName ?? rawEmail.split("@")[0] ?? "Operator"),
+        admin: String(parsed.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
+        tenantId: parsed.tenant_id
+          ? String(parsed.tenant_id)
+          : parsed.tenantId
+            ? String(parsed.tenantId)
+            : null,
+      };
+      await persistAppUserToBackend(userPayload);
+      setShowInsertModal(false);
+      setEditingRow(null);
+      await fetchTableRows("app_users");
+      await refreshAllCounts();
+      setStatusBanner({
+        type: "success",
+        message: editingRow
+          ? `Updated account ${rawEmail} cleanly.`
+          : `Inserted hashed account ${rawEmail} into app_users.`,
+      });
       return;
     }
 
@@ -1305,39 +1496,98 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
               </div>
             </div>
 
-            <div className="flex items-center gap-2 sm:gap-3">
+            <nav className="hidden lg:flex items-center gap-5 text-xs font-mono text-[#A3A3A3]">
+              <a href="#db-features" className="hover:text-white transition-colors">
+                Capabilities
+              </a>
+              <a href="#db-pros-cons" className="hover:text-white transition-colors">
+                Why SparrowX DB
+              </a>
+              <a href="#db-sandbox" className="hover:text-white transition-colors">
+                SQL &amp; Vector Sandbox
+              </a>
+              <a href="#db-auth-card" className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors">
+                Auth &amp; Provisioning
+              </a>
+            </nav>
+
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               {sessionUser ? (
                 <>
+                  <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 font-mono text-[11px]">
+                    <span className="size-1.5 rounded-full bg-emerald-400" />
+                    <span className="max-w-[140px] truncate">{sessionUser.fullName || sessionUser.email}</span>
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-200 font-bold">
+                      {sessionUser.admin === "yes" ? "SUPERUSER" : "DEVELOPER"}
+                    </span>
+                  </span>
                   {!isStandaloneDomain && onOpenClientArea && (
                     <button
                       type="button"
                       onClick={() => onOpenClientArea()}
-                      className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+                      className="px-3 py-1.5 rounded-md border border-white/20 bg-[#14171F] hover:bg-white hover:text-black text-xs font-mono text-zinc-200 transition-colors flex items-center gap-1.5 cursor-pointer"
                     >
                       <span>← Client Area</span>
                     </button>
                   )}
                   <button
                     type="button"
-                    onClick={() => setViewMode("studio")}
-                    className="px-4 py-2 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-black font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                    onClick={() => {
+                      setActiveSection("auth");
+                      setSelectedTable("app_users");
+                      setViewMode("studio");
+                    }}
+                    className="px-3 py-1.5 rounded-md border border-emerald-500/35 bg-[#14171F] hover:bg-emerald-500/15 text-emerald-300 text-xs font-mono transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
-                    <span>Enter Console ({sessionUser.fullName || sessionUser.email}) →</span>
+                    <Users className="size-3.5" />
+                    <span>Account &amp; Users</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("studio")}
+                    className="px-3.5 py-1.5 rounded-md bg-[#3ECF8E] hover:bg-[#34b27b] text-black font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <span>Enter Console →</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLockWorkspace}
+                    className="px-2.5 py-1.5 rounded-md border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-mono transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Sign out of session"
+                  >
+                    <LogOut className="size-3.5" />
+                    <span className="hidden sm:inline">Sign Out</span>
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const el = document.getElementById("db-auth-card");
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                  }}
-                  className="px-4 py-2 rounded-md bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
-                >
-                  <Lock className="size-3.5 text-emerald-600" />
-                  <span>Developer Sign In &amp; Register</span>
-                  <ChevronRight className="size-3.5" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLandingAuthMode("signin");
+                      setLandingAuthError("");
+                      const el = document.getElementById("db-auth-card");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="px-3.5 py-2 rounded-md border border-white/20 bg-[#14171F] hover:bg-white/[0.08] text-white font-mono text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Lock className="size-3.5 text-emerald-400" />
+                    <span>Sign In</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLandingAuthMode("register");
+                      setLandingAuthError("");
+                      const el = document.getElementById("db-auth-card");
+                      if (el) el.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className="px-4 py-2 rounded-md bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <UserPlus className="size-3.5" />
+                    <span>Create DB Account →</span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -1426,10 +1676,19 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    setLandingAuthLoading(true);
                     setLandingAuthError("");
+                    const emailClean = landingAuthEmail.trim().toLowerCase();
+                    if (!DB_EMAIL_PATTERN.test(emailClean)) {
+                      setLandingAuthError("Please enter a valid developer email address.");
+                      return;
+                    }
+                    if (!landingAuthPassword || landingAuthPassword.length < 6) {
+                      setLandingAuthError("Password must be at least 6 characters.");
+                      return;
+                    }
+                    setLandingAuthLoading(true);
                     try {
-                      const res = await authenticateAppUserFromBackend(landingAuthEmail.trim(), landingAuthPassword);
+                      const res = await authenticateAppUserFromBackend(emailClean, landingAuthPassword);
                       if (res.user) {
                         issueSignedSessionToken({
                           id: res.user.id,
@@ -1474,6 +1733,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                     <input
                       type="password"
                       required
+                      minLength={6}
                       value={landingAuthPassword}
                       onChange={(e) => setLandingAuthPassword(e.target.value)}
                       placeholder="••••••••••••"
@@ -1503,10 +1763,22 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
-                    setLandingAuthLoading(true);
                     setLandingAuthError("");
+                    const emailClean = landingRegisterEmail.trim().toLowerCase();
+                    if (!landingRegisterName.trim()) {
+                      setLandingAuthError("Please enter your full name.");
+                      return;
+                    }
+                    if (!DB_EMAIL_PATTERN.test(emailClean)) {
+                      setLandingAuthError("Please provide a valid developer email address.");
+                      return;
+                    }
+                    if (landingRegisterPassword.length < 6) {
+                      setLandingAuthError("Master password must be at least 6 characters.");
+                      return;
+                    }
+                    setLandingAuthLoading(true);
                     try {
-                      const emailClean = landingRegisterEmail.trim().toLowerCase();
                       const existingUser = await fetchAppUserByEmailFromBackend(emailClean);
                       if (existingUser) {
                         setLandingAuthError(
@@ -1644,7 +1916,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           </div>
 
           {/* SECTION: WHAT WE SOLVE & WHAT WE PROVIDE */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div id="db-features" className="scroll-mt-20 grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* What We Solve */}
             <div className="border border-red-500/20 bg-[#0E1015] rounded-md p-6 space-y-4">
               <div className="flex items-center gap-2 text-xs font-mono text-red-400 font-bold uppercase tracking-wider">
@@ -1703,7 +1975,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           </div>
 
           {/* SECTION: HONEST PROS & CONS (STARTUP TRANSPARENCY) */}
-          <div className="border border-white/[0.08] bg-[#0E1015]/85 backdrop-blur-md rounded-md p-6 space-y-4">
+          <div id="db-pros-cons" className="scroll-mt-20 border border-white/[0.08] bg-[#0E1015]/85 backdrop-blur-md rounded-md p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
               <div className="space-y-0.5">
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
@@ -1742,7 +2014,7 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           </div>
 
           {/* INTERACTIVE READ-ONLY STUDIO FRAME */}
-          <div className="border border-white/[0.08] bg-[#0E1015]/85 backdrop-blur-md rounded-md overflow-hidden shadow-lg">
+          <div id="db-sandbox" className="scroll-mt-20 border border-white/[0.08] bg-[#0E1015]/85 backdrop-blur-md rounded-md overflow-hidden shadow-lg">
             {/* Top Frame Tab Bar */}
             <div className="border-b border-white/[0.08] bg-[#14171F] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
               <div className="flex items-center gap-1.5">
@@ -2046,8 +2318,16 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
 
         {/* Right Top Actions */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* User Account / Tenant Badge */}
-          <div className="hidden lg:flex items-center gap-1.5 rounded-md border border-zinc-800 bg-[#222222] px-2.5 py-1 text-xs">
+          {/* User Account / Tenant Badge (click opens Account & Auth management) */}
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSection("auth");
+              setSelectedTable("app_users");
+            }}
+            className="hidden lg:flex items-center gap-1.5 rounded-md border border-zinc-800 hover:border-[#3ECF8E]/40 bg-[#222222] px-2.5 py-1 text-xs transition-colors cursor-pointer"
+            title="Manage your DB account credentials and app_users"
+          >
             <Users className="size-3 text-[#3ECF8E]" />
             <span className="font-mono text-[11px] text-zinc-300 max-w-[120px] truncate">
               {sessionUser.fullName || sessionUser.email}
@@ -2055,7 +2335,24 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
             <span className="rounded bg-zinc-800 px-1 py-0.2 font-mono text-[9px] text-[#3ECF8E]">
               {sessionUser.admin === "yes" ? "SUPERUSER" : "ISOLATED"}
             </span>
-          </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveSection("auth");
+              setSelectedTable("app_users");
+            }}
+            className={`hidden sm:inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors cursor-pointer ${
+              activeSection === "auth"
+                ? "border-[#3ECF8E]/50 bg-[#3ECF8E]/15 text-[#3ECF8E]"
+                : "border-zinc-700 bg-[#222222] text-zinc-300 hover:bg-zinc-800"
+            }`}
+            title="Account & Database User Management"
+          >
+            <UserCheck className="size-3.5" />
+            <span className="font-mono text-[11px]">Account &amp; Auth</span>
+          </button>
 
           <button
             type="button"
@@ -2239,6 +2536,160 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           {/* TAB 1: DATA TABLE VIEW */}
           {(activeSection === "tables" || activeSection === "auth") && (
             <>
+              {/* ACCOUNT MANAGEMENT & DATABASE USER PROVISIONING PANEL (activeSection === "auth") */}
+              {activeSection === "auth" && (
+                <div className="border-b border-[#2E2E2E] bg-[#13151A] p-4 grid grid-cols-1 xl:grid-cols-2 gap-4 shrink-0">
+                  {/* Card 1: My Account & Session Credentials */}
+                  <form
+                    onSubmit={handleUpdateOwnAccount}
+                    className="rounded-md border border-[#2E2E2E] bg-[#181B22] p-4 space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2A2D35] pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="size-4 text-[#3ECF8E]" />
+                        <span className="text-xs font-bold text-white font-mono">
+                          My Database Account &amp; Session
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                        <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-[#3ECF8E] font-bold">
+                          {sessionUser.admin === "yes" ? "SUPERUSER" : "ISOLATED DEVELOPER"}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-[#121318] border border-zinc-700 text-zinc-300">
+                          {sessionUser.tenantId || "Independent Workspace"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                      <div>
+                        <label className="text-[10px] text-zinc-400 uppercase block mb-1">
+                          Signed-In Email
+                        </label>
+                        <input
+                          type="email"
+                          disabled
+                          value={sessionUser.email}
+                          className="w-full px-2.5 py-1.5 rounded bg-[#101216] border border-zinc-800 text-zinc-400 cursor-not-allowed"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-zinc-400 uppercase block mb-1">
+                          Display Name
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={accountDisplayName}
+                          onChange={(e) => setAccountDisplayName(e.target.value)}
+                          placeholder="Full Name"
+                          className="w-full px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-zinc-400 uppercase block mb-1">
+                          New Password (optional, 6+ chars)
+                        </label>
+                        <input
+                          type="password"
+                          minLength={6}
+                          value={accountNewPassword}
+                          onChange={(e) => setAccountNewPassword(e.target.value)}
+                          placeholder="Leave blank to keep"
+                          className="w-full px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Passwords are salted &amp; hashed (spx_sha256_v1$) before PostgreSQL sync.
+                      </span>
+                      <button
+                        type="submit"
+                        disabled={savingAccount}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#3ECF8E] hover:bg-[#34b27b] text-zinc-950 font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <Save className="size-3.5" />
+                        <span>{savingAccount ? "Saving..." : "Save Profile & Password"}</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Card 2: Provision New Database User into app_users */}
+                  <form
+                    onSubmit={handleProvisionDatabaseUser}
+                    className="rounded-md border border-[#2E2E2E] bg-[#181B22] p-4 space-y-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#2A2D35] pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <UserPlus className="size-4 text-sky-400" />
+                        <span className="text-xs font-bold text-white font-mono">
+                          Provision New Database Account (app_users)
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        Validates duplicate emails &amp; hashes credentials
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs font-mono">
+                      <input
+                        type="text"
+                        required
+                        value={newUserFullName}
+                        onChange={(e) => setNewUserFullName(e.target.value)}
+                        placeholder="Full Name"
+                        className="px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                      />
+                      <input
+                        type="email"
+                        required
+                        value={newUserEmail}
+                        onChange={(e) => setNewUserEmail(e.target.value)}
+                        placeholder="dev@company.com"
+                        className="px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                      />
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={newUserPassword}
+                        onChange={(e) => setNewUserPassword(e.target.value)}
+                        placeholder="Password (6+ chars)"
+                        className="px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                      />
+                      <select
+                        value={newUserRole}
+                        onChange={(e) => setNewUserRole(e.target.value === "yes" ? "yes" : "no")}
+                        className="px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                      >
+                        <option value="no">Role: Developer</option>
+                        <option value="yes">Role: Admin (Superuser)</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={newUserTenantId}
+                        onChange={(e) => setNewUserTenantId(e.target.value)}
+                        placeholder="Tenant ID"
+                        className="px-2.5 py-1.5 rounded bg-[#0E1014] border border-zinc-700 text-white focus:outline-none focus:border-[#3ECF8E]"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-end pt-1">
+                      <button
+                        type="submit"
+                        disabled={creatingAccount}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-neutral-200 text-black font-bold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        <UserPlus className="size-3.5" />
+                        <span>{creatingAccount ? "Creating..." : "Create Database User"}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
               {/* TOP ACTION BAR */}
               <div className="border-b border-[#2E2E2E] bg-[#181818] px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2.5">
                 <div className="flex items-center gap-2">

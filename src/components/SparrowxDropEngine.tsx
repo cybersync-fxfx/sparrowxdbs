@@ -709,7 +709,7 @@ export function SparrowxDropEngine() {
   return (
     <div className="min-h-screen bg-[#08090C] text-[#F3F4F6] flex flex-col font-sans selection:bg-white selection:text-black">
       {/* Main Header */}
-      <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16]">
+      <header className="border-b border-white/[0.08] bg-[#0E1015]/95 px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
@@ -732,12 +732,91 @@ export function SparrowxDropEngine() {
             </div>
           </div>
 
-          {/* Right Status */}
-          <div className="flex items-center gap-3 font-mono text-[10px]">
-            <div className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm text-[#9CA3AF]">
+          {/* Center Mode Pills */}
+          <nav className="hidden lg:flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-[#08090C] p-1 text-[11px] font-mono">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode("ephemeral");
+                setIncomingDrop(null);
+                setIncomingPersistentId(null);
+              }}
+              className={`px-3 py-1 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeMode === "ephemeral"
+                  ? "bg-white text-black font-semibold"
+                  : "text-[#9CA3AF] hover:text-white"
+              }`}
+            >
+              <Zap className="size-3 text-emerald-500" />
+              <span>Ephemeral Drop</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode("storage");
+                setIncomingDrop(null);
+                setIncomingPersistentId(null);
+              }}
+              className={`px-3 py-1 rounded transition-colors cursor-pointer flex items-center gap-1.5 ${
+                activeMode === "storage"
+                  ? "bg-emerald-500 text-black font-semibold"
+                  : "text-[#9CA3AF] hover:text-white"
+              }`}
+            >
+              <Lock className="size-3 text-amber-500" />
+              <span>10GB Cloud Vault</span>
+            </button>
+          </nav>
+
+          {/* Right Vault Account & Node Controls */}
+          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+            <div className="hidden sm:flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1.5 rounded-sm text-[#9CA3AF] text-[10px]">
               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span>NVMe RAID-1 STORAGE NODE</span>
+              <span>NVMe RAID-1</span>
             </div>
+
+            {isVaultAuthenticated && vaultUser ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveMode("storage");
+                    setIncomingDrop(null);
+                    setIncomingPersistentId(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                >
+                  <ShieldCheck className="size-3.5 shrink-0" />
+                  <span className="max-w-[150px] truncate">{vaultUser.email}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearSessionToken();
+                    localStorage.removeItem("sparrowx_vault_session");
+                    localStorage.removeItem("sparrowx_auth_user");
+                    setVaultUser(null);
+                    setIsVaultAuthenticated(false);
+                  }}
+                  className="px-2.5 py-1.5 rounded border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 transition-colors cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMode("storage");
+                  setIncomingDrop(null);
+                  setIncomingPersistentId(null);
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-neutral-200 text-black font-semibold transition-colors cursor-pointer"
+              >
+                <Lock className="size-3 text-emerald-600" />
+                <span>Vault Sign In &amp; Register →</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -1221,9 +1300,18 @@ export function SparrowxDropEngine() {
                         setAuthError("");
                         const emailClean = authEmail.trim().toLowerCase();
                         try {
+                          const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                          if (!emailPattern.test(emailClean)) {
+                            setAuthError("Please enter a valid email address.");
+                            return;
+                          }
+                          if (!authPassword || authPassword.length < 6) {
+                            setAuthError("Password must be at least 6 characters.");
+                            return;
+                          }
                           if (vaultAuthMode === "signin") {
                             const res = await authenticateAppUserFromBackend(
-                              authEmail.trim(),
+                              emailClean,
                               authPassword,
                             );
                             if (res.user) {
