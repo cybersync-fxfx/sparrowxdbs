@@ -1305,6 +1305,8 @@ register_pterodactyl_wings_node() {
           if ((int)$node->daemonListen !== $wingsPort) { $node->daemonListen = $wingsPort; $changed = true; }
           if ((int)$node->daemonSFTP !== $sftpPort) { $node->daemonSFTP = $sftpPort; $changed = true; }
           if ((bool)$node->behind_proxy !== false) { $node->behind_proxy = false; $changed = true; }
+          if ((bool)$node->public !== true) { $node->public = true; $changed = true; }
+          if ((bool)$node->maintenance_mode !== false) { $node->maintenance_mode = false; $changed = true; }
           if ($changed) { $node->save(); }
           echo "UPDATED_NODE=" . $node->id . "\n";
       }
@@ -1340,6 +1342,8 @@ register_pterodactyl_wings_node() {
       }
 
       $cfg["remote"] = $panelUrl;
+      $cfg["allowed_origins"] = array_values(array_unique([$panelUrl, "*"]));
+      $cfg["allow_cors_private_network"] = true;
       $cfg["api"]["host"] = "0.0.0.0";
       $cfg["api"]["port"] = $wingsPort;
       $cfg["api"]["ssl"]["enabled"] = true;
@@ -1348,6 +1352,10 @@ register_pterodactyl_wings_node() {
       $cfg["system"]["data"] = "/var/lib/pterodactyl/volumes";
       $cfg["system"]["sftp"]["bind_port"] = $sftpPort;
       $cfg["docker"]["network"]["interface"] = $gw;
+      $cfg["docker"]["network"]["name"] = "pterodactyl_nw";
+      $cfg["docker"]["network"]["network_mode"] = "pterodactyl_nw";
+      $cfg["docker"]["network"]["driver"] = "bridge";
+      $cfg["docker"]["network"]["ispn"] = false;
       $cfg["docker"]["network"]["interfaces"]["v4"]["subnet"] = $subnet;
       $cfg["docker"]["network"]["interfaces"]["v4"]["gateway"] = $gw;
 
@@ -1455,8 +1463,31 @@ EOF_WINGS
   systemctl enable wings >/dev/null 2>&1 || true
 
   ensure_node_letsencrypt_ssl
+
+  # Ensure Wings trusts the local Panel HTTPS certificate even if using self-signed TLS
+  local game_domain="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+  if ! curl -fsS --max-time 5 "https://${game_domain}/" >/dev/null 2>&1; then
+    local panel_ca_src=""
+    for cand_cert in "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "/etc/ssl/${game_domain}.pem"; do
+      if [ -s "${cand_cert}" ] && openssl x509 -in "${cand_cert}" -noout >/dev/null 2>&1; then
+        panel_ca_src="${cand_cert}"
+        break
+      fi
+    done
+    if [ -n "${panel_ca_src}" ] && [ -d /usr/local/share/ca-certificates ]; then
+      cp -f "${panel_ca_src}" /usr/local/share/ca-certificates/sparrowx-panel.crt 2>/dev/null || true
+      command -v update-ca-certificates >/dev/null 2>&1 && update-ca-certificates >/dev/null 2>&1 || true
+      log_fix "Added Panel TLS certificate to system CA trust store for Wings"
+    fi
+  fi
+
   if ! register_pterodactyl_wings_node; then
     return 0
+  fi
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow "${wings_port}/tcp" >/dev/null 2>&1 || true
+    ufw allow "${WINGS_SFTP_PORT:-2022}/tcp" >/dev/null 2>&1 || true
   fi
 
   # Remove stale pterodactyl_nw if Wings is stopped so it recreates cleanly with the non-overlapping subnet
@@ -1480,10 +1511,21 @@ EOF_WINGS
 
   if [ "${wings_ok}" = "true" ]; then
     log_ok "Pterodactyl Wings daemon active for ${node_domain} (HTTPS :${wings_port}, SFTP :${WINGS_SFTP_PORT:-2022})"
+    local trusted_code=""
+    trusted_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 4 "https://${node_domain}:${wings_port}/" 2>/dev/null || echo "000")"
+    if ! echo "${trusted_code}" | grep -qE "^(200|401|403|404)$"; then
+      local ext_code=""
+      ext_code="$(curl -kso /dev/null -w "%{http_code}" --max-time 4 "https://${node_domain}:${wings_port}/" 2>/dev/null || echo "000")"
+      if echo "${ext_code}" | grep -qE "^(200|401|403|404)$"; then
+        log_warn "Wings responds on https://${node_domain}:${wings_port} only with -k (self-signed TLS or Cloudflare proxy; ensure DNS A -> ${SPARROWX_PUBLIC_IP} with DNS-only/grey cloud so browser trusts Let's Encrypt)"
+      else
+        log_warn "Wings is listening locally on :${wings_port}, but https://${node_domain}:${wings_port} returned HTTP ${ext_code} (verify DNS A record for ${node_domain} -> ${SPARROWX_PUBLIC_IP})"
+      fi
+    fi
   else
     local w_err=""
-    w_err="$(journalctl -u wings -n 10 --no-pager 2>/dev/null | tr '\n' ' ' || true)"
-    log_warn "Wings service did not respond on :${wings_port} yet (${w_err:0:180})"
+    w_err="$(journalctl -u wings -n 15 --no-pager 2>/dev/null | tr '\n' ' ' || true)"
+    log_warn "Wings service did not respond on :${wings_port} yet (${w_err:0:220})"
   fi
 }
 
