@@ -123,14 +123,36 @@ ensure_env_key() {
 
 is_port_busy() {
   local port="$1"
-  if command -v ss >/dev/null 2>&1; then
-    ss -tulnH 2>/dev/null | awk '{print $5}' | grep -qE ":${port}$"
-    return $?
-  elif command -v lsof >/dev/null 2>&1; then
-    lsof -i ":${port}" -sTCP:LISTEN >/dev/null 2>&1
-    return $?
+  if command -v ss >/dev/null 2>&1 && ss -tuln 2>/dev/null | grep -qE "(:|\.|\])${port}[[:space:]]"; then
+    return 0
+  fi
+  if command -v lsof >/dev/null 2>&1 && lsof -i ":${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v netstat >/dev/null 2>&1 && netstat -tuln 2>/dev/null | grep -qE "(:|\.)${port}[[:space:]]"; then
+    return 0
+  fi
+  if (echo >/dev/tcp/127.0.0.1/"${port}") >/dev/null 2>&1; then
+    return 0
+  fi
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    if docker ps --format '{{.Ports}}' 2>/dev/null | grep -qE "(:|0\.0\.0\.0:|127\.0\.0\.1:|\[::\]:)${port}->"; then
+      return 0
+    fi
   fi
   return 1
+}
+
+free_docker_port_conflicts() {
+  local port="$1"
+  local keep_name="$2"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    local ctrs
+    ctrs="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' 2>/dev/null | grep -E "(:|0\.0\.0\.0:|127\.0\.0\.1:|\[::\]:)${port}->" | awk -v keep="${keep_name}" '$2 != keep {print $1}' || true)"
+    if [ -n "${ctrs}" ]; then
+      echo "${ctrs}" | xargs -r docker rm -f >/dev/null 2>&1 || true
+    fi
+  fi
 }
 
 port_held_by_other() {
@@ -585,12 +607,23 @@ fi
 
 if [ "${HAS_DOCKER}" = "true" ]; then
   # Stop conflicting host daemons
-  for svc in sparrowx-native.service postgresql apache2 nginx caddy; do
+  for svc in sparrowx-native.service postgresql pgbouncer apache2 nginx caddy; do
     if systemctl is-active --quiet "${svc}" 2>/dev/null; then
       systemctl stop "${svc}" >/dev/null 2>&1 || true
       log_warn "Stopped conflicting host service: ${svc}"
     fi
   done
+  for pg_unit in $(systemctl list-units --type=service --state=active --no-legend 'postgresql@*' 2>/dev/null | awk '{print $1}' || true); do
+    systemctl stop "${pg_unit}" >/dev/null 2>&1 || true
+    log_warn "Stopped conflicting versioned PostgreSQL unit: ${pg_unit}"
+  done
+
+  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 3000, 3001)
+  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
+  free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
+  free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
 
   # Clean legacy duplicate containers from older compose blueprints
   for old_c in sparrowx_postgres sparrowx_pgbouncer sparrowx_postgrest sparrowx_threat_cache sparrowx_studio sparrowx_edge_proxy; do
@@ -629,13 +662,18 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   if [ -n "${IS_PG_RUNNING}" ] && [ -n "${IS_PGRST_RUNNING}" ] && [ "${FORCE_DB_INSTALL}" = "false" ]; then
     log_info "PostgreSQL & PostgREST running cleanly — rebuilding ${APP_SERVICE} container..."
     if compose_cmd -f "${COMPOSE_FILE}" build "${APP_SERVICE}" && compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --remove-orphans "${APP_SERVICE}"; then
-      compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
+      compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps sparrowx nginx >/dev/null 2>&1 || true
+      docker start sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
       docker restart sparrowx-nginx >/dev/null 2>&1 || true
       log_ok "Rebuilt and restarted ${APP_SERVICE} + sparrowx-nginx zero-downtime"
     else
       BUILD_FAILED="true"
     fi
   else
+    if port_held_by_other "${PG_HOST_PORT}" "sparrowx-postgres"; then
+      command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT}/tcp" >/dev/null 2>&1 || true
+      sleep 1
+    fi
     if port_held_by_other "${PG_HOST_PORT}" "sparrowx-postgres"; then
       PG_HOST_PORT="$(find_next_free_port 5433)"
       ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
@@ -649,6 +687,8 @@ if [ "${HAS_DOCKER}" = "true" ]; then
       compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
       docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
       docker network prune -f >/dev/null 2>&1 || true
+      free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
+      command -v fuser >/dev/null 2>&1 && fuser -k 5432/tcp >/dev/null 2>&1 || true
       if is_port_busy "${PG_HOST_PORT}" || [ "${PG_HOST_PORT}" = "5432" ]; then
         if is_port_busy 5432; then
           PG_HOST_PORT="$(find_next_free_port 5433)"
@@ -661,6 +701,8 @@ if [ "${HAS_DOCKER}" = "true" ]; then
         BUILD_FAILED="true"
       fi
     fi
+    compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps sparrowx nginx >/dev/null 2>&1 || true
+    docker start sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 
