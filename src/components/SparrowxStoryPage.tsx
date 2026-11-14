@@ -10,6 +10,7 @@ import {
   Shield,
   Sparkles,
 } from "lucide-react";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 export function SparrowxStoryPage() {
   return (
@@ -300,31 +301,7 @@ export function SparrowxStoryPage() {
         </section>
       </main>
 
-      <footer className="border-t border-sky-500/15 bg-[#05070D] px-6 py-8 text-xs font-mono text-[#8795AB]">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-white font-bold">
-            <span>SPARROWX TECHNOLOGIES</span>
-            <span className="text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30">
-              INDEPENDENT STARTUP
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            <a href="/" className="hover:text-white transition-colors">
-              sparrowx.net
-            </a>
-            <span>&bull;</span>
-            <a href="/#vps" className="hover:text-white transition-colors">
-              Low-Cost VPS
-            </a>
-            <span>&bull;</span>
-            <a href="/#contact" className="hover:text-white transition-colors">
-              Contact
-            </a>
-            <span>&bull;</span>
-            <span>&copy; {new Date().getFullYear()} SparrowX</span>
-          </div>
-        </div>
-      </footer>
+      <SparrowxFooter />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
   Layers,
   Database,
 } from "lucide-react";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   authenticateAppUserFromBackend,
   fetchAppUserByEmailFromBackend,
@@ -740,7 +741,7 @@ export function SparrowxDropEngine() {
                 }`}
               >
                 <Zap className="size-3.5" />
-                <span>Ephemeral Drop</span>
+                <span>Ephemeral (Zero-Save)</span>
               </button>
               <button
                 type="button"
@@ -756,7 +757,7 @@ export function SparrowxDropEngine() {
                 }`}
               >
                 <Lock className="size-3.5" />
-                <span>10 GB Vault</span>
+                <span>Persistent (We Save Data)</span>
               </button>
             </nav>
 
@@ -833,7 +834,7 @@ export function SparrowxDropEngine() {
                 }`}
               >
                 <Zap className="size-3.5 shrink-0" />
-                <span>Ephemeral Drop</span>
+                <span>Ephemeral (Zero-Save)</span>
               </button>
 
               <button
@@ -850,7 +851,7 @@ export function SparrowxDropEngine() {
                 }`}
               >
                 <Lock className="size-3.5 shrink-0" />
-                <span>10 GB Vault</span>
+                <span>Persistent (We Save Data)</span>
               </button>
             </div>
           </div>
@@ -1674,18 +1675,35 @@ export function SparrowxDropEngine() {
         {/* ================================================================= */}
         {activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
-            <div className="text-center space-y-3 max-w-2xl mx-auto">
-              <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-400">
-                <Flame className="size-3.5" />
-                <span>Zero-Disk RAM Lifetime • 15-Minute Auto-Purge</span>
+            <div className="text-center space-y-3.5 max-w-2xl mx-auto">
+              <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-300">
+                <Flame className="size-3.5 text-purple-400" />
+                <span>Zero-Disk RAM • We Don't Save Anything</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
-                Ephemeral Drop: Disappears Without a Trace.
+                Ephemeral Drop: We Don&apos;t Save Anything.
               </h1>
-              <p className="text-sm text-zinc-400">
-                Files are encrypted with AES-GCM in your browser RAM before transfer. The moment you close this tab,
-                memory is zeroed out and destroyed.
+              <p className="text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed">
+                In Ephemeral mode, we don&apos;t save anything. Files are encrypted with AES-GCM in your browser RAM before transfer, and the moment you close this tab, memory is zeroed out and destroyed without a trace.
               </p>
+              <div className="pt-1">
+                <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-950/20 px-4 py-2 text-xs text-zinc-300">
+                  <span className="text-zinc-400">Want to keep your files permanently?</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveMode("storage");
+                      setIncomingDrop(null);
+                      setIncomingPersistentId(null);
+                    }}
+                    className="inline-flex items-center gap-1.5 font-semibold text-purple-300 hover:text-white transition-colors cursor-pointer group"
+                  >
+                    <Lock className="size-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                    <span>Switch to Persistent Storage (We Save Your Data)</span>
+                    <ArrowRight className="size-3" />
+                  </button>
+                </div>
+              </div>
             </div>
 
             {burnNotice && (
@@ -2067,22 +2085,7 @@ export function SparrowxDropEngine() {
         </div>
       </section>
 
-      <footer className="border-t border-white/[0.06] bg-[#05060A] py-6 px-4 sm:px-6">
-        <div className="mx-auto max-w-6xl flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-500">
-          <div className="flex items-center gap-2 font-mono">
-            <ShieldCheck className="size-4 text-purple-400" />
-            <span className="text-zinc-300 font-semibold">SparrowX Drop</span>
-            <span>·</span>
-            <span>Zero-Knowledge File Transfer &amp; Vault</span>
-          </div>
-          <div className="flex items-center gap-4 font-mono">
-            <a href="mailto:files@sparrowx.net" className="hover:text-zinc-300 transition-colors">
-              files@sparrowx.net
-            </a>
-            <span>© {new Date().getFullYear()} SparrowX Drop</span>
-          </div>
-        </div>
-      </footer>
+      <SparrowxFooter />
     </div>
   );
 }

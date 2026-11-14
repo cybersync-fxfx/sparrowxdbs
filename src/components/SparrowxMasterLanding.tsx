@@ -52,6 +52,7 @@ import {
   verifySessionToken,
 } from "@/lib/advanced-features";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 interface SparrowxMasterLandingProps {
   onOpenLogin: () => void;
@@ -1316,143 +1317,13 @@ export function SparrowxMasterLanding({
       </div>
 
       {/* FOOTER */}
-      <footer className="relative z-10 border-t border-white/15 bg-[#05060A]/90 backdrop-blur-md px-6 py-10 text-zinc-400 text-xs font-mono mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="text-left space-y-1">
-            <div className="font-extrabold text-white text-sm flex items-center gap-2">
-              <span>SPARROWX TECHNOLOGIES</span>
-              <span className="text-[9px] text-zinc-200 bg-white/10 px-2 py-0.5 rounded border border-white/25">
-                INDEPENDENT STARTUP
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400">
-              Built with care for developers, startups, and privacy-conscious builders.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-3 text-[11px] text-zinc-400">
-            <a href="https://sparrowx.net" className="hover:text-white transition-colors">
-              sparrowx.net
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a
-              href="https://db.sparrowx.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!window.location.hostname.includes("sparrowx.net")) {
-                  e.preventDefault();
-                  handleLaunch("db", "https://db.sparrowx.net", "db");
-                }
-              }}
-              className="hover:text-white transition-colors"
-            >
-              db.sparrowx.net
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a
-              href="https://sec.sparrowx.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!window.location.hostname.includes("sparrowx.net")) {
-                  e.preventDefault();
-                  handleLaunch("sec", "https://sec.sparrowx.net", "shield");
-                }
-              }}
-              className="hover:text-white transition-colors"
-            >
-              sec.sparrowx.net
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a
-              href="https://file.sparrowx.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!window.location.hostname.includes("sparrowx.net")) {
-                  e.preventDefault();
-                  handleLaunch("file", "https://file.sparrowx.net", "file");
-                }
-              }}
-              className="hover:text-white transition-colors"
-            >
-              file.sparrowx.net
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a
-              href="https://password.sparrowx.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!window.location.hostname.includes("sparrowx.net")) {
-                  e.preventDefault();
-                  handleLaunch("password", "https://password.sparrowx.net", "password");
-                }
-              }}
-              className="hover:text-white transition-colors"
-            >
-              password.sparrowx.net
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a
-              href="https://api.sparrowx.net"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                if (!window.location.hostname.includes("sparrowx.net")) {
-                  e.preventDefault();
-                  handleLaunch("api", "https://api.sparrowx.net", "api");
-                }
-              }}
-              className="hover:text-white transition-colors"
-            >
-              api.sparrowx.net
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a href="#comparison" className="text-white hover:text-zinc-300 transition-colors">
-              Why Us
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a href="/story" className="text-white hover:text-zinc-300 transition-colors">
-              Read Our Story
-            </a>
-            <span className="text-zinc-600">&bull;</span>
-            <a href="#contact" className="text-white hover:text-zinc-300 transition-colors">
-              Contact
-            </a>
-          </div>
-
-          <div className="flex items-center gap-3 text-[11px]">
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-white/10 border border-white/25 text-white font-mono text-[10px]">
-              <span className="size-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
-              <span>All Systems Operational</span>
-            </div>
-            <span className="text-zinc-600">&bull;</span>
-            {sessionUser ? (
-              <button
-                type="button"
-                onClick={handleLandingSignOut}
-                className="text-zinc-200 hover:text-white transition-colors cursor-pointer"
-              >
-                Sign Out
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setOperatorModalOpen(true)}
-                className="text-zinc-300 hover:text-white transition-colors cursor-pointer"
-              >
-                Sign In
-              </button>
-            )}
-            <span className="text-zinc-600">&bull;</span>
-            <span className="text-zinc-400">
-              &copy; {new Date().getFullYear()} SparrowX
-            </span>
-          </div>
-        </div>
-      </footer>
+      <SparrowxFooter
+        onLaunchService={handleLaunch}
+        isAuthenticated={Boolean(sessionUser)}
+        onSignIn={() => setOperatorModalOpen(true)}
+        onSignOut={handleLandingSignOut}
+        inPageAnchors={true}
+      />
 
       {/* Operator Sign In & Account Creation Dialog */}
       <OperatorLoginDialog

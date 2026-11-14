@@ -33,6 +33,7 @@ import {
   issueSignedSessionToken,
   clearSessionToken,
 } from "@/lib/advanced-features";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 const API_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -702,9 +703,7 @@ print(response.json())`;
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/[0.08] bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#64748B]">
-        <span>SPARROWX API GATEWAY // POSTGREST 12.2 • AP-SOUTHEAST-SYD BARE-METAL INGRESS</span>
-      </footer>
+      <SparrowxFooter />
     </div>
   );
 }

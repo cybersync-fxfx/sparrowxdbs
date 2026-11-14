@@ -18,6 +18,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 // EFF Long Wordlist excerpt for Diceware
 const EFF_WORDLIST = [
@@ -808,9 +809,7 @@ export function SparrowxKeysEngine() {
       </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-white/[0.08] bg-[#050608] px-6 py-4 text-center text-[10px] font-mono text-[#64748B]">
-        <span>SPARROWX PASSWORD // 100% CLIENT-SIDE CRYPTOGRAPHIC ENGINE • ZERO SURVEILLANCE • KEYS@SPARROWX.NET</span>
-      </footer>
+      <SparrowxFooter />
     </div>
   );
 }

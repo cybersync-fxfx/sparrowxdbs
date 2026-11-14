@@ -19,6 +19,7 @@ import {
   SparrowxSentraSocWorkbench,
   type SocViewMode,
 } from "@/components/SparrowxSentraSocWorkbench";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   Dialog,
   DialogContent,
@@ -632,9 +633,11 @@ export function SparrowxShieldEngine({
       </main>
 
       {/* FOOTER */}
-      <footer className="border-t border-[#F4F6FA]/[0.07] bg-[#090B11] px-6 py-4 text-center text-xs text-[#F4F6FA]/45">
-        <span>SparrowX Shield · L7 WAF &amp; Autonomous Incident Response · security@sparrowx.net</span>
-      </footer>
+      <SparrowxFooter
+        isAuthenticated={Boolean(activeUser)}
+        onSignIn={() => setSocModalOpen(true)}
+        onSignOut={handleShieldSignOut}
+      />
 
       {/* Operator Auth Dialog */}
       <Dialog open={socModalOpen} onOpenChange={setSocModalOpen}>

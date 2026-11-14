@@ -15,6 +15,7 @@ import {
   clearSessionToken,
 } from "@/lib/advanced-features";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
+import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   Activity,
   AlertCircle,
@@ -3146,9 +3147,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           </section>
         </main>
 
-        <footer className="relative z-10 border-t border-[#262626] bg-[#05060A] px-6 py-5 text-center text-[11px] font-mono text-zinc-500">
-          <span>SPARROWX CLOUD DB // POSTGRESQL 16 + PGVECTOR + ROW LEVEL SECURITY • DB.SPARROWX.NET</span>
-        </footer>
+        <SparrowxFooter />
       </div>
     );
   }
