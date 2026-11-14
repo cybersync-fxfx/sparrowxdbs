@@ -35,13 +35,58 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { authenticateAppUserFromBackend, type AppUser } from "@/lib/supabase";
-import { issueSignedSessionToken } from "@/lib/advanced-features";
+import {
+  authenticateAppUserFromBackend,
+  fetchAppUserByEmailFromBackend,
+  persistAppUserToBackend,
+  type AppUser,
+} from "@/lib/supabase";
+import {
+  clearSessionToken,
+  issueSignedSessionToken,
+  verifySessionToken,
+} from "@/lib/advanced-features";
 
 export interface SparrowxShieldEngineProps {
   currentUser?: AppUser | null;
   onUserAuthenticated?: (user: AppUser) => void;
   onOpenClientArea?: () => void;
+  onSignOut?: () => void;
+}
+
+function readInitialShieldUser(propUser?: AppUser | null): AppUser | null {
+  if (propUser) return propUser;
+  if (typeof window === "undefined") return null;
+  const verified = verifySessionToken();
+  if (verified) {
+    return {
+      id: verified.sub,
+      email: verified.email,
+      fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
+      password: "",
+      admin: verified.role === "admin" ? "yes" : "no",
+      tenantId: verified.tenantId,
+    };
+  }
+  const rawAuthUser = localStorage.getItem("sparrowx_auth_user");
+  if (rawAuthUser) {
+    try {
+      const parsed = JSON.parse(rawAuthUser) as Partial<AppUser>;
+      if (parsed && typeof parsed.email === "string" && parsed.email.includes("@")) {
+        return {
+          id: String(parsed.id || "USR-SHIELD"),
+          email: parsed.email,
+          fullName: String(parsed.fullName || parsed.email.split("@")[0]),
+          password: "",
+          admin: parsed.admin === "yes" ? "yes" : "no",
+          tenantId: parsed.tenantId ?? null,
+        };
+      }
+    } catch {
+      // Ignore malformed sparrowx_auth_user
+    }
+  }
+  return null;
 }
 
 interface InspectionResult {
@@ -66,6 +111,7 @@ export function SparrowxShieldEngine({
   currentUser,
   onUserAuthenticated,
   onOpenClientArea,
+  onSignOut,
 }: SparrowxShieldEngineProps = {}) {
   const [targetDomain, setTargetDomain] = useState<string>("sparrowx.net");
   const [inspecting, setInspecting] = useState<boolean>(false);
@@ -73,11 +119,35 @@ export function SparrowxShieldEngine({
   const [copiedCmd, setCopiedCmd] = useState<boolean>(false);
   const [currency, setCurrency] = useState<"INR" | "USD" | "EUR">("INR");
 
-  // SOC sign in state
+  // SOC persistent session & auth dialog state
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(() =>
+    readInitialShieldUser(currentUser),
+  );
+  const [socAuthMode, setSocAuthMode] = useState<"signin" | "register">("signin");
+  const [socFullName, setSocFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+
+  useEffect(() => {
+    if (currentUser) {
+      setSessionUser(currentUser);
+    } else {
+      setSessionUser(readInitialShieldUser(null));
+    }
+  }, [currentUser]);
+
+  const activeUser = currentUser ?? sessionUser;
+
+  const handleShieldSignOut = () => {
+    clearSessionToken();
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("sparrowx_auth_user");
+    }
+    setSessionUser(null);
+    onSignOut?.();
+  };
 
   const [result, setResult] = useState<InspectionResult | null>({
     domain: "sparrowx.net",
@@ -224,21 +294,30 @@ export function SparrowxShieldEngine({
               <span>TACTICAL RADAR ACTIVE</span>
             </div>
 
-            {currentUser ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenClientArea) {
-                    onOpenClientArea();
-                  } else {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
-                }}
-                className="px-4 py-2 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
-              >
-                <User className="size-3.5" />
-                <span>{onOpenClientArea ? `Open Client Area (${currentUser.fullName || currentUser.email}) →` : `Operator: ${currentUser.fullName || currentUser.email}`}</span>
-              </button>
+            {activeUser ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-mono text-xs">
+                  <span className="size-1.5 rounded-full bg-emerald-400" />
+                  <span>SOC ACTIVE · {activeUser.email}</span>
+                </span>
+                {onOpenClientArea && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenClientArea()}
+                    className="px-3 py-1.5 rounded-md bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-[0_0_15px_rgba(255,107,0,0.35)]"
+                  >
+                    <User className="size-3.5" />
+                    <span>Open Client Area →</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleShieldSignOut}
+                  className="px-3 py-1.5 rounded-md border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-mono text-neutral-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  Sign Out
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -706,16 +785,51 @@ export function SparrowxShieldEngine({
       {/* Operator Auth Dialog */}
       <Dialog open={socModalOpen} onOpenChange={setSocModalOpen}>
         <DialogContent className="bg-[#0F131D] border border-[#FF6B00]/40 text-white max-w-md p-6 font-sans">
+          <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#08090C] border border-[#FF6B00]/25 p-1 font-mono text-xs mb-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSocAuthMode("signin");
+                setAuthError("");
+              }}
+              className={`py-2 rounded font-bold transition-colors cursor-pointer ${
+                socAuthMode === "signin"
+                  ? "bg-[#FF6B00] text-black"
+                  : "text-[#A3A3A3] hover:text-white"
+              }`}
+            >
+              Sign In to SOC
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSocAuthMode("register");
+                setAuthError("");
+              }}
+              className={`py-2 rounded font-bold transition-colors cursor-pointer ${
+                socAuthMode === "register"
+                  ? "bg-[#FF6B00] text-black"
+                  : "text-[#A3A3A3] hover:text-white"
+              }`}
+            >
+              Register Operator
+            </button>
+          </div>
+
           <DialogHeader className="text-left space-y-1.5 mb-2">
             <div className="inline-flex items-center gap-1.5 text-xs font-mono text-[#FF8533] mb-1 font-bold">
               <span className="size-1.5 rounded-full bg-[#FF6B00] animate-pulse" />
               SHADOWSHIELD OPERATOR GATEWAY
             </div>
             <DialogTitle className="text-xl font-bold text-white tracking-tight font-mono">
-              Sign In to Shield Dashboard
+              {socAuthMode === "signin"
+                ? "Sign In to Shield Dashboard"
+                : "Register Shield Operator"}
             </DialogTitle>
             <DialogDescription className="text-xs text-[#A3A3A3] leading-relaxed">
-              Authenticate operator credentials to inspect active packet scrubbing and manage firewall rules.
+              {socAuthMode === "signin"
+                ? "Authenticate operator credentials to inspect active packet scrubbing and manage firewall rules."
+                : "Provision a new SparrowX Shield operator account for domain cloaking and L7 WAF control."}
             </DialogDescription>
           </DialogHeader>
 
@@ -730,24 +844,71 @@ export function SparrowxShieldEngine({
               e.preventDefault();
               setAuthLoading(true);
               setAuthError("");
+              const emailClean = authEmail.trim().toLowerCase();
               try {
-                const res = await authenticateAppUserFromBackend(authEmail.trim(), authPassword);
-                if (res.user) {
-                  setSocModalOpen(false);
+                if (socAuthMode === "signin") {
+                  const res = await authenticateAppUserFromBackend(
+                    authEmail.trim(),
+                    authPassword,
+                  );
+                  if (res.user) {
+                    issueSignedSessionToken({
+                      id: res.user.id,
+                      email: res.user.email,
+                      fullName:
+                        res.user.fullName || res.user.email.split("@")[0] || "Operator",
+                      role: res.user.admin === "yes" ? "admin" : "client",
+                      tenantId: res.user.tenantId,
+                    });
+                    setSessionUser(res.user);
+                    setSocModalOpen(false);
+                    if (onUserAuthenticated) {
+                      onUserAuthenticated(res.user);
+                    } else {
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }
+                  } else {
+                    setAuthError(res.error || "Invalid sign-in credentials.");
+                  }
+                } else {
+                  if (!emailClean || authPassword.length < 6) {
+                    setAuthError(
+                      "Provide a valid email and a password of at least 6 characters.",
+                    );
+                    return;
+                  }
+                  const existing = await fetchAppUserByEmailFromBackend(emailClean);
+                  if (existing) {
+                    setAuthError(
+                      "An account with this email already exists. Please sign in instead.",
+                    );
+                    return;
+                  }
+                  const newUser: AppUser = {
+                    id: `USR-${Date.now().toString().slice(-4)}`,
+                    email: emailClean,
+                    password: authPassword,
+                    fullName:
+                      socFullName.trim() || emailClean.split("@")[0] || "Operator",
+                    admin: "no",
+                    tenantId: `TENANT-SHIELD-${Date.now().toString().slice(-4)}`,
+                  };
+                  await persistAppUserToBackend(newUser);
+                  const sanitizedUser: AppUser = { ...newUser, password: "" };
                   issueSignedSessionToken({
-                    id: res.user.id,
-                    email: res.user.email,
-                    fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
-                    role: res.user.admin === "yes" ? "admin" : "client",
-                    tenantId: res.user.tenantId,
+                    id: sanitizedUser.id,
+                    email: sanitizedUser.email,
+                    fullName: sanitizedUser.fullName,
+                    role: "client",
+                    tenantId: sanitizedUser.tenantId,
                   });
+                  setSessionUser(sanitizedUser);
+                  setSocModalOpen(false);
                   if (onUserAuthenticated) {
-                    onUserAuthenticated(res.user);
+                    onUserAuthenticated(sanitizedUser);
                   } else {
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   }
-                } else {
-                  setAuthError(res.error || "Invalid sign-in credentials.");
                 }
               } catch {
                 setAuthError("Auth gateway offline.");
@@ -757,6 +918,20 @@ export function SparrowxShieldEngine({
             }}
             className="space-y-4 pt-1 font-mono text-xs"
           >
+            {socAuthMode === "register" && (
+              <div className="space-y-1.5 text-left">
+                <label className="text-[11px] text-[#A3A3A3]">Operator Name</label>
+                <input
+                  type="text"
+                  required
+                  value={socFullName}
+                  onChange={(e) => setSocFullName(e.target.value)}
+                  placeholder="Alex Rivera"
+                  className="w-full px-3.5 py-2.5 rounded bg-[#08090C] border border-[#FF6B00]/30 text-white placeholder-[#666666] focus:outline-none focus:border-[#FF6B00]"
+                />
+              </div>
+            )}
+
             <div className="space-y-1.5 text-left">
               <label className="text-[11px] text-[#A3A3A3]">Operator Email</label>
               <input
@@ -774,6 +949,7 @@ export function SparrowxShieldEngine({
               <input
                 type="password"
                 required
+                minLength={socAuthMode === "register" ? 6 : undefined}
                 value={authPassword}
                 onChange={(e) => setAuthPassword(e.target.value)}
                 placeholder="••••••••••••••••"
@@ -785,17 +961,21 @@ export function SparrowxShieldEngine({
               <button
                 type="button"
                 onClick={() => setSocModalOpen(false)}
-                className="px-4 py-2 rounded text-xs text-[#A3A3A3] hover:text-white"
+                className="px-4 py-2 rounded text-xs text-[#A3A3A3] hover:text-white cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={authLoading}
-                className="px-5 py-2 rounded bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5"
+                className="px-5 py-2 rounded bg-[#FF6B00] hover:bg-[#FF8533] text-black font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 {authLoading && <RefreshCw className="size-3 animate-spin" />}
-                <span>Authenticate Operator</span>
+                <span>
+                  {socAuthMode === "signin"
+                    ? "Authenticate Operator"
+                    : "Create Shield Operator"}
+                </span>
               </button>
             </div>
           </form>

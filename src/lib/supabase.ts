@@ -1322,6 +1322,7 @@ export async function persistAppUserToBackend(user: AppUser): Promise<boolean> {
 
   const sanitizedUserForCache: AppUser = {
     ...user,
+    email: user.email.trim().toLowerCase(),
     password: hashedPassword,
   };
 

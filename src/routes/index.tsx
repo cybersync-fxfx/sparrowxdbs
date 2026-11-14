@@ -1532,19 +1532,54 @@ function Dashboard() {
       tenantId: user.tenantId,
     });
     setCurrentUser(user);
+    setShowAuthLogin(false);
 
-    // Strip standalone subdomain query flags (?db=1, ?shield=1, ?sec=1, etc.) so user isn't trapped
-    if (typeof window !== "undefined") {
+    // Preserve standalone subdomain/query-param routing when authenticating inside a standalone product site
+    const isStandaloneContext =
+      typeof window !== "undefined" &&
+      (() => {
+        const host = window.location.hostname;
+        const q = new URLSearchParams(window.location.search);
+        return (
+          host.startsWith("db.") ||
+          host.startsWith("studio.") ||
+          host.startsWith("supabase.") ||
+          host.startsWith("sparrowbase.") ||
+          host.startsWith("api.") ||
+          host.startsWith("rest.") ||
+          host.startsWith("file.") ||
+          host.startsWith("drop.") ||
+          host.startsWith("share.") ||
+          host.startsWith("password.") ||
+          host.startsWith("passwd.") ||
+          host.startsWith("pass.") ||
+          host.startsWith("keys.") ||
+          host.startsWith("shield.") ||
+          host.startsWith("sec.") ||
+          q.get("studio") === "1" ||
+          q.get("studio") === "true" ||
+          q.get("sparrowbase") === "1" ||
+          q.get("db") === "1" ||
+          q.get("api") === "1" ||
+          q.get("file") === "1" ||
+          q.get("drop") === "1" ||
+          q.has("drop") ||
+          q.get("password") === "1" ||
+          q.get("passwd") === "1" ||
+          q.get("keys") === "1" ||
+          q.get("shield") === "1" ||
+          q.get("sec") === "1" ||
+          window.location.hash.includes("key=") ||
+          window.location.pathname.startsWith("/drop") ||
+          window.location.pathname.startsWith("/f/")
+        );
+      })();
+
+    if (typeof window !== "undefined" && !isStandaloneContext) {
       const url = new URL(window.location.href);
-      url.searchParams.delete("db");
-      url.searchParams.delete("shield");
-      url.searchParams.delete("sec");
-      url.searchParams.delete("file");
-      url.searchParams.delete("drop");
-      url.searchParams.delete("password");
-      url.searchParams.delete("keys");
-      url.searchParams.delete("api");
-      url.searchParams.delete("studio");
+      url.searchParams.delete("login");
+      url.searchParams.delete("auth");
+      url.searchParams.delete("signin");
       window.history.replaceState({}, "", url.pathname + (url.search ? url.search : ""));
     }
 
@@ -1592,7 +1627,7 @@ function Dashboard() {
     }
   };
 
-  // Dedicated Domain Ingress Routing (Priority checks before login/SOC)
+  // Dedicated Domain Ingress Routing (Applies whether unauthenticated or authenticated)
   const isStudioDomainOrParam =
     typeof window !== "undefined" &&
     (window.location.hostname.startsWith("db.") ||
@@ -1639,8 +1674,7 @@ function Dashboard() {
       new URLSearchParams(window.location.search).get("shield") === "1" ||
       new URLSearchParams(window.location.search).get("sec") === "1");
 
-  // UN-AUTHENTICATED INGRESS & SUBDOMAIN ROUTING
-  if (authSession.role === "unauthenticated") {
+  if (!showAuthLogin) {
     // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
     if (isStudioDomainOrParam) {
       return (
@@ -1694,13 +1728,16 @@ function Dashboard() {
           <SparrowxShieldEngine
             currentUser={currentUser}
             onUserAuthenticated={handleUserAuthenticated}
-            onOpenClientArea={() => setShowAuthLogin(true)}
+            onSignOut={handleSignOut}
           />
           <BackgroundEngineToaster />
         </>
       );
     }
+  }
 
+  // UN-AUTHENTICATED INGRESS
+  if (authSession.role === "unauthenticated") {
     // 6. Root domain (sparrowx.net / www.sparrowx.net) -> Central Master Landing Page of SparrowX Technologies
     if (!showAuthLogin) {
       return (
@@ -1741,9 +1778,16 @@ function Dashboard() {
         <PortalLoginScreen
           backendSource={backendSource}
           onRegisterAndLoginUser={async (input) => {
+            const cleanEmail = input.email.trim().toLowerCase();
+            const existingBackendUser = await fetchAppUserByEmailFromBackend(cleanEmail);
+            if (existingBackendUser) {
+              return {
+                error: "An account with this email already exists. Please sign in instead.",
+              };
+            }
             emitEngineActivity(
               "Auth Register",
-              `Provisioning workspace for ${input.email}...`,
+              `Provisioning workspace for ${cleanEmail}...`,
               "cooking",
             );
             let createdTenant: ClientTenant | null = null;
@@ -1751,7 +1795,7 @@ function Dashboard() {
               createdTenant = {
                 id: `TNT-${Date.now().toString().slice(-4)}`,
                 name: input.orgName,
-                contactEmail: input.email,
+                contactEmail: cleanEmail,
                 primaryDomain: input.primaryDomain,
                 planTier: input.planTier,
                 status: "Active",
@@ -1771,7 +1815,7 @@ function Dashboard() {
 
             const createdUser: AppUser = {
               id: `USR-${Date.now().toString().slice(-4)}`,
-              email: input.email.toLowerCase(),
+              email: cleanEmail,
               password: input.password,
               fullName: input.fullName,
               admin: "no",

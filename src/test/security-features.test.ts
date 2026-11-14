@@ -1,14 +1,18 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   analyzePromptInSandbox,
+  clearSessionToken,
   exportFirewallBlocklist,
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
 import {
+  authenticateAppUserFromBackend,
+  fetchAppUserByEmailFromBackend,
   generateSecureSparrowKey,
   hashSecretPassword,
   maskSecretKey,
+  persistAppUserToBackend,
   verifyPasswordMatch,
 } from "@/lib/supabase";
 import { generateClientSdkSnippet } from "@/lib/client-sdk-generator";
@@ -221,6 +225,66 @@ describe("Advanced Security & AI Guardrail Features", () => {
 
       expect(harvested.newlyLearned.length).toBeGreaterThanOrEqual(2);
       expect(harvested.allPatterns.some((p) => p.indicatorValue === "198.51.100.77")).toBe(true);
+    });
+  });
+
+  describe("Backend Auth Round-Trip, Failure Rejection & Duplicate Protection", () => {
+    it("rejects unknown emails cleanly without granting a user session", async () => {
+      const res = await authenticateAppUserFromBackend(
+        "nonexistent-operator@sparrowx-test.invalid",
+        "SomePass#2026!",
+      );
+      expect(res.user).toBeNull();
+      expect(typeof res.error).toBe("string");
+      expect(res.error?.length).toBeGreaterThan(0);
+    });
+
+    it("hashes persisted accounts, authenticates valid credentials, rejects wrong passwords, and detects duplicates", async () => {
+      await persistAppUserToBackend({
+        id: "USR-AUTH-991",
+        email: "vaulttester@acme.io",
+        password: "VaultStrongPass#99!",
+        fullName: "Vault Tester",
+        admin: "no",
+        tenantId: "TNT-991",
+      });
+
+      const validLogin = await authenticateAppUserFromBackend(
+        "VaultTester@Acme.IO",
+        "VaultStrongPass#99!",
+      );
+      expect(validLogin.user).not.toBeNull();
+      expect(validLogin.user?.email).toBe("vaulttester@acme.io");
+      expect(validLogin.user?.password).toBe("");
+
+      const wrongPassLogin = await authenticateAppUserFromBackend(
+        "vaulttester@acme.io",
+        "TotallyWrongPassword",
+      );
+      expect(wrongPassLogin.user).toBeNull();
+      expect(wrongPassLogin.error).toContain("Invalid password");
+
+      const duplicateLookup = await fetchAppUserByEmailFromBackend("VAULTTESTER@acme.io");
+      expect(duplicateLookup).not.toBeNull();
+      expect(duplicateLookup?.email).toBe("vaulttester@acme.io");
+      expect(duplicateLookup?.password).toBe("");
+
+      const missingLookup = await fetchAppUserByEmailFromBackend("not-registered@acme.io");
+      expect(missingLookup).toBeNull();
+    });
+
+    it("clears cryptographic session tokens on sign-out / vault lock", () => {
+      issueSignedSessionToken({
+        id: "USR-CLEAR-01",
+        email: "clear-test@sparrowx.net",
+        fullName: "Clear Test",
+        role: "client",
+        tenantId: "TNT-CLEAR",
+      });
+      expect(verifySessionToken()?.email).toBe("clear-test@sparrowx.net");
+
+      clearSessionToken();
+      expect(verifySessionToken()).toBeNull();
     });
   });
 });

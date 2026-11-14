@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import migratedSeedData from "../lib/migrated-seed.json";
 import {
   authenticateAppUserFromBackend,
+  fetchAppUserByEmailFromBackend,
   persistAppUserToBackend,
   persistClientTenantToBackend,
   generateSecureSparrowKey,
@@ -1503,6 +1504,14 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
                     setLandingAuthError("");
                     try {
                       const emailClean = landingRegisterEmail.trim().toLowerCase();
+                      const existingUser = await fetchAppUserByEmailFromBackend(emailClean);
+                      if (existingUser) {
+                        setLandingAuthError(
+                          "An account with this email already exists. Please sign in instead.",
+                        );
+                        setLandingAuthLoading(false);
+                        return;
+                      }
                       const orgClean = landingRegisterOrg.trim() || `${landingRegisterName.trim() || "Org"} Workspace`;
                       const tenantId = `TNT-${Date.now().toString().slice(-4)}`;
 

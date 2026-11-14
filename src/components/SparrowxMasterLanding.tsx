@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { authenticateAppUserFromBackend } from "@/lib/supabase";
 import type { AppUser } from "@/lib/supabase";
+import { issueSignedSessionToken } from "@/lib/advanced-features";
 
 interface SparrowxMasterLandingProps {
   onOpenLogin: () => void;
@@ -47,10 +48,12 @@ function OperatorLoginDialog({
   open,
   onOpenChange,
   onSuccess,
+  onRequestRegister,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (user: AppUser) => void;
+  onRequestRegister?: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -67,6 +70,13 @@ function OperatorLoginDialog({
       setLoading(false);
 
       if (res.user) {
+        issueSignedSessionToken({
+          id: res.user.id,
+          email: res.user.email,
+          fullName: res.user.fullName || res.user.email.split("@")[0] || "Operator",
+          role: res.user.admin === "yes" ? "admin" : "client",
+          tenantId: res.user.tenantId,
+        });
         onOpenChange(false);
         if (onSuccess) {
           onSuccess(res.user);
@@ -144,6 +154,21 @@ function OperatorLoginDialog({
               <span>{loading ? "Authenticating..." : "Sign In"}</span>
             </button>
           </div>
+
+          {onRequestRegister && (
+            <div className="pt-3 border-t border-white/[0.08] text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenChange(false);
+                  onRequestRegister();
+                }}
+                className="text-[11px] text-sky-400 hover:text-sky-300 transition-colors cursor-pointer"
+              >
+                Need a new workspace? Create an account →
+              </button>
+            </div>
+          )}
         </form>
       </DialogContent>
     </Dialog>
@@ -1114,6 +1139,7 @@ export function SparrowxMasterLanding({
             onOpenLogin();
           }
         }}
+        onRequestRegister={onOpenLogin}
       />
     </div>
   );

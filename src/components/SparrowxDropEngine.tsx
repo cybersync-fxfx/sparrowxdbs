@@ -35,7 +35,51 @@ import {
   Layers,
   Database,
 } from "lucide-react";
-import { authenticateAppUserFromBackend } from "@/lib/supabase";
+import {
+  authenticateAppUserFromBackend,
+  fetchAppUserByEmailFromBackend,
+  persistAppUserToBackend,
+  type AppUser,
+} from "@/lib/supabase";
+import {
+  clearSessionToken,
+  issueSignedSessionToken,
+  verifySessionToken,
+} from "@/lib/advanced-features";
+
+function readInitialVaultUser(): AppUser | null {
+  if (typeof window === "undefined") return null;
+  const verified = verifySessionToken();
+  if (verified) {
+    return {
+      id: verified.sub,
+      email: verified.email,
+      fullName: verified.fullName || verified.email.split("@")[0] || "Vault User",
+      password: "",
+      admin: verified.role === "admin" ? "yes" : "no",
+      tenantId: verified.tenantId,
+    };
+  }
+  const rawAuthUser = localStorage.getItem("sparrowx_auth_user");
+  if (rawAuthUser) {
+    try {
+      const parsed = JSON.parse(rawAuthUser) as Partial<AppUser>;
+      if (parsed && typeof parsed.email === "string" && parsed.email.includes("@")) {
+        return {
+          id: String(parsed.id || "USR-VAULT"),
+          email: parsed.email,
+          fullName: String(parsed.fullName || parsed.email.split("@")[0]),
+          password: "",
+          admin: parsed.admin === "yes" ? "yes" : "no",
+          tenantId: parsed.tenantId ?? null,
+        };
+      }
+    } catch {
+      // Ignore malformed sparrowx_auth_user
+    }
+  }
+  return null;
+}
 
 interface StagedFile {
   name: string;
@@ -60,14 +104,12 @@ export function SparrowxDropEngine() {
   const [activeMode, setActiveMode] = useState<"storage" | "ephemeral">("ephemeral");
 
   // Vault authentication state
-  const [isVaultAuthenticated, setIsVaultAuthenticated] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return Boolean(
-      localStorage.getItem("sparrowx_auth_user") ||
-      localStorage.getItem("sparrowx_session_token") ||
-      localStorage.getItem("sparrowx_vault_session")
-    );
-  });
+  const [vaultUser, setVaultUser] = useState<AppUser | null>(() => readInitialVaultUser());
+  const [isVaultAuthenticated, setIsVaultAuthenticated] = useState<boolean>(
+    () => readInitialVaultUser() !== null,
+  );
+  const [vaultAuthMode, setVaultAuthMode] = useState<"signin" | "register">("signin");
+  const [authFullName, setAuthFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
@@ -1122,12 +1164,47 @@ export function SparrowxDropEngine() {
                 {/* Inline Sign-In / Account Provision Form */}
                 <div className="p-6 sm:p-8 bg-[#0B0D13]">
                   <div className="max-w-md mx-auto space-y-4">
+                    <div className="grid grid-cols-2 gap-1.5 rounded bg-[#14171F] border border-white/10 p-1 font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVaultAuthMode("signin");
+                          setAuthError("");
+                        }}
+                        className={`py-2 rounded font-semibold transition-colors cursor-pointer ${
+                          vaultAuthMode === "signin"
+                            ? "bg-white text-black"
+                            : "text-[#9CA3AF] hover:text-white"
+                        }`}
+                      >
+                        Sign In
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVaultAuthMode("register");
+                          setAuthError("");
+                        }}
+                        className={`py-2 rounded font-semibold transition-colors cursor-pointer ${
+                          vaultAuthMode === "register"
+                            ? "bg-emerald-500 text-black"
+                            : "text-[#9CA3AF] hover:text-white"
+                        }`}
+                      >
+                        Create Free Vault
+                      </button>
+                    </div>
+
                     <div className="text-center space-y-1">
                       <h3 className="text-sm font-bold text-white font-mono uppercase tracking-tight">
-                        Sign In to Unlock Your 10 GB Vault
+                        {vaultAuthMode === "signin"
+                          ? "Sign In to Unlock Your 10 GB Vault"
+                          : "Create Your Free 10 GB Vault Account"}
                       </h3>
                       <p className="text-xs text-[#9CA3AF]">
-                        Use your SparrowX credentials to access your persistent storage.
+                        {vaultAuthMode === "signin"
+                          ? "Use your SparrowX credentials to access your persistent storage."
+                          : "Provision an encrypted NVMe vault backed by your SparrowX account."}
                       </p>
                     </div>
 
@@ -1142,24 +1219,85 @@ export function SparrowxDropEngine() {
                         e.preventDefault();
                         setAuthLoading(true);
                         setAuthError("");
+                        const emailClean = authEmail.trim().toLowerCase();
                         try {
-                          const res = await authenticateAppUserFromBackend(authEmail.trim(), authPassword);
-                          if (res.user) {
-                            localStorage.setItem("sparrowx_vault_session", "active");
-                            setIsVaultAuthenticated(true);
+                          if (vaultAuthMode === "signin") {
+                            const res = await authenticateAppUserFromBackend(
+                              authEmail.trim(),
+                              authPassword,
+                            );
+                            if (res.user) {
+                              issueSignedSessionToken({
+                                id: res.user.id,
+                                email: res.user.email,
+                                fullName:
+                                  res.user.fullName ||
+                                  res.user.email.split("@")[0] ||
+                                  "Vault User",
+                                role: res.user.admin === "yes" ? "admin" : "client",
+                                tenantId: res.user.tenantId,
+                              });
+                              localStorage.setItem("sparrowx_vault_session", res.user.email);
+                              setVaultUser(res.user);
+                              setIsVaultAuthenticated(true);
+                            } else {
+                              setAuthError(res.error || "Invalid email or password.");
+                            }
                           } else {
-                            localStorage.setItem("sparrowx_vault_session", authEmail);
+                            if (!emailClean || authPassword.length < 6) {
+                              setAuthError(
+                                "Provide a valid email and a password of at least 6 characters.",
+                              );
+                              return;
+                            }
+                            const existing = await fetchAppUserByEmailFromBackend(emailClean);
+                            if (existing) {
+                              setAuthError(
+                                "An account with this email already exists. Please sign in instead.",
+                              );
+                              return;
+                            }
+                            const newUser: AppUser = {
+                              id: `USR-${Date.now().toString().slice(-4)}`,
+                              email: emailClean,
+                              password: authPassword,
+                              fullName:
+                                authFullName.trim() || emailClean.split("@")[0] || "Vault User",
+                              admin: "no",
+                              tenantId: `TENANT-VAULT-${Date.now().toString().slice(-4)}`,
+                            };
+                            await persistAppUserToBackend(newUser);
+                            issueSignedSessionToken({
+                              id: newUser.id,
+                              email: newUser.email,
+                              fullName: newUser.fullName,
+                              role: "client",
+                              tenantId: newUser.tenantId,
+                            });
+                            localStorage.setItem("sparrowx_vault_session", newUser.email);
+                            setVaultUser({ ...newUser, password: "" });
                             setIsVaultAuthenticated(true);
                           }
                         } catch {
-                          localStorage.setItem("sparrowx_vault_session", authEmail);
-                          setIsVaultAuthenticated(true);
+                          setAuthError(
+                            "Authentication service unavailable. Please verify your credentials and try again.",
+                          );
                         } finally {
                           setAuthLoading(false);
                         }
                       }}
                       className="space-y-3 font-mono text-xs"
                     >
+                      {vaultAuthMode === "register" && (
+                        <input
+                          type="text"
+                          required
+                          value={authFullName}
+                          onChange={(e) => setAuthFullName(e.target.value)}
+                          placeholder="Full Name / Display Label"
+                          className="w-full px-3.5 py-2.5 rounded bg-[#14171F] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
+                        />
+                      )}
                       <input
                         type="email"
                         required
@@ -1171,6 +1309,7 @@ export function SparrowxDropEngine() {
                       <input
                         type="password"
                         required
+                        minLength={vaultAuthMode === "register" ? 6 : undefined}
                         value={authPassword}
                         onChange={(e) => setAuthPassword(e.target.value)}
                         placeholder="Password"
@@ -1182,7 +1321,11 @@ export function SparrowxDropEngine() {
                         className="w-full py-2.5 rounded bg-white text-black font-semibold hover:bg-neutral-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
                       >
                         {authLoading && <RefreshCw className="size-3.5 animate-spin" />}
-                        <span>Unlock Free 10 GB Vault</span>
+                        <span>
+                          {vaultAuthMode === "signin"
+                            ? "Unlock Free 10 GB Vault"
+                            : "Create & Unlock 10 GB Vault"}
+                        </span>
                       </button>
                     </form>
                   </div>
@@ -1192,20 +1335,31 @@ export function SparrowxDropEngine() {
               /* LOGGED IN: FULL SOVEREIGN FILE MANAGER WORKSPACE */
               <div className="space-y-6">
                 {/* User Session Bar */}
-                <div className="border border-white/[0.08] bg-[#0E1015] px-4 py-2.5 rounded flex items-center justify-between text-xs font-mono">
-                  <div className="flex items-center gap-2">
+                <div className="border border-white/[0.08] bg-[#0E1015] px-4 py-2.5 rounded flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                     <span className="text-white font-medium">10 GB Vault Active</span>
+                    {vaultUser && (
+                      <>
+                        <span className="text-[#64748B]">•</span>
+                        <span className="text-emerald-400">
+                          {vaultUser.fullName || vaultUser.email} ({vaultUser.email})
+                        </span>
+                      </>
+                    )}
                     <span className="text-[#64748B]">•</span>
                     <span className="text-[#9CA3AF] tabular-nums">{formatSize(totalDiskUsedBytes)} / 10.00 GB Used</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
+                      clearSessionToken();
                       localStorage.removeItem("sparrowx_vault_session");
+                      localStorage.removeItem("sparrowx_auth_user");
+                      setVaultUser(null);
                       setIsVaultAuthenticated(false);
                     }}
-                    className="text-[#64748B] hover:text-white transition-colors text-[11px]"
+                    className="text-[#64748B] hover:text-white transition-colors text-[11px] cursor-pointer"
                   >
                     Lock Vault
                   </button>
