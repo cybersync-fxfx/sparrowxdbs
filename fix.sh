@@ -83,6 +83,7 @@ ERR_COUNT=0
 declare -a FIXED_LOG=()
 declare -a WARN_LOG=()
 declare -a ERR_LOG=()
+declare -a UNFIXED_LOG=()
 
 FIX_LOG_DIR="/var/log/sparrowx"
 REPO_LOG_DIR="${INSTALL_DIR}/logs"
@@ -124,7 +125,14 @@ log_err()    {
   echo -e "  ${C_RED}[ERR ]${C_RESET}     $*"
   ERR_COUNT=$((ERR_COUNT + 1))
   ERR_LOG+=("$*")
-  append_error_record "ERR" "$*"
+  UNFIXED_LOG+=("$*")
+  append_error_record "ERR_UNFIXED" "$*"
+}
+log_unfixed() {
+  echo -e "  ${C_RED}[UNFIXED]${C_RESET}  $*"
+  ERR_COUNT=$((ERR_COUNT + 1))
+  UNFIXED_LOG+=("$*")
+  append_error_record "UNFIXED" "$*"
 }
 log_fix() {
   echo -e "  ${C_YELLOW}[AUTO-FIX]${C_RESET} ${C_WHITE}$*${C_RESET}"
@@ -775,6 +783,9 @@ EOF_PTERO
     [ -S "${php_sock}" ] && chmod 666 "${php_sock}" 2>/dev/null || true
     systemctl restart pteroq >/dev/null 2>&1 || true
     systemctl restart nginx >/dev/null 2>&1 || true
+    if [ "${probe_attempt}" -eq 2 ]; then
+      log_unfixed "Pterodactyl login/CSRF probe still failing after 2 auto-heal passes (CSRF:${csrf_code} LOGIN:${login_probe_code})"
+    fi
     probe_attempt=$((probe_attempt + 1))
   done
 }
@@ -1856,6 +1867,24 @@ echo -e "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Full Run Log     : ${C
 echo -e "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Error Bundle Log : ${C_WHITE}${FIX_ERROR_LOG}${C_RESET}"
 echo -e "${C_GREEN}╚══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
 
+# Collect any services/checks that remained unfixed after all healing passes
+[ "${PG_READY:-false}" != "true" ] && UNFIXED_LOG+=("PostgreSQL 16 not ready on 127.0.0.1:${PG_HOST_PORT}")
+[ "${PGRST_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("PostgREST API DOWN on 127.0.0.1:${PGRST_HOST_PORT}")
+[ "${APP_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("SparrowX Web App DOWN on 127.0.0.1:${APP_HOST_PORT}")
+[ "${EDGE_HTTP_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Nginx Edge HTTP DOWN on :${HTTP_PORT}")
+[ "${EDGE_HTTPS_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Nginx Edge HTTPS DOWN on :${HTTPS_PORT}")
+if is_pterodactyl_installed && [[ "${PTERO_HEALTH}" == CHECK* ]]; then
+  UNFIXED_LOG+=("Pterodactyl Game Panel unhealthy (${PTERO_HEALTH})")
+fi
+for s in mariadb redis-server nginx pteroq docker; do
+  if systemctl list-unit-files 2>/dev/null | grep -q "^${s}.service"; then
+    s_state="$(systemctl is-active "${s}" 2>/dev/null || echo unknown)"
+    if [ "${s_state}" != "active" ]; then
+      UNFIXED_LOG+=("systemd service ${s} is ${s_state}")
+    fi
+  fi
+done
+
 # Write structured diagnostic error bundle for future auto-patch updates
 {
   echo ""
@@ -1863,7 +1892,15 @@ echo -e "${C_GREEN}╚═══════════════════�
   echo "DIAGNOSTIC SNAPSHOT: $(date -u '+%Y-%m-%d %H:%M:%S UTC' 2>/dev/null || date)"
   echo "GIT_HEAD: $(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
   echo "HEALTH: PG=${PG_READY:-?} PGRST=${PGRST_HEALTH} APP=${APP_HEALTH} HTTP=${EDGE_HTTP_HEALTH} HTTPS=${EDGE_HTTPS_HEALTH} PTERO=${PTERO_HEALTH}"
-  echo "COUNTS: FIXED=${FIXED_COUNT} WARN=${WARN_COUNT} ERR=${ERR_COUNT}"
+  echo "COUNTS: FIXED=${FIXED_COUNT} WARN=${WARN_COUNT} ERR=${ERR_COUNT} UNFIXED=${#UNFIXED_LOG[@]}"
+  echo "--- UNFIXED / UNRESOLVED ERRORS (CANNOT AUTO-FIX YET) ---"
+  if [ "${#UNFIXED_LOG[@]}" -eq 0 ]; then
+    echo "NONE (All checks passed)"
+  else
+    for u_item in "${UNFIXED_LOG[@]}"; do
+      echo "UNFIXED: ${u_item}"
+    done
+  fi
   if [ -f "/var/www/pterodactyl/storage/logs/laravel.log" ]; then
     echo "--- PTERODACTYL LARAVEL.LOG (LAST 40 LINES) ---"
     tail -n 40 /var/www/pterodactyl/storage/logs/laravel.log 2>/dev/null || true
@@ -1889,6 +1926,15 @@ echo -e "${C_GREEN}╚═══════════════════�
   echo "=============================================================================="
 } >> "${FIX_ERROR_LOG}" 2>/dev/null || true
 cp -f "${FIX_ERROR_LOG}" "${REPO_ERROR_LOG}" 2>/dev/null || true
+
+if [ "${#UNFIXED_LOG[@]}" -gt 0 ]; then
+  echo ""
+  echo -e "${C_RED}${C_BOLD}Unfixed / Unresolved Errors (${#UNFIXED_LOG[@]}):${C_RESET}"
+  for u_item in "${UNFIXED_LOG[@]}"; do
+    echo -e "  ${C_RED}✗${C_RESET} ${u_item}"
+  done
+  echo -e "  ${C_DIM}Full error bundle saved to: ${FIX_ERROR_LOG}${C_RESET}"
+fi
 
 if [ "${HAS_DOCKER}" = "true" ]; then
   echo ""
