@@ -63,6 +63,15 @@ if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
   exec sudo -E bash "$0" "$@"
 fi
 
+# Prevent concurrent fix.sh runs (e.g. cron/watchdog + manual) from colliding on Docker containers
+if command -v flock >/dev/null 2>&1; then
+  exec 9>/var/run/sparrowx-fix.lock
+  if ! flock -w 120 9; then
+    echo "Another fix.sh instance is currently running; exiting cleanly."
+    exit 0
+  fi
+fi
+
 # ------------------------------------------------------------------------------
 # Cyber CLI Colors & Visual Formatting
 # ------------------------------------------------------------------------------
@@ -558,8 +567,27 @@ heal_pterodactyl_host_nginx() {
     fi
   fi
 
+  # Always clear stale cached config before validating APP_KEY or running artisan
+  rm -f "${ptero_dir}/bootstrap/cache/config.php" "${ptero_dir}/bootstrap/cache/services.php" 2>/dev/null || true
+
+  local current_app_key=""
+  current_app_key="$(awk -F= '/^APP_KEY=/{sub(/^[^=]*=/,""); print; exit}' "${ptero_dir}/.env" 2>/dev/null | tr -d "\"'\r[:space:]" || true)"
+  if ! echo "${current_app_key}" | grep -qE '^base64:[A-Za-z0-9+/=]{40,}$'; then
+    local new_app_key=""
+    if command -v openssl >/dev/null 2>&1; then
+      new_app_key="base64:$(openssl rand -base64 32 | tr -d '\n\r')"
+    elif [ -n "${php_bin}" ]; then
+      new_app_key="base64:$("${php_bin}" -r 'echo base64_encode(random_bytes(32));' 2>/dev/null || true)"
+    fi
+    if [ -n "${new_app_key}" ]; then
+      set_ptero_env_key "APP_KEY" "${new_app_key}"
+      log_fix "Generated missing/invalid Pterodactyl APP_KEY directly in .env"
+    fi
+  fi
+
   if [ -n "${php_bin}" ] && [ -f "${ptero_dir}/artisan" ]; then
-    if ! grep -q '^APP_KEY=base64:' "${ptero_dir}/.env" 2>/dev/null; then
+    # Fallback artisan key:generate if still missing
+    if ! grep -qE '^APP_KEY=base64:[A-Za-z0-9+/=]{40,}' "${ptero_dir}/.env" 2>/dev/null; then
       (cd "${ptero_dir}" && "${php_bin}" artisan key:generate --force --no-interaction >/dev/null 2>&1 || true)
     fi
 
@@ -1354,8 +1382,9 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    client_max_body_size 100M;
+    client_max_body_size 150M;
     server_tokens off;
+    resolver 127.0.0.11 valid=10s ipv6=off;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -1368,7 +1397,8 @@ server {
     }
 
     location /rest/v1/ {
-        proxy_pass http://sparrowx:3000/rest/v1/;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -1381,7 +1411,8 @@ server {
     }
 
     location / {
-        proxy_pass http://sparrowx:3000;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -1400,8 +1431,9 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    client_max_body_size 100M;
+    client_max_body_size 150M;
     server_tokens off;
+    resolver 127.0.0.11 valid=10s ipv6=off;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -1410,7 +1442,8 @@ server {
     }
 
     location /rest/v1/ {
-        proxy_pass http://sparrowx:3000/rest/v1/;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         add_header Access-Control-Allow-Origin "*" always;
@@ -1420,7 +1453,8 @@ server {
     }
 
     location / {
-        proxy_pass http://sparrowx:3000;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -1440,8 +1474,9 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    client_max_body_size 100M;
+    client_max_body_size 150M;
     server_tokens off;
+    resolver 127.0.0.11 valid=10s ipv6=off;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -1450,7 +1485,8 @@ server {
     }
 
     location /rest/v1/ {
-        proxy_pass http://sparrowx:3000/rest/v1/;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -1461,7 +1497,8 @@ server {
     }
 
     location / {
-        proxy_pass http://sparrowx:3000;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -1856,13 +1893,12 @@ server {
     resolver 127.0.0.11 valid=10s ipv6=off;
     location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; allow all; }
     location /rest/v1/ {
-        set \$upstream_pgrst http://sparrowx-postgrest:3000;
-        rewrite ^/rest/v1/(.*) /\$1 break;
-        proxy_pass \$upstream_pgrst;
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
         proxy_set_header Host \$host;
     }
     location / {
-        set \$upstream_app http://sparrowx-app:3000;
+        set \$upstream_app http://sparrowx:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
