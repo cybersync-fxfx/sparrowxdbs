@@ -1448,8 +1448,9 @@ PartOf=docker.service
 [Service]
 User=root
 WorkingDirectory=/etc/pterodactyl
+RuntimeDirectory=wings
+Environment=HOME=/root
 LimitNOFILE=4096
-PIDFile=/var/run/wings/daemon.pid
 ExecStart=/usr/local/bin/wings
 Restart=on-failure
 StartLimitInterval=180
@@ -1493,6 +1494,11 @@ EOF_WINGS
   # Remove stale pterodactyl_nw if Wings is stopped so it recreates cleanly with the non-overlapping subnet
   if ! systemctl is-active --quiet wings 2>/dev/null; then
     docker network rm pterodactyl_nw >/dev/null 2>&1 || true
+    # Free wings_port if held by a stale non-wings process
+    if ss -tulpn 2>/dev/null | grep -E "(:|\.|\])${wings_port}[[:space:]]" | grep -qv "wings"; then
+      command -v fuser >/dev/null 2>&1 && fuser -k "${wings_port}/tcp" >/dev/null 2>&1 || true
+      sleep 1
+    fi
   fi
 
   systemctl restart wings >/dev/null 2>&1 || true
@@ -1500,7 +1506,8 @@ EOF_WINGS
   for _w in 1 2 3 4 5; do
     if systemctl is-active --quiet wings 2>/dev/null; then
       local w_code=""
-      w_code="$(curl -kso /dev/null -w "%{http_code}" --max-time 2 "https://127.0.0.1:${wings_port}/" 2>/dev/null || echo "000")"
+      w_code="$(curl -kso /dev/null -w "%{http_code}" --max-time 2 "https://127.0.0.1:${wings_port}/" 2>/dev/null || true)"
+      [ -z "${w_code}" ] && w_code="000"
       if echo "${w_code}" | grep -qE "^(200|401|403|404)$"; then
         wings_ok="true"
         break
@@ -1512,10 +1519,12 @@ EOF_WINGS
   if [ "${wings_ok}" = "true" ]; then
     log_ok "Pterodactyl Wings daemon active for ${node_domain} (HTTPS :${wings_port}, SFTP :${WINGS_SFTP_PORT:-2022})"
     local trusted_code=""
-    trusted_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 4 "https://${node_domain}:${wings_port}/" 2>/dev/null || echo "000")"
+    trusted_code="$(curl -sS -o /dev/null -w "%{http_code}" --max-time 4 "https://${node_domain}:${wings_port}/" 2>/dev/null || true)"
+    [ -z "${trusted_code}" ] && trusted_code="000"
     if ! echo "${trusted_code}" | grep -qE "^(200|401|403|404)$"; then
       local ext_code=""
-      ext_code="$(curl -kso /dev/null -w "%{http_code}" --max-time 4 "https://${node_domain}:${wings_port}/" 2>/dev/null || echo "000")"
+      ext_code="$(curl -kso /dev/null -w "%{http_code}" --max-time 4 "https://${node_domain}:${wings_port}/" 2>/dev/null || true)"
+      [ -z "${ext_code}" ] && ext_code="000"
       if echo "${ext_code}" | grep -qE "^(200|401|403|404)$"; then
         log_warn "Wings responds on https://${node_domain}:${wings_port} only with -k (self-signed TLS or Cloudflare proxy; ensure DNS A -> ${SPARROWX_PUBLIC_IP} with DNS-only/grey cloud so browser trusts Let's Encrypt)"
       else
@@ -2808,7 +2817,8 @@ fi
 
 WINGS_HEALTH="NOT INSTALLED"
 if is_wings_installed; then
-  WINGS_CODE="$(curl -kso /dev/null -w "%{http_code}" --max-time 3 "https://127.0.0.1:${WINGS_PORT:-8080}/" 2>/dev/null || echo "000")"
+  WINGS_CODE="$(curl -kso /dev/null -w "%{http_code}" --max-time 3 "https://127.0.0.1:${WINGS_PORT:-8080}/" 2>/dev/null || true)"
+  [ -z "${WINGS_CODE}" ] && WINGS_CODE="000"
   if systemctl is-active --quiet wings 2>/dev/null && echo "${WINGS_CODE}" | grep -qE "^(200|401|403|404)$"; then
     WINGS_HEALTH="ONLINE (${DOMAIN_NODE}:${WINGS_PORT:-8080})"
   else
@@ -2930,11 +2940,17 @@ done
     tail -n 20 /var/log/nginx/error.log 2>/dev/null || true
   fi
   echo "--- SYSTEMD SERVICES ---"
-  for s in mariadb redis-server nginx pteroq docker php8.4-fpm php8.3-fpm php8.2-fpm php8.1-fpm; do
+  for s in mariadb redis-server nginx pteroq wings docker php8.4-fpm php8.3-fpm php8.2-fpm php8.1-fpm; do
     if systemctl list-unit-files 2>/dev/null | grep -q "^${s}.service"; then
       echo "${s}: $(systemctl is-active "${s}" 2>/dev/null || echo unknown)"
     fi
   done
+  if is_wings_installed; then
+    echo "--- WINGS DIAGNOSTICS ---"
+    ls -la /etc/pterodactyl 2>/dev/null || true
+    ss -tulpn 2>/dev/null | grep -E ":(${WINGS_PORT:-8080}|${WINGS_SFTP_PORT:-2022}) " || true
+    journalctl -u wings -n 25 --no-pager 2>/dev/null || true
+  fi
   if [ "${HAS_DOCKER}" = "true" ]; then
     echo "--- DOCKER PS -A ---"
     docker ps -a --filter name=sparrowx --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
