@@ -365,6 +365,31 @@ heal_pterodactyl_host_nginx() {
   done
   php_sock="$(detect_php_fpm_sock)"
 
+  local php_ver=""
+  php_ver="$(echo "${php_sock}" | grep -oE 'php[0-9]+\.[0-9]+' | sed 's/php//' | head -n 1 || true)"
+  local php_bin=""
+  if [ -n "${php_ver}" ] && command -v "php${php_ver}" >/dev/null 2>&1; then
+    php_bin="$(command -v "php${php_ver}")"
+  else
+    php_bin="$(command -v php8.4 || command -v php8.3 || command -v php8.2 || command -v php8.1 || command -v php || true)"
+  fi
+
+  # Ensure all required PHP extensions for the active PHP-FPM version are installed
+  if [ -n "${php_ver}" ] && command -v apt-get >/dev/null 2>&1; then
+    local missing_exts=()
+    for ext in mysql mbstring xml bcmath curl zip gd intl redis; do
+      if [ -n "${php_bin}" ] && ! "${php_bin}" -m 2>/dev/null | grep -qiE "^(${ext}|pdo_${ext}|mysqli)$"; then
+        missing_exts+=("php${php_ver}-${ext}")
+      fi
+    done
+    if [ "${#missing_exts[@]}" -gt 0 ]; then
+      log_fix "Installing missing PHP ${php_ver} extensions for Pterodactyl: ${missing_exts[*]}"
+      DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null 2>&1 || true
+      DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${missing_exts[@]}" >/dev/null 2>&1 || true
+      systemctl restart "php${php_ver}-fpm" >/dev/null 2>&1 || true
+    fi
+  fi
+
   # Sync MariaDB/MySQL database & user credentials + Pterodactyl .env
   local db_cli=""
   if command -v mariadb >/dev/null 2>&1; then
@@ -376,6 +401,15 @@ heal_pterodactyl_host_nginx() {
   local db_name="${PTERO_DB_NAME:-panel}"
   local db_user="${PTERO_DB_USER:-pterodactyl}"
   local db_pass="${PTERO_DB_PASSWORD:-}"
+  if [ -z "${db_pass}" ] && [ -f "${ptero_dir}/.env" ]; then
+    db_pass="$(awk -F= '/^DB_PASSWORD=/{sub(/^[^=]*=/,""); print; exit}' "${ptero_dir}/.env" 2>/dev/null | tr -d "\"'\r" || true)"
+  fi
+  if [ -z "${db_pass}" ]; then
+    db_pass="$(openssl rand -hex 16 2>/dev/null || echo 'SparrowX_Ptero_DB_2026')"
+    PTERO_DB_PASSWORD="${db_pass}"
+    ensure_env_key "PTERO_DB_PASSWORD" "${db_pass}"
+  fi
+
   if [ -n "${db_cli}" ] && [ -n "${db_pass}" ]; then
     "${db_cli}" -u root -e "
       CREATE DATABASE IF NOT EXISTS \`${db_name}\`;
@@ -393,15 +427,22 @@ heal_pterodactyl_host_nginx() {
     cp "${ptero_dir}/.env.example" "${ptero_dir}/.env"
   fi
 
-  local php_bin=""
-  php_bin="$(command -v php8.4 || command -v php8.3 || command -v php8.2 || command -v php8.1 || command -v php || true)"
+  # Repair vendor/ if composer autoload is missing
+  if [ ! -f "${ptero_dir}/vendor/autoload.php" ] && command -v composer >/dev/null 2>&1; then
+    log_fix "Restoring missing Pterodactyl vendor/ dependencies via composer"
+    (cd "${ptero_dir}" && COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --optimize-autoloader --no-interaction >/dev/null 2>&1 || true)
+  fi
 
   if [ -f "${ptero_dir}/.env" ]; then
+    set_ptero_env_key "APP_ENV" "production"
     set_ptero_env_key "APP_URL" "https://${game_domain}"
     set_ptero_env_key "APP_ENVIRONMENT_ONLY" "false"
     set_ptero_env_key "TRUSTED_PROXIES" "*"
     set_ptero_env_key "RECAPTCHA_ENABLED" "false"
-    set_ptero_env_key "SESSION_SECURE_COOKIE" "true"
+    # Prevent 419/500 cookie & CSRF failures behind proxies, Cloudflare Flexible, or HTTP/IP access
+    set_ptero_env_key "SESSION_SECURE_COOKIE" "false"
+    set_ptero_env_key "SESSION_DOMAIN" "null"
+    set_ptero_env_key "DB_CONNECTION" "mysql"
     set_ptero_env_key "DB_HOST" "127.0.0.1"
     set_ptero_env_key "DB_PORT" "3306"
     set_ptero_env_key "DB_DATABASE" "${db_name}"
@@ -415,19 +456,55 @@ heal_pterodactyl_host_nginx() {
     fi
     set_ptero_env_key "HASHIDS_LENGTH" "8"
 
+    # Test real PHP -> Redis connectivity (ping + set/get) before enabling Redis drivers
     local redis_ready="false"
-    if command -v redis-cli >/dev/null 2>&1 && redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -qi "PONG"; then
-      if [ -n "${php_bin}" ] && "${php_bin}" -m 2>/dev/null | grep -qi "^redis$"; then
-        redis_ready="true"
-      fi
+    if [ -n "${php_bin}" ] && "${php_bin}" -r '
+      if (!class_exists("Redis")) exit(1);
+      try {
+        $r = new Redis();
+        if (!@$r->connect("127.0.0.1", 6379, 1.5)) exit(1);
+        $r->set("spx_ptero_probe", "ok", 5);
+        if ($r->get("spx_ptero_probe") !== "ok") exit(1);
+        exit(0);
+      } catch (Throwable $e) { exit(1); }
+    ' >/dev/null 2>&1; then
+      redis_ready="true"
     fi
     if [ "${redis_ready}" = "true" ]; then
       set_ptero_env_key "REDIS_HOST" "127.0.0.1"
       set_ptero_env_key "REDIS_PORT" "6379"
+      set_ptero_env_key "REDIS_PASSWORD" "null"
+      set_ptero_env_key "CACHE_DRIVER" "redis"
+      set_ptero_env_key "SESSION_DRIVER" "redis"
+      set_ptero_env_key "QUEUE_CONNECTION" "redis"
     else
+      log_fix "Redis PHP probe failed or unavailable; switching Pterodactyl cache/session/queue to file/sync"
       set_ptero_env_key "CACHE_DRIVER" "file"
       set_ptero_env_key "SESSION_DRIVER" "file"
       set_ptero_env_key "QUEUE_CONNECTION" "sync"
+    fi
+  fi
+
+  # Verify real PHP PDO -> MariaDB connection before running migrations
+  if [ -n "${php_bin}" ] && [ -n "${db_pass}" ]; then
+    if ! SPX_DB="${db_name}" SPX_U="${db_user}" SPX_P="${db_pass}" "${php_bin}" -r '
+      try {
+        new PDO("mysql:host=127.0.0.1;port=3306;dbname=".getenv("SPX_DB"), getenv("SPX_U"), getenv("SPX_P"), [PDO::ATTR_TIMEOUT => 2]);
+        exit(0);
+      } catch (Throwable $e) { exit(1); }
+    ' >/dev/null 2>&1; then
+      log_fix "PHP PDO MariaDB auth failed for ${db_user}@127.0.0.1; resetting MySQL user & grants"
+      if [ -n "${db_cli}" ]; then
+        "${db_cli}" -u root -e "
+          DROP USER IF EXISTS '${db_user}'@'127.0.0.1';
+          DROP USER IF EXISTS '${db_user}'@'localhost';
+          CREATE USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
+          CREATE USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+          GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1' WITH GRANT OPTION;
+          GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost' WITH GRANT OPTION;
+          FLUSH PRIVILEGES;
+        " >/dev/null 2>&1 || true
+      fi
     fi
   fi
 
@@ -490,11 +567,30 @@ heal_pterodactyl_host_nginx() {
   fi
 
   mkdir -p "${ptero_dir}/storage/logs" "${ptero_dir}/storage/framework/sessions" "${ptero_dir}/storage/framework/views" "${ptero_dir}/storage/framework/cache/data" "${ptero_dir}/bootstrap/cache"
+  touch "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null || true
   if id -u www-data >/dev/null 2>&1; then
+    chown -R www-data:www-data "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" "${ptero_dir}/.env" 2>/dev/null || true
     chown -R www-data:www-data "${ptero_dir}" 2>/dev/null || true
   fi
   chmod -R 775 "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" 2>/dev/null || true
+  chmod 664 "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null || true
   chmod 640 "${ptero_dir}/.env" 2>/dev/null || true
+
+  # Ensure pteroq.service runs as www-data so it never writes root-owned laravel.log files
+  if [ -f "/etc/systemd/system/pteroq.service" ]; then
+    if ! grep -q "^User=www-data" /etc/systemd/system/pteroq.service 2>/dev/null; then
+      sed -i 's/^User=.*/User=www-data/' /etc/systemd/system/pteroq.service 2>/dev/null || true
+      sed -i 's/^Group=.*/Group=www-data/' /etc/systemd/system/pteroq.service 2>/dev/null || true
+      systemctl daemon-reload >/dev/null 2>&1 || true
+    fi
+    systemctl restart pteroq >/dev/null 2>&1 || true
+  fi
+
+  # Restart active PHP-FPM so .env / opcache changes take effect immediately
+  if [ -n "${php_ver}" ] && systemctl list-unit-files 2>/dev/null | grep -q "^php${php_ver}-fpm.service"; then
+    systemctl restart "php${php_ver}-fpm" >/dev/null 2>&1 || true
+  fi
+  [ -S "${php_sock}" ] && chmod 666 "${php_sock}" 2>/dev/null || true
   write_ptero_credentials_file
 
   # Sync existing Let's Encrypt certificate for game.<domain> into ovh/ssl & /etc/ssl
@@ -574,39 +670,71 @@ EOF_PTERO
     log_warn "Host Nginx config check failed for ${ptero_conf}; inspect nginx -t on host"
   fi
 
-  # Live Laravel /sanctum/csrf-cookie + POST /auth/login verification (falls back to file cache/session if Redis throws 500)
-  local csrf_code="000" login_probe_code="000" raw_xsrf="" xsrf_tok="" ptero_cj=""
-  ptero_cj="$(mktemp)"
-  csrf_code="$(curl -s -c "${ptero_cj}" -o /dev/null -w "%{http_code}" --max-time 5 -H "Host: ${game_domain}" -H "X-Forwarded-Proto: https" "http://127.0.0.1:${ptero_port}/sanctum/csrf-cookie" 2>/dev/null || echo "000")"
-  if echo "${csrf_code}" | grep -qE "^(200|204)$"; then
-    raw_xsrf="$(awk '$6=="XSRF-TOKEN"{print $7; exit}' "${ptero_cj}" 2>/dev/null || true)"
-    if [ -n "${raw_xsrf}" ] && [ -n "${php_bin}" ]; then
-      xsrf_tok="$("${php_bin}" -r 'echo urldecode($argv[1] ?? "");' "${raw_xsrf}" 2>/dev/null || echo "${raw_xsrf}")"
-    else
-      xsrf_tok="${raw_xsrf}"
+  # Live Laravel /sanctum/csrf-cookie + POST /auth/login verification & auto-healing loop
+  local probe_attempt=1
+  while [ "${probe_attempt}" -le 2 ]; do
+    local csrf_code="000" login_probe_code="000" login_probe_body="" raw_xsrf="" xsrf_tok="" ptero_cj="" ptero_body_file=""
+    ptero_cj="$(mktemp)"
+    ptero_body_file="$(mktemp)"
+    csrf_code="$(curl -s -c "${ptero_cj}" -o /dev/null -w "%{http_code}" --max-time 6 -H "Host: ${game_domain}" -H "X-Forwarded-Proto: https" "http://127.0.0.1:${ptero_port}/sanctum/csrf-cookie" 2>/dev/null || echo "000")"
+    if echo "${csrf_code}" | grep -qE "^(200|204)$"; then
+      raw_xsrf="$(awk '$6=="XSRF-TOKEN"{print $7; exit}' "${ptero_cj}" 2>/dev/null || true)"
+      if [ -n "${raw_xsrf}" ] && [ -n "${php_bin}" ]; then
+        xsrf_tok="$("${php_bin}" -r 'echo urldecode($argv[1] ?? "");' "${raw_xsrf}" 2>/dev/null || echo "${raw_xsrf}")"
+      else
+        xsrf_tok="${raw_xsrf}"
+      fi
+      if [ -n "${xsrf_tok}" ]; then
+        local probe_user="root"
+        local probe_pass="${PTERO_ADMIN_PASSWORD:-__probe__}"
+        login_probe_code="$(curl -s -b "${ptero_cj}" -o "${ptero_body_file}" -w "%{http_code}" --max-time 6 -X POST -H "Host: ${game_domain}" -H "X-Forwarded-Proto: https" -H "Accept: application/json" -H "Content-Type: application/json" -H "X-XSRF-TOKEN: ${xsrf_tok}" -d "{\"user\":\"${probe_user}\",\"password\":\"${probe_pass}\"}" "http://127.0.0.1:${ptero_port}/auth/login" 2>/dev/null || echo "000")"
+        login_probe_body="$(cat "${ptero_body_file}" 2>/dev/null || true)"
+      fi
     fi
-    if [ -n "${xsrf_tok}" ]; then
-      login_probe_code="$(curl -s -b "${ptero_cj}" -o /dev/null -w "%{http_code}" --max-time 5 -X POST -H "Host: ${game_domain}" -H "X-Forwarded-Proto: https" -H "Accept: application/json" -H "Content-Type: application/json" -H "X-XSRF-TOKEN: ${xsrf_tok}" -d '{"user":"__probe__","password":"__probe__"}' "http://127.0.0.1:${ptero_port}/auth/login" 2>/dev/null || echo "000")"
+    rm -f "${ptero_cj}" "${ptero_body_file}"
+
+    if echo "${csrf_code}" | grep -qE "^(200|204)$" && ! echo "${login_probe_code}" | grep -qE "^(000|419|500|502|503)$" && ! echo "${login_probe_body}" | grep -qi "unexpected error"; then
+      log_ok "Pterodactyl auth & CSRF probe passed (CSRF:${csrf_code}, LOGIN:${login_probe_code})"
+      break
     fi
-  fi
-  rm -f "${ptero_cj}"
-  if ! echo "${csrf_code}" | grep -qE "^(200|204)$" || [ "${login_probe_code}" = "500" ]; then
-    log_fix "Pterodactyl auth probe returned CSRF:${csrf_code} / LOGIN:${login_probe_code}; switching session & cache drivers to file driver"
+
+    log_fix "Pterodactyl auth probe failed (attempt ${probe_attempt}: CSRF:${csrf_code} LOGIN:${login_probe_code}); applying deep Laravel/PHP/Redis/permission repair"
+    if [ -f "${ptero_dir}/storage/logs/laravel.log" ]; then
+      local last_err=""
+      last_err="$(grep -E "local\.ERROR|production\.ERROR|Exception|SQLSTATE|Permission denied" "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null | tail -n 1 || true)"
+      [ -n "${last_err}" ] && log_warn "Last Pterodactyl log error: ${last_err:0:180}"
+    fi
+
     if [ -f "${ptero_dir}/.env" ]; then
       set_ptero_env_key "CACHE_DRIVER" "file"
       set_ptero_env_key "SESSION_DRIVER" "file"
       set_ptero_env_key "QUEUE_CONNECTION" "sync"
+      set_ptero_env_key "SESSION_SECURE_COOKIE" "false"
+      set_ptero_env_key "SESSION_DOMAIN" "null"
+      set_ptero_env_key "TRUSTED_PROXIES" "*"
+      set_ptero_env_key "RECAPTCHA_ENABLED" "false"
     fi
     if [ -n "${php_bin}" ] && [ -f "${ptero_dir}/artisan" ]; then
       (cd "${ptero_dir}" && "${php_bin}" artisan config:clear >/dev/null 2>&1 || true)
       (cd "${ptero_dir}" && "${php_bin}" artisan cache:clear >/dev/null 2>&1 || true)
+      (cd "${ptero_dir}" && "${php_bin}" artisan view:clear >/dev/null 2>&1 || true)
+      (cd "${ptero_dir}" && "${php_bin}" artisan route:clear >/dev/null 2>&1 || true)
     fi
+    touch "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null || true
     if id -u www-data >/dev/null 2>&1; then
-      chown -R www-data:www-data "${ptero_dir}" 2>/dev/null || true
+      chown -R www-data:www-data "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" "${ptero_dir}/.env" 2>/dev/null || true
     fi
     chmod -R 775 "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" 2>/dev/null || true
+    chmod 664 "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null || true
     chmod 640 "${ptero_dir}/.env" 2>/dev/null || true
-  fi
+    if [ -n "${php_ver}" ] && systemctl list-unit-files 2>/dev/null | grep -q "^php${php_ver}-fpm.service"; then
+      systemctl restart "php${php_ver}-fpm" >/dev/null 2>&1 || true
+    fi
+    [ -S "${php_sock}" ] && chmod 666 "${php_sock}" 2>/dev/null || true
+    systemctl restart pteroq >/dev/null 2>&1 || true
+    systemctl restart nginx >/dev/null 2>&1 || true
+    probe_attempt=$((probe_attempt + 1))
+  done
 }
 
 ensure_game_letsencrypt_ssl() {
