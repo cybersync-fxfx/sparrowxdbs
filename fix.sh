@@ -450,6 +450,15 @@ heal_pterodactyl_host_nginx() {
   id -u www-data >/dev/null 2>&1 && chown -R www-data:www-data "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" 2>/dev/null || true
   write_ptero_credentials_file
 
+  # Sync existing Let's Encrypt certificate for game.<domain> into ovh/ssl & /etc/ssl
+  if [ -s "/etc/letsencrypt/live/${game_domain}/fullchain.pem" ] && [ -s "/etc/letsencrypt/live/${game_domain}/privkey.pem" ]; then
+    mkdir -p "${INSTALL_DIR}/ovh/ssl" /etc/ssl
+    cp -fL "/etc/letsencrypt/live/${game_domain}/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
+    cp -fL "/etc/letsencrypt/live/${game_domain}/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
+    ln -sf "/etc/letsencrypt/live/${game_domain}/fullchain.pem" "/etc/ssl/${game_domain}.pem" 2>/dev/null || true
+    ln -sf "/etc/letsencrypt/live/${game_domain}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
+  fi
+
   # Remove default site and stale conf.d vhost that claim ports 80/443
   rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/pterodactyl.conf 2>/dev/null || true
   if [ -f /etc/nginx/sites-available/pterodactyl.conf ]; then
@@ -503,9 +512,10 @@ EOF_PTERO
 
   ln -sf "${ptero_conf}" /etc/nginx/sites-enabled/pterodactyl.conf
   if nginx -t >/dev/null 2>&1; then
+    systemctl unmask nginx >/dev/null 2>&1 || true
     systemctl enable nginx >/dev/null 2>&1 || true
     systemctl restart nginx >/dev/null 2>&1 || true
-    log_fix "Pterodactyl host Nginx re-bound to internal port ${ptero_port} (PHP socket: ${php_sock})"
+    log_fix "Pterodactyl host Nginx enabled & bound to internal port ${ptero_port} (PHP socket: ${php_sock})"
   else
     log_warn "Host Nginx config check failed for ${ptero_conf}; inspect nginx -t on host"
   fi
@@ -526,9 +536,23 @@ compose_cmd() {
 # ==============================================================================
 draw_progress 1 12 "Paths, CRLF & CLI Symlinks"
 
-if [ ! -e "/opt/sparrowx" ] && [ "${INSTALL_DIR}" != "/opt/sparrowx" ]; then
+if [ -d "/opt/sparrowx" ] && [ ! -L "/opt/sparrowx" ] && [ "${INSTALL_DIR}" != "/opt/sparrowx" ]; then
+  if [ -f "/opt/sparrowx/docker-compose.standalone.yml" ]; then
+    compose_cmd -f "/opt/sparrowx/docker-compose.standalone.yml" down --remove-orphans >/dev/null 2>&1 || true
+  fi
+  if [ -f "/opt/sparrowx/docker-compose.ovh.yml" ]; then
+    compose_cmd -f "/opt/sparrowx/docker-compose.ovh.yml" down --remove-orphans >/dev/null 2>&1 || true
+  fi
+  mv -f /opt/sparrowx "/opt/sparrowx.legacy.$(date +%s 2>/dev/null || echo bak)" 2>/dev/null || true
+  ln -sfn "${INSTALL_DIR}" /opt/sparrowx 2>/dev/null || true
+  log_fix "Replaced legacy /opt/sparrowx directory with symlink -> ${INSTALL_DIR}"
+elif [ ! -e "/opt/sparrowx" ] && [ "${INSTALL_DIR}" != "/opt/sparrowx" ]; then
   ln -sfn "${INSTALL_DIR}" /opt/sparrowx 2>/dev/null || true
   log_fix "Created /opt/sparrowx -> ${INSTALL_DIR} compatibility symlink"
+fi
+
+if [ -f "/etc/cron.d/sparrowx-automation" ]; then
+  sed -i "s|/opt/sparrowx/|${INSTALL_DIR}/|g" /etc/cron.d/sparrowx-automation 2>/dev/null || true
 fi
 
 CRLF_REPAIRED=0
@@ -798,34 +822,29 @@ if [ ! -f "${COMPOSE_FILE}" ] && [ -f "${INSTALL_DIR}/docker-compose.yml" ]; the
 fi
 
 if [ "${HAS_DOCKER}" = "true" ]; then
-  # Stop conflicting host daemons that fight over ports 5432, 80, 443, 3000
+  # Stop & disable conflicting host daemons that fight over ports 5432, 80, 443, 3000
   # Keep host nginx alive (shifted onto PTERO_PORT=8090) if Pterodactyl is installed
   for host_svc in postgresql pgbouncer apache2 caddy sparrowx-native.service; do
-    if systemctl is-active --quiet "${host_svc}" 2>/dev/null; then
+    if systemctl is-active --quiet "${host_svc}" 2>/dev/null || systemctl is-enabled --quiet "${host_svc}" 2>/dev/null; then
       systemctl stop "${host_svc}" >/dev/null 2>&1 || true
-      log_fix "Stopped conflicting host daemon: ${host_svc}"
+      if [ "${host_svc}" = "postgresql" ] || [ "${host_svc}" = "pgbouncer" ]; then
+        systemctl disable "${host_svc}" >/dev/null 2>&1 || true
+      fi
+      log_fix "Stopped & secured host daemon against port conflicts: ${host_svc}"
     fi
   done
-  install_pterodactyl_unattended
-  if is_pterodactyl_installed; then
-    heal_pterodactyl_host_nginx
-  elif systemctl is-active --quiet nginx 2>/dev/null; then
-    systemctl stop nginx >/dev/null 2>&1 || true
-    log_fix "Stopped conflicting host daemon: nginx"
-  fi
-  for pg_unit in $(systemctl list-units --type=service --state=active --no-legend 'postgresql@*' 2>/dev/null | awk '{print $1}' || true); do
-    systemctl stop "${pg_unit}" >/dev/null 2>&1 || true
-    log_fix "Stopped conflicting versioned PostgreSQL unit: ${pg_unit}"
+  for pg_unit in $(systemctl list-units --type=service --all --no-legend 'postgresql@*' 2>/dev/null | awk '{print $1}' || true); do
+    if systemctl is-active --quiet "${pg_unit}" 2>/dev/null || systemctl is-enabled --quiet "${pg_unit}" 2>/dev/null; then
+      systemctl stop "${pg_unit}" >/dev/null 2>&1 || true
+      systemctl disable "${pg_unit}" >/dev/null 2>&1 || true
+      log_fix "Stopped & disabled versioned PostgreSQL unit: ${pg_unit}"
+    fi
   done
 
-  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 3000, 3001)
-  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
-  free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
-  free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
-
-  # Clean legacy/duplicate containers from older compose blueprints
+  # Tear down legacy standalone compose & clean duplicate containers BEFORE checking ports
+  if [ -f "${INSTALL_DIR}/docker-compose.standalone.yml" ]; then
+    compose_cmd -f "${INSTALL_DIR}/docker-compose.standalone.yml" down --remove-orphans >/dev/null 2>&1 || true
+  fi
   LEGACY_FOUND=0
   for old_ctr in sparrowx_postgres sparrowx_pgbouncer sparrowx_postgrest sparrowx_threat_cache sparrowx_studio sparrowx_edge_proxy; do
     if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "${old_ctr}"; then
@@ -833,12 +852,41 @@ if [ "${HAS_DOCKER}" = "true" ]; then
       LEGACY_FOUND=$((LEGACY_FOUND + 1))
     fi
   done
-  DEAD_CTRS="$(docker ps -a --filter status=exited --filter status=dead --filter status=created --format '{{.Names}}' 2>/dev/null | grep -E '^sparrowx' || true)"
+  DEAD_CTRS="$(docker ps -a --filter status=exited --filter status=dead --filter status=created --filter status=restarting --format '{{.Names}}' 2>/dev/null | grep -E '^sparrowx' || true)"
   if [ -n "${DEAD_CTRS}" ]; then
     echo "${DEAD_CTRS}" | xargs -r docker rm -f >/dev/null 2>&1 || true
     LEGACY_FOUND=$((LEGACY_FOUND + 1))
   fi
   [ "${LEGACY_FOUND}" -gt 0 ] && log_fix "Cleaned up stale/duplicate SparrowX containers"
+
+  # Remove crashed/non-running sparrowx-postgres or orphaned docker-proxy/postgres processes holding 5432
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+    docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+    pkill -9 -x postgres >/dev/null 2>&1 || true
+    pkill -9 -f "docker-proxy.*-host-port ${PG_HOST_PORT}( |$)" >/dev/null 2>&1 || true
+    command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT}/tcp" >/dev/null 2>&1 || true
+  fi
+
+  install_pterodactyl_unattended
+  if is_pterodactyl_installed; then
+    heal_pterodactyl_host_nginx
+  elif systemctl is-active --quiet nginx 2>/dev/null; then
+    systemctl stop nginx >/dev/null 2>&1 || true
+    log_fix "Stopped conflicting host daemon: nginx"
+  fi
+
+  # Remove orphaned docker-proxy listeners on 80/443 if sparrowx-nginx is not running
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+    pkill -9 -f "docker-proxy.*-host-port ${HTTP_PORT}( |$)" >/dev/null 2>&1 || true
+    pkill -9 -f "docker-proxy.*-host-port ${HTTPS_PORT}( |$)" >/dev/null 2>&1 || true
+  fi
+
+  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 3000, 3001)
+  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
+  free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
+  free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
 
   # Heal HTTP/HTTPS port conflicts (ports 80 / 443 must remain clean for Nginx edge)
   for web_p in "${HTTP_PORT}" "${HTTPS_PORT}"; do
@@ -1027,6 +1075,12 @@ server {
 EOF
 if is_pterodactyl_installed; then
   DOCKER_HOST_IP="$(get_docker_host_ip)"
+  PTERO_SSL_CERT="/etc/nginx/ssl/fullchain.pem"
+  PTERO_SSL_KEY="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
+    PTERO_SSL_CERT="/etc/nginx/ssl/ptero-fullchain.pem"
+    PTERO_SSL_KEY="/etc/nginx/ssl/ptero-privkey.pem"
+  fi
   cat >> "${INSTALL_DIR}/ovh/nginx.conf" <<EOF_PTERO_EDGE
 
 # 4. Pterodactyl Game Panel (${DOMAIN_GAME} -> host nginx :${PTERO_PORT:-8090})
@@ -1034,8 +1088,8 @@ server {
     listen 80;
     listen 443 ssl;
     server_name ${DOMAIN_GAME} panel.${SPARROWX_DOMAIN};
-    ssl_certificate /etc/nginx/ssl/fullchain.pem;
-    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_certificate ${PTERO_SSL_CERT};
+    ssl_certificate_key ${PTERO_SSL_KEY};
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 100M;
     server_tokens off;
@@ -1063,6 +1117,16 @@ log_ok "Synchronized ovh/nginx.conf for all standalone service domains"
 draw_progress 9 12 "Container Fleet Launch"
 
 if [ "${HAS_DOCKER}" = "true" ]; then
+  # Clear uninitialized/corrupted sparrowx_pgdata volume (missing PG_VERSION) to fix initdb crash loops
+  for pg_vol in $(docker volume ls -q 2>/dev/null | grep 'sparrowx_pgdata' || true); do
+    vol_mp="$(docker volume inspect -f '{{.Mountpoint}}' "${pg_vol}" 2>/dev/null || true)"
+    if [ -n "${vol_mp}" ] && [ -d "${vol_mp}" ] && [ ! -f "${vol_mp}/PG_VERSION" ] && [ -n "$(ls -A "${vol_mp}" 2>/dev/null)" ]; then
+      docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+      rm -rf "${vol_mp:?}"/* "${vol_mp:?}"/.[!.]* "${vol_mp:?}"/..?* 2>/dev/null || true
+      log_fix "Cleared uninitialized/corrupted PostgreSQL volume ${pg_vol} (missing PG_VERSION)"
+    fi
+  done
+
   COMPOSE_ARGS=(-d --remove-orphans)
   if [ "${REBUILD_APP}" = "true" ] || ! docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-app"; then
     COMPOSE_ARGS=(-d --build --remove-orphans)

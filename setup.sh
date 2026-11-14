@@ -809,13 +809,17 @@ server {
 EOF
   ln -sfn /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf 2>/dev/null || true
 
-  if [ -d "/etc/letsencrypt/live/${DOMAIN_GAME}" ]; then
+  if [ -s "/etc/letsencrypt/live/${DOMAIN_GAME}/fullchain.pem" ] && [ -s "/etc/letsencrypt/live/${DOMAIN_GAME}/privkey.pem" ]; then
+    mkdir -p "${INSTALL_DIR}/ovh/ssl" /etc/ssl
     cp -fL "/etc/letsencrypt/live/${DOMAIN_GAME}/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
     cp -fL "/etc/letsencrypt/live/${DOMAIN_GAME}/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
+    ln -sf "/etc/letsencrypt/live/${DOMAIN_GAME}/fullchain.pem" "/etc/ssl/${DOMAIN_GAME}.pem" 2>/dev/null || true
+    ln -sf "/etc/letsencrypt/live/${DOMAIN_GAME}/privkey.pem" "/etc/ssl/${DOMAIN_GAME}.key" 2>/dev/null || true
   fi
 
   if command -v nginx >/dev/null 2>&1; then
     nginx -t >/dev/null 2>&1 || true
+    systemctl unmask nginx >/dev/null 2>&1 || true
     systemctl enable nginx >/dev/null 2>&1 || true
     systemctl restart nginx >/dev/null 2>&1 || systemctl reload nginx >/dev/null 2>&1 || true
   fi
@@ -1122,12 +1126,28 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ]; then
     log_ok "Existing SparrowX stack (Postgres, PostgREST, App, Nginx) passed ping audit — preserving live state without teardown."
   else
     log_info "Pre-flight ping audit found offline or incomplete components — cleaning stale conflicts..."
+    if [ -f "${INSTALL_DIR}/docker-compose.standalone.yml" ]; then
+      compose_cmd -f "${INSTALL_DIR}/docker-compose.standalone.yml" down --remove-orphans >/dev/null 2>&1 || true
+    fi
     for old_c in sparrowx_postgres sparrowx_pgbouncer sparrowx_postgrest sparrowx_threat_cache sparrowx_studio sparrowx_edge_proxy; do
       if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "${old_c}"; then
         docker rm -f "${old_c}" >/dev/null 2>&1 || true
       fi
     done
-    systemctl stop sparrowx-native.service >/dev/null 2>&1 || true
+    for svc in postgresql pgbouncer sparrowx-native.service; do
+      systemctl stop "${svc}" >/dev/null 2>&1 || true
+      [ "${svc}" != "sparrowx-native.service" ] && systemctl disable "${svc}" >/dev/null 2>&1 || true
+    done
+    if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+      docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+      pkill -9 -x postgres >/dev/null 2>&1 || true
+      pkill -9 -f "docker-proxy.*-host-port ${PG_HOST_PORT:-5432}( |$)" >/dev/null 2>&1 || true
+      command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT:-5432}/tcp" >/dev/null 2>&1 || true
+    fi
+    if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+      pkill -9 -f "docker-proxy.*-host-port ${HTTP_PORT:-80}( |$)" >/dev/null 2>&1 || true
+      pkill -9 -f "docker-proxy.*-host-port ${HTTPS_PORT:-443}( |$)" >/dev/null 2>&1 || true
+    fi
   fi
 fi
 
@@ -1360,6 +1380,15 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
     STACK_STARTED="yes"
     log_ok "Reloaded sparrowx-nginx zero-downtime while preserving running DB & App containers."
   else
+    for pg_vol in $(docker volume ls -q 2>/dev/null | grep 'sparrowx_pgdata' || true); do
+      vol_mp="$(docker volume inspect -f '{{.Mountpoint}}' "${pg_vol}" 2>/dev/null || true)"
+      if [ -n "${vol_mp}" ] && [ -d "${vol_mp}" ] && [ ! -f "${vol_mp}/PG_VERSION" ] && [ -n "$(ls -A "${vol_mp}" 2>/dev/null)" ]; then
+        docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+        rm -rf "${vol_mp:?}"/* "${vol_mp:?}"/.[!.]* "${vol_mp:?}"/..?* 2>/dev/null || true
+        log_warn "Cleared uninitialized/corrupted PostgreSQL volume ${pg_vol} (missing PG_VERSION)."
+      fi
+    done
+
     log_info "Building & starting PostgreSQL 16, PostgREST, SparrowX App & Nginx Edge Proxy..."
     if compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans; then
       STACK_STARTED="yes"

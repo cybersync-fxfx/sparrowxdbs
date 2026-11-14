@@ -310,13 +310,17 @@ server {
 PTEROEOF
   ln -sfn /etc/nginx/sites-available/pterodactyl.conf /etc/nginx/sites-enabled/pterodactyl.conf 2>/dev/null || true
 
-  if [ -d "/etc/letsencrypt/live/${ptero_dom}" ]; then
+  if [ -s "/etc/letsencrypt/live/${ptero_dom}/fullchain.pem" ] && [ -s "/etc/letsencrypt/live/${ptero_dom}/privkey.pem" ]; then
+    mkdir -p "${INSTALL_DIR}/ovh/ssl" /etc/ssl
     cp -fL "/etc/letsencrypt/live/${ptero_dom}/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
     cp -fL "/etc/letsencrypt/live/${ptero_dom}/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
+    ln -sf "/etc/letsencrypt/live/${ptero_dom}/fullchain.pem" "/etc/ssl/${ptero_dom}.pem" 2>/dev/null || true
+    ln -sf "/etc/letsencrypt/live/${ptero_dom}/privkey.pem" "/etc/ssl/${ptero_dom}.key" 2>/dev/null || true
   fi
 
   if command -v nginx >/dev/null 2>&1; then
     nginx -t >/dev/null 2>&1 || true
+    systemctl unmask nginx >/dev/null 2>&1 || true
     systemctl enable nginx >/dev/null 2>&1 || true
     systemctl restart nginx >/dev/null 2>&1 || systemctl reload nginx >/dev/null 2>&1 || true
   fi
@@ -885,20 +889,43 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     log_warn "Stopped conflicting versioned PostgreSQL unit: ${pg_unit}"
   done
 
-  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 3000, 3001)
-  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
-  free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
-  free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
-  free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
-
-  # Clean legacy duplicate containers from older compose blueprints
+  # Remove legacy/duplicate standalone containers BEFORE checking ports
+  if [ -f "${INSTALL_DIR}/docker-compose.standalone.yml" ]; then
+    compose_cmd -f "${INSTALL_DIR}/docker-compose.standalone.yml" down --remove-orphans >/dev/null 2>&1 || true
+  fi
   for old_c in sparrowx_postgres sparrowx_pgbouncer sparrowx_postgrest sparrowx_threat_cache sparrowx_studio sparrowx_edge_proxy; do
     if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "${old_c}"; then
       docker rm -f "${old_c}" >/dev/null 2>&1 || true
       log_warn "Removed legacy conflicting container: ${old_c}"
     fi
   done
+
+  # Clear crashed/non-running sparrowx-postgres + stray host postgres/docker-proxy on 5432, and uninitialized sparrowx_pgdata
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+    docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+    pkill -9 -x postgres >/dev/null 2>&1 || true
+    pkill -9 -f "docker-proxy.*-host-port ${PG_HOST_PORT}( |$)" >/dev/null 2>&1 || true
+    command -v fuser >/dev/null 2>&1 && fuser -k "${PG_HOST_PORT}/tcp" >/dev/null 2>&1 || true
+  fi
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+    pkill -9 -f "docker-proxy.*-host-port ${HTTP_PORT}( |$)" >/dev/null 2>&1 || true
+    pkill -9 -f "docker-proxy.*-host-port ${HTTPS_PORT}( |$)" >/dev/null 2>&1 || true
+  fi
+  for pg_vol in $(docker volume ls -q 2>/dev/null | grep 'sparrowx_pgdata' || true); do
+    vol_mp="$(docker volume inspect -f '{{.Mountpoint}}' "${pg_vol}" 2>/dev/null || true)"
+    if [ -n "${vol_mp}" ] && [ -d "${vol_mp}" ] && [ ! -f "${vol_mp}/PG_VERSION" ] && [ -n "$(ls -A "${vol_mp}" 2>/dev/null)" ]; then
+      docker rm -f sparrowx-postgres >/dev/null 2>&1 || true
+      rm -rf "${vol_mp:?}"/* "${vol_mp:?}"/.[!.]* "${vol_mp:?}"/..?* 2>/dev/null || true
+      log_warn "Cleared uninitialized/corrupted PostgreSQL volume ${pg_vol} (missing PG_VERSION)"
+    fi
+  done
+
+  # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 3000, 3001)
+  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
+  free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
+  free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
 
   # Free HTTP/HTTPS ports if held by non-sparrowx-nginx processes
   for wp in "${HTTP_PORT}" "${HTTPS_PORT}"; do
