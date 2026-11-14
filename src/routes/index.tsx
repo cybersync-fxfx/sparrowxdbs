@@ -5446,7 +5446,7 @@ function AppSidebar({
         <div className="flex items-center gap-3 px-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2 group-data-[collapsible=icon]:px-0">
           <button
             aria-label={isCollapsed ? "Expand sidebar" : "SparrowX Home"}
-            className="relative grid size-9 shrink-0 place-items-center rounded-lg bg-black/60 border border-white/10 p-1 shadow-sm transition-transform hover:scale-105 overflow-hidden"
+            className="relative grid size-9 shrink-0 place-items-center transition-transform hover:scale-105"
             onClick={() =>
               isCollapsed
                 ? toggleSidebar()

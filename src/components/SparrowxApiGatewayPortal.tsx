@@ -193,9 +193,11 @@ print(response.json())`;
       <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16]">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="size-8 rounded-md bg-[#14171F] border border-white/[0.08] grid place-items-center text-white">
-              <Server className="size-4 text-emerald-400" />
-            </div>
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX API Gateway"
+              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.22)]"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">

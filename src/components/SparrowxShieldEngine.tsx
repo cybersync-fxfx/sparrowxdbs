@@ -195,9 +195,11 @@ export function SparrowxShieldEngine({
       <header className="border-b border-[#FF6B00]/30 bg-[#0C0E14] px-4 sm:px-6 py-3.5 shadow-[0_2px_15px_rgba(255,107,0,0.08)] sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="size-9 rounded-md bg-[#161311] border border-[#FF6B00]/40 grid place-items-center shadow-[0_0_12px_rgba(255,107,0,0.2)]">
-              <Shield className="size-5 text-[#FF6B00]" />
-            </div>
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX Shield"
+              className="size-10 object-contain shrink-0 drop-shadow-[0_4px_14px_rgba(255,107,0,0.3)]"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">

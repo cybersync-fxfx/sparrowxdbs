@@ -1234,9 +1234,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
         <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3.5 border-t border-white/[0.16] sticky top-0 z-40 backdrop-blur-md">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="size-8 rounded-md bg-[#14171F] border border-white/[0.08] grid place-items-center text-white">
-                <Database className="size-4 text-emerald-400" />
-              </div>
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX Cloud DB"
+                className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.22)]"
+              />
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
@@ -1930,9 +1932,11 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           <div className="h-4 w-px bg-zinc-700 shrink-0" />
 
           <div className="flex items-center gap-2 min-w-0">
-            <div className="grid size-7 place-items-center rounded-md bg-[#3ECF8E]/15 border border-[#3ECF8E]/40 text-[#3ECF8E] shrink-0">
-              <Database className="size-4" />
-            </div>
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX DB Studio"
+              className="size-7 object-contain shrink-0 drop-shadow-[0_3px_8px_rgba(255,107,0,0.22)]"
+            />
             <div className="flex items-center gap-2 text-xs truncate">
               <span className="font-bold tracking-tight text-white shrink-0">
                 SparrowX <span className="text-[#3ECF8E]">DB Studio</span>

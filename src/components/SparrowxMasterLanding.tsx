@@ -261,16 +261,11 @@ export function SparrowxMasterLanding({
           {/* Left Brand */}
           <div className="flex items-center gap-3">
             <a href="/" className="flex items-center gap-2.5">
-              <div className="size-8 rounded-md bg-[#111A30] border border-sky-500/30 grid place-items-center shadow-[0_0_10px_rgba(56,189,248,0.15)]">
-                <img
-                  src="/sparrowx-cyber-hawk.png"
-                  alt="SparrowX"
-                  className="size-5 object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-              </div>
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX"
+                className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)]"
+              />
               <div>
                 <span className="font-extrabold text-base tracking-tight text-white font-sans">
                   SPARROWX

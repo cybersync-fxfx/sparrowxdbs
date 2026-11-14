@@ -3711,9 +3711,7 @@ export function PortalLoginScreen({
         {/* Clean Identity Header */}
         <div className="flex items-start justify-between gap-4 border-b border-[#1F1F1F] pb-5">
           <div className="flex items-center gap-3.5">
-            <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/30 bg-gradient-to-br from-primary/20 to-black p-2 shadow-inner">
-              <img src="/sparrowx-logo.png" alt="SparrowX" className="size-full object-contain" />
-            </div>
+            <img src="/sparrowx-logo.png" alt="SparrowX" className="size-11 shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)]" />
             <div>
               <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
                 {mode === "signin" ? "Welcome back to SparrowX" : "Launch Your Protected Workspace"}
@@ -4077,13 +4075,11 @@ export function PortalLoginScreen({
                 }}
                 className="group flex items-center gap-2.5 text-left focus:outline-none"
               >
-                <div className="relative grid size-9 place-items-center rounded-xl bg-gradient-to-br from-zinc-900 to-black border border-white/15 p-1 text-white shadow-inner overflow-hidden shrink-0 group-hover:border-primary/60 group-hover:shadow-[0_0_15px_rgba(249,115,22,0.35)] transition-all">
-                  <img
-                    src="/sparrowx-logo.png"
-                    alt="SparrowX Logo"
-                    className="size-full object-contain group-hover:scale-105 transition-transform duration-200"
-                  />
-                </div>
+                <img
+                  src="/sparrowx-logo.png"
+                  alt="SparrowX Logo"
+                  className="size-9 shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)] group-hover:scale-105 transition-transform duration-200"
+                />
                 <div className="flex items-center gap-2 whitespace-nowrap">
                   <span className="font-display text-base font-extrabold tracking-tight text-white group-hover:text-zinc-100 transition-colors">
                     sparrow<span className="text-primary group-hover:text-orange-400">x</span>
