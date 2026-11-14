@@ -1,0 +1,15 @@
+node_modules
+.output
+dist
+dist-ssr
+.nitro
+.tanstack
+.vinxi
+.wrangler
+.git
+data
+logs
+*.log
+.env
+.DS_Store
+.agents

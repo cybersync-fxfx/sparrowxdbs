@@ -419,8 +419,96 @@ detect_php_fpm_sock() {
 
 get_docker_host_ip() {
   local gw_ip=""
-  gw_ip="$(ip -4 addr show docker0 2>/dev/null | awk '/inet /{print $2}' | cut -d/ -f1 | head -n 1 || true)"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${EDGE_CTR:-sparrowx-nginx}"; then
+      gw_ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.Gateway}} {{end}}' "${EDGE_CTR:-sparrowx-nginx}" 2>/dev/null | awk '{print $1}' | tr -d '[:space:]' || true)"
+      if [ -z "${gw_ip}" ]; then
+        gw_ip="$(docker exec "${EDGE_CTR:-sparrowx-nginx}" sh -c "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1; exit}'" 2>/dev/null | tr -d '[:space:]' || true)"
+      fi
+    fi
+    if [ -z "${gw_ip}" ]; then
+      gw_ip="$(docker network inspect sparrowx_net -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}' 2>/dev/null | awk '{print $1}' | tr -d '[:space:]' || true)"
+    fi
+    if [ -z "${gw_ip}" ]; then
+      gw_ip="$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}' 2>/dev/null | awk '{print $1}' | tr -d '[:space:]' || true)"
+    fi
+  fi
+  if [ -z "${gw_ip}" ] && command -v ip >/dev/null 2>&1; then
+    gw_ip="$(ip -4 addr show docker0 2>/dev/null | awk '/inet / {sub(/\/.*/, "", $2); print $2; exit}' || true)"
+  fi
   echo "${gw_ip:-172.17.0.1}"
+}
+
+ensure_native_fallback_running() {
+  local app_p="${APP_HOST_PORT:-3000}"
+  local pgrst_p="${PGRST_HOST_PORT:-3001}"
+  log_fix "Docker ${APP_CTR:-sparrowx-app} unavailable or failed build — activating native Node.js fallback on :${app_p}"
+
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker stop "${APP_CTR:-sparrowx-app}" >/dev/null 2>&1 || true
+    docker rm -f "${APP_CTR:-sparrowx-app}" >/dev/null 2>&1 || true
+  fi
+
+  if { ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; } && command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | bash - >/dev/null 2>&1 || true
+    apt-get install -y -qq nodejs npm >/dev/null 2>&1 || apt-get install -y -qq nodejs >/dev/null 2>&1 || true
+  fi
+
+  export NODE_OPTIONS="--max-old-space-size=2048"
+  export VITE_SOVEREIGN_SELF_HOSTED="true"
+  export VITE_APP_URL="https://${SPARROWX_STUDIO_DOMAIN:-db.${SPARROWX_DOMAIN}}"
+  export VITE_SITE_URL="https://${SPARROWX_DOMAIN}"
+  export VITE_API_URL="https://${SPARROWX_STUDIO_DOMAIN:-db.${SPARROWX_DOMAIN}}"
+  export VITE_SUPABASE_URL="https://${SPARROWX_STUDIO_DOMAIN:-db.${SPARROWX_DOMAIN}}"
+  export VITE_SUPABASE_ANON_KEY="spx_ovh_sovereign_key"
+
+  (cd "${INSTALL_DIR}" && npm install --legacy-peer-deps && npm run build) || return 1
+
+  local node_bin=""
+  node_bin="$(command -v node || echo /usr/bin/node)"
+  if [ -d /etc/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+    cat > /etc/systemd/system/sparrowx-native.service <<EOF_NATIVE
+[Unit]
+Description=SparrowX Sovereign Web & API Engine (Native Fallback)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${INSTALL_DIR}
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=${app_p}
+Environment=POSTGREST_HOST=127.0.0.1
+Environment=POSTGREST_PORT=${pgrst_p}
+Environment=POSTGREST_INTERNAL_URL=http://127.0.0.1:${pgrst_p}
+Environment=SPARROWX_DB_REST_URL=http://127.0.0.1:${pgrst_p}
+Environment=SPARROWX_DATA_DIR=${INSTALL_DIR}/data
+Environment=SPARROWX_DOMAIN=${SPARROWX_DOMAIN}
+Environment=SPARROWX_PUBLIC_IP=${SPARROWX_PUBLIC_IP}
+ExecStart=${node_bin} ${INSTALL_DIR}/ovh/node-server.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF_NATIVE
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    systemctl enable --now sparrowx-native.service >/dev/null 2>&1 || systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
+  else
+    nohup env NODE_ENV=production HOST=0.0.0.0 PORT="${app_p}" POSTGREST_HOST=127.0.0.1 POSTGREST_PORT="${pgrst_p}" POSTGREST_INTERNAL_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DB_REST_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DATA_DIR="${INSTALL_DIR}/data" SPARROWX_DOMAIN="${SPARROWX_DOMAIN}" SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP}" "${node_bin}" "${INSTALL_DIR}/ovh/node-server.mjs" >"${INSTALL_DIR}/logs/sparrowx-native.log" 2>&1 &
+  fi
+
+  if [ "${HAS_DOCKER:-false}" = "true" ] && [ -n "${COMPOSE_FILE:-}" ] && [ -f "${COMPOSE_FILE}" ]; then
+    compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build "${PG_SVC:-postgres}" "${PGRST_SVC:-postgrest}" >/dev/null 2>&1 || true
+    compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build "${EDGE_SVC:-nginx}" >/dev/null 2>&1 || true
+    docker start "${PG_CTR:-sparrowx-postgres}" "${PGRST_CTR:-sparrowx-postgrest}" "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || true
+    if declare -F render_sparrowx_nginx_conf >/dev/null 2>&1; then
+      render_sparrowx_nginx_conf
+    fi
+    docker restart "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || true
+  fi
+  sleep 2
 }
 
 heal_pterodactyl_host_nginx() {
@@ -1253,27 +1341,7 @@ fi
 # ==============================================================================
 draw_progress 7 12 "Ports & Legacy Containers"
 
-if [ -f "${INSTALL_DIR}/docker-compose.standalone.yml" ]; then
-  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.standalone.yml"
-  STACK_MODE="standalone"
-  PG_CTR="sparrowx_postgres"
-  PG_SVC="sparrowx-postgres"
-  PGB_CTR="sparrowx_pgbouncer"
-  PGB_SVC="sparrowx-pgbouncer"
-  PGRST_CTR="sparrowx_postgrest"
-  PGRST_SVC="sparrowx-postgrest"
-  REDIS_CTR="sparrowx_threat_cache"
-  REDIS_SVC="sparrowx-threat-cache"
-  APP_CTR="sparrowx_studio"
-  APP_SVC="sparrowx-studio"
-  EDGE_CTR="sparrowx_edge_proxy"
-  EDGE_SVC="sparrowx-edge-proxy"
-  UPSTREAM_APP_HOST="sparrowx-studio"
-  UPSTREAM_PGRST_HOST="sparrowx-postgrest"
-  COMPOSE_SERVICES=("sparrowx-postgres" "sparrowx-pgbouncer" "sparrowx-postgrest" "sparrowx-threat-cache" "sparrowx-studio" "sparrowx-edge-proxy")
-  # Remove any legacy OVH-named containers so they never fight standalone containers on ports
-  docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
-else
+if [ -f "${INSTALL_DIR}/docker-compose.ovh.yml" ] || [ ! -f "${INSTALL_DIR}/docker-compose.standalone.yml" ]; then
   COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
   if [ ! -f "${COMPOSE_FILE}" ] && [ -f "${INSTALL_DIR}/docker-compose.yml" ]; then
     COMPOSE_FILE="${INSTALL_DIR}/docker-compose.yml"
@@ -1294,6 +1362,26 @@ else
   UPSTREAM_APP_HOST="sparrowx"
   UPSTREAM_PGRST_HOST="sparrowx"
   COMPOSE_SERVICES=("postgres" "postgrest" "sparrowx" "nginx")
+else
+  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.standalone.yml"
+  STACK_MODE="standalone"
+  PG_CTR="sparrowx_postgres"
+  PG_SVC="sparrowx-postgres"
+  PGB_CTR="sparrowx_pgbouncer"
+  PGB_SVC="sparrowx-pgbouncer"
+  PGRST_CTR="sparrowx_postgrest"
+  PGRST_SVC="sparrowx-postgrest"
+  REDIS_CTR="sparrowx_threat_cache"
+  REDIS_SVC="sparrowx-threat-cache"
+  APP_CTR="sparrowx_studio"
+  APP_SVC="sparrowx-studio"
+  EDGE_CTR="sparrowx_edge_proxy"
+  EDGE_SVC="sparrowx-edge-proxy"
+  UPSTREAM_APP_HOST="sparrowx-studio"
+  UPSTREAM_PGRST_HOST="sparrowx-postgrest"
+  COMPOSE_SERVICES=("sparrowx-postgres" "sparrowx-pgbouncer" "sparrowx-postgrest" "sparrowx-threat-cache" "sparrowx-studio" "sparrowx-edge-proxy")
+  # Remove any legacy OVH-named containers so they never fight standalone containers on ports
+  docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
 fi
 log_scan "Active stack blueprint: ${STACK_MODE} ($(basename "${COMPOSE_FILE}"))"
 
@@ -1468,7 +1556,58 @@ else
   log_ok "TLS certificate validated for ${SPARROWX_DOMAIN}"
 fi
 
-cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
+render_sparrowx_nginx_conf() {
+  local docker_host_ip
+  docker_host_ip="$(get_docker_host_ip)"
+  local ptero_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local ptero_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
+    ptero_ssl_cert="/etc/nginx/ssl/ptero-fullchain.pem"
+    ptero_ssl_key="/etc/nginx/ssl/ptero-privkey.pem"
+  fi
+  local ptero_backend=""
+  if is_pterodactyl_installed; then
+    ptero_backend="    location / {
+        proxy_pass http://${docker_host_ip}:${PTERO_PORT:-8090};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 300;
+        proxy_connect_timeout 60;
+    }"
+  else
+    ptero_backend="    location / {
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
+  fi
+
+  cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 # ============================================================================
 # SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (AUTO-HEALED)
 # ============================================================================
@@ -1482,7 +1621,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 150M;
     server_tokens off;
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -1502,6 +1641,8 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
@@ -1511,6 +1652,20 @@ server {
     location / {
         set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -1531,7 +1686,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 150M;
     server_tokens off;
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -1544,6 +1699,11 @@ server {
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
@@ -1553,6 +1713,21 @@ server {
     location / {
         set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-SparrowX-Studio "1";
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -1574,7 +1749,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 150M;
     server_tokens off;
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -1588,6 +1763,10 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
         add_header Access-Control-Allow-Origin "*" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
@@ -1604,29 +1783,34 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
-EOF
-if is_pterodactyl_installed; then
-  DOCKER_HOST_IP="$(get_docker_host_ip)"
-  PTERO_SSL_CERT="/etc/nginx/ssl/fullchain.pem"
-  PTERO_SSL_KEY="/etc/nginx/ssl/privkey.pem"
-  if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
-    PTERO_SSL_CERT="/etc/nginx/ssl/ptero-fullchain.pem"
-    PTERO_SSL_KEY="/etc/nginx/ssl/ptero-privkey.pem"
-  fi
-  cat >> "${INSTALL_DIR}/ovh/nginx.conf" <<EOF_PTERO_EDGE
 
-# 4. Pterodactyl Game Panel (${DOMAIN_GAME} -> host nginx :${PTERO_PORT:-8090})
+# 4. Game Panel Domain (${DOMAIN_GAME})
 server {
     listen 80;
     listen 443 ssl;
     server_name ${DOMAIN_GAME} panel.${SPARROWX_DOMAIN};
-    ssl_certificate ${PTERO_SSL_CERT};
-    ssl_certificate_key ${PTERO_SSL_KEY};
+    ssl_certificate ${ptero_ssl_cert};
+    ssl_certificate_key ${ptero_ssl_key};
     ssl_protocols TLSv1.2 TLSv1.3;
-    client_max_body_size 100M;
+    client_max_body_size 150M;
     server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -1634,21 +1818,11 @@ server {
         allow all;
     }
 
-    location / {
-        proxy_pass http://${DOCKER_HOST_IP}:${PTERO_PORT:-8090};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_read_timeout 300;
-        proxy_connect_timeout 60;
-    }
+${ptero_backend}
 }
-EOF_PTERO_EDGE
-fi
+EOF
+}
+render_sparrowx_nginx_conf
 log_ok "Synchronized ovh/nginx.conf for all standalone service domains"
 
 # ==============================================================================
@@ -1672,6 +1846,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     COMPOSE_ARGS=(-d --build --remove-orphans)
   fi
 
+  BUILD_FAILED="false"
   log_scan "Starting container stack via $(basename "${COMPOSE_FILE}") (${STACK_MODE} mode)..."
   compose_err_file="$(mktemp)"
   if ! compose_cmd -f "${COMPOSE_FILE}" up "${COMPOSE_ARGS[@]}" >"${compose_err_file}" 2>&1; then
@@ -1721,10 +1896,18 @@ if [ "${HAS_DOCKER}" = "true" ]; then
 
     if ! compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans >"${compose_err_file}" 2>&1; then
       c_err_tail="$(tail -n 10 "${compose_err_file}" 2>/dev/null | tr '\n' ' ' || true)"
-      log_warn "Compose recovery up failed (${c_err_tail:0:180}); starting services individually"
+      log_warn "Compose recovery up failed (${c_err_tail:0:180}); starting core infra & nginx independently"
+      BUILD_FAILED="true"
       for svc in "${COMPOSE_SERVICES[@]}"; do
-        compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${svc}" >/dev/null 2>&1 || true
+        if [ "${svc}" != "${APP_SVC}" ]; then
+          compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build "${svc}" >/dev/null 2>&1 || true
+        fi
       done
+      if compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --build "${APP_SVC}" >/dev/null 2>&1; then
+        BUILD_FAILED="false"
+      else
+        log_warn "Docker build for ${APP_SVC} failed; native Node fallback will keep site online"
+      fi
     else
       log_healed "Container stack launched after clean port & network recovery"
     fi
@@ -1735,21 +1918,23 @@ if [ "${HAS_DOCKER}" = "true" ]; then
 
   # Ensure every individual service is created & running (fixes 'Created' or missing containers)
   for svc in "${COMPOSE_SERVICES[@]}"; do
-    compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${svc}" >/dev/null 2>&1 || true
+    if [ "${svc}" != "${APP_SVC}" ] || [ "${BUILD_FAILED}" != "true" ]; then
+      compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build "${svc}" >/dev/null 2>&1 || true
+    fi
   done
-  docker start "${PG_CTR}" "${PGRST_CTR}" "${APP_CTR}" "${EDGE_CTR}" >/dev/null 2>&1 || true
+  docker start "${PG_CTR}" "${PGRST_CTR}" "${EDGE_CTR}" >/dev/null 2>&1 || true
+  [ "${BUILD_FAILED}" != "true" ] && docker start "${APP_CTR}" >/dev/null 2>&1 || true
   [ -n "${PGB_CTR}" ] && docker start "${PGB_CTR}" >/dev/null 2>&1 || true
   [ -n "${REDIS_CTR}" ] && docker start "${REDIS_CTR}" >/dev/null 2>&1 || true
 
   if is_pterodactyl_installed; then
-    DOCKER_HOST_IP="$(get_docker_host_ip)"
-    tmp_ptero_ip="$(mktemp)"
-    sed -E "s|proxy_pass http://[0-9.]+:${PTERO_PORT:-8090};|proxy_pass http://${DOCKER_HOST_IP}:${PTERO_PORT:-8090};|g" "${INSTALL_DIR}/ovh/nginx.conf" > "${tmp_ptero_ip}" 2>/dev/null && cat "${tmp_ptero_ip}" > "${INSTALL_DIR}/ovh/nginx.conf" || true
-    rm -f "${tmp_ptero_ip}"
     if ! curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${PTERO_PORT:-8090}/" 2>/dev/null; then
       heal_pterodactyl_host_nginx
     fi
   fi
+
+  # Re-render nginx config now that sparrowx_net exists so gateway fallback IP & upstream aliases are exact
+  render_sparrowx_nginx_conf
 
   if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${EDGE_CTR}"; then
     if ! docker exec "${EDGE_CTR}" nginx -t >/dev/null 2>&1; then
@@ -1762,6 +1947,21 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     fi
   fi
 
+  # Wait briefly for app health probe; activate native Node.js fallback if container failed or crashed
+  APP_HTTP_OK="false"
+  if [ "${BUILD_FAILED}" != "true" ]; then
+    for _i in 1 2 3 4 5; do
+      if curl -fsS --max-time 3 "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+        APP_HTTP_OK="true"
+        break
+      fi
+      sleep 2
+    done
+  fi
+  if [ "${BUILD_FAILED}" = "true" ] || [ "${APP_HTTP_OK}" != "true" ]; then
+    ensure_native_fallback_running || true
+  fi
+
   # Ensure Let's Encrypt SSL certificates via port 80 (webroot + standalone fallback for game.<domain>)
   if is_pterodactyl_installed; then
     ensure_game_letsencrypt_ssl
@@ -1771,14 +1971,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   fi
 else
   log_scan "Healing native Node.js build..."
-  export NODE_OPTIONS="--max-old-space-size=2048"
-  export VITE_SOVEREIGN_SELF_HOSTED="true"
-  export VITE_SUPABASE_URL=""
-  if ! npm run build >/dev/null 2>&1; then
-    log_fix "Native build failed; reinstalling npm packages cleanly and rebuilding"
-    npm install --legacy-peer-deps && npm run build
-  fi
-  systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
+  ensure_native_fallback_running || true
 fi
 
 # ==============================================================================
@@ -1913,7 +2106,11 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow 2022/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
-  log_ok "UFW rules verified for ports 22, 80, 443, 8080, 8443, 2022 (${HTTP_PORT}, ${HTTPS_PORT})"
+  ufw allow from 127.0.0.1 to any port "${APP_HOST_PORT:-3000}" proto tcp >/dev/null 2>&1 || true
+  ufw allow from 172.16.0.0/12 to any port "${APP_HOST_PORT:-3000}" proto tcp >/dev/null 2>&1 || true
+  ufw allow from 127.0.0.1 to any port "${PTERO_PORT:-8090}" proto tcp >/dev/null 2>&1 || true
+  ufw allow from 172.16.0.0/12 to any port "${PTERO_PORT:-8090}" proto tcp >/dev/null 2>&1 || true
+  log_ok "UFW rules verified for ports 22, 80, 443, 8080, 8443, 2022 (${HTTP_PORT}, ${HTTPS_PORT}, Docker->Host :${APP_HOST_PORT:-3000}/:${PTERO_PORT:-8090})"
 fi
 
 if [ -d /etc/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
@@ -1972,6 +2169,15 @@ if [ "${APP_HEALTH}" = "DOWN" ] && [ "${HAS_DOCKER}" = "true" ]; then
     APP_HEALTH="RECOVERED (200 OK)"
   else
     docker logs --tail 25 "${APP_CTR}" 2>&1 || true
+    ensure_native_fallback_running || true
+    if curl -fsS "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+      APP_HEALTH="ONLINE (Native :${APP_HOST_PORT})"
+    fi
+  fi
+elif [ "${APP_HEALTH}" = "DOWN" ]; then
+  ensure_native_fallback_running || true
+  if curl -fsS "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+    APP_HEALTH="ONLINE (Native :${APP_HOST_PORT})"
   fi
 fi
 
@@ -2019,6 +2225,7 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
   if ! docker exec "${EDGE_CTR}" nginx -t >/dev/null 2>&1; then
     nginx_err="$(docker exec "${EDGE_CTR}" nginx -t 2>&1 || docker logs --tail 20 "${EDGE_CTR}" 2>&1 || true)"
     log_warn "${EDGE_CTR} config failed (${nginx_err:0:180}); writing clean fallback ovh/nginx.conf"
+    MIN_HOST_IP="$(get_docker_host_ip)"
     cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF_MIN_NGINX
 server {
     listen 80 default_server;
@@ -2028,12 +2235,17 @@ server {
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     client_max_body_size 150M;
-    resolver 127.0.0.11 valid=10s ipv6=off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
     location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; allow all; }
     location /rest/v1/ {
         set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
     }
     location / {
         set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
@@ -2045,10 +2257,22 @@ server {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+    location @sparrowx_host_fallback {
+        proxy_pass http://${MIN_HOST_IP}:${APP_HOST_PORT:-3000};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
 EOF_MIN_NGINX
-    docker restart "${EDGE_CTR}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps "${EDGE_SVC}" >/dev/null 2>&1 || true
+    docker restart "${EDGE_CTR}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps --no-build "${EDGE_SVC}" >/dev/null 2>&1 || true
     sleep 3
   fi
 

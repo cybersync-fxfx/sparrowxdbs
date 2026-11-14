@@ -140,6 +140,10 @@ const server = createServer(async (req, res) => {
   try {
     const reqUrl = req.url || "/";
     const pathname = reqUrl.split("?")[0];
+    const rawHost = req.headers.host || `${HOST}:${PORT}`;
+    const host = rawHost.split(":")[0].toLowerCase();
+    const isHealthRoute =
+      pathname === "/health" || pathname === "/api/health" || pathname === "/api/v1/health";
 
     // CORS preflight handling
     if (req.method === "OPTIONS") {
@@ -157,6 +161,24 @@ const server = createServer(async (req, res) => {
     if (pathname.startsWith("/.") && !pathname.startsWith("/.well-known")) {
       res.writeHead(403, { "Content-Type": "application/json", ...SECURITY_HEADERS });
       res.end(JSON.stringify({ error: "Forbidden: dotfile access denied by SparrowX WAF" }));
+      return;
+    }
+
+    // Fast-path <1ms health check before SSR / upstream checks
+    if (isHealthRoute && (req.method === "GET" || req.method === "HEAD")) {
+      const payload = JSON.stringify({
+        status: "healthy",
+        service: "SparrowX Autonomous Edge Shield",
+        version: "2.4.0",
+        domain: process.env.SPARROWX_DOMAIN || host,
+        timestamp: new Date().toISOString(),
+      });
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        ...SECURITY_HEADERS,
+      });
+      res.end(req.method === "HEAD" ? undefined : payload);
       return;
     }
 
@@ -430,8 +452,6 @@ const server = createServer(async (req, res) => {
       }
     }
 
-    const rawHost = req.headers.host || `${HOST}:${PORT}`;
-    const host = rawHost.split(":")[0].toLowerCase();
     const isApiHost = host.startsWith("api.") || host.startsWith("api-");
     const isRestPath = pathname.startsWith("/rest/v1");
 
@@ -493,8 +513,6 @@ const server = createServer(async (req, res) => {
     // =========================================================================
     // 2. PostgREST Proxy vs. Web UI Ingress for api.sparrowx.net
     // =========================================================================
-    const isHealthRoute =
-      pathname === "/health" || pathname === "/api/health" || pathname === "/api/v1/health";
     const acceptsHtml = (req.headers.accept || "").includes("text/html");
     const isBrowserNavigationToApiHome =
       isApiHost && acceptsHtml && (pathname === "/" || pathname === "/docs");
