@@ -1575,8 +1575,12 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   fi
 
   log_scan "Starting container stack via $(basename "${COMPOSE_FILE}")..."
-  if ! compose_cmd -f "${COMPOSE_FILE}" up "${COMPOSE_ARGS[@]}"; then
-    log_fix "Compose startup hit an error — tearing down conflicting containers/networks & healing ports"
+  local compose_err_file
+  compose_err_file="$(mktemp)"
+  if ! compose_cmd -f "${COMPOSE_FILE}" up "${COMPOSE_ARGS[@]}" >"${compose_err_file}" 2>&1; then
+    local c_err_tail
+    c_err_tail="$(tail -n 10 "${compose_err_file}" 2>/dev/null | tr '\n' ' ' || true)"
+    log_fix "Compose startup hit an error (${c_err_tail:0:180}) — tearing down conflicting containers/networks & healing ports"
     compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
     docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
     docker network prune -f >/dev/null 2>&1 || true
@@ -1604,15 +1608,25 @@ if [ "${HAS_DOCKER}" = "true" ]; then
       log_fix "Reassigned APP_HOST_PORT=${APP_HOST_PORT} after cleanup"
     fi
 
-    compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans || true
-    log_healed "Container stack launched after clean port & network recovery"
+    if ! compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans >"${compose_err_file}" 2>&1; then
+      c_err_tail="$(tail -n 10 "${compose_err_file}" 2>/dev/null | tr '\n' ' ' || true)"
+      log_warn "Compose recovery up failed (${c_err_tail:0:180}); starting services individually"
+      for svc in postgres postgrest sparrowx nginx; do
+        compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${svc}" >/dev/null 2>&1 || true
+      done
+    else
+      log_healed "Container stack launched after clean port & network recovery"
+    fi
   else
     log_ok "Docker Compose fleet up and running"
   fi
+  rm -f "${compose_err_file}"
 
-  # Always force-start sparrowx-app and sparrowx-nginx so ports 80/443 never refuse connections
-  compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps sparrowx nginx >/dev/null 2>&1 || true
-  docker start sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+  # Ensure every individual service is created & running (fixes 'Created' or missing containers)
+  for svc in postgres postgrest sparrowx nginx; do
+    compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${svc}" >/dev/null 2>&1 || true
+  done
+  docker start sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
 
   if is_pterodactyl_installed; then
     DOCKER_HOST_IP="$(get_docker_host_ip)"
@@ -1910,7 +1924,7 @@ server {
     }
 }
 EOF_MIN_NGINX
-    docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    docker restart sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps nginx >/dev/null 2>&1 || true
     sleep 3
   fi
 
