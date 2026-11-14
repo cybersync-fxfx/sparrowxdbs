@@ -196,9 +196,9 @@ export function SparrowxShieldEngine({
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
-              src="/sparrowx-logo.png"
+              src="/sparrowx-shield-logo.svg"
               alt="SparrowX Shield"
-              className="size-10 object-contain shrink-0 drop-shadow-[0_4px_14px_rgba(255,107,0,0.3)]"
+              className="size-10 object-contain shrink-0 drop-shadow-[0_4px_14px_rgba(255,107,0,0.35)]"
             />
             <div>
               <div className="flex items-center gap-2">

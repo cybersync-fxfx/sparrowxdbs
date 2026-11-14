@@ -19,16 +19,11 @@ export function SparrowxStoryPage() {
       <header className="border-b border-sky-500/15 bg-[#0B1020]/95 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
           <a href="/" className="flex items-center gap-2.5 shrink-0">
-            <div className="size-8 rounded-md bg-[#111A30] border border-sky-500/30 grid place-items-center shadow-[0_0_10px_rgba(56,189,248,0.15)]">
-              <img
-                src="/sparrowx-cyber-hawk.png"
-                alt="SparrowX"
-                className="size-5 object-contain"
-                onError={(e) => {
-                  (e.target as HTMLElement).style.display = "none";
-                }}
-              />
-            </div>
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX"
+              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(56,189,248,0.25)]"
+            />
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm sm:text-base tracking-tight text-white">
                 SPARROWX

@@ -1235,9 +1235,9 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img
-                src="/sparrowx-logo.png"
+                src="/sparrowx-db-logo.svg"
                 alt="SparrowX Cloud DB"
-                className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.22)]"
+                className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(62,207,142,0.3)]"
               />
               <div>
                 <div className="flex items-center gap-2">
@@ -1933,9 +1933,9 @@ model ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) =
 
           <div className="flex items-center gap-2 min-w-0">
             <img
-              src="/sparrowx-logo.png"
+              src="/sparrowx-db-logo.svg"
               alt="SparrowX DB Studio"
-              className="size-7 object-contain shrink-0 drop-shadow-[0_3px_8px_rgba(255,107,0,0.22)]"
+              className="size-7 object-contain shrink-0 drop-shadow-[0_3px_8px_rgba(62,207,142,0.3)]"
             />
             <div className="flex items-center gap-2 text-xs truncate">
               <span className="font-bold tracking-tight text-white shrink-0">

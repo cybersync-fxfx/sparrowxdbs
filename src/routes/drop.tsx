@@ -26,6 +26,7 @@ export const Route = createFileRoute("/drop")({
     ],
     links: [
       { rel: "canonical", href: "https://file.sparrowx.net" },
+      { rel: "icon", href: "/sparrowx-drop-logo.svg", type: "image/svg+xml" },
     ],
   }),
   component: SparrowxDropRoute,

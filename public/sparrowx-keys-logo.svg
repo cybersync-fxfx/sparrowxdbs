@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <radialGradient id="keysGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.38" />
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="keysGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7" />
+      <stop offset="45%" stop-color="#FBBF24" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+    <linearGradient id="keysDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#090D16" />
+    </linearGradient>
+    <linearGradient id="keysEmerald" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6EE7B7" />
+      <stop offset="100%" stop-color="#059669" />
+    </linearGradient>
+  </defs>
+
+  <circle cx="64" cy="64" r="56" fill="url(#keysGlow)" />
+
+  <!-- Outer Cryptographic Entropy Ring -->
+  <circle cx="64" cy="56" r="36" stroke="url(#keysGold)" stroke-width="2" stroke-dasharray="6 4" opacity="0.7" />
+
+  <!-- Wing Crests Flanking Hardware Key Prism -->
+  <path d="M12 40 L38 48 L35 58 L17 52 Z" fill="url(#keysGold)" opacity="0.92" />
+  <path d="M116 40 L90 48 L93 58 L111 52 Z" fill="url(#keysGold)" opacity="0.92" />
+
+  <!-- 3D Hexagonal Key Head -->
+  <polygon points="64,20 90,35 90,65 64,80 38,65 38,35" fill="url(#keysDark)" stroke="url(#keysGold)" stroke-width="3" />
+  <polygon points="64,28 82,38 82,58 64,68 46,58 46,38" fill="#111827" stroke="#FDE68A" stroke-width="1" stroke-opacity="0.55" />
+
+  <!-- CSPRNG Emerald Core -->
+  <circle cx="64" cy="48" r="9" fill="url(#keysEmerald)" stroke="#ECFDF5" stroke-width="1.5" />
+  <circle cx="64" cy="48" r="3.5" fill="#FFFFFF" />
+
+  <!-- Metallic Bit-Cut Key Blade Descending -->
+  <path d="M58 76 L70 76 L70 110 L62 116 L58 112 L58 102 L51 102 L51 94 L58 94 L58 88 L50 88 L50 81 L58 81 Z" fill="url(#keysGold)" stroke="#FEF3C7" stroke-width="1.2" />
+</svg>

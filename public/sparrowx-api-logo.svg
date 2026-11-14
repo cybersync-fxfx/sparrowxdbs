@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <radialGradient id="apiGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#818CF8" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#818CF8" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="apiIndigo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E0E7FF" />
+      <stop offset="40%" stop-color="#818CF8" />
+      <stop offset="100%" stop-color="#4338CA" />
+    </linearGradient>
+    <linearGradient id="apiCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#BAE6FD" />
+      <stop offset="50%" stop-color="#38BDF8" />
+      <stop offset="100%" stop-color="#0369A1" />
+    </linearGradient>
+  </defs>
+
+  <circle cx="64" cy="64" r="56" fill="url(#apiGlow)" />
+
+  <!-- Dual Conduit Wing Blades -->
+  <path d="M12 44 L34 52 L34 62 L18 56 Z" fill="url(#apiCyan)" />
+  <path d="M116 44 L94 52 L94 62 L110 56 Z" fill="url(#apiCyan)" />
+
+  <!-- 3D Hexagonal API Gateway Chassis -->
+  <polygon points="64,18 100,39 100,81 64,102 28,81 28,39" fill="#0F172A" stroke="url(#apiIndigo)" stroke-width="3.5" />
+  <polygon points="64,27 91,43 91,77 64,93 37,77 37,43" fill="#111827" stroke="#38BDF8" stroke-width="1.2" stroke-opacity="0.55" />
+
+  <!-- Corner Routing Nodes -->
+  <circle cx="64" cy="18" r="4" fill="#38BDF8" />
+  <circle cx="100" cy="39" r="4" fill="#818CF8" />
+  <circle cx="100" cy="81" r="4" fill="#38BDF8" />
+  <circle cx="64" cy="102" r="4" fill="#818CF8" />
+  <circle cx="28" cy="81" r="4" fill="#38BDF8" />
+  <circle cx="28" cy="39" r="4" fill="#818CF8" />
+
+  <!-- High-Speed PostgREST Lightning Core -->
+  <path d="M68 38 L50 63 L63 63 L59 84 L79 57 L66 57 Z" fill="url(#apiCyan)" stroke="#FFFFFF" stroke-width="1.2" />
+</svg>

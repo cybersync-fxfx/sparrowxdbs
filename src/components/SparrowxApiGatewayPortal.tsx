@@ -194,9 +194,9 @@ print(response.json())`;
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
-              src="/sparrowx-logo.png"
+              src="/sparrowx-api-logo.svg"
               alt="SparrowX API Gateway"
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.22)]"
+              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(129,140,248,0.3)]"
             />
             <div>
               <div className="flex items-center gap-2">

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <radialGradient id="shieldGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#FF6B00" stop-opacity="0.42" />
+      <stop offset="100%" stop-color="#FF6B00" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="shieldOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FED7AA" />
+      <stop offset="35%" stop-color="#FF8533" />
+      <stop offset="75%" stop-color="#FF6B00" />
+      <stop offset="100%" stop-color="#9A3412" />
+    </linearGradient>
+    <linearGradient id="shieldArmor" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E1B18" />
+      <stop offset="100%" stop-color="#090A0E" />
+    </linearGradient>
+  </defs>
+
+  <circle cx="64" cy="64" r="56" fill="url(#shieldGlow)" />
+
+  <!-- Tactical Aegis Falcon Shoulder Wings -->
+  <path d="M10 34 L38 40 L34 52 L16 46 Z" fill="url(#shieldOrange)" />
+  <path d="M118 34 L90 40 L94 52 L112 46 Z" fill="url(#shieldOrange)" />
+
+  <!-- Outer Faceted 3D Armor Shield -->
+  <path d="M64 14 L104 30 L100 72 C97 94 64 114 64 114 C64 114 31 94 28 72 L24 30 Z" fill="url(#shieldOrange)" />
+
+  <!-- Recessed Obsidian Core Shield -->
+  <path d="M64 23 L95 35 L92 70 C89 87 64 103 64 103 C64 103 39 87 36 70 L33 35 Z" fill="url(#shieldArmor)" stroke="#FED7AA" stroke-width="1.2" stroke-opacity="0.55" />
+
+  <!-- Center Vertical Bevel Seam (3D Faceting) -->
+  <path d="M64 23 L64 103" stroke="#FF6B00" stroke-width="1.5" stroke-opacity="0.45" />
+
+  <!-- Active Tactical Radar Rings & Hawk Chevron -->
+  <circle cx="64" cy="58" r="19" stroke="#FF6B00" stroke-width="1.8" stroke-dasharray="18 8" opacity="0.85" />
+  <circle cx="64" cy="58" r="11" stroke="#FF8533" stroke-width="1.5" opacity="0.7" />
+  <path d="M51 54 L64 42 L77 54 L64 66 Z" fill="url(#shieldOrange)" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.85" />
+  <circle cx="64" cy="54" r="3" fill="#FFFFFF" />
+</svg>
