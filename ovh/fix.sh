@@ -100,8 +100,8 @@ REPO_ERROR_LOG="${REPO_LOG_DIR}/errors.log"
 } > "${FIX_FULL_LOG}" 2>/dev/null || true
 cp -f "${FIX_FULL_LOG}" "${REPO_FULL_LOG}" 2>/dev/null || true
 
-# Mirror all terminal output (ANSI-stripped) to persistent log files
-exec > >(tee >(sed -r 's/\x1B\[[0-9;]*[mK]//g' >> "${FIX_FULL_LOG}" 2>/dev/null) >(sed -r 's/\x1B\[[0-9;]*[mK]//g' >> "${REPO_FULL_LOG}" 2>/dev/null)) 2>&1
+# Mirror all terminal output to persistent log file
+exec > >(tee -a "${FIX_FULL_LOG}") 2>&1
 
 append_error_record() {
   local level="$1"
@@ -652,7 +652,9 @@ heal_pterodactyl_host_nginx() {
     ln -sf "/etc/letsencrypt/live/${game_domain}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
   fi
 
-  # Remove default site and stale conf.d vhost that claim ports 80/443
+  # Remove ANY host nginx vhost other than pterodactyl.conf so nothing steals ports 80/443 from sparrowx-nginx
+  find /etc/nginx/sites-enabled -maxdepth 1 -type l -o -type f 2>/dev/null | grep -v '/pterodactyl\.conf$' | xargs -r rm -f 2>/dev/null || true
+  find /etc/nginx/conf.d -maxdepth 1 -name '*.conf' 2>/dev/null | grep -v '/pterodactyl\.conf$' | xargs -r rm -f 2>/dev/null || true
   rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/pterodactyl.conf 2>/dev/null || true
   if [ -f /etc/nginx/sites-available/pterodactyl.conf ]; then
     ptero_conf="/etc/nginx/sites-available/pterodactyl.conf"
@@ -720,12 +722,13 @@ EOF_PTERO
     log_warn "Host Nginx config check failed for ${ptero_conf}; inspect nginx -t on host"
   fi
 
-  # Live Laravel /sanctum/csrf-cookie + POST /auth/login verification & auto-healing loop
+  # Live Laravel GET / + /sanctum/csrf-cookie + POST /auth/login verification & auto-healing loop
   local probe_attempt=1
   while [ "${probe_attempt}" -le 2 ]; do
-    local csrf_code="000" login_probe_code="000" login_probe_body="" raw_xsrf="" xsrf_tok="" ptero_cj="" ptero_body_file=""
+    local root_code="000" csrf_code="000" login_probe_code="000" login_probe_body="" raw_xsrf="" xsrf_tok="" ptero_cj="" ptero_body_file=""
     ptero_cj="$(mktemp)"
     ptero_body_file="$(mktemp)"
+    root_code="$(curl -s -o /dev/null -w "%{http_code}" --max-time 6 -H "Host: ${game_domain}" -H "X-Forwarded-Proto: https" "http://127.0.0.1:${ptero_port}/" 2>/dev/null || echo "000")"
     csrf_code="$(curl -s -c "${ptero_cj}" -o /dev/null -w "%{http_code}" --max-time 6 -H "Host: ${game_domain}" -H "X-Forwarded-Proto: https" "http://127.0.0.1:${ptero_port}/sanctum/csrf-cookie" 2>/dev/null || echo "000")"
     if echo "${csrf_code}" | grep -qE "^(200|204)$"; then
       raw_xsrf="$(awk '$6=="XSRF-TOKEN"{print $7; exit}' "${ptero_cj}" 2>/dev/null || true)"
@@ -743,17 +746,20 @@ EOF_PTERO
     fi
     rm -f "${ptero_cj}" "${ptero_body_file}"
 
-    if echo "${csrf_code}" | grep -qE "^(200|204)$" && ! echo "${login_probe_code}" | grep -qE "^(000|419|500|502|503)$" && ! echo "${login_probe_body}" | grep -qi "unexpected error"; then
-      log_ok "Pterodactyl auth & CSRF probe passed (CSRF:${csrf_code}, LOGIN:${login_probe_code})"
+    if echo "${root_code}" | grep -qE "^(200|301|302)$" && echo "${csrf_code}" | grep -qE "^(200|204)$" && ! echo "${login_probe_code}" | grep -qE "^(000|419|500|502|503)$" && ! echo "${login_probe_body}" | grep -qi "unexpected error"; then
+      log_ok "Pterodactyl GET / & auth probe passed (ROOT:${root_code}, CSRF:${csrf_code}, LOGIN:${login_probe_code})"
       break
     fi
 
-    log_fix "Pterodactyl auth probe failed (attempt ${probe_attempt}: CSRF:${csrf_code} LOGIN:${login_probe_code}); applying deep Laravel/PHP/Redis/permission repair"
+    log_fix "Pterodactyl probe failed (attempt ${probe_attempt}: ROOT:${root_code} CSRF:${csrf_code} LOGIN:${login_probe_code}); applying deep Laravel/PHP/Redis/cache/permission repair"
     if [ -f "${ptero_dir}/storage/logs/laravel.log" ]; then
       local last_err=""
-      last_err="$(grep -E "local\.ERROR|production\.ERROR|Exception|SQLSTATE|Permission denied" "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null | tail -n 1 || true)"
+      last_err="$(grep -E "local\.ERROR|production\.ERROR|Exception|SQLSTATE|Permission denied|Fatal error" "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null | tail -n 1 || true)"
       [ -n "${last_err}" ] && log_warn "Last Pterodactyl log error: ${last_err:0:180}"
     fi
+
+    # Clear compiled bootstrap/cache files that may hold stale config/services
+    rm -f "${ptero_dir}/bootstrap/cache/"*.php 2>/dev/null || true
 
     if [ -f "${ptero_dir}/.env" ]; then
       set_ptero_env_key "CACHE_DRIVER" "file"
@@ -784,7 +790,7 @@ EOF_PTERO
     systemctl restart pteroq >/dev/null 2>&1 || true
     systemctl restart nginx >/dev/null 2>&1 || true
     if [ "${probe_attempt}" -eq 2 ]; then
-      log_unfixed "Pterodactyl login/CSRF probe still failing after 2 auto-heal passes (CSRF:${csrf_code} LOGIN:${login_probe_code})"
+      log_unfixed "Pterodactyl probe still failing after 2 auto-heal passes (ROOT:${root_code} CSRF:${csrf_code} LOGIN:${login_probe_code})"
     fi
     probe_attempt=$((probe_attempt + 1))
   done
@@ -1804,6 +1810,80 @@ fi
 
 if curl -kfsS -o /dev/null -w "%{http_code}" "https://127.0.0.1:${HTTPS_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$"; then
   EDGE_HTTPS_HEALTH="ONLINE (:${HTTPS_PORT})"
+fi
+
+# Guaranteed Edge Proxy Recovery if port 80 or 443 is refusing connections
+if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; } && [ "${HAS_DOCKER}" = "true" ]; then
+  log_fix "Edge proxy down (HTTP=${EDGE_HTTP_HEALTH}, HTTPS=${EDGE_HTTPS_HEALTH}); running guaranteed sparrowx-nginx recovery"
+  if [ ! -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ] || [ ! -s "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
+    mkdir -p "${INSTALL_DIR}/ovh/ssl"
+    openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+      -keyout "${INSTALL_DIR}/ovh/ssl/privkey.pem" \
+      -out "${INSTALL_DIR}/ovh/ssl/fullchain.pem" \
+      -subj "/CN=${SPARROWX_DOMAIN}" >/dev/null 2>&1 || true
+  fi
+  if [ ! -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
+    cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
+    cp -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
+  fi
+
+  # Ensure nothing else on host is holding 80/443
+  free_docker_port_conflicts "${HTTP_PORT}" "sparrowx-nginx"
+  free_docker_port_conflicts "${HTTPS_PORT}" "sparrowx-nginx"
+  for web_p in "${HTTP_PORT}" "${HTTPS_PORT}"; do
+    if port_held_by_other "${web_p}" "sparrowx-nginx"; then
+      command -v fuser >/dev/null 2>&1 && fuser -k "${web_p}/tcp" >/dev/null 2>&1 || true
+      pkill -9 -f "docker-proxy.*-host-port ${web_p}( |$)" >/dev/null 2>&1 || true
+    fi
+  done
+
+  compose_cmd -f "${COMPOSE_FILE}" up -d --force-recreate --no-deps nginx >/dev/null 2>&1 || true
+  docker start sparrowx-nginx >/dev/null 2>&1 || true
+  sleep 3
+
+  if ! docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
+    nginx_err="$(docker exec sparrowx-nginx nginx -t 2>&1 || docker logs --tail 20 sparrowx-nginx 2>&1 || true)"
+    log_warn "sparrowx-nginx config failed (${nginx_err:0:180}); writing clean fallback ovh/nginx.conf"
+    cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF_MIN_NGINX
+server {
+    listen 80 default_server;
+    listen 443 ssl default_server;
+    server_name ${SPARROWX_DOMAIN} www.${SPARROWX_DOMAIN} db.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} file.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} _;
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; allow all; }
+    location /rest/v1/ {
+        set \$upstream_pgrst http://sparrowx-postgrest:3000;
+        rewrite ^/rest/v1/(.*) /\$1 break;
+        proxy_pass \$upstream_pgrst;
+        proxy_set_header Host \$host;
+    }
+    location / {
+        set \$upstream_app http://sparrowx-app:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF_MIN_NGINX
+    docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    sleep 3
+  fi
+
+  if curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${HTTP_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$"; then
+    EDGE_HTTP_HEALTH="RECOVERED (:${HTTP_PORT})"
+  fi
+  if curl -kfsS -o /dev/null -w "%{http_code}" "https://127.0.0.1:${HTTPS_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$"; then
+    EDGE_HTTPS_HEALTH="RECOVERED (:${HTTPS_PORT})"
+  fi
 fi
 
 PTERO_HEALTH="NOT INSTALLED"
