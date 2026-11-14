@@ -16,8 +16,13 @@
 # ============================================================================
 set -u
 
-INSTALL_DIR="/opt/sparrowx"
-[ ! -d "${INSTALL_DIR}" ] && INSTALL_DIR="$(pwd)"
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_SOURCE}")" && pwd)"
+if [ "$(basename "${SCRIPT_DIR}")" = "ovh" ]; then
+  INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  INSTALL_DIR="${SCRIPT_DIR}"
+fi
 cd "${INSTALL_DIR}" || exit 1
 
 C_RESET="\033[0m"
@@ -257,8 +262,31 @@ fi
 
 DB_MARKER_FILE="${INSTALL_DIR}/data/.db_initialized"
 
+is_port_busy() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tuln 2>/dev/null | grep -qE "[:.]${port}[[:space:]]"
+    return $?
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -i ":${port}" >/dev/null 2>&1
+    return $?
+  fi
+  return 1
+}
+
+find_next_free_port() {
+  local port="$1"
+  local max_tries=20
+  local i=0
+  while [ "${i}" -lt "${max_tries}" ] && is_port_busy "${port}"; do
+    port=$((port + 1))
+    i=$((i + 1))
+  done
+  echo "${port}"
+}
+
 if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  systemctl stop sparrowx-native.service >/dev/null 2>&1 || true
+  systemctl stop sparrowx-native.service postgresql nginx apache2 >/dev/null 2>&1 || true
 
   COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
   APP_SERVICE="sparrowx"
@@ -277,8 +305,26 @@ if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
       docker restart sparrowx-nginx >/dev/null 2>&1 || true
     fi
   else
+    if is_port_busy "${PG_HOST_PORT}"; then
+      log_warn "Host port ${PG_HOST_PORT} is already in use; selecting free PostgreSQL port..."
+      PG_HOST_PORT="$(find_next_free_port 5433)"
+      ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+      export PG_HOST_PORT
+      log_ok "Switched PG_HOST_PORT to free port ${PG_HOST_PORT} in .env."
+    fi
+
     log_info "[Step 5/6] Launching Full-Stack Docker containers via ${COMPOSE_FILE}..."
-    docker compose -f "${COMPOSE_FILE}" up --build -d
+    if ! docker compose -f "${COMPOSE_FILE}" up --build -d; then
+      log_warn "Docker Compose startup hit a conflict; cleaning stale containers and healing port bindings..."
+      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+      if is_port_busy "${PG_HOST_PORT}" || [ "${PG_HOST_PORT}" = "5432" ]; then
+        PG_HOST_PORT="$(find_next_free_port 5433)"
+        ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+        export PG_HOST_PORT
+        log_warn "Updated PG_HOST_PORT=${PG_HOST_PORT} in .env to bypass port 5432 conflict."
+      fi
+      docker compose -f "${COMPOSE_FILE}" up --build -d
+    fi
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 else

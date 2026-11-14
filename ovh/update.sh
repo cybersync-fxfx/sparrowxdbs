@@ -16,8 +16,13 @@
 # ============================================================================
 set -u
 
-INSTALL_DIR="/opt/sparrowx"
-[ ! -d "${INSTALL_DIR}" ] && INSTALL_DIR="$(pwd)"
+SCRIPT_SOURCE="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${SCRIPT_SOURCE}")" && pwd)"
+if [ "$(basename "${SCRIPT_DIR}")" = "ovh" ]; then
+  INSTALL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+else
+  INSTALL_DIR="${SCRIPT_DIR}"
+fi
 cd "${INSTALL_DIR}" || exit 1
 
 C_RESET="\033[0m"
@@ -48,20 +53,22 @@ fi
 DETECTED_IP="$(curl -4 -fsS --max-time 4 https://api.ipify.org 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")"
 SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP:-${DETECTED_IP}}"
 
-# Ask only if domain or studio domain is not yet configured in .env
-if [ -z "${SPARROWX_DOMAIN:-}" ] && [ -e /dev/tty ]; then
-  read -r -p "1. Enter your main SparrowX domain [default: ${SPARROWX_PUBLIC_IP}]: " IN_DOM </dev/tty || true
-  SPARROWX_DOMAIN="${IN_DOM:-${SPARROWX_PUBLIC_IP}}"
-else
-  SPARROWX_DOMAIN="${SPARROWX_DOMAIN:-${SPARROWX_PUBLIC_IP}}"
+# Auto-detect existing configured domain from .env, DNS zone files, or nginx.conf (ZERO prompts!)
+if [ -z "${SPARROWX_DOMAIN:-}" ]; then
+  EXISTING_ZONE="$(ls -1 "${INSTALL_DIR}"/ovh/dns/db.* /etc/bind/zones/db.* 2>/dev/null | head -n 1 || true)"
+  if [ -n "${EXISTING_ZONE}" ]; then
+    SPARROWX_DOMAIN="$(basename "${EXISTING_ZONE}" | sed 's/^db\.//')"
+  elif [ -f "${INSTALL_DIR}/ovh/nginx.conf" ]; then
+    SPARROWX_DOMAIN="$(awk '/server_name/ {print $2; exit}' "${INSTALL_DIR}/ovh/nginx.conf" | tr -d ';' || true)"
+  fi
 fi
+SPARROWX_DOMAIN="$(echo "${SPARROWX_DOMAIN:-sparrowx.net}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+[ -z "${SPARROWX_DOMAIN}" ] || [ "${SPARROWX_DOMAIN}" = "_" ] && SPARROWX_DOMAIN="sparrowx.net"
 
 DEFAULT_STUDIO_DOM="db.${SPARROWX_DOMAIN}"
-if [ -z "${SPARROWX_STUDIO_DOMAIN:-}" ] && [ -e /dev/tty ]; then
-  read -r -p "2. Enter your separate Supabase Studio Admin domain [default: ${DEFAULT_STUDIO_DOM}]: " IN_STD </dev/tty || true
-  SPARROWX_STUDIO_DOMAIN="${IN_STD:-${DEFAULT_STUDIO_DOM}}"
-else
-  SPARROWX_STUDIO_DOMAIN="${SPARROWX_STUDIO_DOMAIN:-${DEFAULT_STUDIO_DOM}}"
+SPARROWX_STUDIO_DOMAIN="$(echo "${SPARROWX_STUDIO_DOMAIN:-${DEFAULT_STUDIO_DOM}}" | sed -E 's#^https?://##; s#/.*$##' | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+if [ -z "${SPARROWX_STUDIO_DOMAIN}" ] || [ "${SPARROWX_STUDIO_DOMAIN}" = "${SPARROWX_DOMAIN}" ]; then
+  SPARROWX_STUDIO_DOMAIN="db.${SPARROWX_DOMAIN}"
 fi
 
 HTTP_PORT="${HTTP_PORT:-80}"
@@ -70,26 +77,29 @@ APP_HOST_PORT="${APP_HOST_PORT:-3000}"
 PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 
-# Ensure SPARROWX_STUDIO_DOMAIN is saved in .env
-if [ -f "${INSTALL_DIR}/.env" ]; then
-  grep -q "^SPARROWX_STUDIO_DOMAIN=" "${INSTALL_DIR}/.env" && \
-    sed -i "s|^SPARROWX_STUDIO_DOMAIN=.*|SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}|" "${INSTALL_DIR}/.env" || \
-    echo "SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}" >> "${INSTALL_DIR}/.env"
-else
-  cat > "${INSTALL_DIR}/.env" <<EOF
-SPARROWX_DOMAIN=${SPARROWX_DOMAIN}
-SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}
-SPARROWX_PUBLIC_IP=${SPARROWX_PUBLIC_IP}
-HTTP_PORT=${HTTP_PORT}
-HTTPS_PORT=${HTTPS_PORT}
-APP_HOST_PORT=${APP_HOST_PORT}
-PGRST_HOST_PORT=${PGRST_HOST_PORT}
-PG_HOST_PORT=${PG_HOST_PORT}
-POSTGRES_USER=sparrowx
-POSTGRES_PASSWORD=sparrowx_ovh_secret_2026
-POSTGRES_DB=sparrowx_db
-EOF
-fi
+# Ensure all required keys are persisted in .env so future runs never re-prompt
+touch "${INSTALL_DIR}/.env"
+ensure_env_key() {
+  local key="$1"
+  local val="$2"
+  if grep -q "^${key}=" "${INSTALL_DIR}/.env" 2>/dev/null; then
+    sed -i "s|^${key}=.*|${key}=${val}|" "${INSTALL_DIR}/.env"
+  else
+    echo "${key}=${val}" >> "${INSTALL_DIR}/.env"
+  fi
+}
+
+ensure_env_key "SPARROWX_DOMAIN" "${SPARROWX_DOMAIN}"
+ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
+ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
+ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
+ensure_env_key "HTTPS_PORT" "${HTTPS_PORT}"
+ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
+ensure_env_key "PGRST_HOST_PORT" "${PGRST_HOST_PORT}"
+ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+ensure_env_key "POSTGRES_USER" "${POSTGRES_USER:-sparrowx}"
+ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}"
+ensure_env_key "POSTGRES_DB" "${POSTGRES_DB:-sparrowx_db}"
 
 # 2. Pull Latest Code from GitHub
 log_info "[Step 1/6] Pulling latest commits from GitHub (origin/main)..."
@@ -99,8 +109,9 @@ if [ -d "${INSTALL_DIR}/.git" ]; then
 fi
 
 # 3. Auto-Tune OS Security, Kernel Sysctl & Vulnerability Hardening
-log_info "[Step 2/6] Auto-tuning Linux kernel security, SYN flood defense & CVE patching..."
-cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
+if [ ! -f /etc/sysctl.d/99-sparrowx-hardening.conf ]; then
+  log_info "[Step 2/6] Applying first-time Linux kernel security & Fail2Ban hardening..."
+  cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
 # SparrowX Autonomous Kernel Security & High-Throughput Tuning
 net.ipv4.tcp_syncookies = 1
 net.ipv4.conf.all.rp_filter = 1
@@ -113,18 +124,21 @@ net.ipv4.conf.default.send_redirects = 0
 net.core.somaxconn = 65535
 net.ipv4.tcp_max_syn_backlog = 65535
 EOF
-sysctl --system >/dev/null 2>&1 || true
+  sysctl --system >/dev/null 2>&1 || true
 
-if command -v apt-get >/dev/null 2>&1; then
-  export DEBIAN_FRONTEND=noninteractive
-  apt-get install -y -qq unattended-upgrades fail2ban >/dev/null 2>&1 || true
-  systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
-  systemctl enable --now fail2ban >/dev/null 2>&1 || true
+  if command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y -qq unattended-upgrades fail2ban >/dev/null 2>&1 || true
+    systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
+    systemctl enable --now fail2ban >/dev/null 2>&1 || true
+  fi
+  log_ok "Kernel SYN-cookie shield, anti-spoofing, Fail2Ban, and unattended CVE upgrades active."
+else
+  log_ok "[Step 2/6] OS kernel hardening & Fail2Ban already installed (skipping)."
 fi
-log_ok "Kernel SYN-cookie shield, anti-spoofing, Fail2Ban, and unattended CVE upgrades active."
 
 # 4. Configure Nginx for both Main Domain and Separate Supabase Studio Domain
-log_info "[Step 3/6] Configuring Nginx reverse proxy for ${SPARROWX_DOMAIN} & ${SPARROWX_STUDIO_DOMAIN}..."
+log_info "[Step 3/6] Verifying Nginx reverse proxy for ${SPARROWX_DOMAIN} & ${SPARROWX_STUDIO_DOMAIN}..."
 mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/data/users"
 if [ ! -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ] || [ ! -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
@@ -203,13 +217,14 @@ server {
 EOF
 log_ok "Nginx configured for both ${SPARROWX_DOMAIN} and ${SPARROWX_STUDIO_DOMAIN}."
 
-# 5. Install Global CLI Tools (`sparrowx`, `sparrowx-db`, `./manage-db.sh`) & Auto-Upgrade Timer
-log_info "[Step 4/6] Installing Terminal Database Studio (manage-db.sh) & Auto-Upgrade Daemon..."
+# 5. Ensure Global CLI Symlinks & Auto-Upgrade Timer exist
 chmod +x "${INSTALL_DIR}/manage-db.sh" "${INSTALL_DIR}/update.sh" 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
 
-cat > /etc/systemd/system/sparrowx-autoupdate.service <<EOF
+if [ ! -f /etc/systemd/system/sparrowx-autoupdate.timer ]; then
+  log_info "[Step 4/6] Installing Auto-Upgrade Daemon (sparrowx-autoupdate.timer)..."
+  cat > /etc/systemd/system/sparrowx-autoupdate.service <<EOF
 [Unit]
 Description=SparrowX Automatic GitHub Sync & Rebuild
 After=network-online.target
@@ -217,10 +232,10 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=/bin/bash -c 'git fetch origin main --depth=1 && if [ "\$(git rev-parse HEAD)" != "\$(git rev-parse origin/main)" ]; then git reset --hard origin/main && docker compose -f docker-compose.ovh.yml up --build -d; fi'
+ExecStart=/bin/bash -c 'git fetch origin main --depth=1 && if [ "\$(git rev-parse HEAD)" != "\$(git rev-parse origin/main)" ]; then git reset --hard origin/main && docker compose -f docker-compose.ovh.yml up --build -d --no-deps sparrowx; fi'
 EOF
 
-cat > /etc/systemd/system/sparrowx-autoupdate.timer <<EOF
+  cat > /etc/systemd/system/sparrowx-autoupdate.timer <<EOF
 [Unit]
 Description=Check GitHub every 5 minutes for SparrowX updates
 
@@ -232,15 +247,88 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
-systemctl daemon-reload >/dev/null 2>&1 || true
-systemctl enable --now sparrowx-autoupdate.timer >/dev/null 2>&1 || true
-log_ok "Auto-upgrade timer active (checks GitHub every 5m) and 'sparrowx-db' CLI installed."
-
-# 6. Rebuild & Restart Full-Stack Containers + Shift Cloud Supabase Data to Local DB
-log_info "[Step 5/6] Rebuilding & launching Full-Stack Docker containers..."
-if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
-  docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up --build -d
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable --now sparrowx-autoupdate.timer >/dev/null 2>&1 || true
+  log_ok "Auto-upgrade timer active and 'sparrowx-db' CLI installed."
 else
+  log_ok "[Step 4/6] CLI tools & auto-upgrade timer already installed (skipping)."
+fi
+
+# 6. Rebuild & Restart Application (Keep Running DB Containers Untouched if Already Up)
+FORCE_DB_INSTALL="false"
+if [ "${1:-}" = "--reinstall-db" ] || [ "${1:-}" = "--force-db" ]; then
+  FORCE_DB_INSTALL="true"
+fi
+
+DB_MARKER_FILE="${INSTALL_DIR}/data/.db_initialized"
+
+is_port_busy() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tuln 2>/dev/null | grep -qE "[:.]${port}[[:space:]]"
+    return $?
+  elif command -v lsof >/dev/null 2>&1; then
+    lsof -i ":${port}" >/dev/null 2>&1
+    return $?
+  fi
+  return 1
+}
+
+find_next_free_port() {
+  local port="$1"
+  local max_tries=20
+  local i=0
+  while [ "${i}" -lt "${max_tries}" ] && is_port_busy "${port}"; do
+    port=$((port + 1))
+    i=$((i + 1))
+  done
+  echo "${port}"
+}
+
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  systemctl stop sparrowx-native.service postgresql nginx apache2 >/dev/null 2>&1 || true
+
+  COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
+  APP_SERVICE="sparrowx"
+  if [ -f "${INSTALL_DIR}/docker-compose.sparrowx.yml" ]; then
+    COMPOSE_FILE="${INSTALL_DIR}/docker-compose.sparrowx.yml"
+    APP_SERVICE="sparrowx-studio"
+  fi
+
+  IS_PG_RUNNING="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -E 'sparrowx[-_]postgres' || true)"
+  if [ -n "${IS_PG_RUNNING}" ] && [ "${FORCE_DB_INSTALL}" = "false" ]; then
+    log_info "[Step 5/6] PostgreSQL & PostgREST are already running — rebuilding ONLY the SparrowX web app container (${APP_SERVICE})..."
+    docker compose -f "${COMPOSE_FILE}" build "${APP_SERVICE}"
+    docker compose -f "${COMPOSE_FILE}" up -d --no-deps "${APP_SERVICE}"
+    if grep -q "nginx:" "${COMPOSE_FILE}" 2>/dev/null; then
+      docker compose -f "${COMPOSE_FILE}" up -d nginx
+      docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    fi
+  else
+    if is_port_busy "${PG_HOST_PORT}"; then
+      log_warn "Host port ${PG_HOST_PORT} is already in use; selecting free PostgreSQL port..."
+      PG_HOST_PORT="$(find_next_free_port 5433)"
+      ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+      export PG_HOST_PORT
+      log_ok "Switched PG_HOST_PORT to free port ${PG_HOST_PORT} in .env."
+    fi
+
+    log_info "[Step 5/6] Launching Full-Stack Docker containers via ${COMPOSE_FILE}..."
+    if ! docker compose -f "${COMPOSE_FILE}" up --build -d; then
+      log_warn "Docker Compose startup hit a conflict; cleaning stale containers and healing port bindings..."
+      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+      if is_port_busy "${PG_HOST_PORT}" || [ "${PG_HOST_PORT}" = "5432" ]; then
+        PG_HOST_PORT="$(find_next_free_port 5433)"
+        ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+        export PG_HOST_PORT
+        log_warn "Updated PG_HOST_PORT=${PG_HOST_PORT} in .env to bypass port 5432 conflict."
+      fi
+      docker compose -f "${COMPOSE_FILE}" up --build -d
+    fi
+    docker restart sparrowx-nginx >/dev/null 2>&1 || true
+  fi
+else
+  log_info "[Step 5/6] Rebuilding native SparrowX application..."
   export NODE_OPTIONS="--max-old-space-size=2048"
   export VITE_SOVEREIGN_SELF_HOSTED="true"
   export VITE_SUPABASE_URL=""
@@ -248,9 +336,53 @@ else
   systemctl restart sparrowx-native.service 2>/dev/null || true
 fi
 
-log_info "[Step 6/6] Shifting Cloud Supabase data into Local OVH DB & Per-User Folders..."
-sleep 3
-"${INSTALL_DIR}/manage-db.sh" sync || true
+# Ensure firewall allows HTTP/HTTPS traffic
+if command -v ufw >/dev/null 2>&1; then
+  ufw allow 80/tcp >/dev/null 2>&1 || true
+  ufw allow 443/tcp >/dev/null 2>&1 || true
+  ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
+  ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
+fi
+
+# Verify HTTP health endpoint responds 200 OK
+log_info "Verifying live HTTP health probe on port ${HTTP_PORT} & ${APP_HOST_PORT}..."
+HEALTH_OK="false"
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -fsS "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+    HEALTH_OK="true"
+    break
+  fi
+  sleep 2
+done
+
+if [ "${HEALTH_OK}" = "true" ]; then
+  log_ok "SparrowX Web Server is healthy and responding (HTTP 200 OK)."
+else
+  log_warn "App container health check took longer than expected; inspecting container logs..."
+  docker logs --tail 20 sparrowx-app 2>&1 || true
+  docker logs --tail 20 sparrowx-nginx 2>&1 || true
+fi
+
+# 7. Only Seed / Install Database on First Run (or when --reinstall-db is passed)
+EXISTING_USERS_COUNT="0"
+if curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/app_users?select=id&limit=1" 2>/dev/null | grep -q '"id"'; then
+  EXISTING_USERS_COUNT="1"
+fi
+
+if [ -f "${DB_MARKER_FILE}" ] || [ "${EXISTING_USERS_COUNT}" = "1" ]; then
+  if [ "${FORCE_DB_INSTALL}" = "true" ]; then
+    log_info "[Step 6/6] --reinstall-db requested: Re-seeding Local OVH DB..."
+    sleep 2
+    "${INSTALL_DIR}/manage-db.sh" sync && touch "${DB_MARKER_FILE}" || true
+  else
+    touch "${DB_MARKER_FILE}" 2>/dev/null || true
+    log_ok "[Step 6/6] Local PostgreSQL database is already installed and populated — skipping DB installation (use './update.sh --reinstall-db' to force)."
+  fi
+else
+  log_info "[Step 6/6] First-time Database Setup: Seeding Local OVH DB & Per-User Folders..."
+  sleep 3
+  "${INSTALL_DIR}/manage-db.sh" sync && touch "${DB_MARKER_FILE}" || true
+fi
 
 HTTP_SUFFIX=""
 [ "${HTTP_PORT}" != "80" ] && HTTP_SUFFIX=":${HTTP_PORT}"
@@ -269,11 +401,13 @@ echo -e "  6. ${C_GREEN}Liquid-Glass Fixed Navbar${C_RESET}      : Zero scroll s
 echo -e "  7. ${C_GREEN}Simplified Login & Landing UI${C_RESET}  : Removed clutter badges, 'Hashed Credential', & filler text"
 echo -e "  8. ${C_GREEN}Kernel Security & Auto-Upgrade${C_RESET} : SYN cookies, Fail2Ban, UFW & 5-min GitHub auto-updater"
 echo -e "${C_GREEN}------------------------------------------------------------------------${C_RESET}"
-echo -e "${C_BOLD}How to Access Everything Fully:${C_RESET}"
-echo -e "  • ${C_BOLD}Main Command Center (Web)${C_RESET}      : ${C_CYAN}http://${SPARROWX_DOMAIN}${HTTP_SUFFIX}${C_RESET} (or http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX})"
-echo -e "  • ${C_BOLD}Supabase Web Studio (Domain)${C_RESET}   : ${C_GREEN}http://${SPARROWX_STUDIO_DOMAIN}${HTTP_SUFFIX}${C_RESET}"
-echo -e "  • ${C_BOLD}Supabase Web Studio (Direct)${C_RESET}   : ${C_GREEN}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/?studio=1${C_RESET}"
-echo -e "  • ${C_BOLD}Terminal DB Manager (TUI)${C_RESET}      : Run ${C_YELLOW}./manage-db.sh${C_RESET} (or ${C_YELLOW}sparrowx-db${C_RESET})"
-echo -e "  • ${C_BOLD}Per-User Database Folders${C_RESET}      : ${C_CYAN}${INSTALL_DIR}/data/users/<username>/${C_RESET}"
-echo -e "  • ${C_BOLD}One-Command Future Update${C_RESET}      : Run ${C_YELLOW}./update.sh${C_RESET} (or ${C_YELLOW}sparrowx-update${C_RESET})"
+echo -e "${C_BOLD}How to Access All Dedicated SparrowX Domains:${C_RESET}"
+echo -e "  • ${C_BOLD}Master Company Portal${C_RESET}     : ${C_CYAN}https://${SPARROWX_DOMAIN}${C_RESET} (Central Landing Page)"
+echo -e "  • ${C_BOLD}SparrowX DB Studio${C_RESET}        : ${C_GREEN}https://db.${SPARROWX_DOMAIN}${C_RESET} (PostgreSQL 16 & pgvector BaaS)"
+echo -e "  • ${C_BOLD}SparrowX Files (Storage)${C_RESET}  : ${C_CYAN}https://file.${SPARROWX_DOMAIN}${C_RESET} (NVMe Disk & P2P RAM Drop)"
+echo -e "  • ${C_BOLD}SparrowX Keys (Passwords)${C_RESET} : ${C_YELLOW}https://password.${SPARROWX_DOMAIN}${C_RESET} (100% Offline CSPRNG)"
+echo -e "  • ${C_BOLD}SparrowX Shield (SOC)${C_RESET}     : ${C_BLUE}https://sec.${SPARROWX_DOMAIN}${C_RESET} (Edge WAF & Threat Defense)"
+echo -e "  • ${C_BOLD}SparrowX REST API Gateway${C_RESET} : ${C_GREEN}https://api.${SPARROWX_DOMAIN}${C_RESET} (PostgREST OpenAPI Docs)"
+echo -e "  • ${C_BOLD}Terminal DB Manager (TUI)${C_RESET} : Run ${C_YELLOW}./manage-db.sh${C_RESET} (or ${C_YELLOW}sparrowx-db${C_RESET})"
+echo -e "  • ${C_BOLD}One-Command Future Update${C_RESET} : Run ${C_YELLOW}./update.sh${C_RESET} (or ${C_YELLOW}sparrowx-update${C_RESET})"
 echo -e "${C_GREEN}========================================================================${C_RESET}"
