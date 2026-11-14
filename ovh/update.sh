@@ -31,6 +31,7 @@ C_GREEN="\033[1;32m"
 C_CYAN="\033[1;36m"
 C_YELLOW="\033[1;33m"
 C_RED="\033[1;31m"
+C_BLUE="\033[1;34m"
 
 log_info() { echo -e "${C_CYAN}[UPDATE]${C_RESET} $*"; }
 log_ok()   { echo -e "${C_GREEN}[OK]${C_RESET}     $*"; }
@@ -104,8 +105,14 @@ ensure_env_key "POSTGRES_DB" "${POSTGRES_DB:-sparrowx_db}"
 # 2. Pull Latest Code from GitHub
 log_info "[Step 1/6] Pulling latest commits from GitHub (origin/main)..."
 if [ -d "${INSTALL_DIR}/.git" ]; then
+  BEFORE_HASH="$(git rev-parse HEAD 2>/dev/null || echo "")"
   git fetch origin main --depth=1 && git reset --hard origin/main
+  AFTER_HASH="$(git rev-parse HEAD 2>/dev/null || echo "")"
   log_ok "Repository updated to commit $(git rev-parse --short HEAD)."
+  if [ "${BEFORE_HASH}" != "${AFTER_HASH}" ] && [ "${SPARROWX_REEXEC:-0}" != "1" ]; then
+    export SPARROWX_REEXEC=1
+    exec bash "${INSTALL_DIR}/update.sh" "$@"
+  fi
 fi
 
 # 3. Auto-Tune OS Security, Kernel Sysctl & Vulnerability Hardening
@@ -156,7 +163,7 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    client_max_body_size 25M;
+    client_max_body_size 100M;
     server_tokens off;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -194,7 +201,7 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    client_max_body_size 25M;
+    client_max_body_size 100M;
     server_tokens off;
 
     location /rest/v1/ {
