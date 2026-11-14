@@ -18,7 +18,7 @@ const FOUNDER_EMAIL = "founder@sparrowx.net";
 const SECURITY_EMAIL = "security@sparrowx.net";
 
 const inputClass =
-  "w-full px-3.5 py-2.5 rounded bg-[#080808] border border-white/35 text-white placeholder-zinc-500 focus:outline-none focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40 transition-colors aria-[invalid=true]:border-white aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-white";
+  "w-full px-3.5 py-2.5 rounded bg-[#080808] border border-white/35 text-white placeholder-zinc-500 focus:outline-none focus-visible:border-white focus-visible:ring-2 focus-visible:ring-white/40 transition-colors aria-[invalid=true]:border-rose-400 aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-rose-400/50";
 
 function CopyRow({ label, email }: { label: string; email: string }) {
   const [copied, setCopied] = useState(false);
@@ -47,7 +47,7 @@ function CopyRow({ label, email }: { label: string; email: string }) {
         }}
         className="size-8 rounded bg-[#141414] border border-white/30 text-zinc-300 hover:text-white grid place-items-center shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-white/40 outline-none"
       >
-        {copied ? <Check className="size-3.5 text-white" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+        {copied ? <Check className="size-3.5 text-emerald-400" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
       </button>
     </div>
   );
@@ -113,8 +113,8 @@ export function ContactSection() {
   });
   const err = (key: "name" | "email" | "topic" | "message") =>
     errors[key] ? (
-      <p id={`${uid}-${key}-err`} className="text-[11px] text-white flex items-center gap-1.5">
-        <AlertCircle className="size-3.5 shrink-0 text-white" aria-hidden="true" />
+      <p id={`${uid}-${key}-err`} className="text-[11px] text-rose-300 flex items-center gap-1.5">
+        <AlertCircle className="size-3.5 shrink-0 text-rose-400" aria-hidden="true" />
         <span>{errors[key]}</span>
       </p>
     ) : null;
@@ -127,7 +127,7 @@ export function ContactSection() {
       <div className="max-w-7xl mx-auto space-y-10">
         <div className="space-y-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-300">
-            <Mail className="size-3.5 text-white" aria-hidden="true" />
+            <Mail className="size-3.5 text-sky-400" aria-hidden="true" />
             <span>DIRECT FOUNDER ACCESS</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
@@ -150,7 +150,7 @@ export function ContactSection() {
                 <CopyRow label="Security & disclosures" email={SECURITY_EMAIL} />
                 <div className="p-3 rounded bg-[#080808] border border-white/20 space-y-1">
                   <div className="flex items-center gap-2 text-white font-semibold">
-                    <span className="size-2 rounded-full bg-white shrink-0" aria-hidden="true" />
+                    <span className="size-2 rounded-full bg-emerald-400 shrink-0" aria-hidden="true" />
                     <span>Target response: within 4 hours</span>
                   </div>
                   <p className="text-[11px] text-zinc-400 leading-relaxed">
@@ -190,7 +190,7 @@ export function ContactSection() {
           <div className="lg:col-span-7 border border-white/25 bg-[#0A0A0A] rounded-lg p-6 sm:p-8 space-y-5 shadow-2xl">
             <div className="border-b border-white/15 pb-3 space-y-0.5">
               <h3 className="font-bold text-white text-base font-sans flex items-center gap-2">
-                <MessageSquare className="size-4 text-white" aria-hidden="true" />
+                <MessageSquare className="size-4 text-sky-400" aria-hidden="true" />
                 <span>Send a message</span>
               </h3>
               <p className="text-xs text-zinc-400">
@@ -201,16 +201,16 @@ export function ContactSection() {
             {status === "success" ? (
               <div
                 role="status"
-                className="p-6 rounded-lg bg-[#080808] border border-white/35 space-y-4 text-left"
+                className="p-6 rounded-lg bg-[#080808] border border-emerald-500/35 space-y-4 text-left"
               >
                 <div className="flex items-center gap-3">
-                  <div className="size-10 rounded-full bg-white/10 border border-white/40 grid place-items-center text-white shrink-0">
+                  <div className="size-10 rounded-full bg-emerald-500/15 border border-emerald-500/40 grid place-items-center text-emerald-400 shrink-0">
                     <CheckCircle2 className="size-5" aria-hidden="true" />
                   </div>
                   <div>
                     <h4 className="text-white font-bold text-sm">Message received</h4>
                     <p className="text-xs text-zinc-400 font-mono">
-                      Ticket: <span className="text-white font-bold">{ticketId}</span>
+                      Ticket: <span className="text-emerald-400 font-bold">{ticketId}</span>
                     </p>
                   </div>
                 </div>
@@ -325,11 +325,11 @@ export function ContactSection() {
 
                 <div aria-live="polite">
                   {status === "error" && formError && (
-                    <div className="p-3 rounded bg-white/[0.06] border border-white/40 text-white text-[11px] flex items-start gap-2">
-                      <AlertCircle className="size-4 shrink-0 mt-px text-white" aria-hidden="true" />
+                    <div className="p-3 rounded bg-rose-500/10 border border-rose-500/35 text-rose-200 text-[11px] flex items-start gap-2">
+                      <AlertCircle className="size-4 shrink-0 mt-px text-rose-400" aria-hidden="true" />
                       <div className="space-y-1">
                         <p>{formError}</p>
-                        <a href={mailto} className="underline hover:text-zinc-300">
+                        <a href={mailto} className="underline hover:text-white">
                           Email us instead
                         </a>
                       </div>
