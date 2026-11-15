@@ -109,6 +109,7 @@ export function SparrowxShieldEngine({
   // Auth dialog state
   const [socModalOpen, setSocModalOpen] = useState(false);
   const [socAuthMode, setSocAuthMode] = useState<"signin" | "register">("signin");
+  const [selectedPlanForAuth, setSelectedPlanForAuth] = useState<string | null>(null);
   const [socFullName, setSocFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
@@ -199,8 +200,9 @@ export function SparrowxShieldEngine({
     }
   };
 
-  const openAuthModal = (mode: "signin" | "register" = "signin") => {
+  const openAuthModal = (mode: "signin" | "register" = "signin", planLabel?: string) => {
     setSocAuthMode(mode);
+    setSelectedPlanForAuth(planLabel ?? null);
     setAuthError("");
     setSocModalOpen(true);
   };
@@ -282,6 +284,13 @@ export function SparrowxShieldEngine({
               </DialogDescription>
             </div>
           </DialogHeader>
+
+          {selectedPlanForAuth && (
+            <div className="mx-6 mb-3 flex items-center justify-between rounded-xl border border-[#F9103A]/35 bg-[#F9103A]/10 px-3.5 py-2 text-xs">
+              <span className="text-[#F4F6FA]/75">Selected Plan</span>
+              <span className="font-mono font-semibold text-[#FFEBB9]">{selectedPlanForAuth}</span>
+            </div>
+          )}
 
           <div
             role="tablist"

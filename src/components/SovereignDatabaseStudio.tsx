@@ -20,6 +20,8 @@ import {
   SiAstro,
   SiNextdotjs,
   SiNuxt,
+  SiPostgresql,
+  SiPython,
   SiReact,
   SiRedwoodjs,
   SiSolid,
@@ -538,7 +540,25 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     icon: SiRedwoodjs,
     accent: "text-red-400 border-red-500/30 bg-red-500/10",
     snippet: (restBase, anonKey) =>
-      `// api/src/lib/db.ts\nimport { PrismaClient } from '@prisma/client'\n// Connect via PgBouncer Port 6543 or PostgREST ${restBase}\n// apikey=${anonKey}\nexport const db = new PrismaClient()`,
+      `// api/src/lib/db.ts\nimport { PrismaClient } from '@prisma/client'\n// Direct PostgreSQL 16 (PgBouncer Port 6543):\n// DATABASE_URL="postgresql://spx_u_<user>:<password>@db.sparrowx.net:6543/spx_db_<user>?sslmode=require"\n// Or PostgREST: ${restBase} (apikey=${anonKey})\nexport const db = new PrismaClient()`,
+  },
+  {
+    id: "prisma",
+    label: "Prisma / Drizzle",
+    badge: "ORM",
+    icon: SiPostgresql,
+    accent: "text-[#A3E635] border-[#A3E635]/30 bg-[#A3E635]/10",
+    snippet: () =>
+      `# .env (Direct PostgreSQL 16 + PgBouncer Port 6543)\nDATABASE_URL="postgresql://spx_u_<user>:<password>@db.sparrowx.net:6543/spx_db_<user>?sslmode=require"\n\n// Drizzle ORM:\nimport { drizzle } from 'drizzle-orm/node-postgres'\nexport const db = drizzle(process.env.DATABASE_URL!)`,
+  },
+  {
+    id: "python",
+    label: "Python (psycopg)",
+    badge: "Py",
+    icon: SiPython,
+    accent: "text-amber-300 border-amber-400/30 bg-amber-500/10",
+    snippet: () =>
+      `# pip install "psycopg[binary]"\nimport os, psycopg\n\nconn = psycopg.connect(\n    "postgresql://spx_u_<user>:<password>@db.sparrowx.net:6543/spx_db_<user>?sslmode=require"\n)\nprint(conn.execute("SELECT version();").fetchone())`,
   },
 ];
 
@@ -572,6 +592,7 @@ const PRICING_PLANS: PricingTier[] = [
       { title: "5 GB zero-tax egress" },
       { title: "5 GB cached egress" },
       { title: "Built-in Auth, pgvector & Studio" },
+      { title: "99.5% Best-Effort Uptime" },
     ],
   },
   {
@@ -591,7 +612,7 @@ const PRICING_PLANS: PricingTier[] = [
       { title: "250 GB zero-tax egress", detail: "Unlimited cached reads" },
       { title: "Daily automated backups (14-day retention)" },
       { title: "Dedicated PgBouncer Port 6543 pooler" },
-      { title: "Email & direct founder support" },
+      { title: "99.9% Uptime SLA & founder support" },
     ],
   },
   {
@@ -608,7 +629,7 @@ const PRICING_PLANS: PricingTier[] = [
       { title: "Project-scoped and read-only role access" },
       { title: "Point-in-time recovery (PITR)" },
       { title: "SSO & custom SAML providers" },
-      { title: "Priority engineering support & SLAs" },
+      { title: "99.95% Uptime SLA & priority engineering support" },
     ],
   },
   {
@@ -2246,7 +2267,7 @@ export function SovereignDatabaseStudio({
                   {sessionUser ? "Open Database Studio →" : "Start your project"}
                 </button>
                 <a
-                  href="#db-docs"
+                  href="/docs/errors"
                   className="px-4 py-2 rounded-md border border-[#2E2E2E] bg-[#1A1A1D] hover:bg-[#232327] text-zinc-200 font-medium text-xs transition-colors"
                 >
                   Read Documentation

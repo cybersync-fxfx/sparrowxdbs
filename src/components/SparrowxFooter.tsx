@@ -50,7 +50,7 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
   {
     label: "PostgREST API",
     sublabel: "api.sparrowx.net",
-    href: "/db",
+    href: "/gateway",
     serviceKey: "api",
   },
   {
@@ -195,7 +195,7 @@ export function SparrowxFooter({
                   </a>
                 </li>
                 <li className="min-w-0">
-                  <a href="/errors" className={LINK_CLASSES}>
+                  <a href="/docs/errors" className={LINK_CLASSES}>
                     Error Reference
                   </a>
                 </li>
@@ -259,6 +259,18 @@ export function SparrowxFooter({
             developers, startups, and privacy-conscious builders.
           </p>
           <div className="flex flex-wrap items-center gap-6 min-w-0">
+            <a
+              href="/story"
+              className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
+            >
+              Privacy Policy
+            </a>
+            <a
+              href="/story"
+              className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
+            >
+              Terms of Service
+            </a>
             <a
               href="https://sparrowx.net"
               className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"

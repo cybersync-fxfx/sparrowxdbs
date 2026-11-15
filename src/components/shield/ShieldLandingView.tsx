@@ -32,7 +32,7 @@ export const GAMESEC_URL = "/game";
 
 export interface ShieldLandingViewProps {
   activeUser: AppUser | null;
-  onOpenAuthModal: (mode?: "signin" | "register") => void;
+  onOpenAuthModal: (mode?: "signin" | "register", planLabel?: string) => void;
   onEnterClientArea: () => void;
   onEnterDashboard: () => void;
   onSignOut: () => void;
@@ -461,6 +461,48 @@ export function ShieldLandingView({
           </div>
         </section>
 
+        {/* 3-Step DNS / CNAME WAF Onboarding Preview */}
+        <section className="max-w-[1380px] mx-auto px-4 sm:px-6 pt-12 pb-2">
+          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0B0E16] p-6 sm:p-8 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#F96246]">
+                  60-Second Edge Onboarding
+                </p>
+                <h2 className="text-xl sm:text-2xl font-semibold text-[#F4F6FA] tracking-tight mt-1">
+                  How DNS / CNAME Origin Cloaking Works
+                </h2>
+              </div>
+              <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/10 px-3 py-1 font-mono text-[11px] text-[#10B981]">
+                Zero Code Changes Required
+              </span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3 text-xs">
+              <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-4 space-y-1.5">
+                <span className="font-mono text-[10px] text-[#F9103A]">STEP 01 · REGISTER ASSET</span>
+                <p className="font-semibold text-[#F4F6FA]">Add Domain in Client Area</p>
+                <p className="text-[#F4F6FA]/55 leading-relaxed">
+                  Enter your domain or API hostname to generate a scoped SparrowX Shield Edge token.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-4 space-y-1.5">
+                <span className="font-mono text-[10px] text-[#F96246]">STEP 02 · POINT CNAME</span>
+                <p className="font-semibold text-[#F4F6FA]">CNAME → edge.sparrowx.net</p>
+                <p className="text-[#F4F6FA]/55 leading-relaxed">
+                  Update your DNS CNAME record to route public traffic through SparrowX Anycast WAF.
+                </p>
+              </div>
+              <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-4 space-y-1.5">
+                <span className="font-mono text-[10px] text-[#10B981]">STEP 03 · VERIFY &amp; ENFORCE</span>
+                <p className="font-semibold text-[#F4F6FA]">Auto-TLS + L7 Shield Active</p>
+                <p className="text-[#F4F6FA]/55 leading-relaxed">
+                  Origin IP is masked, HSTS/CSP headers are enforced, and live telemetry streams to your SOC.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Plans Section */}
         <section id="shield-agent-plans" className="max-w-[1380px] mx-auto px-4 sm:px-6 py-14 sm:py-18 space-y-6">
           <div className="flex flex-wrap items-end justify-between gap-4">
@@ -554,7 +596,11 @@ export function ShieldLandingView({
 
                   <button
                     type="button"
-                    onClick={() => (activeUser ? onEnterClientArea() : onOpenAuthModal("register"))}
+                    onClick={() =>
+                      activeUser
+                        ? onEnterClientArea()
+                        : onOpenAuthModal("register", `${plan.name} · ${formatPlanPrice(plan)}/mo`)
+                    }
                     className={`w-full rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
                       popular
                         ? "bg-[#F9103A] text-white hover:bg-[#F9103A]/90 shadow-[0_6px_20px_rgba(249,16,58,0.28)]"
