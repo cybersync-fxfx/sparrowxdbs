@@ -318,7 +318,10 @@ heal_pterodactyl_host_nginx() {
   fi
   local ptero_dir="/var/www/pterodactyl"
   local ptero_p="${PTERO_PORT:-8090}"
-  local ptero_dom="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+  local ptero_dom="${DOMAIN_GAME:-game.panel.${SPARROWX_DOMAIN}}"
+  if [ "${ptero_dom}" = "game.${SPARROWX_DOMAIN}" ]; then
+    ptero_dom="game.panel.${SPARROWX_DOMAIN}"
+  fi
   local php_sock="" php_bin=""
   php_bin="$(command -v php8.4 || command -v php8.3 || command -v php8.2 || command -v php8.1 || command -v php || true)"
 
@@ -344,6 +347,16 @@ heal_pterodactyl_host_nginx() {
   elif command -v mysql >/dev/null 2>&1; then
     db_cli="mysql"
   fi
+  for mdb_cnf in /etc/mysql/mariadb.conf.d/50-server.cnf /etc/mysql/mysql.conf.d/mysqld.cnf; do
+    if [ -f "${mdb_cnf}" ] && grep -qE '^\s*bind-address\s*=\s*127\.0\.0\.1' "${mdb_cnf}"; then
+      sed -i -E 's/^\s*bind-address\s*=\s*127\.0\.0\.1/bind-address = 0.0.0.0/' "${mdb_cnf}"
+      systemctl restart mariadb >/dev/null 2>&1 || systemctl restart mysql >/dev/null 2>&1 || true
+    fi
+  done
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow 3306/tcp >/dev/null 2>&1 || true
+  fi
+
   local db_name="${PTERO_DB_NAME:-panel}"
   local db_user="${PTERO_DB_USER:-pterodactyl}"
   local db_pass="${PTERO_DB_PASSWORD:-}"
@@ -354,8 +367,11 @@ heal_pterodactyl_host_nginx() {
       ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
       CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
       ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
-      GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1' WITH GRANT OPTION;
-      GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost' WITH GRANT OPTION;
+      CREATE USER IF NOT EXISTS '${db_user}'@'%' IDENTIFIED BY '${db_pass}';
+      ALTER USER '${db_user}'@'%' IDENTIFIED BY '${db_pass}';
+      GRANT ALL PRIVILEGES ON *.* TO '${db_user}'@'127.0.0.1' WITH GRANT OPTION;
+      GRANT ALL PRIVILEGES ON *.* TO '${db_user}'@'localhost' WITH GRANT OPTION;
+      GRANT ALL PRIVILEGES ON *.* TO '${db_user}'@'%' WITH GRANT OPTION;
       FLUSH PRIVILEGES;
     " >/dev/null 2>&1 || true
   fi
@@ -406,6 +422,39 @@ heal_pterodactyl_host_nginx() {
       (cd "${ptero_dir}" && "${php_bin}" artisan key:generate --force --no-interaction >/dev/null 2>&1 || true)
     fi
     (cd "${ptero_dir}" && "${php_bin}" artisan migrate --seed --force --no-interaction >/dev/null 2>&1 || true)
+    if [ -n "${db_pass}" ]; then
+      SPX_DBH_HOST="${ptero_dom}" SPX_DBH_USER="${db_user}" SPX_DBH_PASS="${db_pass}" "${php_bin}" -r '
+        require "/var/www/pterodactyl/vendor/autoload.php";
+        $app = require "/var/www/pterodactyl/bootstrap/app.php";
+        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        $host = getenv("SPX_DBH_HOST");
+        $user = getenv("SPX_DBH_USER");
+        $pass = getenv("SPX_DBH_PASS");
+        $nodeId = Illuminate\Support\Facades\DB::table("nodes")->orderBy("id")->value("id");
+        $enc = Illuminate\Support\Facades\Crypt::encryptString($pass);
+        $existing = Illuminate\Support\Facades\DB::table("database_hosts")->whereIn("host", [$host, "127.0.0.1"])->first();
+        if (!$existing) {
+          Illuminate\Support\Facades\DB::table("database_hosts")->insert([
+            "name" => "SparrowX MariaDB",
+            "host" => $host,
+            "port" => 3306,
+            "username" => $user,
+            "password" => $enc,
+            "max_databases" => null,
+            "node_id" => $nodeId,
+            "created_at" => date("Y-m-d H:i:s"),
+            "updated_at" => date("Y-m-d H:i:s"),
+          ]);
+        } else {
+          Illuminate\Support\Facades\DB::table("database_hosts")->where("id", $existing->id)->update([
+            "username" => $user,
+            "password" => $enc,
+            "node_id" => $existing->node_id ?: $nodeId,
+            "updated_at" => date("Y-m-d H:i:s"),
+          ]);
+        }
+      ' >/dev/null 2>&1 || true
+    fi
 
     if [ -n "${db_cli}" ] && [ -n "${PTERO_ADMIN_PASSWORD:-}" ]; then
       local has_root_user="0"
@@ -552,20 +601,82 @@ PTEROEOF
   log_warn "Aligned host Pterodactyl Nginx onto internal port ${ptero_p} (preserving :80/:443 for SparrowX Edge)"
 }
 
-ensure_game_letsencrypt_ssl() {
-  local game_domain="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+issue_le_cert_to_ovh_ssl() {
+  local target_domain="$1"
+  local cert_prefix="$2"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
-  local live_dir="/etc/letsencrypt/live/${game_domain}"
+  local live_dir="/etc/letsencrypt/live/${target_domain}"
   local ssl_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${SPARROWX_DOMAIN}}}"
 
-  if [ -z "${game_domain}" ] || [[ "${game_domain}" == *.local ]] || [ "${game_domain}" = "localhost" ]; then
+  if [ -z "${target_domain}" ] || [[ "${target_domain}" == *.local ]] || [ "${target_domain}" = "localhost" ]; then
     return 0
   fi
 
   if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
     ssl_email="admin@${SPARROWX_DOMAIN}"
   fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+    log_info "Requesting Let's Encrypt SSL for ${target_domain} via HTTP-01 port 80..."
+    if certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos \
+      -m "${ssl_email}" \
+      --cert-name "${target_domain}" \
+      -d "${target_domain}" >/dev/null 2>&1; then
+      log_ok "Issued Let's Encrypt SSL for ${target_domain} via port 80 webroot"
+    else
+      log_warn "Webroot challenge deferred; retrying ${target_domain} via standalone port 80 listener..."
+      docker stop sparrowx-nginx >/dev/null 2>&1 || true
+      systemctl stop nginx >/dev/null 2>&1 || true
+      if command -v fuser >/dev/null 2>&1; then
+        fuser -k 80/tcp >/dev/null 2>&1 || true
+      fi
+      sleep 1
+
+      if certbot certonly \
+        --standalone --preferred-challenges http \
+        --non-interactive --agree-tos \
+        -m "${ssl_email}" \
+        --cert-name "${target_domain}" \
+        -d "${target_domain}" >/dev/null 2>&1; then
+        log_ok "Issued Let's Encrypt SSL for ${target_domain} via standalone port 80 challenge"
+      else
+        log_warn "Let's Encrypt HTTP-01 challenge failed for ${target_domain} (verify DNS A record & external port 80)"
+      fi
+
+      if is_pterodactyl_installed; then
+        systemctl start nginx >/dev/null 2>&1 || true
+      fi
+      docker start sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
+    fi
+  else
+    certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos --keep-until-expiring \
+      -m "${ssl_email}" \
+      --cert-name "${target_domain}" \
+      -d "${target_domain}" >/dev/null 2>&1 || true
+  fi
+
+  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/${cert_prefix}-fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/${cert_prefix}-privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/${cert_prefix}-fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/${cert_prefix}-privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${target_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${target_domain}.key" 2>/dev/null || true
+    log_ok "Live Let's Encrypt SSL wired for https://${target_domain}"
+  fi
+}
+
+ensure_game_letsencrypt_ssl() {
+  local game_panel_domain="${DOMAIN_GAME:-game.panel.${SPARROWX_DOMAIN}}"
+  local game_web_domain="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
+  local game_dash_domain="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
 
   mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
 
@@ -580,22 +691,73 @@ ensure_game_letsencrypt_ssl() {
   fi
 
   if ! command -v certbot >/dev/null 2>&1; then
-    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for ${game_domain}"
+    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for game domains"
     return 0
   fi
 
-  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
-    log_info "Requesting Let's Encrypt SSL for ${game_domain} via HTTP-01 port 80..."
+  if is_pterodactyl_installed; then
+    issue_le_cert_to_ovh_ssl "${game_panel_domain}" "ptero"
+  fi
+  issue_le_cert_to_ovh_ssl "${game_web_domain}" "game-web"
+  issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
+}
 
+ensure_core_letsencrypt_ssl() {
+  local root_domain="${SPARROWX_DOMAIN:-}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
+  local live_dir="/etc/letsencrypt/live/${root_domain}"
+  local ssl_email="${SPARROWX_ADMIN_EMAIL:-${PTERO_ADMIN_EMAIL:-admin@${root_domain}}}"
+
+  if [ -z "${root_domain}" ] || [[ "${root_domain}" == *.local ]] || [ "${root_domain}" = "localhost" ]; then
+    return 0
+  fi
+
+  if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
+    ssl_email="admin@${root_domain}"
+  fi
+
+  mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local -a candidate_domains=(
+    "${root_domain}"
+    "db.${root_domain}"
+    "sec.${root_domain}"
+    "file.${root_domain}"
+    "password.${root_domain}"
+    "api.${root_domain}"
+  )
+  if getent ahosts "www.${root_domain}" >/dev/null 2>&1; then
+    candidate_domains+=("www.${root_domain}")
+  fi
+
+  local -a domain_args=()
+  local d
+  for d in "${candidate_domains[@]}"; do
+    if ! command -v getent >/dev/null 2>&1 || getent ahosts "${d}" >/dev/null 2>&1; then
+      domain_args+=("-d" "${d}")
+    fi
+  done
+
+  if [ "${#domain_args[@]}" -eq 0 ]; then
+    domain_args=("-d" "${root_domain}")
+  fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+    log_info "Requesting Let's Encrypt SAN SSL for ${root_domain} & core subdomains via HTTP-01..."
     if certbot certonly \
       --webroot -w "${webroot}" \
-      --non-interactive --agree-tos \
+      --non-interactive --agree-tos --expand \
       -m "${ssl_email}" \
-      --cert-name "${game_domain}" \
-      -d "${game_domain}" >/dev/null 2>&1; then
-      log_ok "Issued Let's Encrypt SSL for ${game_domain} via port 80 webroot"
+      --cert-name "${root_domain}" \
+      "${domain_args[@]}" >/dev/null 2>&1; then
+      log_ok "Issued Let's Encrypt SAN SSL for ${root_domain} via port 80 webroot"
     else
-      log_warn "Webroot challenge deferred; retrying ${game_domain} via standalone port 80 listener..."
+      log_warn "Webroot challenge deferred; retrying ${root_domain} via standalone port 80 listener..."
       docker stop sparrowx-nginx >/dev/null 2>&1 || true
       systemctl stop nginx >/dev/null 2>&1 || true
       if command -v fuser >/dev/null 2>&1; then
@@ -605,13 +767,18 @@ ensure_game_letsencrypt_ssl() {
 
       if certbot certonly \
         --standalone --preferred-challenges http \
-        --non-interactive --agree-tos \
+        --non-interactive --agree-tos --expand \
         -m "${ssl_email}" \
-        --cert-name "${game_domain}" \
-        -d "${game_domain}" >/dev/null 2>&1; then
-        log_ok "Issued Let's Encrypt SSL for ${game_domain} via standalone port 80 challenge"
+        --cert-name "${root_domain}" \
+        "${domain_args[@]}" >/dev/null 2>&1; then
+        log_ok "Issued Let's Encrypt SAN SSL for ${root_domain} via standalone port 80 challenge"
       else
-        log_warn "Let's Encrypt HTTP-01 challenge failed for ${game_domain} (verify DNS A record & external port 80)"
+        certbot certonly \
+          --standalone --preferred-challenges http \
+          --non-interactive --agree-tos \
+          -m "${ssl_email}" \
+          --cert-name "${root_domain}" \
+          -d "${root_domain}" >/dev/null 2>&1 || true
       fi
 
       if is_pterodactyl_installed; then
@@ -624,32 +791,18 @@ ensure_game_letsencrypt_ssl() {
       --webroot -w "${webroot}" \
       --non-interactive --agree-tos --keep-until-expiring \
       -m "${ssl_email}" \
-      --cert-name "${game_domain}" \
-      -d "${game_domain}" >/dev/null 2>&1 || true
+      --cert-name "${root_domain}" \
+      "${domain_args[@]}" >/dev/null 2>&1 || true
   fi
 
   if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
-    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
-    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
-    chmod 644 "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
-    chmod 600 "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
-    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${game_domain}.pem" 2>/dev/null || true
-    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
-
-    if [ -f "${INSTALL_DIR}/ovh/nginx.conf" ] && grep -q "${game_domain}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
-      local tmp_nginx=""
-      tmp_nginx="$(mktemp)"
-      awk '
-        /# 4\. Pterodactyl Game Panel/ { in_ptero=1 }
-        in_ptero && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/ptero-fullchain.pem;") }
-        in_ptero && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/ptero-privkey.pem;") }
-        in_ptero && /^}/ { in_ptero=0 }
-        { print }
-      ' "${INSTALL_DIR}/ovh/nginx.conf" > "${tmp_nginx}" && cat "${tmp_nginx}" > "${INSTALL_DIR}/ovh/nginx.conf"
-      rm -f "${tmp_nginx}"
-      docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
-    fi
-    log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${root_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${root_domain}.key" 2>/dev/null || true
+    log_ok "Live Let's Encrypt SAN SSL wired for https://${root_domain} (+ db/sec/file/password/api)"
   fi
 }
 
@@ -752,6 +905,8 @@ HTTPS_PORT="${HTTPS_PORT:-443}"
 APP_HOST_PORT="${APP_HOST_PORT:-3000}"
 PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
+DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
+DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
 if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${SPARROWX_DOMAIN}" ]; then
   DOMAIN_GAME="game.panel.${SPARROWX_DOMAIN}"
 fi
@@ -795,6 +950,8 @@ ensure_env_key "DOMAIN_ROOT" "${SPARROWX_DOMAIN}"
 ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
 ensure_env_key "DOMAIN_STUDIO" "${SPARROWX_STUDIO_DOMAIN}"
 ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
+ensure_env_key "DOMAIN_GAME_WEB" "${DOMAIN_GAME_WEB}"
+ensure_env_key "DOMAIN_GAME_DASH" "${DOMAIN_GAME_DASH}"
 ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
 ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
 ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
@@ -815,7 +972,7 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${PTERO_DB_NAME}" ] && ensure_env_key "PTERO_DB_NAME" "${PTERO_DB_NAME}"
 [ -n "${PTERO_DB_USER}" ] && ensure_env_key "PTERO_DB_USER" "${PTERO_DB_USER}"
 [ -n "${PTERO_DB_PASSWORD}" ] && ensure_env_key "PTERO_DB_PASSWORD" "${PTERO_DB_PASSWORD}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
