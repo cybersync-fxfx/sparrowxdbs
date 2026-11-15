@@ -1,7 +1,7 @@
-import fivemImg from "@/assets/hero-fivem.jpg.asset.json";
-import sampImg from "@/assets/hero-samp.jpg.asset.json";
-import minecraftImg from "@/assets/hero-minecraft.avif.asset.json";
-import discordImg from "@/assets/hero-discord.webp.asset.json";
+import fivemImg from "@/assets/hero-fivem.jpg";
+import sampImg from "@/assets/hero-samp.jpg";
+import minecraftImg from "@/assets/hero-minecraft.jpg";
+import discordImg from "@/assets/hero-discord.jpg";
 
 export const SERVICE_IDS = ["fivem", "samp", "minecraft", "discord"] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
