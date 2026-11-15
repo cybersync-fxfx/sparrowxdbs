@@ -938,6 +938,11 @@ export function SovereignDatabaseStudio({
   const [landingRegisterName, setLandingRegisterName] = useState<string>("");
   const [landingRegisterEmail, setLandingRegisterEmail] = useState<string>("");
   const [landingRegisterPassword, setLandingRegisterPassword] = useState<string>("");
+  const [landingRegisterRegion, setLandingRegisterRegion] = useState<"apac-sgp" | "eu-fra">("apac-sgp");
+  const [landingSqlCustomResult, setLandingSqlCustomResult] = useState<{
+    columns: string[];
+    rows: Record<string, string>[];
+  } | null>(null);
   const [landingMobileMenuOpen, setLandingMobileMenuOpen] = useState<boolean>(false);
 
   // New Supabase-style Landing interactive states
@@ -2266,10 +2271,12 @@ export function SovereignDatabaseStudio({
               id="db-auth-card"
               className="lg:col-span-5 border border-[#2E2E2E] bg-[#0A0D14] rounded-xl p-5 space-y-4 shadow-xl scroll-mt-20"
             >
-              <div className="flex items-center justify-between border-b border-[#262626] pb-3">
-                <div className="flex items-center gap-1.5">
+              <div className="relative z-10 flex items-center justify-between border-b border-[#262626] pb-3">
+                <div role="tablist" aria-label="Workspace authentication mode" className="flex items-center gap-1.5">
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={landingAuthMode === "signin"}
                     onClick={() => {
                       setLandingAuthMode("signin");
                       setLandingAuthError("");
@@ -2284,6 +2291,8 @@ export function SovereignDatabaseStudio({
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={landingAuthMode === "register"}
                     onClick={() => {
                       setLandingAuthMode("register");
                       setLandingAuthError("");
@@ -2297,6 +2306,9 @@ export function SovereignDatabaseStudio({
                     Create Account
                   </button>
                 </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#A3E635]/10 border border-[#A3E635]/30 text-[#A3E635]">
+                  {selectedPricingPlan}
+                </span>
               </div>
 
               {landingAuthError && (
@@ -2520,12 +2532,25 @@ export function SovereignDatabaseStudio({
                   </div>
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
-                      Master Password (6+ chars)
+                      Cluster Region
+                    </label>
+                    <select
+                      value={landingRegisterRegion}
+                      onChange={(e) => setLandingRegisterRegion(e.target.value as "apac-sgp" | "eu-fra")}
+                      className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white text-xs focus:outline-none focus:border-[#A3E635]"
+                    >
+                      <option value="apac-sgp">APAC — Singapore / Chennai (ap-south-1)</option>
+                      <option value="eu-fra">EU — Frankfurt (eu-central-1)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
+                      Master Password (12+ chars)
                     </label>
                     <input
                       type="password"
                       required
-                      minLength={6}
+                      minLength={12}
                       value={landingRegisterPassword}
                       onChange={(e) => setLandingRegisterPassword(e.target.value)}
                       placeholder="••••••••••••"
@@ -2832,9 +2857,10 @@ export function SovereignDatabaseStudio({
                     </p>
                   </div>
                 ) : (
-                  <pre className="p-3 rounded-md bg-[#07090E] border border-[#262626] font-mono text-[11px] text-[#A3E635] overflow-x-auto">
-{`# Connect CLI & verify sovereign PostgreSQL 16 cluster
-psql "postgresql://postgres:[PASSWORD]@db.sparrowx.net:6543/sparrowbase?sslmode=require"
+                  <pre className="p-3 rounded-md bg-[#07090E] border border-[#262626] font-mono text-[11px] text-[#A3E635] overflow-x-auto leading-relaxed">
+{`# Direct PostgreSQL 16 + PgBouncer (Port 6543) for psql, Prisma, Drizzle, psycopg
+DATABASE_URL="postgresql://spx_u_<user>:<password>@db.sparrowx.net:6543/spx_db_<user>?sslmode=require"
+psql "$DATABASE_URL" -c "SELECT version();"
 curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY"`}
                   </pre>
                 )}
@@ -3067,7 +3093,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               <div className="p-6 bg-[#07090E] space-y-4 font-mono text-xs">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400 text-[11px] uppercase">SQL Query Scratchpad</span>
+                    <span className="text-zinc-400 text-[11px] uppercase">SQL Query Scratchpad · Sample Output Preview</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -3075,7 +3101,30 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         setTimeout(() => {
                           setLandingRunning(false);
                           setLandingLatency((0.6 + Math.random() * 0.4).toFixed(1) + "ms");
-                        }, 200);
+                          const q = landingSqlQuery.trim().replace(/;+$/, "");
+                          const mathMatch = q.match(/^SELECT\s+(\d+)\s*([+\-*/])\s*(\d+)(?:\s+AS\s+([a-zA-Z_][a-zA-Z0-9_]*))?$/i);
+                          if (mathMatch) {
+                            const a = Number(mathMatch[1]);
+                            const op = mathMatch[2];
+                            const b = Number(mathMatch[3]);
+                            const alias = mathMatch[4] || "?column?";
+                            const val =
+                              op === "+" ? a + b : op === "-" ? a - b : op === "*" ? a * b : b !== 0 ? a / b : "NaN";
+                            setLandingSqlCustomResult({ columns: [alias], rows: [{ [alias]: String(val) }] });
+                          } else if (/^SELECT\s+NOW\(\)/i.test(q)) {
+                            setLandingSqlCustomResult({
+                              columns: ["now"],
+                              rows: [{ now: new Date().toISOString() }],
+                            });
+                          } else if (/^SELECT\s+VERSION\(\)/i.test(q)) {
+                            setLandingSqlCustomResult({
+                              columns: ["version"],
+                              rows: [{ version: "PostgreSQL 16.4 (SparrowX Sovereign Cluster) + pgvector 0.7.0" }],
+                            });
+                          } else {
+                            setLandingSqlCustomResult(null);
+                          }
+                        }, 180);
                       }}
                       className="px-3 py-1 rounded bg-[#A3E635] text-[#11181C] font-semibold text-xs hover:bg-[#84CC16] transition-colors cursor-pointer flex items-center gap-1.5"
                     >
@@ -3093,28 +3142,51 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
                 <div className="border border-[#262626] rounded overflow-hidden">
                   <div className="bg-[#18181B] px-3 py-1.5 border-b border-[#262626] flex justify-between text-[10px] text-zinc-500">
-                    <span>QUERY RESULTS (2 ROWS)</span>
+                    <span>
+                      {landingSqlCustomResult
+                        ? `QUERY RESULTS (${landingSqlCustomResult.rows.length} ROW)`
+                        : "SAMPLE OUTPUT PREVIEW (2 ROWS)"}
+                    </span>
                     <span className="text-[#A3E635]">EXEC TIME: {landingLatency}</span>
                   </div>
                   <div className="p-3 bg-[#07090E] overflow-x-auto text-[11px] text-zinc-400">
-                    <div className="grid grid-cols-4 gap-2 text-white font-semibold border-b border-[#242428] pb-1.5 mb-1.5">
-                      <span>id</span>
-                      <span>email</span>
-                      <span>full_name</span>
-                      <span>role</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 py-1">
-                      <span className="truncate">usr_018f_492a</span>
-                      <span className="truncate">founder@startup.io</span>
-                      <span className="truncate">Sarah Chen</span>
-                      <span className="text-[#A3E635]">admin</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 py-1">
-                      <span className="truncate">usr_019c_88b1</span>
-                      <span className="truncate">cto@fintech.co</span>
-                      <span className="truncate">David Kumar</span>
-                      <span className="text-[#A3E635]">operator</span>
-                    </div>
+                    {landingSqlCustomResult ? (
+                      <div>
+                        <div className="grid gap-2 text-white font-semibold border-b border-[#242428] pb-1.5 mb-1.5" style={{ gridTemplateColumns: `repeat(${landingSqlCustomResult.columns.length}, minmax(0, 1fr))` }}>
+                          {landingSqlCustomResult.columns.map((col) => (
+                            <span key={col}>{col}</span>
+                          ))}
+                        </div>
+                        {landingSqlCustomResult.rows.map((row, rIdx) => (
+                          <div key={rIdx} className="grid gap-2 py-1 text-[#A3E635]" style={{ gridTemplateColumns: `repeat(${landingSqlCustomResult.columns.length}, minmax(0, 1fr))` }}>
+                            {landingSqlCustomResult.columns.map((col) => (
+                              <span key={col} className="truncate">{row[col]}</span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-4 gap-2 text-white font-semibold border-b border-[#242428] pb-1.5 mb-1.5">
+                          <span>id</span>
+                          <span>email</span>
+                          <span>full_name</span>
+                          <span>role</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 py-1">
+                          <span className="truncate">usr_018f_492a</span>
+                          <span className="truncate">founder@startup.io</span>
+                          <span className="truncate">Sarah Chen</span>
+                          <span className="text-[#A3E635]">admin</span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 py-1">
+                          <span className="truncate">usr_019c_88b1</span>
+                          <span className="truncate">cto@fintech.co</span>
+                          <span className="truncate">David Kumar</span>
+                          <span className="text-[#A3E635]">operator</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

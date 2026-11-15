@@ -79,6 +79,10 @@ const SECURITY_HEADERS = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  "Content-Security-Policy":
+    "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; font-src 'self' data: https:; frame-ancestors 'self'; base-uri 'self'",
+  "X-SparrowX-WAF": "ACTIVE",
+  "X-SparrowX-Shield": "PROTECTED",
 };
 
 const MAX_BODY_BYTES = 25 * 1024 * 1024; // 25 MB hard cap against memory exhaustion
@@ -452,25 +456,45 @@ const server = createServer(async (req, res) => {
       }
     }
 
-    const isApiHost = host.startsWith("api.") || host.startsWith("api-");
+    const acceptsHtml = (req.headers.accept || "").includes("text/html");
+    const isApiHost = host.startsWith("api.") || host.startsWith("api-") || host.startsWith("rest.");
     const isRestPath = pathname.startsWith("/rest/v1");
+    const isDbHost =
+      host.startsWith("db.") ||
+      host.startsWith("studio.") ||
+      host.startsWith("supabase.") ||
+      host.startsWith("sparrowbase.");
+    const isShieldHost = host.startsWith("sec.") || host.startsWith("shield.");
+    const isDropHost = host.startsWith("file.") || host.startsWith("drop.") || host.startsWith("share.");
+    const isKeysHost =
+      host.startsWith("password.") ||
+      host.startsWith("passwd.") ||
+      host.startsWith("pass.") ||
+      host.startsWith("keys.");
     const isGameDashHost = host.startsWith("game.dash.") || host.startsWith("game-dash.");
     const isGameWebHost =
       !isGameDashHost &&
       !host.startsWith("game.panel.") &&
       (host.startsWith("game.") || host.startsWith("game-"));
 
-    if (isGameDashHost && pathname === "/") {
+    if ((req.method === "GET" || req.method === "HEAD") && pathname === "/") {
       const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
-      res.writeHead(302, { Location: `/game/dashboard${qs}`, ...SECURITY_HEADERS });
-      res.end();
-      return;
-    }
-    if (isGameWebHost && pathname === "/") {
-      const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
-      res.writeHead(302, { Location: `/game${qs}`, ...SECURITY_HEADERS });
-      res.end();
-      return;
+      let redirectDest = null;
+      if (isGameDashHost) redirectDest = `/game/dashboard${qs}`;
+      else if (isGameWebHost) redirectDest = `/game${qs}`;
+      else if (isDbHost) redirectDest = `/db${qs}`;
+      else if (isShieldHost) redirectDest = `/shield${qs}`;
+      else if (isDropHost) redirectDest = `/drop${qs}`;
+      else if (isKeysHost) redirectDest = `/keys${qs}`;
+      else if (isApiHost && acceptsHtml && !req.headers["apikey"] && !req.headers["authorization"]) {
+        redirectDest = `/gateway${qs}`;
+      }
+
+      if (redirectDest) {
+        res.writeHead(302, { Location: redirectDest, ...SECURITY_HEADERS });
+        res.end();
+        return;
+      }
     }
 
     // Unified SSR / TanStack Start renderer
@@ -531,12 +555,25 @@ const server = createServer(async (req, res) => {
     // =========================================================================
     // 2. PostgREST Proxy vs. Web UI Ingress for api.sparrowx.net
     // =========================================================================
-    const acceptsHtml = (req.headers.accept || "").includes("text/html");
-    const isBrowserNavigationToApiHome =
-      isApiHost && acceptsHtml && (pathname === "/" || pathname === "/docs");
+    const isBrowserNavigationToApiHtmlRoute =
+      isApiHost &&
+      acceptsHtml &&
+      (pathname === "/" ||
+        pathname === "/gateway" ||
+        pathname === "/docs" ||
+        pathname.startsWith("/docs/") ||
+        pathname === "/errors" ||
+        pathname === "/story" ||
+        pathname === "/db" ||
+        pathname === "/drop" ||
+        pathname === "/keys" ||
+        pathname === "/shield" ||
+        pathname === "/game" ||
+        pathname.startsWith("/game/") ||
+        pathname.startsWith("/f/"));
 
     // If it's a programmatic query to PostgREST (/rest/v1 or api domain queries)
-    if (!isHealthRoute && !isBrowserNavigationToApiHome && (isApiHost || isRestPath)) {
+    if (!isHealthRoute && !isBrowserNavigationToApiHtmlRoute && (isApiHost || isRestPath)) {
       const apiKey = String(
         req.headers["apikey"] ||
           String(req.headers["authorization"] || "").replace(/^Bearer\s+/i, "")

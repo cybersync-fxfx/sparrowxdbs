@@ -174,7 +174,7 @@ export function ShieldLandingView({
             className="pointer-events-none absolute -top-36 left-1/2 -translate-x-1/2 h-[460px] w-[780px] rounded-full bg-[radial-gradient(circle,rgba(249,16,58,0.16),rgba(249,98,70,0.06)_45%,transparent_72%)] blur-2xl"
           />
           <div className="max-w-[1380px] mx-auto px-4 sm:px-6 py-14 sm:py-20 grid gap-10 lg:grid-cols-[1.15fr_0.95fr] items-center relative">
-            <div className="space-y-6">
+            <div className="space-y-6 min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-[#F9103A]/35 bg-[#F9103A]/10 px-3.5 py-1 text-[11px] font-medium text-[#F96246]">
                 <span className="size-1.5 rounded-full bg-[#10B981]" />
                 <span>SPARROWX SHIELD · EDGE WAF &amp; AUTONOMOUS SOC</span>
@@ -249,7 +249,7 @@ export function ShieldLandingView({
             {/* Interactive Live Perimeter Audit Card */}
             <div
               id="shield-scanner"
-              className="rounded-2xl border border-[#F4F6FA]/[0.09] bg-[#0D1017]/95 p-5 sm:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.75)] space-y-4"
+              className="min-w-0 w-full max-w-full overflow-hidden rounded-2xl border border-[#F4F6FA]/[0.09] bg-[#0D1017]/95 p-5 sm:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.75)] space-y-4"
             >
               <div className="flex items-center justify-between gap-2">
                 <div>
