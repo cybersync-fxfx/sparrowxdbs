@@ -3712,7 +3712,7 @@ export function PortalLoginScreen({
         <div className="flex items-start justify-between gap-4 border-b border-[#1F1F1F] pb-5">
           <div className="flex items-center gap-3.5">
             <div className="size-11 rounded-xl overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)]">
-              <img src="/logos/sparrowx-main.jpg" alt="SparrowX" className="size-full object-cover scale-110" />
+              <img src="/logos/sparrowx-main.jpg" alt="SparrowX Autonomous Cybersecurity Operations Center" width={44} height={44} className="size-full object-cover scale-110" />
             </div>
             <div>
               <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
@@ -4721,7 +4721,7 @@ export function PortalLoginScreen({
             <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
               <div className="flex items-center gap-2.5">
                 <div className="size-6 rounded-md overflow-hidden border border-orange-500/25 bg-[#0A0808] shrink-0">
-                  <img src="/logos/sparrowx-main.jpg" alt="SparrowX" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-main.jpg" alt="SparrowX Cyber Defense Platform" width={24} height={24} className="size-full object-cover scale-110" />
                 </div>
                 <span className="font-semibold text-zinc-300">SparrowX Cyber Defense</span>
                 <span>

@@ -118,7 +118,10 @@ export function SparrowxFooter({
               <div className="size-8 rounded-lg overflow-hidden border border-orange-500/25 bg-[#0A0808] shrink-0">
                 <img
                   src="/logos/sparrowx-main.jpg"
-                  alt="SparrowX home"
+                  alt="SparrowX Autonomous Security and Sovereign Cloud Platform"
+                  width={32}
+                  height={32}
+                  loading="lazy"
                   className="size-full object-cover scale-110"
                 />
               </div>

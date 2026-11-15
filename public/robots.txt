@@ -1,7 +1,22 @@
 User-agent: Googlebot
 Allow: /
+Disallow: /api/public/auth/
+Disallow: /game/dashboard
+
+User-agent: Googlebot-Image
+Allow: /
+Allow: /logos/
+Allow: /assets/
 
 User-agent: Bingbot
+Allow: /
+Disallow: /api/public/auth/
+Disallow: /game/dashboard
+
+User-agent: Applebot
+Allow: /
+
+User-agent: DuckDuckBot
 Allow: /
 
 User-agent: Twitterbot
@@ -10,7 +25,12 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+User-agent: LinkedInBot
+Allow: /
+
 User-agent: *
 Allow: /
+Disallow: /api/public/auth/
+Disallow: /game/dashboard
 
 Sitemap: https://sparrowx.net/sitemap.xml

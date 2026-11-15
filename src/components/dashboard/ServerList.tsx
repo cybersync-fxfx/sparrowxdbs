@@ -50,7 +50,7 @@ function ServerCard({ s }: { s: ServerView }) {
     <div className="rounded-2xl border border-border bg-background/40 p-5">
       <div className="flex items-start gap-3">
         {svc ? (
-          <img src={svc.image} alt="" className="size-11 rounded-xl object-cover" />
+          <img src={svc.image} alt={`${svc.name} game server node`} width={44} height={44} className="size-11 rounded-xl object-cover" />
         ) : (
           <span className="grid size-11 place-items-center rounded-xl bg-muted"><ServerIcon className="size-5" /></span>
         )}

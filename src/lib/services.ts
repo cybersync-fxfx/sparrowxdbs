@@ -3,6 +3,14 @@ import sampImg from "@/assets/hero-samp.jpg";
 import minecraftImg from "@/assets/hero-minecraft.jpg";
 import discordImg from "@/assets/hero-discord.jpg";
 
+function resolveAssetUrl(asset: unknown): string {
+  if (typeof asset === "string") return asset;
+  if (asset && typeof asset === "object" && "url" in asset && typeof (asset as { url: unknown }).url === "string") {
+    return (asset as { url: string }).url;
+  }
+  return "";
+}
+
 export const SERVICE_IDS = ["fivem", "samp", "minecraft", "discord"] as const;
 export type ServiceId = (typeof SERVICE_IDS)[number];
 
@@ -37,7 +45,7 @@ export const SERVICES: Record<ServiceId, Service> = {
     headline: "Build Your Dream RP City Without Texture Loss.",
     sub: "Ryzen-class cores, NVMe Gen4 streaming and txAdmin pre-installed — your MLOs, vehicles and EUP load like they were meant to.",
     badge: "txAdmin Ready • OneSync Infinity",
-    image: fivemImg.url,
+    image: resolveAssetUrl(fivemImg),
     telemetry: { tick: 99.4, tickLabel: "Tick Stability", latencyMs: 12, uptime: 99.99 },
     plans: [
       { id: "fivem-vinewood", name: "Vinewood Dev", ramMb: 4096, vcpu: 1.5, diskGb: 35, slots: 32, priceInr: 399 },
@@ -52,7 +60,7 @@ export const SERVICES: Record<ServiceId, Service> = {
     headline: "Zero-Lag Pawn & open.mp Server Infrastructure.",
     sub: "Classic San Andreas multiplayer on modern silicon. Run 0.3.7 or open.mp with plugins, MySQL and instant restarts.",
     badge: "open.mp & 0.3.7",
-    image: sampImg.url,
+    image: resolveAssetUrl(sampImg),
     telemetry: { tick: 98.8, tickLabel: "Tick Stability", latencyMs: 13, uptime: 99.98 },
     plans: [
       { id: "samp-street", name: "Street Starter", ramMb: 1024, vcpu: 0.5, diskGb: 10, slots: 50, priceInr: 79 },
@@ -67,7 +75,7 @@ export const SERVICES: Record<ServiceId, Service> = {
     headline: "20.0 Locked TPS Even During Massive World Gen.",
     sub: "High-clock cores and NVMe Gen4 chunk I/O keep SMPs, networks and heavy modpacks at a flat 20 TPS.",
     badge: "PaperMC • Purpur • Fabric",
-    image: minecraftImg.url,
+    image: resolveAssetUrl(minecraftImg),
     telemetry: { tick: 100, tickLabel: "TPS Lock (20.0)", latencyMs: 14, uptime: 99.99 },
     plans: [
       { id: "mc-coal", name: "Coal SMP", ramMb: 2048, vcpu: 1.0, diskGb: 15, priceInr: 179 },
@@ -82,7 +90,7 @@ export const SERVICES: Record<ServiceId, Service> = {
     headline: "Always-Online Bot Nodes With Sub-10ms Gateway Ping.",
     sub: "Host discord.js, discord.py and Lavalink music nodes 24/7 with auto-restart, Git deploys and zero sleep.",
     badge: "Node.js • Python • Lavalink",
-    image: discordImg.url,
+    image: resolveAssetUrl(discordImg),
     telemetry: { tick: 99.9, tickLabel: "Process Uptime", latencyMs: 8, uptime: 99.99 },
     plans: [
       { id: "bot-spark", name: "Spark Bot", ramMb: 512, vcpu: 0.25, diskGb: 5, priceInr: 49 },

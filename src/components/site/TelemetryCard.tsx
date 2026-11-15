@@ -34,7 +34,7 @@ export function TelemetryCard({ service }: { service: Service }) {
         className="glass w-full max-w-sm rounded-3xl p-5 glow-svc"
       >
         <div className="flex items-center gap-3">
-          <img src={service.image} alt={`${service.name} server preview`} className="size-14 rounded-2xl object-cover ring-1 ring-svc/50" />
+          <img src={service.image} alt={`${service.name} high performance game server preview`} width={56} height={56} className="size-14 rounded-2xl object-cover ring-1 ring-svc/50" />
           <div className="min-w-0 flex-1">
             <p className="truncate font-display text-sm font-semibold">{service.name} Node</p>
             <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">

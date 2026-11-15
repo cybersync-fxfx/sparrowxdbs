@@ -110,7 +110,7 @@ function GameDashboard() {
             ) : (
               <div className="relative">
                 <div className="flex items-center gap-4">
-                  <img src={data.user.avatarUrl} alt={`${data.user.username} avatar`} className="size-16 rounded-2xl ring-2 ring-sheen/60" />
+                  <img src={data.user.avatarUrl} alt={`${data.user.username} player avatar`} width={64} height={64} className="size-16 rounded-2xl ring-2 ring-sheen/60" />
                   <div className="min-w-0">
                     <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Welcome back</p>
                     <h1 className="truncate text-2xl font-bold">{data.user.globalName ?? data.user.username}</h1>

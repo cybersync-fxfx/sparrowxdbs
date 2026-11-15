@@ -18,22 +18,98 @@ export const Route = createFileRoute("/game/")({
   }),
   head: () => ({
     meta: [
-      { title: "SparrowX Game Hosting — FiveM, SA-MP, Minecraft & Discord Bot Servers in India" },
+      { title: "SparrowX Game Hosting — FiveM, SA-MP, Minecraft & Discord Bot Servers" },
       {
         name: "description",
-        content: "NVMe Gen4 game servers in Asia-IN with 12–15ms ping, sub-second DDoS mitigation and INR pricing from ₹49/mo.",
+        content:
+          "High-performance NVMe Gen4 game server hosting in Asia-IN with 12–15ms ping, sub-second DDoS mitigation, instant Pterodactyl panel provisioning, and INR pricing from ₹49/mo.",
       },
-      { property: "og:title", content: "SparrowX Game Hosting — Premium Game Servers in India" },
+      {
+        name: "keywords",
+        content:
+          "fivem server hosting india, samp server hosting, minecraft server hosting india, discord bot hosting 24/7, low ping game hosting, pterodactyl game panel, nvme game server, ddos protected game hosting, sparrowx game",
+      },
+      { property: "og:title", content: "SparrowX Game Hosting — Premium Low-Ping Game Servers" },
       {
         property: "og:description",
-        content: "FiveM, SA-MP, Minecraft and Discord bot hosting on NVMe Gen4 nodes. Login with Discord and deploy in seconds.",
+        content:
+          "Deploy FiveM, SA-MP, Minecraft, and Discord bot servers in seconds with dedicated NVMe Gen4 speed, sub-second DDoS filtering, and Pterodactyl panel.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://game.sparrowx.net" },
+      { property: "og:image", content: "https://sparrowx.net/assets/logo-game-A5Nnak65.png" },
+      { property: "og:image:alt", content: "SparrowX Game Hosting — High Performance Game Servers" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "SparrowX Game Hosting — FiveM, SA-MP, Minecraft & Discord Bots" },
+      {
+        name: "twitter:description",
+        content:
+          "Low-ping NVMe Gen4 game hosting in Asia-IN with instant Discord login and automated Pterodactyl setup.",
+      },
+      { name: "twitter:image", content: "https://sparrowx.net/assets/logo-game-A5Nnak65.png" },
+      { name: "twitter:image:alt", content: "SparrowX Game Hosting — High Performance Game Servers" },
     ],
     links: [
+      { rel: "canonical", href: "https://game.sparrowx.net" },
       { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "SoftwareApplication",
+              "name": "SparrowX Game Hosting",
+              "applicationCategory": "GameServerHosting",
+              "operatingSystem": "All",
+              "url": "https://game.sparrowx.net",
+              "description":
+                "Enterprise NVMe Gen4 game server hosting for FiveM, SA-MP, Minecraft, and Discord bots with instant Pterodactyl deployment and sub-second DDoS defense.",
+              "offers": {
+                "@type": "Offer",
+                "price": "49",
+                "priceCurrency": "INR",
+              },
+            },
+            {
+              "@type": "FAQPage",
+              "mainEntity": [
+                {
+                  "@type": "Question",
+                  "name": "Which games and services are supported?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "SparrowX Game Hosting provides specialized 1-click deployments for FiveM (GTA V Roleplay), SA-MP (San Andreas Multiplayer), Minecraft (Paper, Forge, Fabric, Bedrock), and 24/7 Discord bots.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  "name": "What hardware and network latency can I expect?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "All nodes run on Ryzen / Intel Xeon NVMe Gen4 SSD infrastructure located in Asia-IN data centers, delivering ultra-low 12–15ms latency across India and neighboring regions.",
+                  },
+                },
+                {
+                  "@type": "Question",
+                  "name": "How does server control work?",
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text":
+                      "Each server is instantly linked to your Pterodactyl Game Panel account at game.panel.sparrowx.net with full file manager, console, restart controls, and database allocations.",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      },
     ],
   }),
   component: GameIndex,

@@ -42,7 +42,7 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
         {me ? (
           <Button asChild variant="discord" size="sm" className="rounded-xl">
             <Link to="/game/dashboard" search={{ deploy: undefined }}>
-              <img src={me.avatarUrl} alt="" className="size-5 rounded-full" />
+              <img src={me.avatarUrl} alt={`${me.username} player avatar`} width={20} height={20} className="size-5 rounded-full" />
               <span className="hidden sm:inline">Dashboard</span>
               <LayoutDashboard className="sm:hidden" />
             </Link>

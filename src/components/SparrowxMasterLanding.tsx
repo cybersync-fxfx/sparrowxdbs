@@ -514,7 +514,9 @@ export function SparrowxMasterLanding({
             <div className="size-8 rounded-lg overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0 shadow-[0_2px_10px_rgba(249,98,70,0.2)]">
               <img
                 src="/logos/sparrowx-main.jpg"
-                alt="SparrowX"
+                alt="SparrowX Autonomous Security Platform and Sovereign Developer Cloud Logo"
+                width={32}
+                height={32}
                 className="size-full object-cover scale-110"
               />
             </div>
@@ -548,7 +550,7 @@ export function SparrowxMasterLanding({
                     }}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-db.jpg" alt="SparrowX DB" className="size-6 rounded object-cover shrink-0 border border-[#A3E635]/30" />
+                    <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-[#A3E635]/30" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Cloud DB</div>
                       <div className="text-[11px] text-zinc-400">PostgreSQL &amp; Vector Studio</div>
@@ -563,7 +565,7 @@ export function SparrowxMasterLanding({
                     }}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop" className="size-6 rounded object-cover shrink-0 border border-purple-500/30" />
+                    <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted File Transfer and 10GB Cloud Vault" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-purple-500/30" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Drop</div>
                       <div className="text-[11px] text-zinc-400">Ephemeral Drop &amp; 10GB Vault</div>
@@ -578,7 +580,7 @@ export function SparrowxMasterLanding({
                     }}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys" className="size-6 rounded object-cover shrink-0 border border-amber-500/30" />
+                    <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — 100% Offline Cryptographic Password Generator" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-amber-500/30" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Keys</div>
                       <div className="text-[11px] text-zinc-400">Offline Key Generator</div>
@@ -593,7 +595,7 @@ export function SparrowxMasterLanding({
                     }}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield" className="size-6 rounded object-cover shrink-0 border border-[#F9103A]/30" />
+                    <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF & Real-Time DDoS Threat Radar" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-[#F9103A]/30" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Shield</div>
                       <div className="text-[11px] text-zinc-400">Threat Map &amp; DDoS Defense</div>
@@ -708,7 +710,7 @@ export function SparrowxMasterLanding({
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
                 <div className="size-8 rounded-md overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0">
-                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX DB" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL" width={32} height={32} className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud DB</div>
@@ -726,7 +728,7 @@ export function SparrowxMasterLanding({
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
                 <div className="size-8 rounded-md overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0">
-                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted File Vault" width={32} height={32} className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Drop</div>
@@ -744,7 +746,7 @@ export function SparrowxMasterLanding({
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
                 <div className="size-8 rounded-md overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0">
-                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — Offline Password Generator" width={32} height={32} className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Keys (Free)</div>
@@ -762,7 +764,7 @@ export function SparrowxMasterLanding({
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
                 <div className="size-8 rounded-md overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] shrink-0">
-                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF & DDoS Defense" width={32} height={32} className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Shield</div>
@@ -987,7 +989,7 @@ export function SparrowxMasterLanding({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="size-10 rounded-lg overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0">
-                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX DB" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL with pgvector AI search" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
                 </div>
                 <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   POSTGRES + VECTOR
@@ -1013,7 +1015,7 @@ export function SparrowxMasterLanding({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="size-10 rounded-lg overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0">
-                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted Ephemeral File Vault and Secure Sharing" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
                 </div>
                 <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   FREE • NO LOGIN
@@ -1039,7 +1041,7 @@ export function SparrowxMasterLanding({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="size-10 rounded-lg overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0">
-                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — 100% Offline Cryptographic Password Generator" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
                 </div>
                 <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   FREE • NO LOGIN
@@ -1065,7 +1067,7 @@ export function SparrowxMasterLanding({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div className="size-10 rounded-lg overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] shrink-0">
-                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield" className="size-full object-cover scale-110" />
+                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF and Real-Time DDoS Threat Radar" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
                 </div>
                 <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
                   EDGE DEFENSE
