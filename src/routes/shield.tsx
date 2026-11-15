@@ -26,7 +26,7 @@ export const Route = createFileRoute("/shield")({
     ],
     links: [
       { rel: "canonical", href: "https://sec.sparrowx.net" },
-      { rel: "icon", href: "/sparrowx-shield-logo.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/logos/sparrowx-shield.jpg", type: "image/jpeg" },
       { rel: "shortcut icon", href: "/favicon.ico" },
     ],
   }),

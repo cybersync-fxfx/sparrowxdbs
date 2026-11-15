@@ -196,9 +196,9 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "icon", href: "/favicon.ico", sizes: "any" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "icon", href: "/logos/sparrowx-main.jpg", type: "image/jpeg" },
+      { rel: "icon", href: "/logos/sparrowx-silver.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-main.jpg" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
     ],
   }),

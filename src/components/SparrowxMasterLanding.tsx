@@ -707,8 +707,8 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
-                  <Database className="size-4" aria-hidden="true" />
+                <div className="size-8 rounded-md overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0">
+                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX DB" className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud DB</div>
@@ -725,8 +725,8 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
-                  <FileUp className="size-4" aria-hidden="true" />
+                <div className="size-8 rounded-md overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0">
+                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop" className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Drop</div>
@@ -743,8 +743,8 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
-                  <KeyRound className="size-4" aria-hidden="true" />
+                <div className="size-8 rounded-md overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0">
+                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys" className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Keys (Free)</div>
@@ -761,11 +761,11 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
-                  <Shield className="size-4" aria-hidden="true" />
+                <div className="size-8 rounded-md overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] shrink-0">
+                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield" className="size-full object-cover scale-110" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs text-white">SparrowX Security</div>
+                  <div className="font-bold text-xs text-white">SparrowX Shield</div>
                   <div className="text-[10px] text-zinc-400 truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">sec.sparrowx.net</span>

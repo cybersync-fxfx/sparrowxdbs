@@ -432,11 +432,11 @@ export function ClientIntegrationModal({
         {/* Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
           <div className="flex items-start sm:items-center gap-4">
-            <span className="grid size-12 place-items-center rounded-2xl bg-black/80 border border-white/15 p-2 text-primary shadow-inner shrink-0">
+            <span className="size-12 rounded-2xl overflow-hidden bg-black/80 border border-orange-500/30 shadow-inner shrink-0">
               <img
-                src="/sparrowx-logo.png"
+                src="/logos/sparrowx-main.jpg"
                 alt="SparrowX Logo"
-                className="size-full object-contain"
+                className="size-full object-cover scale-110"
               />
             </span>
             <div className="space-y-1.5">
