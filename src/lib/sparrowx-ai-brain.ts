@@ -43,7 +43,7 @@ export interface AiBrainChatTurn {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
-  modelUsed?: SparrowxBrainModel | undefined;
+  modelUsed?: string | undefined;
   interactionId?: string | undefined;
   learnedPatternsCount?: number | undefined;
 }
@@ -544,7 +544,7 @@ export async function querySparrowxGeminiBrain(params: {
   previousInteractionId?: string | undefined;
 }): Promise<{
   text: string;
-  modelUsed: SparrowxBrainModel;
+  modelUsed: string;
   interactionId?: string | undefined;
   liveApiSucceeded: boolean;
 }> {
@@ -589,7 +589,10 @@ ${learnedPatterns
         }
         return {
           text: outputText,
-          modelUsed: selectedModel,
+          modelUsed:
+            selectedModel === "gemini-4-argon"
+              ? "SparrowX AI Deep Reasoning"
+              : "SparrowX AI Fast Neural",
           interactionId: interaction.id,
           liveApiSucceeded: true,
         };
@@ -607,7 +610,10 @@ ${learnedPatterns
   );
   return {
     text: fallbackText,
-    modelUsed: selectedModel,
+    modelUsed:
+      selectedModel === "gemini-4-argon"
+        ? "SparrowX AI Deep Reasoning"
+        : "SparrowX AI Fast Neural",
     liveApiSucceeded: false,
   };
 }

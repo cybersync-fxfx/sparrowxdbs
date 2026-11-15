@@ -11,6 +11,10 @@ export const Route = createFileRoute("/docs/errors")({
         content: "Find out what went wrong, why it happened, and how to fix it in SparrowX.",
       },
     ],
+    links: [
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+    ],
   }),
   validateSearch: (search: Record<string, unknown>): { code?: string; ref?: string } => {
     return {
@@ -34,7 +38,7 @@ function DocsErrorsPage() {
             href="/"
             className="flex items-center gap-2.5 font-display text-base font-bold text-white hover:opacity-90"
           >
-            <img src="/sparrowx-logo.png" alt="SparrowX Logo" className="size-6 object-contain" />
+            <img src="/logos/sparrowx-silver.png" alt="SparrowX Logo" className="size-6 object-contain" />
             <span>
               sparrow<span className="text-primary">x</span>
             </span>

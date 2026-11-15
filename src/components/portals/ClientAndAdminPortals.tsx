@@ -420,7 +420,7 @@ export function ClientPortalView({
           <div>
             <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
               <img
-                src="/sparrowx-logo.png"
+                src="/logos/sparrowx-silver.png"
                 alt="SparrowX Logo"
                 className="size-4 object-contain inline-block"
               />
@@ -2996,7 +2996,7 @@ export function AdminPortalView({
             <div>
               <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase text-primary">
                 <img
-                  src="/sparrowx-logo.png"
+                  src="/logos/sparrowx-silver.png"
                   alt="SparrowX Logo"
                   className="size-4 object-contain inline-block"
                 />
@@ -3711,7 +3711,9 @@ export function PortalLoginScreen({
         {/* Clean Identity Header */}
         <div className="flex items-start justify-between gap-4 border-b border-[#1F1F1F] pb-5">
           <div className="flex items-center gap-3.5">
-            <img src="/sparrowx-logo.png" alt="SparrowX" className="size-11 shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)]" />
+            <div className="size-11 rounded-xl overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)]">
+              <img src="/logos/sparrowx-main.jpg" alt="SparrowX" className="size-full object-cover scale-110" />
+            </div>
             <div>
               <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
                 {mode === "signin" ? "Welcome back to SparrowX" : "Launch Your Protected Workspace"}
@@ -4075,11 +4077,13 @@ export function PortalLoginScreen({
                 }}
                 className="group flex items-center gap-2.5 text-left focus:outline-none"
               >
-                <img
-                  src="/sparrowx-logo.png"
-                  alt="SparrowX Logo"
-                  className="size-9 shrink-0 object-contain drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)] group-hover:scale-105 transition-transform duration-200"
-                />
+                <div className="size-9 rounded-lg overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0 drop-shadow-[0_4px_12px_rgba(255,107,0,0.25)] group-hover:scale-105 transition-transform duration-200">
+                  <img
+                    src="/logos/sparrowx-main.jpg"
+                    alt="SparrowX Logo"
+                    className="size-full object-cover scale-110"
+                  />
+                </div>
                 <div className="flex items-center gap-2 whitespace-nowrap">
                   <span className="font-display text-base font-extrabold tracking-tight text-white group-hover:text-zinc-100 transition-colors">
                     sparrow<span className="text-primary group-hover:text-orange-400">x</span>
@@ -4716,7 +4720,9 @@ export function PortalLoginScreen({
           <footer className="border-t border-[#1F1F1F] bg-black py-8 px-4 sm:px-8">
             <div className="mx-auto flex max-w-7xl flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-500">
               <div className="flex items-center gap-2.5">
-                <img src="/sparrowx-logo.png" alt="SparrowX" className="size-5 object-contain" />
+                <div className="size-6 rounded-md overflow-hidden border border-orange-500/25 bg-[#0A0808] shrink-0">
+                  <img src="/logos/sparrowx-main.jpg" alt="SparrowX" className="size-full object-cover scale-110" />
+                </div>
                 <span className="font-semibold text-zinc-300">SparrowX Cyber Defense</span>
                 <span>
                   · Built to protect builders, startups, and enterprises from modern cyber attacks.

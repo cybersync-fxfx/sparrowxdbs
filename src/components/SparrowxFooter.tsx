@@ -115,11 +115,13 @@ export function SparrowxFooter({
               href="/"
               className="min-h-6 inline-flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
-              <img
-                src="/sparrowx-logo.png"
-                alt="SparrowX home"
-                className="size-7 object-contain shrink-0"
-              />
+              <div className="size-8 rounded-lg overflow-hidden border border-orange-500/25 bg-[#0A0808] shrink-0">
+                <img
+                  src="/logos/sparrowx-main.jpg"
+                  alt="SparrowX home"
+                  className="size-full object-cover scale-110"
+                />
+              </div>
               <span className="text-base font-medium tracking-tight text-[#F4F6FA]">
                 SparrowX Technologies
               </span>

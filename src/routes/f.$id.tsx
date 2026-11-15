@@ -18,6 +18,10 @@ export const Route = createFileRoute("/f/$id")({
           "Download your shared file privately on SparrowX Files. 100% encrypted transfer.",
       },
     ],
+    links: [
+      { rel: "icon", href: "/sparrowx-drop-logo.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+    ],
   }),
   component: SparrowxFileDownloadRoute,
 });

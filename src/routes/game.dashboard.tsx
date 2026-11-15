@@ -33,6 +33,10 @@ export const Route = createFileRoute("/game/dashboard")({
       { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
+    links: [
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+    ],
   }),
   pendingComponent: () => (
     <div className="theme-dashboard grid min-h-screen place-items-center bg-background">

@@ -27,6 +27,7 @@ export const Route = createFileRoute("/keys")({
     links: [
       { rel: "canonical", href: "https://password.sparrowx.net" },
       { rel: "icon", href: "/sparrowx-keys-logo.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
     ],
   }),
   component: SparrowxKeysRoute,

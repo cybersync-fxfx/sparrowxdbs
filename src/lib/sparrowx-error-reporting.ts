@@ -21,12 +21,6 @@ declare global {
       stack?: string;
       filename?: string;
     }) => void;
-    __lovableEvents?: SparrowxEvents;
-    __lovableReportRuntimeError?: (payload: {
-      message: string;
-      stack?: string;
-      filename?: string;
-    }) => void;
   }
 }
 
@@ -45,33 +39,13 @@ export function reportSparrowxError(error: unknown, context: Record<string, unkn
       severity: "error",
     },
   );
-  window.__lovableEvents?.captureException?.(
-    error,
-    {
-      source: "react_error_boundary",
-      route: window.location.pathname,
-      ...context,
-    },
-    {
-      mechanism: "react_error_boundary",
-      handled: false,
-      severity: "error",
-    },
-  );
   const stack = error instanceof Error ? error.stack : undefined;
   window.__sparrowxReportRuntimeError?.({
     message: describeThrown(error),
     ...(stack !== undefined && { stack }),
     filename: window.location.pathname,
   });
-  window.__lovableReportRuntimeError?.({
-    message: describeThrown(error),
-    ...(stack !== undefined && { stack }),
-    filename: window.location.pathname,
-  });
 }
-
-export const reportLovableError = reportSparrowxError;
 
 const MAX_SERIALIZED_LENGTH = 2000;
 

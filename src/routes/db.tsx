@@ -27,6 +27,7 @@ export const Route = createFileRoute("/db")({
     links: [
       { rel: "canonical", href: "https://db.sparrowx.net" },
       { rel: "icon", href: "/sparrowx-db-logo.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
     ],
   }),
   component: SparrowxDbRoute,

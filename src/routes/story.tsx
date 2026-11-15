@@ -24,7 +24,11 @@ export const Route = createFileRoute("/story")({
       },
       { property: "og:url", content: "https://sparrowx.net/story" },
     ],
-    links: [{ rel: "canonical", href: "https://sparrowx.net/story" }],
+    links: [
+      { rel: "canonical", href: "https://sparrowx.net/story" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+    ],
   }),
   component: SparrowxStoryRoute,
 });

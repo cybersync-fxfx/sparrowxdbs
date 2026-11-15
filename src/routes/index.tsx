@@ -2195,7 +2195,7 @@ function Dashboard() {
             </Button>
 
             <div className="hidden sm:flex items-center gap-2 pr-1">
-              <img src="/sparrowx-logo.png" alt="SparrowX" className="size-5 object-contain" />
+              <img src="/logos/sparrowx-silver.png" alt="SparrowX" className="size-5 object-contain" />
             </div>
             <span className="hidden text-muted-foreground/60 sm:block">/</span>
             <span className="truncate text-xs sm:text-sm font-semibold text-foreground max-w-[100px] sm:max-w-[200px]">
@@ -5524,11 +5524,13 @@ function AppSidebar({
             title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "SparrowX Home"}
             type="button"
           >
-            <img
-              src="/sparrowx-logo.png"
-              alt="SparrowX Logo"
-              className="size-full object-contain"
-            />
+            <div className="size-8 rounded-lg overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0">
+              <img
+                src="/logos/sparrowx-main.jpg"
+                alt="SparrowX Logo"
+                className="size-full object-cover scale-110"
+              />
+            </div>
           </button>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="font-display text-base font-semibold">

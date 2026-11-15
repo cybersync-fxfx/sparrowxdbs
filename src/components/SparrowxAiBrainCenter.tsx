@@ -936,10 +936,10 @@ export function SparrowxAiBrainCenter({
         </div>
       )}
 
-      {/* TAB 2: INTERACTIVE GEMINI SECURITY COPILOT & PAYLOAD LEARNER */}
+      {/* TAB 2: INTERACTIVE SPARROWX AI SECURITY COPILOT & PAYLOAD LEARNER */}
       {activeTab === "copilot" && (
         <div className="grid gap-6 xl:grid-cols-12 items-start">
-          {/* Left 6 Cols: Interactive Gemini AI Brain Copilot & Custom Threat Learner */}
+          {/* Left 6 Cols: Interactive SparrowX AI Brain Copilot & Custom Threat Learner */}
           <div className="xl:col-span-6 space-y-6">
             <div className="rounded-2xl border border-[#1F1F1F] bg-[#0A0A0A] p-5 flex flex-col h-[560px]">
               <div className="flex items-center justify-between border-b border-[#1F1F1F] pb-3.5">

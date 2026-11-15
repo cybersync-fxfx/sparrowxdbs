@@ -713,11 +713,13 @@ export function SparrowxDropEngine() {
       <header className="border-b border-purple-500/20 bg-[#05060A]/90 sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 shrink-0">
-            <img
-              src="/sparrowx-drop-logo.svg"
-              alt="SparrowX Drop"
-              className="size-7 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(168,85,247,0.35)]"
-            />
+            <div className="size-8 rounded-lg overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0 drop-shadow-[0_4px_12px_rgba(168,85,247,0.35)]">
+              <img
+                src="/logos/sparrowx-drop.jpg"
+                alt="SparrowX Drop"
+                className="size-full object-cover scale-110"
+              />
+            </div>
             <span className="font-bold text-sm tracking-tight text-white">SparrowX</span>
             <span className="px-2 py-0.5 rounded bg-purple-500/15 border border-purple-500/30 text-[10px] font-mono font-semibold text-purple-300">
               DROP

@@ -277,11 +277,13 @@ export function SparrowxKeysEngine() {
       <header className="border-b border-white/[0.08] bg-[#0E1015] px-4 sm:px-6 py-3 border-t border-white/[0.16]">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <img
-              src="/sparrowx-keys-logo.svg"
-              alt="SparrowX Keys"
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(245,158,11,0.3)]"
-            />
+            <div className="size-9 rounded-lg overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0 drop-shadow-[0_4px_12px_rgba(245,158,11,0.3)]">
+              <img
+                src="/logos/sparrowx-keys.jpg"
+                alt="SparrowX Keys"
+                className="size-full object-cover scale-110"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
                 SPARROWX // KEYS

@@ -151,7 +151,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content:
-          "Free, instant file sharing and password generation with zero sign-up required, built with love by an independent startup.",
+          "Free, instant file sharing and password generation with zero sign-up required, engineered by SparrowX Autonomous Security.",
       },
       { name: "twitter:site", content: "@sparrowx" },
     ],

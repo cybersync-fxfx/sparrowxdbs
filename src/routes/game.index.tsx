@@ -31,6 +31,10 @@ export const Route = createFileRoute("/game/")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+    ],
   }),
   component: GameIndex,
 });
