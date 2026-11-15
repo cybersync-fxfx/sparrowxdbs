@@ -278,7 +278,7 @@ export function SparrowxKeysEngine() {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
-              src="/sparrowx-logo.png"
+              src="/logos/sparrowx-keys.png"
               alt="SparrowX Keys"
               width={36}
               height={36}

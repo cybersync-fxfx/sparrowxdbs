@@ -226,7 +226,7 @@ export function SparrowxShieldEngine({
         <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
-              src="/sparrowx-logo.png"
+              src="/logos/sparrowx-shield.png"
               alt="SparrowX Shield"
               width={36}
               height={36}

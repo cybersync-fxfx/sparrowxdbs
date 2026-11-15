@@ -714,7 +714,7 @@ export function SparrowxDropEngine() {
         <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5 shrink-0">
             <img
-              src="/sparrowx-logo.png"
+              src="/logos/sparrowx-drop.png"
               alt="SparrowX Drop"
               width={34}
               height={34}

@@ -2106,7 +2106,7 @@ export function SovereignDatabaseStudio({
           <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
               <img
-                src="/sparrowx-logo.png"
+                src="/logos/sparrowx-db.png"
                 alt="SparrowX DB"
                 width={34}
                 height={34}
@@ -3341,7 +3341,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             className="flex items-center gap-1.5 hover:opacity-85 transition-opacity cursor-pointer shrink-0"
             title="SparrowX Cloud DB Landing"
           >
-            <img src="/sparrowx-logo.png" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={30} height={30} className="size-7.5 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(255,255,255,0.2)]" />
+            <img src="/logos/sparrowx-db.png" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={30} height={30} className="size-7.5 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(62,207,142,0.3)]" />
           </button>
 
           <span className="text-zinc-600 font-light hidden sm:inline">/</span>
