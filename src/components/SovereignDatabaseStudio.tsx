@@ -3195,8 +3195,19 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         type="button"
                         onClick={() => {
                           setSelectedPricingPlan(tier.id);
-                          if (sessionUser) setViewMode("studio");
-                          else scrollToAuthCard("register");
+                          if (sessionUser) {
+                            setActiveSection("settings");
+                            setSettingsSubTab("billing");
+                            setViewMode("studio");
+                            toast.success(
+                              `Selected ${tier.name} plan (${tier.price}${tier.unit || ""}) — review in Subscription & Billing`,
+                            );
+                          } else {
+                            scrollToAuthCard("register");
+                            toast.info(
+                              `Selected ${tier.name} plan — create your isolated account to continue`,
+                            );
+                          }
                         }}
                         className={`w-full py-2 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                           tier.id === "Enterprise"
@@ -6232,12 +6243,43 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                         SparrowX Vault encrypts sensitive credentials at rest using authenticated AES-256 / SHA-256 verification before storage in PostgreSQL 16.
                       </p>
                     ) : effectiveSettingsTab === "billing" ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-zinc-300">Current Workspace Plan</span>
-                          <span className="px-2.5 py-0.5 rounded bg-[#A3E635]/15 text-[#A3E635] font-mono font-bold">
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <span className="text-zinc-300 font-medium">Selected Workspace Plan</span>
+                            <p className="text-[11px] text-zinc-500">
+                              Switch plans anytime — isolated PostgreSQL storage &amp; role remain intact.
+                            </p>
+                          </div>
+                          <span className="px-2.5 py-1 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[#A3E635] font-mono font-bold">
                             {selectedPricingPlan.toUpperCase()}
                           </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {PRICING_PLANS.map((tier) => {
+                            const active = selectedPricingPlan === tier.id;
+                            return (
+                              <button
+                                key={tier.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPricingPlan(tier.id);
+                                  toast.success(`Workspace plan updated to ${tier.name} (${tier.price}${tier.unit || ""})`);
+                                }}
+                                className={`rounded-lg border p-3 text-left transition-colors cursor-pointer ${
+                                  active
+                                    ? "border-[#A3E635]/60 bg-[#A3E635]/10 text-white"
+                                    : "border-[#262626] bg-[#07090E] text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                                }`}
+                              >
+                                <div className="font-mono font-bold text-xs text-white">{tier.name}</div>
+                                <div className="text-[11px] text-[#A3E635] font-mono mt-0.5">
+                                  {tier.price}
+                                  {tier.unit}
+                                </div>
+                              </button>
+                            );
+                          })}
                         </div>
                         <p className="text-zinc-400">
                           Database storage used: 25.9 MB • WAL: 80 MB • Unmetered internal REST queries.
