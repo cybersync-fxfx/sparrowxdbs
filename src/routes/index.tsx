@@ -213,9 +213,8 @@ export const Route = createFileRoute("/")({
     ],
     links: [
       { rel: "canonical", href: "https://sparrowx.net" },
-      { rel: "icon", href: "/logos/sparrowx-main.jpg", type: "image/jpeg" },
-      { rel: "icon", href: "/logos/sparrowx-silver.png", type: "image/png" },
-      { rel: "shortcut icon", href: "/logos/sparrowx-main.jpg" },
+      { rel: "icon", href: "/sparrowx-logo.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/sparrowx-logo.png" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
     ],
     scripts: [
@@ -5597,13 +5596,13 @@ function AppSidebar({
             title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "SparrowX Home"}
             type="button"
           >
-            <div className="size-8 rounded-lg overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0">
-              <img
-                src="/logos/sparrowx-main.jpg"
-                alt="SparrowX Logo"
-                className="size-full object-cover scale-110"
-              />
-            </div>
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX Logo"
+              width={34}
+              height={34}
+              className="size-8.5 object-contain shrink-0 drop-shadow-[0_4px_10px_rgba(255,255,255,0.22)]"
+            />
           </button>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
             <div className="font-display text-base font-semibold">

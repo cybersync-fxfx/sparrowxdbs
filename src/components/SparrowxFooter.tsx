@@ -115,16 +115,14 @@ export function SparrowxFooter({
               href="/"
               className="min-h-6 inline-flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
-              <div className="size-8 rounded-lg overflow-hidden border border-orange-500/25 bg-[#0A0808] shrink-0">
-                <img
-                  src="/logos/sparrowx-main.jpg"
-                  alt="SparrowX Autonomous Security and Sovereign Cloud Platform"
-                  width={32}
-                  height={32}
-                  loading="lazy"
-                  className="size-full object-cover scale-110"
-                />
-              </div>
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX Autonomous Security and Sovereign Cloud Platform"
+                width={34}
+                height={34}
+                loading="lazy"
+                className="size-8.5 object-contain shrink-0 drop-shadow-[0_4px_10px_rgba(255,255,255,0.2)]"
+              />
               <span className="text-base font-medium tracking-tight text-[#F4F6FA]">
                 SparrowX Technologies
               </span>

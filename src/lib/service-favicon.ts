@@ -63,7 +63,7 @@ export function resolveServiceFavicon(
     return { href: "/logos/sparrowx-network.jpg", type: "image/jpeg" };
   }
 
-  return { href: "/logos/sparrowx-main.jpg", type: "image/jpeg" };
+  return { href: "/sparrowx-logo.png", type: "image/png" };
 }
 
 export function applyServiceFavicon(meta: ServiceFaviconMeta): void {

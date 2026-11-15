@@ -510,16 +510,14 @@ export function SparrowxMasterLanding({
       <header className="border-b border-white/10 bg-[#05060A]/90 sticky top-0 z-40 backdrop-blur-md">
         <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
           {/* Left Brand */}
-          <a href="/" className="flex items-center gap-2.5 shrink-0">
-            <div className="size-8 rounded-lg overflow-hidden border border-orange-500/30 bg-[#0A0808] shrink-0 shadow-[0_2px_10px_rgba(249,98,70,0.2)]">
-              <img
-                src="/logos/sparrowx-main.jpg"
-                alt="SparrowX Autonomous Security Platform and Sovereign Developer Cloud Logo"
-                width={32}
-                height={32}
-                className="size-full object-cover scale-110"
-              />
-            </div>
+          <a href="/" className="flex items-center gap-2.5 shrink-0 group">
+            <img
+              src="/sparrowx-logo.png"
+              alt="SparrowX Autonomous Security Platform and Sovereign Developer Cloud Logo"
+              width={36}
+              height={36}
+              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)] group-hover:scale-105 transition-transform duration-200"
+            />
             <span className="font-bold text-sm tracking-wider text-white font-sans">
               SPARROWX
             </span>
