@@ -65,8 +65,8 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
   },
   {
     label: "Game Server Panel",
-    sublabel: "game.sparrowx.net",
-    href: "https://game.sparrowx.net",
+    sublabel: "game.panel.sparrowx.net",
+    href: "https://game.panel.sparrowx.net",
   },
 ];
 

@@ -28,6 +28,8 @@ export interface SparrowxSentraSocWorkbenchProps {
   activeRailMode?: SocViewMode | undefined;
   onSelectRailMode?: ((mode: SocViewMode) => void) | undefined;
   showExtendedRailItems?: boolean | undefined;
+  /** When false (default in production client flows), never seed fake FIN-WS-0419 / INC-4127 sample incidents. */
+  allowDemoFallback?: boolean | undefined;
 }
 
 interface SocNode {
@@ -440,19 +442,31 @@ export function SparrowxSentraSocWorkbench({
   activeRailMode,
   onSelectRailMode,
   showExtendedRailItems = false,
+  allowDemoFallback = true,
 }: SparrowxSentraSocWorkbenchProps) {
-  const [cases, setCases] = useState<SocCase[]>(INITIAL_CASES);
-  const [selectedCaseId, setSelectedCaseId] = useState<string>("INC-4127");
+  const [cases, setCases] = useState<SocCase[]>(() =>
+    allowDemoFallback ? INITIAL_CASES : [],
+  );
+  const [selectedCaseId, setSelectedCaseId] = useState<string>(() =>
+    allowDemoFallback ? "INC-4127" : "",
+  );
   const [queueTab, setQueueTab] = useState<"Open" | "Mine" | "Resolved">("Open");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [internalMode, setInternalMode] = useState<"queue" | "calm">("queue");
+  const [internalMode, setInternalMode] = useState<"queue" | "calm">(() =>
+    allowDemoFallback || (incidents && incidents.length > 0) ? "queue" : "calm",
+  );
   const [investigatedHostId, setInvestigatedHostId] = useState<string | null>(null);
   const [clockUtc, setClockUtc] = useState<string>("14:02:39");
   const [liveSeconds, setLiveSeconds] = useState<number>(39);
 
   // Merge any external live backend incidents cleanly into the Sentra queue
   useEffect(() => {
-    if (!incidents || incidents.length === 0) return;
+    if (!incidents || incidents.length === 0) {
+      if (!allowDemoFallback) {
+        setCases([]);
+      }
+      return;
+    }
     setCases((prev) => {
       const existingIds = new Set(prev.map((c) => c.id));
       const mapped = incidents
@@ -479,8 +493,8 @@ export function SparrowxSentraSocWorkbench({
             openedAt: inc.time,
             mitre: "T1190, T1078",
             owner: inc.assignee,
-            alertsGrouped: Math.max(2, inc.affectedAssets + 2),
-            assetsInPath: Math.max(2, inc.affectedAssets + 1),
+            alertsGrouped: Math.max(1, inc.affectedAssets),
+            assetsInPath: Math.max(1, inc.affectedAssets),
             filesEncrypted: 0,
             containSeconds: isContained ? 28 : 42,
             confidence: 94,
@@ -528,9 +542,14 @@ export function SparrowxSentraSocWorkbench({
             backendIncidentId: inc.id,
           };
         });
-      return mapped.length > 0 ? [...mapped, ...prev] : prev;
+      const base = allowDemoFallback ? prev : prev.filter((p) => incidents.some((i) => i.id === p.id));
+      const nextList = mapped.length > 0 ? [...mapped, ...base] : base;
+      if (nextList.length > 0 && !allowDemoFallback) {
+        setInternalMode("queue");
+      }
+      return nextList;
     });
-  }, [incidents, assets]);
+  }, [incidents, assets, allowDemoFallback]);
 
   // Live clock & stopwatch tick for active uncontained incident
   useEffect(() => {
@@ -550,9 +569,6 @@ export function SparrowxSentraSocWorkbench({
     const id = setInterval(updateClock, 1000);
     return () => clearInterval(id);
   }, []);
-
-  const isCalmMode =
-    activeRailMode === "calm" || (activeRailMode !== "queue" && internalMode === "calm");
 
   const resolvedCase = useMemo(
     () => cases.find((c) => c.id === selectedCaseId) ?? cases[0],
@@ -581,10 +597,20 @@ export function SparrowxSentraSocWorkbench({
     );
   }, [queueTab, openCases, mineCases, resolvedCases, cases, searchQuery]);
 
-  if (!resolvedCase) return null;
-  const activeCase: SocCase = resolvedCase;
+  const isCalmMode =
+    !resolvedCase ||
+    activeRailMode === "calm" ||
+    (activeRailMode !== "queue" && internalMode === "calm");
 
-  const isSelectedResolved = activeCase.status !== "Open";
+  const activeCase: SocCase | undefined = resolvedCase;
+
+  const isSelectedResolved = activeCase ? activeCase.status !== "Open" : true;
+
+  const watchedAssetsLabel = allowDemoFallback
+    ? "Watching 1,284 assets"
+    : assets.length > 0
+      ? `Watching ${assets.length} ${assets.length === 1 ? "asset" : "assets"}`
+      : "Telemetry Off · Not Configured";
 
   const handleContainCase = async (targetCase: SocCase) => {
     if (targetCase.backendIncidentId && onResolveIncident) {
@@ -615,11 +641,11 @@ export function SparrowxSentraSocWorkbench({
       // In-browser / offline fallback
     }
 
-    emitEngineToast({
-      title: "Host Isolated & Threat Contained",
-      description: `${targetCase.id} neutralized. Cryptographic audit entry chained with SHA-256 integrity.`,
-      variant: "success",
-    });
+    emitEngineToast(
+      `${targetCase.id} neutralized. Cryptographic audit entry chained with SHA-256 integrity.`,
+      "success",
+      "Host Isolated & Threat Contained",
+    );
 
     const nowStr = new Date().toLocaleTimeString("en-GB", {
       hour: "2-digit",
@@ -664,11 +690,11 @@ export function SparrowxSentraSocWorkbench({
       // In-browser fallback
     }
 
-    emitEngineToast({
-      title: "Case Re-opened",
-      description: `${caseId} returned to active triage queue. Quarantine state updated.`,
-      variant: "info",
-    });
+    emitEngineToast(
+      `${caseId} returned to active triage queue. Quarantine state updated.`,
+      "info",
+      "Case Re-opened",
+    );
 
     setCases((prev) =>
       prev.map((c) => {
@@ -679,19 +705,21 @@ export function SparrowxSentraSocWorkbench({
     );
   };
 
-  const displaySeconds = isSelectedResolved
-    ? activeCase.containSeconds
-    : activeCase.id === "INC-4127"
-      ? (liveSeconds % 36) + 24
-      : activeCase.containSeconds;
+  const displaySeconds = !activeCase
+    ? 0
+    : isSelectedResolved
+      ? activeCase.containSeconds
+      : activeCase.id === "INC-4127"
+        ? (liveSeconds % 36) + 24
+        : activeCase.containSeconds;
 
-  const operatorName = currentUser?.fullName || "Mateo Ruiz";
+  const operatorName = currentUser?.fullName || (allowDemoFallback ? "Mateo Ruiz" : "Guest Operator");
   const operatorInitials = operatorName
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
-    .join("") || "MR";
+    .join("") || "SP";
 
   const sevBadgeClass = (sev: SocCase["severity"], resolved: boolean) => {
     if (resolved) {
@@ -754,7 +782,7 @@ export function SparrowxSentraSocWorkbench({
             </button>
             <span className="text-[#F4F6FA]/30">&gt;</span>
             <span className="font-medium text-[#F4F6FA] tabular-nums">
-              {isCalmMode ? "Live queue" : activeCase.id}
+              {isCalmMode || !activeCase ? "Live queue" : activeCase.id}
             </span>
           </div>
         </div>
@@ -783,8 +811,8 @@ export function SparrowxSentraSocWorkbench({
             className="inline-flex items-center gap-1.5 rounded-full border border-[#F4F6FA]/[0.08] bg-[#121620] px-2.5 py-1 text-[11px] font-medium text-[#F4F6FA]/85 transition-colors hover:border-[#F4F6FA]/25 cursor-pointer"
             title="Toggle Live Calm Radar View"
           >
-            <span className="size-1.5 rounded-full bg-[#10B981]" />
-            <span className="tabular-nums">Watching 1,284 assets</span>
+            <span className={`size-1.5 rounded-full ${allowDemoFallback || assets.length > 0 ? "bg-[#10B981]" : "bg-[#F96246]"}`} />
+            <span className="tabular-nums">{watchedAssetsLabel}</span>
           </button>
 
           <span className="hidden md:inline-block font-mono text-[11px] text-[#F4F6FA]/55 tabular-nums">
@@ -931,14 +959,18 @@ export function SparrowxSentraSocWorkbench({
 
             <div className="space-y-1">
               <span className="text-[10px] font-medium uppercase tracking-wider text-[#F4F6FA]/45">
-                Alerts Today
+                {allowDemoFallback ? "Alerts Today" : "Live Incidents"}
               </span>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-3xl font-medium tracking-tight text-[#F4F6FA] tabular-nums">
-                  3,912
+                  {allowDemoFallback ? "3,912" : cases.length}
                 </span>
                 <span className="text-[11px] font-medium text-[#10B981] tabular-nums">
-                  ^ 4.1% vs 7d avg
+                  {allowDemoFallback
+                    ? "^ 4.1% vs 7d avg"
+                    : assets.length > 0
+                      ? "Sensor Active"
+                      : "Not Configured"}
                 </span>
               </div>
             </div>
@@ -947,16 +979,20 @@ export function SparrowxSentraSocWorkbench({
               <div className="flex items-center justify-between text-[#F4F6FA]/65">
                 <span className="flex items-center gap-2">
                   <span className="size-1.5 rounded-full bg-[#10B981]" />
-                  <span>Closed as noise by SparrowX</span>
+                  <span>{allowDemoFallback ? "Closed as noise by SparrowX" : "Resolved incidents"}</span>
                 </span>
-                <span className="font-medium text-[#F4F6FA] tabular-nums">3,861</span>
+                <span className="font-medium text-[#F4F6FA] tabular-nums">
+                  {allowDemoFallback ? "3,861" : resolvedCases.length}
+                </span>
               </div>
               <div className="flex items-center justify-between text-[#F4F6FA]/65">
                 <span className="flex items-center gap-2">
                   <span className="size-1.5 rounded-full bg-[#F96246]" />
                   <span>Grouped into {cases.length} incidents</span>
                 </span>
-                <span className="font-medium text-[#F4F6FA] tabular-nums">51</span>
+                <span className="font-medium text-[#F4F6FA] tabular-nums">
+                  {allowDemoFallback ? "51" : openCases.length}
+                </span>
               </div>
               <div className="flex items-center justify-between text-[#F4F6FA]/65">
                 <span className="flex items-center gap-2">
@@ -988,7 +1024,7 @@ export function SparrowxSentraSocWorkbench({
               [
                 { id: "Open", count: openCases.length },
                 { id: "Mine", count: mineCases.length },
-                { id: "Resolved", count: 47 + resolvedCases.length },
+                { id: "Resolved", count: (allowDemoFallback ? 47 : 0) + resolvedCases.length },
               ] as const
             ).map((tab) => {
               const selected = queueTab === tab.id;
@@ -1018,7 +1054,7 @@ export function SparrowxSentraSocWorkbench({
           <div className="flex-1 divide-y divide-[#F4F6FA]/[0.06] overflow-y-auto max-h-[470px]">
             {filteredQueue.length > 0 ? (
               filteredQueue.map((c) => {
-                const isSelected = !isCalmMode && activeCase.id === c.id;
+                const isSelected = !isCalmMode && activeCase?.id === c.id;
                 const isResolved = c.status !== "Open";
                 return (
                   <button
@@ -1120,31 +1156,50 @@ export function SparrowxSentraSocWorkbench({
 
                 <div className="space-y-2 max-w-md">
                   <h2 className="text-2xl sm:text-3xl font-medium tracking-tight text-[#F4F6FA]">
-                    All quiet. Nothing needs you.
+                    {allowDemoFallback
+                      ? "All quiet. Nothing needs you."
+                      : assets.length > 0
+                        ? "Perimeter Clear. Zero Open Incidents."
+                        : "Edge Telemetry Not Configured Yet"}
                   </h2>
                   <p className="text-xs sm:text-sm text-[#F4F6FA]/55 leading-relaxed">
-                    SparrowX closed 3,861 alerts as noise today and grouped 51 into{" "}
-                    {cases.length} incidents. You get paged only when a person has to decide.
+                    {allowDemoFallback
+                      ? `SparrowX closed 3,861 alerts as noise today and grouped 51 into ${cases.length} incidents. You get paged only when a person has to decide.`
+                      : assets.length > 0
+                        ? `Monitoring ${assets.length} protected ${assets.length === 1 ? "asset" : "assets"} in real time. Genuine WAF & telemetry triggers will appear here immediately.`
+                        : "Connect a domain or edge sensor in Client Area to activate live L7 WAF inspection, attack correlation, and autonomous containment."}
                   </p>
                 </div>
               </div>
 
               <div className="grid w-full max-w-xl grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#0D1017] p-4 text-left space-y-1">
-                  <div className="text-xl font-medium text-[#F4F6FA] tabular-nums">1.8 s</div>
-                  <div className="text-[11px] text-[#F4F6FA]/50">median triage</div>
+                  <div className="text-xl font-medium text-[#F4F6FA] tabular-nums">
+                    {allowDemoFallback ? "1.8 s" : `${openCases.length}`}
+                  </div>
+                  <div className="text-[11px] text-[#F4F6FA]/50">
+                    {allowDemoFallback ? "median triage" : "open incidents"}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#0D1017] p-4 text-left space-y-1">
-                  <div className="text-xl font-medium text-[#F4F6FA] tabular-nums">6 h 12 m</div>
-                  <div className="text-[11px] text-[#F4F6FA]/50">since last critical</div>
+                  <div className="text-xl font-medium text-[#F4F6FA] tabular-nums">
+                    {allowDemoFallback ? "6 h 12 m" : `${assets.length}`}
+                  </div>
+                  <div className="text-[11px] text-[#F4F6FA]/50">
+                    {allowDemoFallback ? "since last critical" : "connected assets"}
+                  </div>
                 </div>
                 <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#0D1017] p-4 text-left space-y-1">
-                  <div className="text-xl font-medium text-[#10B981] tabular-nums">98.7%</div>
-                  <div className="text-[11px] text-[#F4F6FA]/50">auto-closed</div>
+                  <div className="text-xl font-medium text-[#10B981] tabular-nums">
+                    {allowDemoFallback ? "98.7%" : assets.length > 0 ? "ARMED" : "OFF"}
+                  </div>
+                  <div className="text-[11px] text-[#F4F6FA]/50">
+                    {allowDemoFallback ? "auto-closed" : "sensor status"}
+                  </div>
                 </div>
               </div>
             </div>
-          ) : (
+          ) : activeCase ? (
             /* ACTIVE INCIDENT TRIAGE VIEW (Top-Right, Bottom-Left, Bottom-Right of Image 1) */
             <div className="space-y-5">
               {/* Top Row: Severity & ID + 4-Stage Pipeline Stepper */}
@@ -1626,7 +1681,7 @@ export function SparrowxSentraSocWorkbench({
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
         </main>
 
         {/* 4. RIGHT PANE: SPARROWX SENSE 3D ORB + AI TRIAGE TIMELINE */}
@@ -1643,7 +1698,11 @@ export function SparrowxSentraSocWorkbench({
                 <span>SparrowX Sense</span>
               </span>
               <span className="text-[11px] text-[#F4F6FA]/45 tabular-nums">
-                Live · 1,284 assets
+                {allowDemoFallback
+                  ? "Live · 1,284 assets"
+                  : assets.length > 0
+                    ? `Live · ${assets.length} assets`
+                    : "Not Configured"}
               </span>
             </div>
 
@@ -1719,13 +1778,13 @@ export function SparrowxSentraSocWorkbench({
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-medium text-[#F4F6FA] tabular-nums block">
-                    {isCalmMode ? "0%" : `${activeCase.confidence}%`}
+                    {isCalmMode || !activeCase ? "0%" : `${activeCase.confidence}%`}
                   </span>
                   <span className="text-[10px] text-[#F4F6FA]/45">confidence</span>
                 </div>
               </div>
 
-              {isCalmMode ? (
+              {isCalmMode || !activeCase ? (
                 <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#0D1017] p-4 space-y-2 text-center my-4">
                   <span className="text-xs font-medium text-[#F4F6FA] block">Listening</span>
                   <p className="text-[11px] text-[#F4F6FA]/50 leading-relaxed">
@@ -1759,7 +1818,7 @@ export function SparrowxSentraSocWorkbench({
             </div>
 
             {/* Bottom Action / Approval State Card */}
-            {!isCalmMode && (
+            {!isCalmMode && activeCase && (
               isSelectedResolved ? (
                 <div className="rounded-xl border border-[#10B981]/35 bg-[#0D1A16] p-3.5 space-y-1">
                   <div className="flex items-center justify-between text-[11px]">

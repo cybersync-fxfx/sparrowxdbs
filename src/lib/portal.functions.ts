@@ -87,6 +87,21 @@ export const confirmTopup = createServerFn({ method: "POST" })
     }),
   );
 
+export const serverPowerAction = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z.object({
+      identifier: z.string().min(4).max(20).regex(/^[a-zA-Z0-9]+$/),
+      signal: z.enum(["start", "stop", "restart"]),
+    }).parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).powerAction(data.identifier, data.signal)),
+  );
+
+export const getPanelLaunchContext = createServerFn({ method: "GET" }).handler(async () =>
+  run(async () => (await import("./server/portal.server")).getPanelLaunchInfo()),
+);
+
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
   const { getAppSession } = await import("./server/session.server");
   const s = await getAppSession();

@@ -1,11 +1,13 @@
+import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Clock, Copy, ExternalLink, Server as ServerIcon } from "lucide-react";
+import { Clock, Copy, ExternalLink, Loader2, Play, RotateCw, Server as ServerIcon, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { serverPowerAction } from "@/lib/portal.functions";
 import { SERVICES } from "@/lib/services";
 import type { ServerStatus, ServerView } from "@/lib/portal-types";
 import { cn } from "@/lib/utils";
-import { errorText, useServers } from "./hooks";
+import { errorText, useRefreshAll, useServers } from "./hooks";
 
 const STATUS: Record<ServerStatus, string> = {
   ONLINE: "bg-success/15 text-success",
@@ -40,12 +42,26 @@ function Usage({ label, used, limit, unit }: { label: string; used: number | nul
 
 function ServerCard({ s }: { s: ServerView }) {
   const svc = s.service ? SERVICES[s.service] : null;
+  const refresh = useRefreshAll();
+  const power = useMutation({
+    mutationFn: (signal: "start" | "restart" | "stop") =>
+      serverPowerAction({ data: { identifier: s.identifier, signal } }),
+    onSuccess: async (res) => {
+      toast.success(res.message);
+      await refresh();
+    },
+    onError: (e) => toast.error(errorText(e)),
+  });
+
   const copyAddr = () =>
     s.address &&
     navigator.clipboard.writeText(s.address).then(
       () => toast.success("Address copied"),
       () => toast.error("Couldn't access clipboard"),
     );
+
+  const ssoConsoleHref = `/api/game/panel-sso?next=${encodeURIComponent(`/server/${s.identifier}`)}`;
+
   return (
     <div className="rounded-2xl border border-border bg-background/40 p-5">
       <div className="flex items-start gap-3">
@@ -62,6 +78,7 @@ function ServerCard({ s }: { s: ServerView }) {
       </div>
 
       <button
+        type="button"
         onClick={copyAddr}
         disabled={!s.address}
         className="mt-4 flex w-full items-center justify-between rounded-xl border border-border bg-card/60 px-3 py-2 font-mono text-sm hover:border-sheen/60"
@@ -75,11 +92,52 @@ function ServerCard({ s }: { s: ServerView }) {
         <Usage label="CPU" used={s.cpuUsed} limit={s.cpuLimit} unit="%" />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="size-3.5" /> {countdown(s.expiresAt)}</span>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3.5">
+        <div className="flex items-center gap-1.5">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 rounded-lg px-2.5 text-xs text-emerald-300 hover:bg-emerald-500/15"
+            disabled={power.isPending}
+            onClick={() => power.mutate("start")}
+            title="Start server"
+          >
+            {power.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />} Start
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 rounded-lg px-2.5 text-xs text-amber-300 hover:bg-amber-500/15"
+            disabled={power.isPending}
+            onClick={() => power.mutate("restart")}
+            title="Restart server"
+          >
+            <RotateCw className="size-3.5" /> Restart
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-8 rounded-lg px-2.5 text-xs text-rose-300 hover:bg-rose-500/15"
+            disabled={power.isPending}
+            onClick={() => power.mutate("stop")}
+            title="Stop server"
+          >
+            <Square className="size-3.5" /> Stop
+          </Button>
+        </div>
+
         <Button asChild size="sm" variant="discord" className="rounded-lg">
-          <a href={s.manageUrl} target="_blank" rel="noreferrer">Manage Console <ExternalLink /></a>
+          <a href={ssoConsoleHref} target="_blank" rel="noreferrer">
+            Open Panel <ExternalLink />
+          </a>
         </Button>
+      </div>
+      <div className="mt-2.5 flex items-center justify-between text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5"><Clock className="size-3" /> {countdown(s.expiresAt)}</span>
+        <span className="font-mono opacity-75">ID: {s.identifier}</span>
       </div>
     </div>
   );

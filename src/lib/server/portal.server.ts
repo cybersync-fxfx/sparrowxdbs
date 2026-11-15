@@ -23,8 +23,8 @@ export async function buildDemoSession(): Promise<SessionData> {
   const pw = generatePassword();
   const now = Date.now();
   const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
-  const mc = SERVICES.minecraft.plans[1];
-  const bot = SERVICES.discord.plans[0];
+  const mc = SERVICES.minecraft.plans[1] ?? SERVICES.minecraft.plans[0]!;
+  const bot = SERVICES.discord.plans[0]!;
   const demo: DemoState = {
     coins: 1000 + 500 - planCostCoins(mc) - planCostCoins(bot),
     pteroUserId: 4821,
@@ -281,6 +281,81 @@ export async function liveClientId(): Promise<string> {
 
 export async function creditTopup(clientId: string, coins: number, paymentId: string) {
   return db.creditCoins(clientId, coins, "topup" as TxType, "UPI / card top-up via Razorpay", `razorpay:${paymentId}`);
+}
+
+export async function getPanelSsoIdentity(): Promise<
+  | null
+  | { mode: "demo"; pteroUserId: number; username: string; email: string }
+  | { mode: "live"; pteroUserId: number | null; username: string; email: string }
+> {
+  const session = await getAppSession();
+  const d = session.data;
+  if (!d.discordId) return null;
+  if (d.mode === "demo" && d.demo) {
+    return {
+      mode: "demo",
+      pteroUserId: d.demo.pteroUserId,
+      username: d.demo.pteroUsername,
+      email: d.demo.email,
+    };
+  }
+  const mode = getMode();
+  if (d.mode === "live" && d.clientId && mode === "live") {
+    const client = await db.getClient(d.clientId);
+    if (!client) return null;
+    const email = client.email ?? `discord-${client.discord_id}@users.sparrowx.net`;
+    return {
+      mode: "live",
+      pteroUserId: client.ptero_user_id ?? null,
+      username: client.ptero_username ?? d.username ?? "player",
+      email,
+    };
+  }
+  return null;
+}
+
+export async function getPanelLaunchInfo() {
+  const c = await ctx();
+  const { isPteroSsoReady } = await import("./ptero-sso.server");
+  const base = panelUrl();
+  if (c.mode === "demo") {
+    return {
+      mode: "demo" as const,
+      panelUrl: base,
+      username: c.demo.pteroUsername,
+      email: c.demo.email,
+      ssoReady: false,
+    };
+  }
+  const client = await db.getClient(c.clientId);
+  if (!client) throw new PortalError("UNAUTHENTICATED", "Account not found");
+  const ssoReady = await isPteroSsoReady(base);
+  return {
+    mode: "live" as const,
+    panelUrl: base,
+    username: client.ptero_username,
+    email: client.email ?? `discord-${client.discord_id}@users.sparrowx.net`,
+    ssoReady,
+  };
+}
+
+export async function powerAction(identifier: string, signal: "start" | "stop" | "restart") {
+  const c = await ctx();
+  if (c.mode === "demo") {
+    return { ok: true, signal, identifier, message: `Demo server "${identifier}" received ${signal.toUpperCase()} signal` };
+  }
+  const client = await db.getClient(c.clientId);
+  if (!client?.ptero_user_id) throw new PortalError("NOT_FOUND", "Panel account not linked yet");
+  const owned = await ptero.listUserServers(client.ptero_user_id);
+  if (!owned.some((s) => s.identifier === identifier)) {
+    throw new PortalError("BAD_REQUEST", "Server does not belong to your account");
+  }
+  try {
+    await ptero.sendServerPower(identifier, signal);
+    return { ok: true, signal, identifier, message: `Power signal (${signal}) sent to ${identifier}` };
+  } catch (e) {
+    throw new PortalError("UNAVAILABLE", e instanceof Error ? e.message : "Unable to send power signal");
+  }
 }
 
 export type { ServiceId };

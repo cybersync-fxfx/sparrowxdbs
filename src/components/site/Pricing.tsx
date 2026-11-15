@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
+import { DiscordIcon } from "./DiscordIcon";
 import { LOGIN_HREF, useSessionSummary } from "./Navbar";
 
 export function Pricing({ service }: { service: Service }) {
@@ -59,11 +60,13 @@ export function Pricing({ service }: { service: Service }) {
               <div className="mt-8 flex-1" />
               {me ? (
                 <Button asChild variant={p.popular ? "svc" : "ivory"} size="xl" className="w-full">
-                  <Link to="/game/dashboard" search={{ deploy: p.id }}>Deploy Plan</Link>
+                  <Link to="/game/dashboard" search={{ deploy: p.id }}>Deploy in Client Area</Link>
                 </Button>
               ) : (
                 <Button asChild variant={p.popular ? "svc" : "ivory"} size="xl" className="w-full">
-                  <a href={`${LOGIN_HREF}?plan=${p.id}`}>Deploy Plan</a>
+                  <a href={`${LOGIN_HREF}?plan=${p.id}`}>
+                    <DiscordIcon className="size-4" /> Continue with Discord
+                  </a>
                 </Button>
               )}
             </div>

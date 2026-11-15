@@ -9,7 +9,7 @@ import { Pricing } from "@/components/site/Pricing";
 import { Footer } from "@/components/site/Footer";
 import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/services";
 
-type Search = { service?: ServiceId; auth_error?: string };
+type Search = { service?: ServiceId | undefined; auth_error?: string | undefined };
 
 export const Route = createFileRoute("/game/")({
   validateSearch: (s: Record<string, unknown>): Search => ({
@@ -102,7 +102,7 @@ export const Route = createFileRoute("/game/")({
                   "acceptedAnswer": {
                     "@type": "Answer",
                     "text":
-                      "Each server is instantly linked to your Pterodactyl Game Panel account at game.sparrowx.net with full file manager, console, restart controls, and database allocations.",
+                      "Each server is instantly linked to your Pterodactyl Game Panel account at game.panel.sparrowx.net with 1-click auto-login, full file manager, console, restart controls, and database allocations.",
                   },
                 },
               ],
@@ -125,7 +125,15 @@ function GameIndex() {
   useEffect(() => {
     if (search.auth_error) {
       toast.error(search.auth_error);
-      navigate({ search: (prev) => ({ ...prev, auth_error: undefined }), replace: true, resetScroll: false });
+      navigate({
+        search: (prev) => {
+          const next = { ...prev };
+          delete next.auth_error;
+          return next;
+        },
+        replace: true,
+        resetScroll: false,
+      });
     }
   }, [search.auth_error, navigate]);
 

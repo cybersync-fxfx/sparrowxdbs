@@ -32,7 +32,7 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
       <div className="mx-auto mt-3 flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-2.5 glass sm:px-5">
-        <Link to="/game" search={{ service: undefined }} aria-label="SparrowX home">
+        <Link to="/game" search={{}} aria-label="SparrowX home">
           <Brand />
         </Link>
         <div className="hidden md:block">
@@ -40,9 +40,9 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
         </div>
         {me ? (
           <Button asChild variant="discord" size="sm" className="rounded-xl">
-            <Link to="/game/dashboard" search={{ deploy: undefined }}>
+            <Link to="/game/dashboard" search={{}}>
               <img src={me.avatarUrl} alt={`${me.username} player avatar`} width={20} height={20} className="size-5 rounded-full" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <span className="hidden sm:inline">Client Area</span>
               <LayoutDashboard className="sm:hidden" />
             </Link>
           </Button>

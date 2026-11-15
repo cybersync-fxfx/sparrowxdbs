@@ -20,11 +20,13 @@ import { Route as FIndexRouteImport } from './routes/f.index'
 import { Route as FIdRouteImport } from './routes/f.$id'
 import { Route as GameIndexRouteImport } from './routes/game.index'
 import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
+import { Route as GamePanelLaunchRouteImport } from './routes/game.panel-launch'
 import { Route as ApiDbHealthRouteImport } from './routes/api/db/health'
 import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
 import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
+import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
 import { Route as ApiPublicAuthDiscordCallbackRouteImport } from './routes/api/public/auth/discord/callback'
 import { Route as ApiPublicAuthDiscordLoginRouteImport } from './routes/api/public/auth/discord/login'
@@ -84,6 +86,11 @@ const GameDashboardRoute = GameDashboardRouteImport.update({
   path: '/game/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GamePanelLaunchRoute = GamePanelLaunchRouteImport.update({
+  id: '/game/panel-launch',
+  path: '/game/panel-launch',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDbHealthRoute = ApiDbHealthRouteImport.update({
   id: '/api/db/health',
   path: '/api/db/health',
@@ -107,6 +114,11 @@ const ApiDbQueryRoute = ApiDbQueryRouteImport.update({
 const ApiDbSummaryRoute = ApiDbSummaryRouteImport.update({
   id: '/api/db/summary',
   path: '/api/db/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
+  id: '/api/game/panel-sso',
+  path: '/api/game/panel-sso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicRazorpayWebhookRoute =
@@ -138,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
+  '/game/panel-launch': typeof GamePanelLaunchRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
   '/api/db/health': typeof ApiDbHealthRoute
@@ -145,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
+  '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -159,6 +173,7 @@ export interface FileRoutesByTo {
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
+  '/game/panel-launch': typeof GamePanelLaunchRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
   '/api/db/health': typeof ApiDbHealthRoute
@@ -166,6 +181,7 @@ export interface FileRoutesByTo {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
+  '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -181,6 +197,7 @@ export interface FileRoutesById {
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
+  '/game/panel-launch': typeof GamePanelLaunchRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
   '/api/db/health': typeof ApiDbHealthRoute
@@ -188,6 +205,7 @@ export interface FileRoutesById {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
+  '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -204,6 +222,7 @@ export interface FileRouteTypes {
     | '/docs/errors'
     | '/f/$id'
     | '/game/dashboard'
+    | '/game/panel-launch'
     | '/f/'
     | '/game/'
     | '/api/db/health'
@@ -211,6 +230,7 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/game/panel-sso'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -225,6 +245,7 @@ export interface FileRouteTypes {
     | '/docs/errors'
     | '/f/$id'
     | '/game/dashboard'
+    | '/game/panel-launch'
     | '/f'
     | '/game'
     | '/api/db/health'
@@ -232,6 +253,7 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/game/panel-sso'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -246,6 +268,7 @@ export interface FileRouteTypes {
     | '/docs/errors'
     | '/f/$id'
     | '/game/dashboard'
+    | '/game/panel-launch'
     | '/f/'
     | '/game/'
     | '/api/db/health'
@@ -253,6 +276,7 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/game/panel-sso'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -268,6 +292,7 @@ export interface RootRouteChildren {
   DocsErrorsRoute: typeof DocsErrorsRoute
   FIdRoute: typeof FIdRoute
   GameDashboardRoute: typeof GameDashboardRoute
+  GamePanelLaunchRoute: typeof GamePanelLaunchRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
   ApiDbHealthRoute: typeof ApiDbHealthRoute
@@ -275,6 +300,7 @@ export interface RootRouteChildren {
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
   ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
+  ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicAuthDiscordCallbackRoute: typeof ApiPublicAuthDiscordCallbackRoute
   ApiPublicAuthDiscordLoginRoute: typeof ApiPublicAuthDiscordLoginRoute
@@ -359,6 +385,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/game/panel-launch': {
+      id: '/game/panel-launch'
+      path: '/game/panel-launch'
+      fullPath: '/game/panel-launch'
+      preLoaderRoute: typeof GamePanelLaunchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/db/health': {
       id: '/api/db/health'
       path: '/api/db/health'
@@ -392,6 +425,13 @@ declare module '@tanstack/react-router' {
       path: '/api/db/summary'
       fullPath: '/api/db/summary'
       preLoaderRoute: typeof ApiDbSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/game/panel-sso': {
+      id: '/api/game/panel-sso'
+      path: '/api/game/panel-sso'
+      fullPath: '/api/game/panel-sso'
+      preLoaderRoute: typeof ApiGamePanelSsoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/razorpay/webhook': {
@@ -428,6 +468,7 @@ const rootRouteChildren: RootRouteChildren = {
   DocsErrorsRoute: DocsErrorsRoute,
   FIdRoute: FIdRoute,
   GameDashboardRoute: GameDashboardRoute,
+  GamePanelLaunchRoute: GamePanelLaunchRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
   ApiDbHealthRoute: ApiDbHealthRoute,
@@ -435,6 +476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbProvisionRoute: ApiDbProvisionRoute,
   ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
+  ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicAuthDiscordCallbackRoute: ApiPublicAuthDiscordCallbackRoute,
   ApiPublicAuthDiscordLoginRoute: ApiPublicAuthDiscordLoginRoute,

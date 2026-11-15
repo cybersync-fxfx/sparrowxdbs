@@ -175,3 +175,29 @@ export async function listUserServers(userId: number): Promise<LiveServer[]> {
     }),
   );
 }
+
+export async function sendServerPower(
+  identifier: string,
+  signal: "start" | "stop" | "restart" | "kill",
+): Promise<void> {
+  const key = env("PTERO_CLIENT_API_KEY");
+  if (!key) {
+    throw new Error("PTERO_CLIENT_API_KEY is not configured for remote power actions");
+  }
+  if (!/^[a-z0-9]{6,16}$/i.test(identifier)) {
+    throw new Error("Invalid server identifier");
+  }
+  const res = await fetch(`${panelUrl()}/api/client/servers/${identifier}/power`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: "Application/vnd.pterodactyl.v1+json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ signal }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Pterodactyl power ${res.status}: ${text.slice(0, 180)}`);
+  }
+}

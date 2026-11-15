@@ -4,13 +4,14 @@ export const Route = createFileRoute("/api/public/auth/discord/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const url = new URL(request.url);
-        const origin = url.origin;
-        const fail = (reason: string) => Response.redirect(`${origin}/game?auth_error=${encodeURIComponent(reason)}`, 302);
         const { env, getMode } = await import("@/lib/server/config.server");
         const { getAppSession } = await import("@/lib/server/session.server");
         const { timingSafeEqual } = await import("@/lib/server/crypto.server");
-        if (getMode() !== "live") return Response.redirect(`${origin}/api/public/auth/discord/login`, 302);
+        const { redirect302, resolveRequestOrigin } = await import("@/lib/server/http.server");
+        const url = new URL(request.url);
+        const origin = resolveRequestOrigin(request);
+        const fail = (reason: string) => redirect302(`${origin}/game?auth_error=${encodeURIComponent(reason)}`);
+        if (getMode() !== "live") return redirect302(`${origin}/api/public/auth/discord/login`);
 
         const session = await getAppSession();
         const code = url.searchParams.get("code");
@@ -20,13 +21,17 @@ export const Route = createFileRoute("/api/public/auth/discord/callback")({
         if (!code || !expected || !timingSafeEqual(state, expected)) return fail("Sign-in expired, please try again");
 
         try {
+          const clientId = env("DISCORD_CLIENT_ID");
+          const clientSecret = env("DISCORD_CLIENT_SECRET");
+          if (!clientId || !clientSecret) return fail("Discord OAuth is not configured on this server");
+
           const redirectUri = env("DISCORD_REDIRECT_URI") ?? `${origin}/api/public/auth/discord/callback`;
           const tokenRes = await fetch("https://discord.com/api/oauth2/token", {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
-              client_id: env("DISCORD_CLIENT_ID")!,
-              client_secret: env("DISCORD_CLIENT_SECRET")!,
+              client_id: clientId,
+              client_secret: clientSecret,
               grant_type: "authorization_code",
               code,
               redirect_uri: redirectUri,
@@ -50,6 +55,12 @@ export const Route = createFileRoute("/api/public/auth/discord/callback")({
             email: me.verified ? (me.email ?? null) : null,
           });
           const nextPlan = session.data.nextPlan;
+          const savedOrigin = session.data.oauthOrigin;
+          const safeOrigin =
+            savedOrigin && /^https?:\/\/([a-z0-9-]+\.)*sparrowx\.net(:\d+)?$/i.test(savedOrigin)
+              ? savedOrigin
+              : origin;
+          await session.clear();
           await session.update({
             mode: "live",
             clientId: client.id,
@@ -57,10 +68,8 @@ export const Route = createFileRoute("/api/public/auth/discord/callback")({
             username: me.username,
             globalName: me.global_name,
             avatar: me.avatar,
-            oauthState: undefined,
-            nextPlan: undefined,
           });
-          return Response.redirect(`${origin}/game/dashboard${nextPlan ? `?deploy=${nextPlan}` : ""}`, 302);
+          return redirect302(`${safeOrigin}/game/dashboard${nextPlan ? `?deploy=${nextPlan}` : ""}`);
         } catch (e) {
           console.error("Discord callback failed", e);
           return fail("We couldn't set up your account, please try again");

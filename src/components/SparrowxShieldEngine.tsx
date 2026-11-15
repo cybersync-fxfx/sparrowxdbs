@@ -2,24 +2,14 @@ import React, { useEffect, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  Check,
-  Copy,
   Eye,
   EyeOff,
-  Globe,
   Lock,
   Mail,
   RefreshCw,
   Shield,
-  Terminal,
   User,
 } from "lucide-react";
-import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
-import {
-  SparrowxSentraSocWorkbench,
-  type SocViewMode,
-} from "@/components/SparrowxSentraSocWorkbench";
-import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   Dialog,
   DialogContent,
@@ -29,29 +19,35 @@ import {
 } from "@/components/ui/dialog";
 import {
   authenticateAppUserFromBackend,
+  fetchAllWorkspaceData,
   fetchAppUserByEmailFromBackend,
   persistAppUserToBackend,
+  persistAssetToBackend,
+  persistIncidentToBackend,
   type AppUser,
+  type Asset,
+  type ClientTenant,
+  type Incident,
+  type ProtectedService,
 } from "@/lib/supabase";
 import {
   clearSessionToken,
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
-import { SPARROWX_PLANS, type SparrowxPlan } from "@/lib/sparrowx-plans";
-import {
-  validateSafePublicTarget,
-  runLivePublicDomainScan,
-  downloadBrandedHtmlSecurityReport,
-  type LiveDomainAuditResult,
-} from "@/components/GrowthAndMonetizationHub";
+import { ShieldLandingView } from "./shield/ShieldLandingView";
+import { ShieldClientAreaView } from "./shield/ShieldClientAreaView";
+import { ShieldSocDashboardView } from "./shield/ShieldSocDashboardView";
 
 export interface SparrowxShieldEngineProps {
   currentUser?: AppUser | null;
   onUserAuthenticated?: (user: AppUser) => void;
   onOpenClientArea?: () => void;
   onSignOut?: () => void;
+  initialStage?: ShieldStage;
 }
+
+export type ShieldStage = "landing" | "client-area" | "dashboard";
 
 function readInitialShieldUser(propUser?: AppUser | null): AppUser | null {
   if (propUser) return propUser;
@@ -88,41 +84,30 @@ function readInitialShieldUser(propUser?: AppUser | null): AppUser | null {
   return null;
 }
 
-interface InspectionResult {
-  domain: string;
-  ip: string;
-  tlsVersion: string;
-  cipherSuite: string;
-  dnsPropagation: string;
-  edgeLatencyMs: number;
-  originCloaked: boolean;
-  wafStatus: "Active" | "Monitoring";
-  threatScore: number;
-  securityHeaders: {
-    hsts: boolean;
-    csp: boolean;
-    xframe: boolean;
-    nosniff: boolean;
-  };
-}
-
 export function SparrowxShieldEngine({
   currentUser,
   onUserAuthenticated,
-  onOpenClientArea,
   onSignOut,
+  initialStage,
 }: SparrowxShieldEngineProps = {}) {
-  const [targetDomain, setTargetDomain] = useState<string>("sparrowx.net");
-  const [inspecting, setInspecting] = useState<boolean>(false);
-  const [socModalOpen, setSocModalOpen] = useState<boolean>(false);
-  const [copiedCmd, setCopiedCmd] = useState<boolean>(false);
-  const [currency, setCurrency] = useState<"INR" | "USD" | "EUR">("INR");
-  const [railMode, setRailMode] = useState<SocViewMode>("queue");
-
-  // SOC persistent session & auth dialog state
   const [sessionUser, setSessionUser] = useState<AppUser | null>(() =>
     readInitialShieldUser(currentUser),
   );
+  const activeUser = currentUser ?? sessionUser;
+
+  const [viewStage, setViewStage] = useState<ShieldStage>(() => {
+    if (initialStage) return initialStage;
+    return readInitialShieldUser(currentUser) ? "client-area" : "landing";
+  });
+
+  // Workspace collections loaded ONLY after authentication
+  const [tenants, setTenants] = useState<ClientTenant[]>([]);
+  const [services, setServices] = useState<ProtectedService[]>([]);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+
+  // Auth dialog state
+  const [socModalOpen, setSocModalOpen] = useState(false);
   const [socAuthMode, setSocAuthMode] = useState<"signin" | "register">("signin");
   const [socFullName, setSocFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
@@ -134,12 +119,33 @@ export function SparrowxShieldEngine({
   useEffect(() => {
     if (currentUser) {
       setSessionUser(currentUser);
+      setViewStage((prev) => (prev === "landing" ? "client-area" : prev));
     } else {
-      setSessionUser(readInitialShieldUser(null));
+      const next = readInitialShieldUser(null);
+      setSessionUser(next);
+      if (!next) setViewStage("landing");
     }
   }, [currentUser]);
 
-  const activeUser = currentUser ?? sessionUser;
+  useEffect(() => {
+    if (!activeUser) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const ws = await fetchAllWorkspaceData();
+        if (cancelled) return;
+        setTenants(ws.clientTenants ?? []);
+        setServices(ws.protectedServices ?? []);
+        setIncidents(ws.incidents ?? []);
+        setAssets(ws.assets ?? []);
+      } catch {
+        // Offline / empty backend stays cleanly empty (zero fake data)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeUser?.id, activeUser?.email]);
 
   const handleShieldSignOut = () => {
     clearSessionToken();
@@ -147,665 +153,111 @@ export function SparrowxShieldEngine({
       localStorage.removeItem("sparrowx_auth_user");
     }
     setSessionUser(null);
+    setViewStage("landing");
     onSignOut?.();
   };
 
-  const handleRailSelect = (mode: SocViewMode) => {
-    setRailMode(mode);
-    if (typeof document !== "undefined") {
-      if (mode === "map") {
-        document.getElementById("shield-threat-map")?.scrollIntoView({ behavior: "smooth" });
-      } else if (mode === "plans") {
-        document.getElementById("shield-agent-plans")?.scrollIntoView({ behavior: "smooth" });
-      }
+  const completeAuthTransition = (user: AppUser) => {
+    issueSignedSessionToken({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName || user.email.split("@")[0] || "Operator",
+      role: user.admin === "yes" ? "admin" : "client",
+      tenantId: user.tenantId,
+    });
+    setSessionUser(user);
+    setSocModalOpen(false);
+    // Strict post-login destination: Client Area BEFORE Dashboard
+    setViewStage("client-area");
+    onUserAuthenticated?.(user);
+    if (typeof window !== "undefined" && typeof window.scrollTo === "function") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
-  const [result, setResult] = useState<InspectionResult | null>({
-    domain: "sparrowx.net",
-    ip: "Anycast Edge Gateway (Origin Cloaked)",
-    tlsVersion: "TLS 1.3 (ChaCha20-Poly1305 / AES-256-GCM)",
-    cipherSuite: "ECDHE-ECDSA-AES256-GCM-SHA384",
-    dnsPropagation: "Global Synchronized (100% propagated)",
-    edgeLatencyMs: 9,
-    originCloaked: true,
-    wafStatus: "Active",
-    threatScore: 0,
-    securityHeaders: {
-      hsts: true,
-      csp: true,
-      xframe: true,
-      nosniff: true,
-    },
-  });
-
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
-  const [liveAudit, setLiveAudit] = useState<LiveDomainAuditResult | null>(null);
-  const [auditError, setAuditError] = useState<string | null>(null);
-
-  const runSecurityInspection = async () => {
-    if (!targetDomain.trim()) return;
-    setInspecting(true);
-    setAuditError(null);
-    try {
-      const safe = validateSafePublicTarget(targetDomain);
-      if (!safe.valid) {
-        setAuditError(safe.error ?? "Invalid domain target.");
-        setInspecting(false);
-        return;
-      }
-      const live = await runLivePublicDomainScan(safe.cleanHost);
-      setLiveAudit(live);
-
-      const hasCsp = live.findings.some(
-        (f) =>
-          f.category === "Defensive HTTP Headers" &&
-          f.status === "passed" &&
-          f.title.toLowerCase().includes("csp"),
-      );
-      const hasHsts = live.findings.some(
-        (f) =>
-          f.category === "Defensive HTTP Headers" &&
-          f.status === "passed" &&
-          f.title.toLowerCase().includes("hsts"),
-      );
-      const hasXframe = live.findings.some(
-        (f) =>
-          f.category === "Defensive HTTP Headers" &&
-          f.status === "passed" &&
-          f.title.toLowerCase().includes("frame"),
-      );
-      const hasNosniff = live.findings.some(
-        (f) =>
-          f.category === "Defensive HTTP Headers" &&
-          f.status === "passed" &&
-          f.title.toLowerCase().includes("nosniff"),
-      );
-      const isCloaked = live.score >= 70 || safe.cleanHost.includes("sparrowx");
-
-      setResult({
-        domain: safe.cleanHost,
-        ip: isCloaked
-          ? "Anycast Edge Gateway (Origin Cloaked)"
-          : (live.findings[0]?.evidence?.slice(0, 45) ?? "Direct Cloud IP Exposed"),
-        tlsVersion:
-          live.scoreGrade === "A"
-            ? "TLS 1.3 (ChaCha20-Poly1305 / AES-256-GCM)"
-            : "TLS 1.2 / Standard Edge Handshake",
-        cipherSuite: "ECDHE-ECDSA-AES256-GCM-SHA384",
-        dnsPropagation: "Global Synchronized (100% propagated)",
-        edgeLatencyMs: Math.floor(8 + Math.random() * 12),
-        originCloaked: isCloaked,
-        wafStatus: isCloaked ? "Active" : "Exposed",
-        threatScore: Math.max(0, 100 - live.score),
-        securityHeaders: {
-          hsts: hasHsts,
-          csp: hasCsp,
-          xframe: hasXframe,
-          nosniff: hasNosniff,
-        },
-      });
-    } catch (err) {
-      setAuditError(err instanceof Error ? err.message : "Live perimeter scan failed.");
-    } finally {
-      setInspecting(false);
+  const handleResolveIncident = async (id: string) => {
+    const next = incidents.map((inc) =>
+      inc.id === id ? { ...inc, status: "Contained" as const } : inc,
+    );
+    setIncidents(next);
+    const updated = next.find((i) => i.id === id);
+    if (updated) {
+      await persistIncidentToBackend(updated);
     }
   };
 
-  const formatPlanPrice = (plan: SparrowxPlan) => {
-    const rawUsd = billingCycle === "annual" ? plan.annualPriceMonthly : plan.monthlyPrice;
-    if (currency === "INR") {
-      return `₹${Math.round(rawUsd * 85).toLocaleString("en-IN")}`;
+  const handleToggleAssetIsolation = async (id: string) => {
+    const next = assets.map((a) =>
+      a.id === id
+        ? { ...a, status: (a.status === "Isolated" ? "Protected" : "Isolated") as Asset["status"] }
+        : a,
+    );
+    setAssets(next);
+    const updated = next.find((a) => a.id === id);
+    if (updated) {
+      await persistAssetToBackend(updated);
     }
-    if (currency === "EUR") {
-      return `€${Math.round(rawUsd * 0.92)}`;
+  };
+
+  const openAuthModal = (mode: "signin" | "register" = "signin") => {
+    setSocAuthMode(mode);
+    setAuthError("");
+    setSocModalOpen(true);
+  };
+
+  const handleEnterClientArea = () => {
+    if (!activeUser) {
+      openAuthModal("signin");
+      return;
     }
-    return `$${rawUsd}`;
+    setViewStage("client-area");
+  };
+
+  const handleEnterDashboard = () => {
+    if (!activeUser) {
+      openAuthModal("signin");
+      return;
+    }
+    setViewStage("dashboard");
   };
 
   return (
-    <div className="font-soc min-h-screen bg-[#090B11] text-[#F4F6FA] flex flex-col selection:bg-[#F9103A] selection:text-[#F4F6FA]">
-      {/* TOP BAR */}
-      <header className="sticky top-0 z-40 border-b border-[#F4F6FA]/[0.07] bg-[#090B11]/95 px-4 sm:px-6 py-3 backdrop-blur-md">
-        <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logos/sparrowx-shield.png"
-              alt="SparrowX Shield"
-              width={36}
-              height={36}
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]"
-            />
-            <div className="flex items-center gap-2">
-              <span className="text-base font-medium tracking-tight text-[#F4F6FA]">
-                SparrowX Shield
-              </span>
-              <span className="hidden sm:inline text-xs text-[#F4F6FA]/40">
-                sec.sparrowx.net
-              </span>
-            </div>
-          </div>
+    <>
+      {viewStage === "dashboard" && activeUser ? (
+        <ShieldSocDashboardView
+          activeUser={activeUser}
+          tenants={tenants}
+          incidents={incidents}
+          assets={assets}
+          onIncidentsUpdated={setIncidents}
+          onResolveIncident={handleResolveIncident}
+          onToggleAssetIsolation={handleToggleAssetIsolation}
+          onBackToClientArea={() => setViewStage("client-area")}
+          onSignOut={handleShieldSignOut}
+        />
+      ) : viewStage === "client-area" && activeUser ? (
+        <ShieldClientAreaView
+          activeUser={activeUser}
+          tenants={tenants}
+          services={services}
+          incidents={incidents}
+          onTenantsUpdated={setTenants}
+          onServicesUpdated={setServices}
+          onOpenDashboard={() => setViewStage("dashboard")}
+          onBackToLanding={() => setViewStage("landing")}
+          onSignOut={handleShieldSignOut}
+        />
+      ) : (
+        <ShieldLandingView
+          activeUser={activeUser}
+          onOpenAuthModal={openAuthModal}
+          onEnterClientArea={handleEnterClientArea}
+          onEnterDashboard={handleEnterDashboard}
+          onSignOut={handleShieldSignOut}
+        />
+      )}
 
-          <nav aria-label="Primary Shield Sections" className="hidden md:flex items-center gap-6 text-xs">
-            <a
-              href="#shield-soc-workbench"
-              onClick={() => setRailMode("queue")}
-              className="text-[#F4F6FA]/85 hover:text-[#F4F6FA] transition-colors"
-            >
-              Incident Triage
-            </a>
-            <a
-              href="#shield-threat-map"
-              className="text-[#F4F6FA]/60 hover:text-[#F4F6FA] transition-colors"
-            >
-              Threat Map &amp; Audit
-            </a>
-            <a
-              href="#shield-agent-plans"
-              className="text-[#F4F6FA]/60 hover:text-[#F4F6FA] transition-colors"
-            >
-              Connector &amp; Plans
-            </a>
-          </nav>
-
-          <div className="flex items-center gap-2.5">
-            {activeUser ? (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/35 bg-[#10B981]/10 px-3 py-1 text-xs font-medium text-[#10B981]">
-                  <span className="size-1.5 rounded-full bg-[#10B981]" />
-                  <span>{activeUser.email}</span>
-                </span>
-                {onOpenClientArea && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenClientArea()}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#F9103A] px-3 py-1.5 text-xs font-medium text-[#F4F6FA] transition-colors hover:bg-[#F9103A]/90 cursor-pointer"
-                  >
-                    <User className="size-3.5" />
-                    <span>Client Area</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={handleShieldSignOut}
-                  className="rounded-lg border border-[#F4F6FA]/12 bg-[#121620] px-3 py-1.5 text-xs text-[#F4F6FA]/75 transition-colors hover:text-[#F4F6FA] cursor-pointer"
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setSocModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#F9103A] px-4 py-2 text-xs font-medium text-[#F4F6FA] transition-colors hover:bg-[#F9103A]/90 cursor-pointer shadow-[0_6px_20px_rgba(249,16,58,0.28)]"
-              >
-                <Lock className="size-3.5" />
-                <span>{onOpenClientArea ? "Sign In to Client Area" : "Sign In to SOC"}</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* MAIN CONTAINER — OPENS DIRECTLY INTO THE SENTRA SOC WORKBENCH */}
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-8">
-        <div id="shield-soc-workbench">
-          <SparrowxSentraSocWorkbench
-            currentUser={activeUser}
-            activeRailMode={railMode}
-            onSelectRailMode={handleRailSelect}
-            onOpenAuthModal={() => setSocModalOpen(true)}
-            onOpenClientArea={onOpenClientArea}
-            onSignOut={handleShieldSignOut}
-            showExtendedRailItems={true}
-          />
-        </div>
-
-        {/* SECTION 2: LIVE GLOBAL THREAT MAP & 15-SECOND ORIGIN CLOAKING AUDIT */}
-        <section id="shield-threat-map" className="space-y-6">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-medium tracking-tight text-[#F4F6FA]">
-                Perimeter Radar &amp; Domain Origin Audit
-              </h2>
-              <p className="mt-1 text-xs sm:text-sm text-[#F4F6FA]/55">
-                Inspect live inbound packet deflection and test whether your origin IP is exposed.
-              </p>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-[#F4F6FA]/60">
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#10B981]" /> Edge Relay
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-[#F9103A]" /> Intercepted Flows
-              </span>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-2 sm:p-4">
-            <CyberThreatMatrixMap
-              height={typeof window !== "undefined" && window.innerWidth < 640 ? 320 : 500}
-              enableSimulation={true}
-              simIntervalMs={1800}
-              showControls={true}
-              showFeed={true}
-              showStats={true}
-            />
-          </div>
-
-          {/* Domain Security & Origin Audit Panel */}
-          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-5 sm:p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row gap-2.5">
-              <div className="relative flex-1">
-                <Globe className="size-4 text-[#F4F6FA]/40 absolute left-3.5 top-3.5 sm:top-3" />
-                <input
-                  type="text"
-                  placeholder="Enter domain to audit (e.g. yourstartup.com, sparrowx.net)"
-                  value={targetDomain}
-                  onChange={(e) => setTargetDomain(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && runSecurityInspection()}
-                  className="w-full h-11 sm:h-10 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] pl-10 pr-4 text-xs font-mono text-[#F4F6FA] placeholder-[#F4F6FA]/40 outline-none focus:border-[#F96246]"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={runSecurityInspection}
-                disabled={inspecting}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[#F9103A] hover:bg-[#F9103A]/90 text-[#F4F6FA] font-medium px-6 h-11 sm:h-10 text-xs transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-              >
-                <RefreshCw className={`size-3.5 ${inspecting ? "animate-spin" : ""}`} />
-                <span>{inspecting ? "Auditing..." : "Audit Domain"}</span>
-              </button>
-            </div>
-
-            {auditError && (
-              <div className="rounded-xl border border-[#F9103A]/40 bg-[#F9103A]/10 p-4 text-xs text-[#F96246] flex items-center gap-2">
-                <AlertTriangle className="size-4 shrink-0" />
-                <span>{auditError}</span>
-              </div>
-            )}
-
-            {result && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  <div className="p-4 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.07] space-y-1">
-                    <span className="text-[11px] text-[#F4F6FA]/50 block">Server Ingress IP</span>
-                    <span className="text-[#F4F6FA] font-medium block truncate">{result.ip}</span>
-                    <span
-                      className={`text-[11px] font-medium ${
-                        result.originCloaked ? "text-[#10B981]" : "text-[#F96246]"
-                      }`}
-                    >
-                      {result.originCloaked ? "Origin Cloaked" : "Origin IP Exposed"}
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.07] space-y-1">
-                    <span className="text-[11px] text-[#F4F6FA]/50 block">TLS Encryption</span>
-                    <span className="text-[#10B981] font-medium block truncate">
-                      {result.tlsVersion}
-                    </span>
-                    <span className="text-[11px] text-[#F4F6FA]/45 font-mono truncate block">
-                      {result.cipherSuite}
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.07] space-y-1">
-                    <span className="text-[11px] text-[#F4F6FA]/50 block">Anycast DNS Sync</span>
-                    <span className="text-[#F4F6FA] font-medium block">{result.dnsPropagation}</span>
-                    <span className="text-[11px] text-[#10B981]">Zero DNS leak detected</span>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.07] space-y-1">
-                    <span className="text-[11px] text-[#F4F6FA]/50 block">Edge Relay Latency</span>
-                    <span className="text-[#FFEBB9] font-medium tabular-nums block text-base">
-                      {result.edgeLatencyMs} ms
-                    </span>
-                    <span className="text-[11px] text-[#10B981]">High-speed Edge Relay</span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.07] flex flex-wrap items-center justify-between gap-4 text-xs">
-                  <span className="text-[#FFEBB9] font-medium">Perimeter Headers</span>
-                  <span className="flex items-center gap-1.5 text-[#F4F6FA]">
-                    <Check
-                      className={`size-3.5 ${
-                        result.securityHeaders.hsts ? "text-[#10B981]" : "text-[#F4F6FA]/30"
-                      }`}
-                    />
-                    HSTS Enforced
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[#F4F6FA]">
-                    <Check
-                      className={`size-3.5 ${
-                        result.securityHeaders.csp ? "text-[#10B981]" : "text-[#F4F6FA]/30"
-                      }`}
-                    />
-                    Content-Security-Policy
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[#F4F6FA]">
-                    <Check
-                      className={`size-3.5 ${
-                        result.securityHeaders.xframe ? "text-[#10B981]" : "text-[#F4F6FA]/30"
-                      }`}
-                    />
-                    X-Frame-Options: SAMEORIGIN
-                  </span>
-                  <span className="flex items-center gap-1.5 text-[#F4F6FA]">
-                    <Check
-                      className={`size-3.5 ${
-                        result.securityHeaders.nosniff ? "text-[#10B981]" : "text-[#F4F6FA]/30"
-                      }`}
-                    />
-                    X-Content-Type-Options: nosniff
-                  </span>
-                </div>
-
-                {liveAudit && (
-                  <div className="p-5 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.10] space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F4F6FA]/[0.07] pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <span className="rounded-md bg-[#F9103A]/20 border border-[#F9103A]/40 px-2 py-0.5 text-xs font-mono font-bold text-[#F96246]">
-                          GRADE {liveAudit.scoreGrade}
-                        </span>
-                        <span className="text-xs font-medium text-[#F4F6FA]">
-                          Score: {liveAudit.score}/100 · {liveAudit.targetCategory}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => downloadBrandedHtmlSecurityReport(liveAudit)}
-                        className="inline-flex items-center gap-1.5 text-xs text-[#FFEBB9] hover:text-white transition-colors cursor-pointer"
-                      >
-                        <Shield className="size-3.5" />
-                        <span>Download Executive Audit Report (HTML)</span>
-                      </button>
-                    </div>
-
-                    {liveAudit.advisory?.recommendedAction && (
-                      <div className="text-xs text-[#F4F6FA]/75 bg-[#0D1017] p-3 rounded-lg border border-[#F4F6FA]/[0.06] space-y-1">
-                        <span className="text-[#FFEBB9] font-medium block">
-                          SparrowX AI Brain Advisory:
-                        </span>
-                        <p className="leading-relaxed">
-                          {liveAudit.advisory.recommendedAction}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* SECTION 3: 1-COMMAND SERVER AGENT & PROTECTION PLANS */}
-        <section id="shield-agent-plans" className="space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left: Live Scrubbing Stream */}
-            <div className="lg:col-span-6 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] flex flex-col justify-between overflow-hidden">
-              <div className="border-b border-[#F4F6FA]/[0.07] px-4 py-3 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <Terminal className="size-3.5 text-[#F96246]" />
-                  <span className="font-medium text-[#F4F6FA]">Autonomous Edge Scrubbing Daemon</span>
-                </div>
-                <span className="text-[#10B981] text-[11px] font-medium">Active Defense</span>
-              </div>
-
-              <div className="p-4 bg-[#090B11] font-mono text-[11px] text-[#F4F6FA]/65 space-y-2 overflow-x-auto flex-1">
-                <div className="text-[#F4F6FA]/40">
-                  [00:14:02] shadowshield-daemon v2.8 initialized across Anycast nodes
-                </div>
-                <div className="text-[#10B981]">
-                  [00:14:05] [packet-filter] Fastpath SYN proxy and origin cloak active
-                </div>
-                <div className="text-[#F9103A]">
-                  [00:14:12] [DEFLECTED] TCP SYN flood from 182.21.90.11 -&gt; :443 [480 pkts/s]
-                </div>
-                <div className="text-[#FFEBB9]">
-                  [00:14:18] [WAF-L7] SQL injection payload dropped from AS13335
-                </div>
-                <div className="text-[#F96246]">
-                  [00:14:30] [RATE-LIMITED] Malicious scraper throttled: 120 req/min cap
-                </div>
-                <div className="text-[#10B981]">
-                  [00:14:41] [AI-GUARD] Adversarial prompt injection deflected on /api/v1/generate
-                </div>
-              </div>
-            </div>
-
-            {/* Right: 1-Command Server Protect */}
-            <div className="lg:col-span-6 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-5 sm:p-6 flex flex-col justify-between space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-xs text-[#10B981]">
-                  <Shield className="size-4" />
-                  <span className="font-medium uppercase tracking-wider font-mono">Zero-Config Deployment</span>
-                </div>
-                <h3 className="text-xl font-medium text-[#F4F6FA] tracking-tight">
-                  Deploy Autonomous Shield in 60 Seconds
-                </h3>
-                <p className="text-xs text-[#F4F6FA]/60 leading-relaxed">
-                  Run our hardened drop-in edge agent on any Linux VPS, Docker cluster, or Kubernetes node to automatically cloak your origin IP, filter Layer-7 floods, and pipe telemetry to your SparrowX SOC.
-                </p>
-              </div>
-
-              <div className="space-y-2 text-xs">
-                <span className="text-[#F4F6FA]/60 text-[11px] block">Run on your origin server (Ubuntu/Debian/RHEL):</span>
-                <div className="flex items-center justify-between gap-2 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] px-3 py-2.5">
-                  <code className="text-[#FFEBB9] font-mono text-[11px] truncate select-all">
-                    curl -sSL https://sec.sparrowx.net/install.sh | sudo bash
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        "curl -sSL https://sec.sparrowx.net/install.sh | sudo bash",
-                      );
-                      setCopiedCmd(true);
-                      setTimeout(() => setCopiedCmd(false), 2000);
-                    }}
-                    className="px-2.5 py-1 rounded-lg border border-[#F4F6FA]/12 bg-[#121620] text-[#F4F6FA] hover:border-[#F96246]/50 transition-colors cursor-pointer shrink-0 text-[11px]"
-                  >
-                    {copiedCmd ? (
-                      <span className="text-[#10B981] flex items-center gap-1">
-                        <Check className="size-3" /> Copied
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1">
-                        <Copy className="size-3" /> Copy
-                      </span>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Business Model Subscription Plans */}
-          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-6 sm:p-8 space-y-6">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#F4F6FA]/[0.07] pb-6">
-              <div>
-                <div className="flex items-center gap-2 text-xs font-mono uppercase text-[#F96246] tracking-wider mb-1">
-                  <span>Monetization &amp; Protection Mesh</span>
-                </div>
-                <h2 className="text-2xl font-medium text-[#F4F6FA] tracking-tight">
-                  Production Security &amp; SOC Subscription Tiers
-                </h2>
-                <p className="text-xs sm:text-sm text-[#F4F6FA]/55 mt-1 max-w-2xl">
-                  Transparent, predictable pricing with measured unit economics and enterprise-grade SLAs. No sudden $1,000 egress traps.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                {/* Billing Cycle Toggle */}
-                <div className="flex items-center gap-1 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-1 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle("monthly")}
-                    className={`rounded-lg px-3 py-1 transition-colors cursor-pointer ${
-                      billingCycle === "monthly"
-                        ? "bg-[#F9103A] text-white font-medium"
-                        : "text-[#F4F6FA]/55 hover:text-white"
-                    }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycle("annual")}
-                    className={`rounded-lg px-3 py-1 transition-colors cursor-pointer flex items-center gap-1.5 ${
-                      billingCycle === "annual"
-                        ? "bg-[#F9103A] text-white font-medium"
-                        : "text-[#F4F6FA]/55 hover:text-white"
-                    }`}
-                  >
-                    <span>Annual</span>
-                    <span className="text-[10px] bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded font-mono font-bold">
-                      Save ~20%
-                    </span>
-                  </button>
-                </div>
-
-                {/* Currency Selector */}
-                <div
-                  role="tablist"
-                  aria-label="Billing currency"
-                  className="flex items-center gap-1 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-1 text-xs"
-                >
-                  {(["INR", "USD", "EUR"] as const).map((curr) => (
-                    <button
-                      key={curr}
-                      type="button"
-                      role="tab"
-                      aria-selected={currency === curr}
-                      onClick={() => setCurrency(curr)}
-                      className={`rounded-lg px-3 py-1 transition-colors cursor-pointer ${
-                        currency === curr
-                          ? "bg-[#F4F6FA]/15 text-[#F4F6FA] font-medium"
-                          : "text-[#F4F6FA]/45 hover:text-[#F4F6FA]"
-                      }`}
-                    >
-                      {curr}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* The 6 Plans Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {SPARROWX_PLANS.map((plan) => {
-                const isPopular = plan.popular;
-                return (
-                  <div
-                    key={plan.id}
-                    className={`rounded-xl border p-5 flex flex-col justify-between space-y-5 transition-all ${
-                      isPopular
-                        ? "border-[#F9103A]/50 bg-[#140E14] shadow-[0_12px_36px_rgba(249,16,58,0.12)]"
-                        : "border-[#F4F6FA]/[0.08] bg-[#090B11] hover:border-[#F4F6FA]/[0.18]"
-                    }`}
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F96246]">
-                          {plan.tier}
-                        </span>
-                        {plan.badge && (
-                          <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
-                              isPopular
-                                ? "bg-[#F9103A] text-white"
-                                : "bg-[#F4F6FA]/10 text-[#FFEBB9] border border-[#FFEBB9]/25"
-                            }`}
-                          >
-                            {plan.badge}
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="text-lg font-bold text-white tracking-tight">{plan.name}</h3>
-
-                      <div className="pt-1 tabular-nums">
-                        <span className="text-3xl font-extrabold text-white">
-                          {formatPlanPrice(plan)}
-                        </span>
-                        <span className="text-xs text-[#F4F6FA]/45 ml-1">/month</span>
-                        {billingCycle === "annual" && (
-                          <span className="block text-[11px] text-[#10B981] mt-0.5 font-mono">
-                            Billed annually ({plan.annualSavingsPct}% savings)
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-xs text-[#F4F6FA]/60 leading-relaxed min-h-[36px]">
-                        {plan.tagline}
-                      </p>
-
-                      <div className="pt-2 border-t border-[#F4F6FA]/[0.06] space-y-2 text-xs">
-                        <div className="flex items-center justify-between text-[#F4F6FA]/70 text-[11px]">
-                          <span>Requests Quota:</span>
-                          <span className="font-mono text-white font-semibold">
-                            {(plan.requestQuotaMonthly / 1_000_000).toFixed(1).replace(".0", "")}M / mo
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[#F4F6FA]/70 text-[11px]">
-                          <span>Protected Domains:</span>
-                          <span className="font-mono text-white font-semibold">
-                            {plan.maxDomains === -1 ? "Unlimited" : `${plan.maxDomains} Domains`}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-[#F4F6FA]/70 text-[11px]">
-                          <span>Response SLA:</span>
-                          <span className="font-mono text-[#10B981] text-[10px]">
-                            {plan.sla}
-                          </span>
-                        </div>
-                      </div>
-
-                      <ul className="pt-2 space-y-1.5 text-xs text-[#F4F6FA]/80">
-                        {plan.highlights.map((h, i) => (
-                          <li key={i} className="flex items-start gap-2 text-[11px]">
-                            <Check className="size-3.5 text-[#10B981] shrink-0 mt-0.5" />
-                            <span>{h}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onOpenClientArea) {
-                          onOpenClientArea();
-                        } else {
-                          setSocModalOpen(true);
-                        }
-                      }}
-                      className={`w-full py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                        isPopular
-                          ? "bg-[#F9103A] hover:bg-[#F9103A]/90 text-white shadow-[0_4px_16px_rgba(249,16,58,0.3)]"
-                          : "border border-[#F4F6FA]/15 bg-[#121620] hover:bg-white hover:text-black text-white"
-                      }`}
-                    >
-                      <span>Deploy {plan.name}</span>
-                      <ArrowRight className="size-3.5" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* FOOTER */}
-      <SparrowxFooter
-        isAuthenticated={Boolean(activeUser)}
-        onSignIn={() => setSocModalOpen(true)}
-        onSignOut={handleShieldSignOut}
-      />
-
-      {/* Operator Auth Dialog */}
+      {/* Operator Auth Dialog (Transitions directly to Client Area upon login) */}
       <Dialog open={socModalOpen} onOpenChange={setSocModalOpen}>
         <DialogContent className="font-soc bg-[#0B0E17]/95 backdrop-blur-xl border border-[#F4F6FA]/[0.10] text-[#F4F6FA] sm:max-w-[440px] p-0 gap-0 overflow-hidden rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.85)]">
           <div className="h-px w-full bg-gradient-to-r from-transparent via-[#F9103A]/75 to-transparent" />
@@ -820,18 +272,17 @@ export function SparrowxShieldEngine({
             <div className="space-y-1">
               <DialogTitle className="text-xl font-medium text-[#F4F6FA] tracking-tight">
                 {socAuthMode === "signin"
-                  ? "Sign In to Shield Dashboard"
+                  ? "Sign In to Shield Client Area"
                   : "Register Shield Operator"}
               </DialogTitle>
               <DialogDescription className="text-[13px] text-[#F4F6FA]/60 leading-relaxed">
                 {socAuthMode === "signin"
-                  ? "Authenticate operator credentials to inspect active packet scrubbing and manage firewall rules."
-                  : "Provision a new SparrowX Shield operator account for domain cloaking and L7 WAF control."}
+                  ? "Sign in to access your Client Area, manage domain keys, and launch the Security + SOC Dashboard."
+                  : "Provision your SparrowX Shield Client Area operator account."}
               </DialogDescription>
             </div>
           </DialogHeader>
 
-          {/* Mode Tabs */}
           <div
             role="tablist"
             aria-label="Operator authentication mode"
@@ -852,7 +303,7 @@ export function SparrowxShieldEngine({
               }`}
             >
               <Lock className="size-3.5" />
-              <span>Sign In to SOC</span>
+              <span>Sign In</span>
             </button>
             <button
               type="button"
@@ -869,7 +320,7 @@ export function SparrowxShieldEngine({
               }`}
             >
               <User className="size-3.5" />
-              <span>Register Operator</span>
+              <span>Register</span>
             </button>
           </div>
 
@@ -893,63 +344,30 @@ export function SparrowxShieldEngine({
                     authPassword,
                   );
                   if (res.user) {
-                    issueSignedSessionToken({
-                      id: res.user.id,
-                      email: res.user.email,
-                      fullName:
-                        res.user.fullName || res.user.email.split("@")[0] || "Operator",
-                      role: res.user.admin === "yes" ? "admin" : "client",
-                      tenantId: res.user.tenantId,
-                    });
-                    setSessionUser(res.user);
-                    setSocModalOpen(false);
-                    if (onUserAuthenticated) {
-                      onUserAuthenticated(res.user);
-                    } else {
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }
+                    completeAuthTransition(res.user);
                   } else {
                     setAuthError(res.error || "Invalid sign-in credentials.");
                   }
                 } else {
                   if (!emailClean || authPassword.length < 6) {
-                    setAuthError(
-                      "Provide a valid email and a password of at least 6 characters.",
-                    );
+                    setAuthError("Provide a valid email and a password of at least 6 characters.");
                     return;
                   }
                   const existing = await fetchAppUserByEmailFromBackend(emailClean);
                   if (existing) {
-                    setAuthError(
-                      "An account with this email already exists. Please sign in instead.",
-                    );
+                    setAuthError("An account with this email already exists. Please sign in instead.");
                     return;
                   }
                   const newUser: AppUser = {
                     id: `USR-${Date.now().toString().slice(-4)}`,
                     email: emailClean,
                     password: authPassword,
-                    fullName:
-                      socFullName.trim() || emailClean.split("@")[0] || "Operator",
+                    fullName: socFullName.trim() || emailClean.split("@")[0] || "Operator",
                     admin: "no",
                     tenantId: `TENANT-SHIELD-${Date.now().toString().slice(-4)}`,
                   };
                   await persistAppUserToBackend(newUser);
-                  const sanitizedUser: AppUser = { ...newUser, password: "" };
-                  issueSignedSessionToken({
-                    id: sanitizedUser.id,
-                    email: sanitizedUser.email,
-                    fullName: sanitizedUser.fullName,
-                    role: "client",
-                    tenantId: sanitizedUser.tenantId,
-                  });
-                  setSessionUser(sanitizedUser);
-                  setSocModalOpen(false);
-                  if (onUserAuthenticated) {
-                    onUserAuthenticated(sanitizedUser);
-                  } else {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }
+                  completeAuthTransition({ ...newUser, password: "" });
                 }
               } catch {
                 setAuthError("Auth gateway offline.");
@@ -961,9 +379,7 @@ export function SparrowxShieldEngine({
           >
             {socAuthMode === "register" && (
               <div className="space-y-1.5 text-left">
-                <label className="text-xs font-medium text-[#F4F6FA]/75 block">
-                  Operator Name
-                </label>
+                <label className="text-xs font-medium text-[#F4F6FA]/75 block">Operator Name</label>
                 <div className="relative">
                   <User className="size-4 text-[#F4F6FA]/40 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
@@ -971,7 +387,7 @@ export function SparrowxShieldEngine({
                     required
                     value={socFullName}
                     onChange={(e) => setSocFullName(e.target.value)}
-                    placeholder="Mateo Ruiz"
+                    placeholder="Your Name"
                     className="w-full rounded-xl border border-[#F4F6FA]/[0.10] bg-[#06080E]/90 pl-10 pr-3.5 py-2.5 text-sm text-[#F4F6FA] placeholder-[#F4F6FA]/35 focus:outline-none focus:border-[#F9103A] transition-colors"
                   />
                 </div>
@@ -979,9 +395,7 @@ export function SparrowxShieldEngine({
             )}
 
             <div className="space-y-1.5 text-left">
-              <label className="text-xs font-medium text-[#F4F6FA]/75 block">
-                Operator Email
-              </label>
+              <label className="text-xs font-medium text-[#F4F6FA]/75 block">Operator Email</label>
               <div className="relative">
                 <Mail className="size-4 text-[#F4F6FA]/40 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -989,16 +403,14 @@ export function SparrowxShieldEngine({
                   required
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="admin@sparrowx.net"
+                  placeholder="admin@yourdomain.com"
                   className="w-full rounded-xl border border-[#F4F6FA]/[0.10] bg-[#06080E]/90 pl-10 pr-3.5 py-2.5 text-sm text-[#F4F6FA] placeholder-[#F4F6FA]/35 focus:outline-none focus:border-[#F9103A] transition-colors"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5 text-left">
-              <label className="text-xs font-medium text-[#F4F6FA]/75 block">
-                Cryptographic Key / Password
-              </label>
+              <label className="text-xs font-medium text-[#F4F6FA]/75 block">Password</label>
               <div className="relative">
                 <Lock className="size-4 text-[#F4F6FA]/40 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
@@ -1016,11 +428,7 @@ export function SparrowxShieldEngine({
                   aria-label={showAuthPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-[#F4F6FA]/45 hover:text-[#F4F6FA] transition-colors cursor-pointer p-1"
                 >
-                  {showAuthPassword ? (
-                    <EyeOff className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
+                  {showAuthPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
@@ -1030,16 +438,8 @@ export function SparrowxShieldEngine({
               disabled={authLoading}
               className="w-full h-11 rounded-xl bg-[#F9103A] hover:bg-[#F9103A]/90 text-[#F4F6FA] font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer mt-1"
             >
-              {authLoading ? (
-                <RefreshCw className="size-4 animate-spin" />
-              ) : (
-                <Shield className="size-4" />
-              )}
-              <span>
-                {socAuthMode === "signin"
-                  ? "Authenticate Operator"
-                  : "Create Shield Operator"}
-              </span>
+              {authLoading ? <RefreshCw className="size-4 animate-spin" /> : <Shield className="size-4" />}
+              <span>{socAuthMode === "signin" ? "Enter Client Area" : "Create Account & Enter Client Area"}</span>
               {!authLoading && <ArrowRight className="size-4" />}
             </button>
           </form>
@@ -1053,9 +453,7 @@ export function SparrowxShieldEngine({
               }}
               className="hover:text-[#F4F6FA] transition-colors cursor-pointer"
             >
-              {socAuthMode === "signin"
-                ? "Need access? Register operator"
-                : "Already registered? Sign in"}
+              {socAuthMode === "signin" ? "Need access? Register operator" : "Already registered? Sign in"}
             </button>
             <button
               type="button"
@@ -1067,6 +465,6 @@ export function SparrowxShieldEngine({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
