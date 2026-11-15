@@ -38,20 +38,20 @@ export const resetPanelPassword = createServerFn({ method: "POST" }).handler(asy
 );
 
 export const deployPlan = createServerFn({ method: "POST" })
-  .inputValidator((d) =>
+  .validator((d) =>
     z.object({ planId: z.string().min(1).max(40), serverName: z.string().max(60).regex(/^[\w .\-']*$/, "Letters, numbers, spaces, - . ' only") }).parse(d),
   )
   .handler(async ({ data }) => run(async () => (await import("./server/portal.server")).deploy(data.planId, data.serverName)));
 
 export const redeemPromo = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ code: z.string().trim().min(3).max(32).regex(/^[A-Za-z0-9_-]+$/) }).parse(d))
+  .validator((d) => z.object({ code: z.string().trim().min(3).max(32).regex(/^[A-Za-z0-9_-]+$/) }).parse(d))
   .handler(async ({ data }) => run(async () => (await import("./server/portal.server")).redeemPromo(data.code)));
 
 const amountSchema = z.object({ amount: z.number().int().min(10).max(50000) });
 
 /** Starts a top-up: Razorpay order in live mode, instant simulated credit in demo mode. */
 export const startTopup = createServerFn({ method: "POST" })
-  .inputValidator((d) => amountSchema.parse(d))
+  .validator((d) => amountSchema.parse(d))
   .handler(async ({ data }) =>
     run(async () => {
       const { getMode, integrations } = await import("./server/config.server");
@@ -69,7 +69,7 @@ export const startTopup = createServerFn({ method: "POST" })
   );
 
 export const confirmTopup = createServerFn({ method: "POST" })
-  .inputValidator((d) =>
+  .validator((d) =>
     z.object({ orderId: z.string().min(5).max(64), paymentId: z.string().min(5).max(64), signature: z.string().min(10).max(256) }).parse(d),
   )
   .handler(async ({ data }) =>

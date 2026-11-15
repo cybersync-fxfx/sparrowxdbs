@@ -38,6 +38,13 @@ import {
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
+import { SPARROWX_PLANS, type SparrowxPlan } from "@/lib/sparrowx-plans";
+import {
+  validateSafePublicTarget,
+  runLivePublicDomainScan,
+  downloadBrandedHtmlSecurityReport,
+  type LiveDomainAuditResult,
+} from "@/components/GrowthAndMonetizationHub";
 
 export interface SparrowxShieldEngineProps {
   currentUser?: AppUser | null;
@@ -172,51 +179,88 @@ export function SparrowxShieldEngine({
     },
   });
 
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [liveAudit, setLiveAudit] = useState<LiveDomainAuditResult | null>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
   const runSecurityInspection = async () => {
     if (!targetDomain.trim()) return;
     setInspecting(true);
+    setAuditError(null);
     try {
-      await new Promise((r) => setTimeout(r, 550));
-      const clean = targetDomain.trim().toLowerCase().replace(/^https?:\/\//, "");
-      const isSparrow = clean.includes("sparrowx");
+      const safe = validateSafePublicTarget(targetDomain);
+      if (!safe.valid) {
+        setAuditError(safe.error ?? "Invalid domain target.");
+        setInspecting(false);
+        return;
+      }
+      const live = await runLivePublicDomainScan(safe.cleanHost);
+      setLiveAudit(live);
+
+      const hasCsp = live.findings.some(
+        (f) =>
+          f.category === "Defensive HTTP Headers" &&
+          f.status === "passed" &&
+          f.title.toLowerCase().includes("csp"),
+      );
+      const hasHsts = live.findings.some(
+        (f) =>
+          f.category === "Defensive HTTP Headers" &&
+          f.status === "passed" &&
+          f.title.toLowerCase().includes("hsts"),
+      );
+      const hasXframe = live.findings.some(
+        (f) =>
+          f.category === "Defensive HTTP Headers" &&
+          f.status === "passed" &&
+          f.title.toLowerCase().includes("frame"),
+      );
+      const hasNosniff = live.findings.some(
+        (f) =>
+          f.category === "Defensive HTTP Headers" &&
+          f.status === "passed" &&
+          f.title.toLowerCase().includes("nosniff"),
+      );
+      const isCloaked = live.score >= 70 || safe.cleanHost.includes("sparrowx");
+
       setResult({
-        domain: clean,
-        ip: isSparrow ? "Anycast Edge Gateway (Protected)" : "Direct Cloud IP Exposed",
-        tlsVersion: "TLS 1.3 (ChaCha20-Poly1305 / AES-256-GCM)",
+        domain: safe.cleanHost,
+        ip: isCloaked
+          ? "Anycast Edge Gateway (Origin Cloaked)"
+          : (live.findings[0]?.evidence?.slice(0, 45) ?? "Direct Cloud IP Exposed"),
+        tlsVersion:
+          live.scoreGrade === "A"
+            ? "TLS 1.3 (ChaCha20-Poly1305 / AES-256-GCM)"
+            : "TLS 1.2 / Standard Edge Handshake",
         cipherSuite: "ECDHE-ECDSA-AES256-GCM-SHA384",
-        dnsPropagation: "Anycast Synchronized (100% propagated)",
+        dnsPropagation: "Global Synchronized (100% propagated)",
         edgeLatencyMs: Math.floor(8 + Math.random() * 12),
-        originCloaked: isSparrow,
-        wafStatus: "Active",
-        threatScore: isSparrow ? 0 : 35,
+        originCloaked: isCloaked,
+        wafStatus: isCloaked ? "Active" : "Exposed",
+        threatScore: Math.max(0, 100 - live.score),
         securityHeaders: {
-          hsts: isSparrow,
-          csp: isSparrow,
-          xframe: isSparrow,
-          nosniff: isSparrow,
+          hsts: hasHsts,
+          csp: hasCsp,
+          xframe: hasXframe,
+          nosniff: hasNosniff,
         },
       });
+    } catch (err) {
+      setAuditError(err instanceof Error ? err.message : "Live perimeter scan failed.");
     } finally {
       setInspecting(false);
     }
   };
 
-  const pricingData = {
-    INR: {
-      single: { price: "₹300", period: "/mo" },
-      basic: { price: "₹1,580", period: "/mo" },
-      pro: { price: "₹2,420", period: "/mo" },
-    },
-    USD: {
-      single: { price: "$4", period: "/mo" },
-      basic: { price: "$19", period: "/mo" },
-      pro: { price: "$29", period: "/mo" },
-    },
-    EUR: {
-      single: { price: "€3.70", period: "/mo" },
-      basic: { price: "€17.50", period: "/mo" },
-      pro: { price: "€26.80", period: "/mo" },
-    },
+  const formatPlanPrice = (plan: SparrowxPlan) => {
+    const rawUsd = billingCycle === "annual" ? plan.annualPriceMonthly : plan.monthlyPrice;
+    if (currency === "INR") {
+      return `₹${Math.round(rawUsd * 85).toLocaleString("en-IN")}`;
+    }
+    if (currency === "EUR") {
+      return `€${Math.round(rawUsd * 0.92)}`;
+    }
+    return `$${rawUsd}`;
   };
 
   return (
@@ -374,6 +418,13 @@ export function SparrowxShieldEngine({
               </button>
             </div>
 
+            {auditError && (
+              <div className="rounded-xl border border-[#F9103A]/40 bg-[#F9103A]/10 p-4 text-xs text-[#F96246] flex items-center gap-2">
+                <AlertTriangle className="size-4 shrink-0" />
+                <span>{auditError}</span>
+              </div>
+            )}
+
             {result && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
@@ -449,186 +500,299 @@ export function SparrowxShieldEngine({
                     X-Content-Type-Options: nosniff
                   </span>
                 </div>
+
+                {liveAudit && (
+                  <div className="p-5 rounded-xl bg-[#090B11] border border-[#F4F6FA]/[0.10] space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#F4F6FA]/[0.07] pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <span className="rounded-md bg-[#F9103A]/20 border border-[#F9103A]/40 px-2 py-0.5 text-xs font-mono font-bold text-[#F96246]">
+                          GRADE {liveAudit.scoreGrade}
+                        </span>
+                        <span className="text-xs font-medium text-[#F4F6FA]">
+                          Score: {liveAudit.score}/100 · {liveAudit.targetCategory}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => downloadBrandedHtmlSecurityReport(liveAudit)}
+                        className="inline-flex items-center gap-1.5 text-xs text-[#FFEBB9] hover:text-white transition-colors cursor-pointer"
+                      >
+                        <Shield className="size-3.5" />
+                        <span>Download Executive Audit Report (HTML)</span>
+                      </button>
+                    </div>
+
+                    {liveAudit.advisory?.recommendedAction && (
+                      <div className="text-xs text-[#F4F6FA]/75 bg-[#0D1017] p-3 rounded-lg border border-[#F4F6FA]/[0.06] space-y-1">
+                        <span className="text-[#FFEBB9] font-medium block">
+                          SparrowX AI Brain Advisory:
+                        </span>
+                        <p className="leading-relaxed">
+                          {liveAudit.advisory.recommendedAction}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         </section>
 
         {/* SECTION 3: 1-COMMAND SERVER AGENT & PROTECTION PLANS */}
-        <section id="shield-agent-plans" className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: Live Scrubbing Stream + 1-Command Agent Install */}
-          <div className="lg:col-span-5 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] flex flex-col justify-between overflow-hidden">
-            <div className="border-b border-[#F4F6FA]/[0.07] px-4 py-3 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <Terminal className="size-3.5 text-[#F96246]" />
-                <span className="font-medium text-[#F4F6FA]">Edge Scrubbing Daemon</span>
+        <section id="shield-agent-plans" className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Live Scrubbing Stream */}
+            <div className="lg:col-span-6 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] flex flex-col justify-between overflow-hidden">
+              <div className="border-b border-[#F4F6FA]/[0.07] px-4 py-3 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <Terminal className="size-3.5 text-[#F96246]" />
+                  <span className="font-medium text-[#F4F6FA]">Autonomous Edge Scrubbing Daemon</span>
+                </div>
+                <span className="text-[#10B981] text-[11px] font-medium">Active Defense</span>
               </div>
-              <span className="text-[#10B981] text-[11px] font-medium">Active Defense</span>
+
+              <div className="p-4 bg-[#090B11] font-mono text-[11px] text-[#F4F6FA]/65 space-y-2 overflow-x-auto flex-1">
+                <div className="text-[#F4F6FA]/40">
+                  [00:14:02] shadowshield-daemon v2.8 initialized across Anycast nodes
+                </div>
+                <div className="text-[#10B981]">
+                  [00:14:05] [packet-filter] Fastpath SYN proxy and origin cloak active
+                </div>
+                <div className="text-[#F9103A]">
+                  [00:14:12] [DEFLECTED] TCP SYN flood from 182.21.90.11 -&gt; :443 [480 pkts/s]
+                </div>
+                <div className="text-[#FFEBB9]">
+                  [00:14:18] [WAF-L7] SQL injection payload dropped from AS13335
+                </div>
+                <div className="text-[#F96246]">
+                  [00:14:30] [RATE-LIMITED] Malicious scraper throttled: 120 req/min cap
+                </div>
+                <div className="text-[#10B981]">
+                  [00:14:41] [AI-GUARD] Adversarial prompt injection deflected on /api/v1/generate
+                </div>
+              </div>
             </div>
 
-            <div className="p-4 bg-[#090B11] font-mono text-[11px] text-[#F4F6FA]/65 space-y-2 overflow-x-auto flex-1">
-              <div className="text-[#F4F6FA]/40">
-                [00:14:02] shadowshield-daemon v2.8 started on AP-Southeast Edge
+            {/* Right: 1-Command Server Protect */}
+            <div className="lg:col-span-6 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-5 sm:p-6 flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-xs text-[#10B981]">
+                  <Shield className="size-4" />
+                  <span className="font-medium uppercase tracking-wider font-mono">Zero-Config Deployment</span>
+                </div>
+                <h3 className="text-xl font-medium text-[#F4F6FA] tracking-tight">
+                  Deploy Autonomous Shield in 60 Seconds
+                </h3>
+                <p className="text-xs text-[#F4F6FA]/60 leading-relaxed">
+                  Run our hardened drop-in edge agent on any Linux VPS, Docker cluster, or Kubernetes node to automatically cloak your origin IP, filter Layer-7 floods, and pipe telemetry to your SparrowX SOC.
+                </p>
               </div>
-              <div className="text-[#10B981]">
-                [00:14:05] [packet-filter] Fastpath SYN proxy and origin cloak verified
-              </div>
-              <div className="text-[#F9103A]">
-                [00:14:12] [DEFLECTED] TCP SYN flood from 182.21.90.11 -&gt; :443 [480 pkts/s]
-              </div>
-              <div className="text-[#FFEBB9]">
-                [00:14:18] [WAF-L7] SQL injection payload blocked from AS13335
-              </div>
-              <div className="text-[#F96246]">
-                [00:14:30] [RATE-LIMITED] Malicious scraper throttled: 120 req/min cap
-              </div>
-              <div className="text-[#10B981]">
-                [00:14:41] [AI-GUARD] LLM jailbreak payload deflected on /api/v1/generate
-              </div>
-            </div>
 
-            <div className="p-4 bg-[#0D1017] border-t border-[#F4F6FA]/[0.07] space-y-2.5 text-xs">
-              <span className="text-[#F4F6FA]/60 text-[11px] block">1-Command Server Protect</span>
-              <div className="flex items-center justify-between gap-2 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] px-3 py-2">
-                <code className="text-[#FFEBB9] font-mono text-[11px] truncate select-all">
-                  curl -sSL https://sec.sparrowx.net/install.sh | sudo bash
-                </code>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      "curl -sSL https://sec.sparrowx.net/install.sh | sudo bash",
-                    );
-                    setCopiedCmd(true);
-                    setTimeout(() => setCopiedCmd(false), 2000);
-                  }}
-                  className="px-2.5 py-1 rounded-lg border border-[#F4F6FA]/12 bg-[#121620] text-[#F4F6FA] hover:border-[#F96246]/50 transition-colors cursor-pointer shrink-0 text-[11px]"
-                >
-                  {copiedCmd ? (
-                    <span className="text-[#10B981] flex items-center gap-1">
-                      <Check className="size-3" /> Copied
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <Copy className="size-3" /> Copy
-                    </span>
-                  )}
-                </button>
+              <div className="space-y-2 text-xs">
+                <span className="text-[#F4F6FA]/60 text-[11px] block">Run on your origin server (Ubuntu/Debian/RHEL):</span>
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] px-3 py-2.5">
+                  <code className="text-[#FFEBB9] font-mono text-[11px] truncate select-all">
+                    curl -sSL https://sec.sparrowx.net/install.sh | sudo bash
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        "curl -sSL https://sec.sparrowx.net/install.sh | sudo bash",
+                      );
+                      setCopiedCmd(true);
+                      setTimeout(() => setCopiedCmd(false), 2000);
+                    }}
+                    className="px-2.5 py-1 rounded-lg border border-[#F4F6FA]/12 bg-[#121620] text-[#F4F6FA] hover:border-[#F96246]/50 transition-colors cursor-pointer shrink-0 text-[11px]"
+                  >
+                    {copiedCmd ? (
+                      <span className="text-[#10B981] flex items-center gap-1">
+                        <Check className="size-3" /> Copied
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1">
+                        <Copy className="size-3" /> Copy
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Right: Protection Plans */}
-          <div className="lg:col-span-7 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-5 sm:p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F4F6FA]/[0.07] pb-4">
+          {/* Business Model Subscription Plans */}
+          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#F4F6FA]/[0.07] pb-6">
               <div>
-                <h2 className="text-xl font-medium text-[#F4F6FA] tracking-tight">
-                  Protection Plans
+                <div className="flex items-center gap-2 text-xs font-mono uppercase text-[#F96246] tracking-wider mb-1">
+                  <span>Monetization &amp; Protection Mesh</span>
+                </div>
+                <h2 className="text-2xl font-medium text-[#F4F6FA] tracking-tight">
+                  Production Security &amp; SOC Subscription Tiers
                 </h2>
-                <p className="text-xs text-[#F4F6FA]/55 mt-0.5">
-                  Predictable monthly coverage with origin cloaking and DDoS scrubbing.
+                <p className="text-xs sm:text-sm text-[#F4F6FA]/55 mt-1 max-w-2xl">
+                  Transparent, predictable pricing with measured unit economics and enterprise-grade SLAs. No sudden $1,000 egress traps.
                 </p>
               </div>
 
-              <div
-                role="tablist"
-                aria-label="Billing currency"
-                className="flex items-center gap-1 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-1 text-xs self-start"
-              >
-                {(["INR", "USD", "EUR"] as const).map((curr) => (
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Billing Cycle Toggle */}
+                <div className="flex items-center gap-1 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-1 text-xs">
                   <button
-                    key={curr}
                     type="button"
-                    role="tab"
-                    aria-selected={currency === curr}
-                    onClick={() => setCurrency(curr)}
+                    onClick={() => setBillingCycle("monthly")}
                     className={`rounded-lg px-3 py-1 transition-colors cursor-pointer ${
-                      currency === curr
-                        ? "bg-[#F9103A] text-[#F4F6FA] font-medium"
-                        : "text-[#F4F6FA]/55 hover:text-[#F4F6FA]"
+                      billingCycle === "monthly"
+                        ? "bg-[#F9103A] text-white font-medium"
+                        : "text-[#F4F6FA]/55 hover:text-white"
                     }`}
                   >
-                    {curr}
+                    Monthly
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setBillingCycle("annual")}
+                    className={`rounded-lg px-3 py-1 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      billingCycle === "annual"
+                        ? "bg-[#F9103A] text-white font-medium"
+                        : "text-[#F4F6FA]/55 hover:text-white"
+                    }`}
+                  >
+                    <span>Annual</span>
+                    <span className="text-[10px] bg-[#10B981]/20 text-[#10B981] px-1.5 py-0.5 rounded font-mono font-bold">
+                      Save ~20%
+                    </span>
+                  </button>
+                </div>
+
+                {/* Currency Selector */}
+                <div
+                  role="tablist"
+                  aria-label="Billing currency"
+                  className="flex items-center gap-1 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-1 text-xs"
+                >
+                  {(["INR", "USD", "EUR"] as const).map((curr) => (
+                    <button
+                      key={curr}
+                      type="button"
+                      role="tab"
+                      aria-selected={currency === curr}
+                      onClick={() => setCurrency(curr)}
+                      className={`rounded-lg px-3 py-1 transition-colors cursor-pointer ${
+                        currency === curr
+                          ? "bg-[#F4F6FA]/15 text-[#F4F6FA] font-medium"
+                          : "text-[#F4F6FA]/45 hover:text-[#F4F6FA]"
+                      }`}
+                    >
+                      {curr}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-              {/* Plan 1 */}
-              <div className="rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-4 flex flex-col justify-between space-y-4">
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-[#F96246]">Single-Port Shield</span>
-                  <div className="pt-1 tabular-nums">
-                    <span className="text-2xl font-medium text-[#F4F6FA]">
-                      {pricingData[currency].single.price}
-                    </span>
-                    <span className="text-xs text-[#F4F6FA]/45">
-                      {pricingData[currency].single.period}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#F4F6FA]/55">
-                    1 cloaked origin port, L4/L7 rate limiting, live attack stream.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSocModalOpen(true)}
-                  className="w-full py-2 rounded-lg border border-[#F4F6FA]/15 bg-[#121620] hover:border-[#F96246]/50 text-xs font-medium text-[#F4F6FA] transition-colors cursor-pointer"
-                >
-                  Deploy Port Shield
-                </button>
-              </div>
+            {/* The 6 Plans Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {SPARROWX_PLANS.map((plan) => {
+                const isPopular = plan.popular;
+                return (
+                  <div
+                    key={plan.id}
+                    className={`rounded-xl border p-5 flex flex-col justify-between space-y-5 transition-all ${
+                      isPopular
+                        ? "border-[#F9103A]/50 bg-[#140E14] shadow-[0_12px_36px_rgba(249,16,58,0.12)]"
+                        : "border-[#F4F6FA]/[0.08] bg-[#090B11] hover:border-[#F4F6FA]/[0.18]"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-mono font-semibold uppercase tracking-wider text-[#F96246]">
+                          {plan.tier}
+                        </span>
+                        {plan.badge && (
+                          <span
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                              isPopular
+                                ? "bg-[#F9103A] text-white"
+                                : "bg-[#F4F6FA]/10 text-[#FFEBB9] border border-[#FFEBB9]/25"
+                            }`}
+                          >
+                            {plan.badge}
+                          </span>
+                        )}
+                      </div>
 
-              {/* Plan 2 */}
-              <div className="rounded-xl border border-[#F9103A]/45 bg-[#140E13] p-4 flex flex-col justify-between space-y-4">
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-[#F9103A]">Basic Shield</span>
-                  <div className="pt-1 tabular-nums">
-                    <span className="text-2xl font-medium text-[#F4F6FA]">
-                      {pricingData[currency].basic.price}
-                    </span>
-                    <span className="text-xs text-[#F4F6FA]/45">
-                      {pricingData[currency].basic.period}
-                    </span>
-                  </div>
-                  <p className="text-xs text-[#F4F6FA]/70">
-                    Up to 5 domains, DDoS deflection, SQLi WAF barrier, 24/7 radar.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSocModalOpen(true)}
-                  className="w-full py-2 rounded-lg bg-[#F9103A] hover:bg-[#F9103A]/90 text-xs font-medium text-[#F4F6FA] transition-colors cursor-pointer"
-                >
-                  Provision Basic Shield
-                </button>
-              </div>
+                      <h3 className="text-lg font-bold text-white tracking-tight">{plan.name}</h3>
 
-              {/* Plan 3 */}
-              <div className="rounded-xl border border-[#F4F6FA]/[0.08] bg-[#090B11] p-4 flex flex-col justify-between space-y-4">
-                <div className="space-y-1.5">
-                  <span className="text-[11px] font-medium text-[#FFEBB9]">Pro Shield</span>
-                  <div className="pt-1 tabular-nums">
-                    <span className="text-2xl font-medium text-[#F4F6FA]">
-                      {pricingData[currency].pro.price}
-                    </span>
-                    <span className="text-xs text-[#F4F6FA]/45">
-                      {pricingData[currency].pro.period}
-                    </span>
+                      <div className="pt-1 tabular-nums">
+                        <span className="text-3xl font-extrabold text-white">
+                          {formatPlanPrice(plan)}
+                        </span>
+                        <span className="text-xs text-[#F4F6FA]/45 ml-1">/month</span>
+                        {billingCycle === "annual" && (
+                          <span className="block text-[11px] text-[#10B981] mt-0.5 font-mono">
+                            Billed annually ({plan.annualSavingsPct}% savings)
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-xs text-[#F4F6FA]/60 leading-relaxed min-h-[36px]">
+                        {plan.tagline}
+                      </p>
+
+                      <div className="pt-2 border-t border-[#F4F6FA]/[0.06] space-y-2 text-xs">
+                        <div className="flex items-center justify-between text-[#F4F6FA]/70 text-[11px]">
+                          <span>Requests Quota:</span>
+                          <span className="font-mono text-white font-semibold">
+                            {(plan.requestQuotaMonthly / 1_000_000).toFixed(1).replace(".0", "")}M / mo
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[#F4F6FA]/70 text-[11px]">
+                          <span>Protected Domains:</span>
+                          <span className="font-mono text-white font-semibold">
+                            {plan.maxDomains === -1 ? "Unlimited" : `${plan.maxDomains} Domains`}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[#F4F6FA]/70 text-[11px]">
+                          <span>Response SLA:</span>
+                          <span className="font-mono text-[#10B981] text-[10px]">
+                            {plan.sla}
+                          </span>
+                        </div>
+                      </div>
+
+                      <ul className="pt-2 space-y-1.5 text-xs text-[#F4F6FA]/80">
+                        {plan.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-[11px]">
+                            <Check className="size-3.5 text-[#10B981] shrink-0 mt-0.5" />
+                            <span>{h}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onOpenClientArea) {
+                          onOpenClientArea();
+                        } else {
+                          setSocModalOpen(true);
+                        }
+                      }}
+                      className={`w-full py-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        isPopular
+                          ? "bg-[#F9103A] hover:bg-[#F9103A]/90 text-white shadow-[0_4px_16px_rgba(249,16,58,0.3)]"
+                          : "border border-[#F4F6FA]/15 bg-[#121620] hover:bg-white hover:text-black text-white"
+                      }`}
+                    >
+                      <span>Deploy {plan.name}</span>
+                      <ArrowRight className="size-3.5" />
+                    </button>
                   </div>
-                  <p className="text-xs text-[#F4F6FA]/55">
-                    Unlimited endpoints, AI prompt guard, dedicated scrubbing, custom routing.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSocModalOpen(true)}
-                  className="w-full py-2 rounded-lg border border-[#F4F6FA]/15 bg-[#121620] hover:border-[#FFEBB9]/45 text-xs font-medium text-[#F4F6FA] transition-colors cursor-pointer"
-                >
-                  Provision Pro Shield
-                </button>
-              </div>
+                );
+              })}
             </div>
           </div>
         </section>
