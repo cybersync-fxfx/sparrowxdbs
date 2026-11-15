@@ -255,3 +255,96 @@ CREATE INDEX IF NOT EXISTS idx_contact_inquiries_created_at ON public.contact_in
 -- Inquiries contain personal data: the anonymous PostgREST role may only insert, never read back.
 REVOKE ALL ON public.contact_inquiries FROM web_anon;
 GRANT INSERT ON public.contact_inquiries TO web_anon;
+
+-- 16. SparrowX Game Hosting Portal (/game & /game/dashboard)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS public.clients (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  discord_id          TEXT NOT NULL UNIQUE,
+  discord_username    TEXT NOT NULL,
+  discord_avatar      TEXT,
+  email               TEXT,
+  ptero_user_id       INTEGER UNIQUE,
+  ptero_username      TEXT,
+  ptero_password_enc  TEXT,
+  coins               INTEGER NOT NULL DEFAULT 0 CHECK (coins >= 0),
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.subscriptions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id        UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  ptero_server_id  INTEGER,
+  service_type     TEXT NOT NULL CHECK (service_type IN ('fivem','samp','minecraft','discord')),
+  plan_name        TEXT NOT NULL,
+  price_coins      INTEGER NOT NULL CHECK (price_coins > 0),
+  status           TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','cancelled')),
+  expires_at       TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS subscriptions_client_idx ON public.subscriptions(client_id);
+CREATE INDEX IF NOT EXISTS subscriptions_expiry_idx ON public.subscriptions(expires_at) WHERE status = 'active';
+
+CREATE TABLE IF NOT EXISTS public.coin_transactions (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id    UUID NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
+  amount       INTEGER NOT NULL,
+  type         TEXT NOT NULL CHECK (type IN ('topup','promo','purchase','refund','bonus')),
+  description  TEXT NOT NULL,
+  reference    TEXT UNIQUE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS coin_tx_client_idx ON public.coin_transactions(client_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.promo_codes (
+  code        TEXT PRIMARY KEY,
+  coins       INTEGER NOT NULL CHECK (coins > 0),
+  active      BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE OR REPLACE FUNCTION public.spend_coins(p_client_id UUID, p_amount INTEGER, p_description TEXT)
+RETURNS INTEGER LANGUAGE plpgsql AS $$
+DECLARE new_balance INTEGER;
+BEGIN
+  IF p_amount <= 0 THEN RAISE EXCEPTION 'invalid_amount'; END IF;
+  UPDATE public.clients SET coins = coins - p_amount
+   WHERE id = p_client_id AND coins >= p_amount
+   RETURNING coins INTO new_balance;
+  IF new_balance IS NULL THEN RAISE EXCEPTION 'insufficient_coins'; END IF;
+  INSERT INTO public.coin_transactions (client_id, amount, type, description)
+  VALUES (p_client_id, -p_amount, 'purchase', p_description);
+  RETURN new_balance;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.credit_coins(
+  p_client_id UUID, p_amount INTEGER, p_type TEXT, p_description TEXT, p_reference TEXT
+) RETURNS TABLE (balance INTEGER, applied BOOLEAN) LANGUAGE plpgsql AS $$
+DECLARE inserted BOOLEAN := FALSE;
+BEGIN
+  IF p_amount <= 0 THEN RAISE EXCEPTION 'invalid_amount'; END IF;
+  INSERT INTO public.coin_transactions (client_id, amount, type, description, reference)
+  VALUES (p_client_id, p_amount, p_type, p_description, p_reference)
+  ON CONFLICT (reference) DO NOTHING
+  RETURNING TRUE INTO inserted;
+  IF COALESCE(inserted, FALSE) THEN
+    UPDATE public.clients SET coins = coins + p_amount WHERE id = p_client_id;
+  END IF;
+  RETURN QUERY SELECT c.coins, COALESCE(inserted, FALSE) FROM public.clients c WHERE c.id = p_client_id;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sparrowx_service') THEN
+    CREATE ROLE sparrowx_service NOLOGIN;
+  END IF;
+END $$;
+GRANT USAGE ON SCHEMA public TO sparrowx_service;
+GRANT SELECT, INSERT, UPDATE ON public.clients, public.subscriptions, public.coin_transactions TO sparrowx_service;
+GRANT SELECT ON public.promo_codes TO sparrowx_service;
+GRANT EXECUTE ON FUNCTION public.spend_coins(UUID, INTEGER, TEXT) TO sparrowx_service;
+GRANT EXECUTE ON FUNCTION public.credit_coins(UUID, INTEGER, TEXT, TEXT, TEXT) TO sparrowx_service;
+GRANT SELECT, INSERT, UPDATE ON public.clients, public.subscriptions, public.coin_transactions TO web_anon;
+GRANT SELECT ON public.promo_codes TO web_anon;
+GRANT EXECUTE ON FUNCTION public.spend_coins(UUID, INTEGER, TEXT) TO web_anon;
+GRANT EXECUTE ON FUNCTION public.credit_coins(UUID, INTEGER, TEXT, TEXT, TEXT) TO web_anon;

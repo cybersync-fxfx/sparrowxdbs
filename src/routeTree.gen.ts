@@ -18,6 +18,11 @@ import { Route as StoryRouteImport } from './routes/story'
 import { Route as DocsErrorsRouteImport } from './routes/docs/errors'
 import { Route as FIndexRouteImport } from './routes/f.index'
 import { Route as FIdRouteImport } from './routes/f.$id'
+import { Route as GameIndexRouteImport } from './routes/game.index'
+import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
+import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
+import { Route as ApiPublicAuthDiscordCallbackRouteImport } from './routes/api/public/auth/discord/callback'
+import { Route as ApiPublicAuthDiscordLoginRouteImport } from './routes/api/public/auth/discord/login'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +69,34 @@ const FIdRoute = FIdRouteImport.update({
   path: '/f/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GameIndexRoute = GameIndexRouteImport.update({
+  id: '/game/',
+  path: '/game/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GameDashboardRoute = GameDashboardRouteImport.update({
+  id: '/game/dashboard',
+  path: '/game/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicRazorpayWebhookRoute =
+  ApiPublicRazorpayWebhookRouteImport.update({
+    id: '/api/public/razorpay/webhook',
+    path: '/api/public/razorpay/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicAuthDiscordCallbackRoute =
+  ApiPublicAuthDiscordCallbackRouteImport.update({
+    id: '/api/public/auth/discord/callback',
+    path: '/api/public/auth/discord/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicAuthDiscordLoginRoute =
+  ApiPublicAuthDiscordLoginRouteImport.update({
+    id: '/api/public/auth/discord/login',
+    path: '/api/public/auth/discord/login',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -74,7 +107,12 @@ export interface FileRoutesByFullPath {
   '/story': typeof StoryRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
+  '/game/dashboard': typeof GameDashboardRoute
   '/f/': typeof FIndexRoute
+  '/game/': typeof GameIndexRoute
+  '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
+  '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -85,7 +123,12 @@ export interface FileRoutesByTo {
   '/story': typeof StoryRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
+  '/game/dashboard': typeof GameDashboardRoute
   '/f': typeof FIndexRoute
+  '/game': typeof GameIndexRoute
+  '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
+  '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,7 +140,12 @@ export interface FileRoutesById {
   '/story': typeof StoryRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
+  '/game/dashboard': typeof GameDashboardRoute
   '/f/': typeof FIndexRoute
+  '/game/': typeof GameIndexRoute
+  '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
+  '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -110,7 +158,12 @@ export interface FileRouteTypes {
     | '/story'
     | '/docs/errors'
     | '/f/$id'
+    | '/game/dashboard'
     | '/f/'
+    | '/game/'
+    | '/api/public/razorpay/webhook'
+    | '/api/public/auth/discord/callback'
+    | '/api/public/auth/discord/login'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -121,7 +174,12 @@ export interface FileRouteTypes {
     | '/story'
     | '/docs/errors'
     | '/f/$id'
+    | '/game/dashboard'
     | '/f'
+    | '/game'
+    | '/api/public/razorpay/webhook'
+    | '/api/public/auth/discord/callback'
+    | '/api/public/auth/discord/login'
   id:
     | '__root__'
     | '/'
@@ -132,7 +190,12 @@ export interface FileRouteTypes {
     | '/story'
     | '/docs/errors'
     | '/f/$id'
+    | '/game/dashboard'
     | '/f/'
+    | '/game/'
+    | '/api/public/razorpay/webhook'
+    | '/api/public/auth/discord/callback'
+    | '/api/public/auth/discord/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -144,7 +207,12 @@ export interface RootRouteChildren {
   StoryRoute: typeof StoryRoute
   DocsErrorsRoute: typeof DocsErrorsRoute
   FIdRoute: typeof FIdRoute
+  GameDashboardRoute: typeof GameDashboardRoute
   FIndexRoute: typeof FIndexRoute
+  GameIndexRoute: typeof GameIndexRoute
+  ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
+  ApiPublicAuthDiscordCallbackRoute: typeof ApiPublicAuthDiscordCallbackRoute
+  ApiPublicAuthDiscordLoginRoute: typeof ApiPublicAuthDiscordLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +280,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/game/': {
+      id: '/game/'
+      path: '/game'
+      fullPath: '/game/'
+      preLoaderRoute: typeof GameIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/game/dashboard': {
+      id: '/game/dashboard'
+      path: '/game/dashboard'
+      fullPath: '/game/dashboard'
+      preLoaderRoute: typeof GameDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/razorpay/webhook': {
+      id: '/api/public/razorpay/webhook'
+      path: '/api/public/razorpay/webhook'
+      fullPath: '/api/public/razorpay/webhook'
+      preLoaderRoute: typeof ApiPublicRazorpayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/discord/callback': {
+      id: '/api/public/auth/discord/callback'
+      path: '/api/public/auth/discord/callback'
+      fullPath: '/api/public/auth/discord/callback'
+      preLoaderRoute: typeof ApiPublicAuthDiscordCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/auth/discord/login': {
+      id: '/api/public/auth/discord/login'
+      path: '/api/public/auth/discord/login'
+      fullPath: '/api/public/auth/discord/login'
+      preLoaderRoute: typeof ApiPublicAuthDiscordLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -224,7 +327,12 @@ const rootRouteChildren: RootRouteChildren = {
   StoryRoute: StoryRoute,
   DocsErrorsRoute: DocsErrorsRoute,
   FIdRoute: FIdRoute,
+  GameDashboardRoute: GameDashboardRoute,
   FIndexRoute: FIndexRoute,
+  GameIndexRoute: GameIndexRoute,
+  ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
+  ApiPublicAuthDiscordCallbackRoute: ApiPublicAuthDiscordCallbackRoute,
+  ApiPublicAuthDiscordLoginRoute: ApiPublicAuthDiscordLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

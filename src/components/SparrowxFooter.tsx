@@ -59,6 +59,11 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     localParam: "api",
   },
   {
+    label: "Game Hosting",
+    sublabel: "sparrowx.net/game",
+    href: "/game",
+  },
+  {
     label: "Game Server Panel",
     sublabel: "game.sparrowx.net",
     href: "https://game.sparrowx.net",

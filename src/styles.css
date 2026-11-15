@@ -69,6 +69,17 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Game Hosting brand + service tokens */
+  --color-svc: var(--svc);
+  --color-discord: var(--discord);
+  --color-discord-deep: var(--discord-deep);
+  --color-sheen: var(--sheen);
+  --color-glass: var(--glass);
+  --color-fivem: var(--svc-fivem);
+  --color-samp: var(--svc-samp);
+  --color-minecraft: var(--svc-minecraft);
+  --color-discordbot: var(--svc-discord);
 }
 
 :root {
@@ -461,3 +472,159 @@ html { scroll-behavior: smooth; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ============================================================================
+   SPARROWX GAME HOSTING (/game & /game/dashboard)
+   ============================================================================ */
+@property --svc {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: oklch(0.68 0.22 41);
+}
+
+.theme-game {
+  --font-display: "Unbounded", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.875rem;
+  --background: oklch(0.13 0.008 270);
+  --foreground: oklch(0.985 0.006 95);
+  --card: oklch(0.165 0.01 270);
+  --card-foreground: oklch(0.985 0.006 95);
+  --popover: oklch(0.165 0.01 270);
+  --popover-foreground: oklch(0.985 0.006 95);
+  --primary: oklch(0.985 0.006 95);
+  --primary-foreground: oklch(0.13 0.008 270);
+  --secondary: oklch(0.21 0.01 270);
+  --secondary-foreground: oklch(0.985 0.006 95);
+  --muted: oklch(0.21 0.01 270);
+  --muted-foreground: oklch(0.7 0.01 270);
+  --accent: oklch(0.24 0.012 270);
+  --accent-foreground: oklch(0.985 0.006 95);
+  --destructive: oklch(0.64 0.22 25);
+  --destructive-foreground: oklch(0.985 0.006 95);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.985 0.006 95 / 40%);
+  --glass: oklch(0.165 0.01 270 / 90%);
+
+  --discord: oklch(0.59 0.2 277);
+  --discord-deep: oklch(0.5 0.22 275);
+  --sheen: oklch(0.72 0.15 278);
+  --success: oklch(0.8 0.2 145);
+  --warning: oklch(0.78 0.16 75);
+
+  --svc-fivem: oklch(0.68 0.22 41);
+  --svc-samp: oklch(0.77 0.16 70);
+  --svc-minecraft: oklch(0.83 0.24 136);
+  --svc-discord: var(--discord);
+
+  --shadow-discord: 0 0 0 1px color-mix(in oklab, var(--discord) 60%, transparent),
+    0 10px 40px -8px color-mix(in oklab, var(--discord) 70%, transparent);
+  --shadow-svc: 0 0 0 1px color-mix(in oklab, var(--svc) 45%, transparent),
+    0 20px 60px -15px color-mix(in oklab, var(--svc) 60%, transparent);
+  --gradient-discord: linear-gradient(135deg, var(--discord), var(--discord-deep));
+  font-family: var(--font-sans);
+}
+
+.theme-game h1,
+.theme-game h2,
+.theme-game h3,
+.theme-game h4,
+.theme-dashboard h1,
+.theme-dashboard h2,
+.theme-dashboard h3,
+.theme-dashboard h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+[data-service="fivem"] { --svc: var(--svc-fivem); }
+[data-service="samp"] { --svc: var(--svc-samp); }
+[data-service="minecraft"] { --svc: var(--svc-minecraft); }
+[data-service="discord"] { --svc: var(--svc-discord); }
+[data-service] { transition: --svc 700ms ease; }
+
+.theme-dashboard {
+  --font-display: "Unbounded", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.875rem;
+  --background: oklch(0.09 0.012 285);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.18 0.05 275);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.18 0.05 275);
+  --popover-foreground: oklch(1 0 0);
+  --discord: oklch(0.59 0.2 277);
+  --discord-deep: oklch(0.5 0.22 275);
+  --sheen: oklch(0.72 0.15 278);
+  --success: oklch(0.8 0.2 145);
+  --warning: oklch(0.78 0.16 75);
+  --primary: var(--discord);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.23 0.055 275);
+  --secondary-foreground: oklch(0.88 0.01 260);
+  --muted: oklch(0.22 0.05 275);
+  --muted-foreground: oklch(0.71 0.02 260);
+  --accent: oklch(0.26 0.07 275);
+  --accent-foreground: oklch(1 0 0);
+  --border: oklch(0.72 0.15 278 / 16%);
+  --input: oklch(0.72 0.15 278 / 22%);
+  --ring: var(--sheen);
+  --svc: var(--discord);
+  --glass: oklch(0.165 0.01 270 / 90%);
+  --shadow-discord: 0 0 0 1px color-mix(in oklab, var(--discord) 60%, transparent),
+    0 10px 40px -8px color-mix(in oklab, var(--discord) 70%, transparent);
+  --gradient-discord: linear-gradient(135deg, var(--discord), var(--discord-deep));
+  --gradient-card: linear-gradient(160deg, oklch(0.21 0.06 275) 0%, oklch(0.16 0.045 275) 55%, oklch(0.13 0.035 278) 100%);
+  --shadow-card: inset 0 1px 0 oklch(0.72 0.15 278 / 18%), 0 24px 60px -30px oklch(0 0 0 / 80%);
+  font-family: var(--font-sans);
+}
+
+@utility glass {
+  background: var(--glass);
+  backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid var(--color-border);
+}
+@utility glow-svc { box-shadow: var(--shadow-svc); }
+@utility glow-discord { box-shadow: var(--shadow-discord); }
+@utility bg-gradient-discord { background-image: var(--gradient-discord); }
+@utility text-svc-gradient {
+  background-image: linear-gradient(100deg, var(--color-foreground) 20%, var(--svc) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@utility surface-3d {
+  background-image: var(--gradient-card);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+}
+@utility rim-sheen {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--sheen), transparent 40%, transparent 60%, var(--discord));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+}
+@utility grid-fade {
+  background-image:
+    linear-gradient(to right, oklch(1 0 0 / 4%) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(1 0 0 / 4%) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+@utility animate-pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
