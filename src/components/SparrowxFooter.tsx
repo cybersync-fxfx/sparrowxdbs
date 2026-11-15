@@ -26,37 +26,32 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
   {
     label: "Cloud Database",
     sublabel: "db.sparrowx.net",
-    href: "https://db.sparrowx.net",
+    href: "/db",
     serviceKey: "db",
-    localParam: "db",
   },
   {
     label: "Shield SOC & WAF",
     sublabel: "sec.sparrowx.net",
-    href: "https://sec.sparrowx.net",
+    href: "/shield",
     serviceKey: "sec",
-    localParam: "shield",
   },
   {
     label: "Drop File Vault",
     sublabel: "file.sparrowx.net",
-    href: "https://file.sparrowx.net",
+    href: "/drop",
     serviceKey: "file",
-    localParam: "file",
   },
   {
     label: "Password & Keys",
     sublabel: "password.sparrowx.net",
-    href: "https://password.sparrowx.net",
+    href: "/keys",
     serviceKey: "password",
-    localParam: "password",
   },
   {
     label: "PostgREST API",
     sublabel: "api.sparrowx.net",
-    href: "https://api.sparrowx.net",
+    href: "/db",
     serviceKey: "api",
-    localParam: "api",
   },
   {
     label: "Game Hosting",
@@ -92,17 +87,16 @@ export function SparrowxFooter({
     item: ProductLinkItem,
   ) => {
     if (typeof window === "undefined") return;
-    const isProductionSubdomain = window.location.hostname.includes("sparrowx.net");
-    if (isProductionSubdomain || !item.localParam) {
+    if (item.href.startsWith("/")) {
+      e.preventDefault();
+      window.location.assign(item.href);
       return;
     }
-
-    e.preventDefault();
     if (onLaunchService && item.serviceKey) {
-      onLaunchService(item.serviceKey, item.href, item.localParam);
+      e.preventDefault();
+      onLaunchService(item.serviceKey, item.href, item.serviceKey);
       return;
     }
-    window.location.assign(`/?${item.localParam}=1`);
   };
 
   return (

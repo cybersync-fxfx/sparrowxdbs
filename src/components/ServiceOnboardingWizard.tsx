@@ -320,7 +320,7 @@ export function ServiceOnboardingWizard({
                 {
                   id: "ai_agent" as AssetType,
                   title: "AI Agent & LLM Application",
-                  desc: "OpenAI, Claude, Gemini, LangChain, or MCP autonomous tools. Shielded from prompt injections and PII leaks.",
+                  desc: "SparrowX AI, OpenAI, Claude, LangChain, or MCP autonomous tools. Shielded from prompt injections and PII leaks.",
                   badge: "Prompt & MCP Shield",
                   icon: Cpu,
                   color: "text-violet-400 border-violet-500/30 bg-violet-500/10",
@@ -439,7 +439,7 @@ export function ServiceOnboardingWizard({
                   >
                     <option value="OpenAI GPT-4o">OpenAI (GPT-4o / GPT-4-Turbo)</option>
                     <option value="Anthropic Claude 3.5">Anthropic (Claude 3.5 Sonnet / Haiku)</option>
-                    <option value="Google Gemini 2.0">Google Gemini (Gemini 2.0 Flash / Pro)</option>
+                    <option value="SparrowX AI Engine">SparrowX AI Engine (Fast Neural / Deep Reasoning)</option>
                     <option value="Local vLLM / Ollama">Local Model (vLLM / Ollama / DeepSeek)</option>
                   </select>
                 </div>

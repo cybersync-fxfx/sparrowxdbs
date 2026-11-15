@@ -266,6 +266,12 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        {/* Google AdSense */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5926090831336748"
+          crossOrigin="anonymous"
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

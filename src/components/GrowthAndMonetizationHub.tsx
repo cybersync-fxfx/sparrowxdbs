@@ -3775,7 +3775,7 @@ export function ClientOnboardingWizard({
                 <div className="font-bold text-white text-sm">AI Agent &amp; LLM</div>
               </div>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                OpenAI, Gemini, Anthropic &amp; MCP tool execution firewall
+                SparrowX AI, OpenAI, Anthropic &amp; MCP tool execution firewall
               </p>
             </button>
 

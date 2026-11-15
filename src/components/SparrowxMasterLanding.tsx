@@ -483,18 +483,26 @@ export function SparrowxMasterLanding({
     },
   ];
 
-  const handleLaunch = (_targetId: string, url: string, param: string) => {
+  const directRoutes: Record<string, string> = {
+    db: "/db",
+    file: "/drop",
+    drop: "/drop",
+    password: "/keys",
+    keys: "/keys",
+    sec: "/shield",
+    shield: "/shield",
+    api: "/db",
+    game: "/game",
+  };
+
+  const handleLaunch = (targetId: string, url: string, _param?: string) => {
     if (typeof window === "undefined") return;
-    let targetUrl = url;
-    if (!window.location.hostname.includes("sparrowx.net")) {
-      const u = new URL(window.location.origin + "/");
-      u.searchParams.set(param, "1");
-      targetUrl = u.toString();
+    const directPath = directRoutes[targetId];
+    if (directPath) {
+      window.location.href = directPath;
+      return;
     }
-    const opened = window.open(targetUrl, "_blank", "noopener,noreferrer");
-    if (!opened) {
-      window.location.href = targetUrl;
-    }
+    window.location.href = url;
   };
 
   const handleLandingSignOut = () => {

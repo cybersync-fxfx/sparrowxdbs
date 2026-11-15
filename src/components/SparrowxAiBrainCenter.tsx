@@ -1023,7 +1023,7 @@ export function SparrowxAiBrainCenter({
                         <span className="font-bold uppercase text-primary">
                           {turn.role === "user"
                             ? "SOC Operator"
-                            : `SparrowX Brain (${turn.modelUsed ?? config.model})`}
+                            : `SparrowX Brain (${turn.modelUsed ?? (config.model.includes("4") ? "SparrowX Deep Reasoning" : "SparrowX Fast Neural")})`}
                         </span>
                         <span>{turn.timestamp}</span>
                       </div>

@@ -395,7 +395,7 @@ export function ClientIntegrationModal({
     {
       id: "ai_agent",
       title: "AI Agent & LLM",
-      description: "Model Context Protocol (MCP), OpenAI, Gemini, Anthropic, Ollama",
+      description: "Model Context Protocol (MCP), SparrowX AI Neural Engine, OpenAI, Anthropic, Ollama",
       icon: Cpu,
       badge: "Prompt Guardrail",
     },
