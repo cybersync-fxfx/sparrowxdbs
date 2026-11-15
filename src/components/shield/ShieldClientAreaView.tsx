@@ -382,16 +382,14 @@ export function ShieldClientAreaView({
                   <span>Need Game Server DDoS Protection?</span>
                 </div>
                 <p className="text-[11px] text-[#F4F6FA]/60 leading-relaxed">
-                  Protecting a FiveM, Minecraft, SA-MP, or dedicated game server from DDoS attacks? Visit <span className="font-mono text-[#F4F6FA]">gamesec.sparrowx.net</span>.
+                  Protecting a FiveM, Minecraft, SA-MP, or dedicated game server from DDoS attacks? Visit <span className="font-mono text-[#F4F6FA]">sparrowx.net/game</span>.
                 </p>
                 <a
                   href={GAMESEC_URL}
-                  target="_blank"
-                  rel="noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-lg border border-[#F96246]/40 bg-[#F96246]/15 px-3 py-1.5 text-xs font-medium text-[#FFEBB9] hover:bg-[#F96246]/25 transition-colors"
                 >
                   <Server className="size-3.5" />
-                  <span>Open gamesec.sparrowx.net</span>
+                  <span>Open Game DDoS Platform</span>
                   <ArrowRight className="size-3.5" />
                 </a>
               </div>

@@ -642,6 +642,9 @@ heal_pterodactyl_host_nginx() {
       set_ptero_env_key "HASHIDS_SALT" "$(openssl rand -hex 10 2>/dev/null || echo 'spx_hashids_salt_2026')"
     fi
     set_ptero_env_key "HASHIDS_LENGTH" "8"
+    if [ -n "${PTERO_SSO_SECRET:-}" ]; then
+      set_ptero_env_key "SPARROWX_SSO_SECRET" "${PTERO_SSO_SECRET}"
+    fi
 
     # Test real PHP -> Redis connectivity (ping + set/get) before enabling Redis drivers
     local redis_ready="false"
@@ -775,7 +778,11 @@ heal_pterodactyl_host_nginx() {
     (cd "${ptero_dir}" && "${php_bin}" artisan queue:restart >/dev/null 2>&1 || true)
   fi
 
-  mkdir -p "${ptero_dir}/storage/logs" "${ptero_dir}/storage/framework/sessions" "${ptero_dir}/storage/framework/views" "${ptero_dir}/storage/framework/cache/data" "${ptero_dir}/bootstrap/cache"
+  mkdir -p "${ptero_dir}/storage/logs" "${ptero_dir}/storage/framework/sessions" "${ptero_dir}/storage/framework/views" "${ptero_dir}/storage/framework/cache/data" "${ptero_dir}/bootstrap/cache" "${ptero_dir}/public"
+  if [ -f "${INSTALL_DIR}/ovh/sparrowx-sso.php" ]; then
+    cp -f "${INSTALL_DIR}/ovh/sparrowx-sso.php" "${ptero_dir}/public/sparrowx-sso.php" 2>/dev/null || true
+    chmod 644 "${ptero_dir}/public/sparrowx-sso.php" 2>/dev/null || true
+  fi
   touch "${ptero_dir}/storage/logs/laravel.log" 2>/dev/null || true
   if id -u www-data >/dev/null 2>&1; then
     chown -R www-data:www-data "${ptero_dir}/storage" "${ptero_dir}/bootstrap/cache" "${ptero_dir}/.env" 2>/dev/null || true
@@ -1388,6 +1395,8 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}"
 POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
 SPARROWX_JWT_SECRET="${SPARROWX_JWT_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_jwt_secret_key_32_characters_2026')}"
 SPARROWX_REDIS_SECRET="${SPARROWX_REDIS_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo 'sparrowx_redis_secret_2026')}"
+PTERO_SSO_SECRET="${PTERO_SSO_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')}"
+PTERO_URL="https://${DOMAIN_GAME}"
 
 EXISTING_PTERO_DB=""
 EXISTING_PTERO_USER=""
@@ -1439,7 +1448,9 @@ ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET
+ensure_env_key "PTERO_URL" "https://${DOMAIN_GAME}"
+ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET
 
 log_ok "Verified .env (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -2442,6 +2453,14 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
       -out "${INSTALL_DIR}/ovh/ssl/fullchain.pem" \
       -subj "/CN=${SPARROWX_DOMAIN}" >/dev/null 2>&1 || true
   fi
+  for _cert_prefix in ptero game-web game-dash; do
+    if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
+      cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
+    fi
+    if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-privkey.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
+      cp -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-privkey.pem" 2>/dev/null || true
+    fi
+  done
 
   # Ensure nothing else on host is holding 80/443
   free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"

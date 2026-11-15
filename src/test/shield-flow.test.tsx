@@ -41,7 +41,7 @@ describe("SparrowX Security (sec.sparrowx.net) Landing -> Client Area -> SOC Das
 
     const gameSecLinks = screen
       .getAllByRole("link")
-      .filter((el) => el.getAttribute("href") === "https://gamesec.sparrowx.net");
+      .filter((el) => el.getAttribute("href") === "/game");
     expect(gameSecLinks.length).toBeGreaterThanOrEqual(1);
 
     // Strict no-fake-data check: zero demo SOC telemetry or fake incidents
