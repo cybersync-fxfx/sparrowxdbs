@@ -742,16 +742,21 @@ interface TopologyClusterPanelProps {
   region: string;
   envLabel: string;
   pingMs: number | null;
+  tableCount?: number;
+  totalRows?: number;
+  host?: string;
 }
 
-function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanelProps) {
+function TopologyClusterPanel({
+  region,
+  envLabel,
+  pingMs,
+  tableCount = 0,
+  totalRows = 0,
+  host = "db.sparrowx.net",
+}: TopologyClusterPanelProps) {
   const [topologyMode, setTopologyMode] = useState<"topology" | "metrics">("topology");
-  const regionLabel =
-    region === "ap-south-1"
-      ? "South Asia (Mumbai / Chennai)"
-      : region === "eu-central-1"
-        ? "Central Europe (Frankfurt)"
-        : "Southeast Asia (Singapore)";
+  const isLive = pingMs !== null;
 
   return (
     <div className="space-y-4">
@@ -794,134 +799,68 @@ function TopologyClusterPanel({ region, envLabel, pingMs }: TopologyClusterPanel
               </div>
               <div>
                 <div className="text-xs font-semibold text-white">Primary Database</div>
-                <div className="text-[11px] text-zinc-400">{regionLabel}</div>
+                <div className="text-[11px] font-mono text-zinc-400">{host}</div>
                 <div className="text-[10px] font-mono text-zinc-500">
-                  {region} • Nano • {envLabel}
+                  {region} • PostgREST • {envLabel}
                 </div>
               </div>
             </div>
             <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 bg-lime-500/10 border border-lime-500/30 text-[10px] font-mono text-[#A3E635]">
               <span className="size-1.5 rounded-full bg-[#A3E635] animate-pulse" />
-              LIVE
+              {isLive ? "LIVE" : "PROBING"}
             </span>
           </div>
 
           <div className="border-t border-[#262626] pt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-zinc-300">
-            <span>CPU 2%</span>
+            <span>{tableCount} table(s)</span>
             <span className="text-zinc-600">•</span>
-            <span>Disk 14%</span>
+            <span>{totalRows.toLocaleString()} row(s)</span>
             <span className="text-zinc-600">•</span>
-            <span>RAM 55%</span>
-            <span className="text-zinc-600">•</span>
-            <span>{topologyMode === "metrics" ? `RTT ${pingMs ?? 1.2}ms` : "7/60 conns"}</span>
+            <span>{pingMs !== null ? `RTT ${pingMs}ms` : "Checking RTT"}</span>
           </div>
         </div>
       </div>
 
-      {/* Compute & Disk Telemetry Panels */}
+      {/* Measured API Telemetry & Honest Host Metric Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-                <span className="size-1.5 rounded-full bg-zinc-400" />
-                <span>COMPUTE</span>
-                <HelpCircle className="size-3 text-zinc-500" />
-              </div>
-              <div className="text-xl font-bold text-white mt-0.5 font-mono">60%</div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+              <span className="size-1.5 rounded-full bg-[#A3E635]" />
+              <span>LIVE POSTGREST PROBE</span>
             </div>
-
-            <div className="flex items-center gap-4 text-right font-mono">
-              <div>
-                <div className="text-[10px] text-zinc-500 flex items-center justify-end gap-1">
-                  <span className="size-1.5 rounded-full bg-amber-400" /> CPU
-                </div>
-                <div className="text-sm font-semibold text-white">7%</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-zinc-500 flex items-center justify-end gap-1">
-                  <span className="size-1.5 rounded-full bg-amber-300" /> MEMORY
-                </div>
-                <div className="text-sm font-semibold text-white">60%</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-zinc-500 flex items-center justify-end gap-1">
-                  <span className="size-1.5 rounded-full bg-lime-400" /> DISK IO BALANCE
-                </div>
-                <div className="text-sm font-semibold text-white">99%</div>
-              </div>
-            </div>
+            <span className="text-xs font-mono text-[#A3E635]">
+              {pingMs !== null ? `${pingMs} ms` : "Checking..."}
+            </span>
           </div>
-
-          <div className="h-28 relative rounded-md bg-[#05060A] border border-[#242424] px-2 pt-2 pb-1">
-            <svg viewBox="0 0 360 80" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-              <line x1="28" y1="8" x2="356" y2="8" stroke="rgba(239,68,68,0.45)" strokeWidth="1" />
-              <line x1="28" y1="30" x2="356" y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-              <line x1="28" y1="54" x2="356" y2="54" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-              <text x="0" y="12" fill="#71717a" fontSize="8" fontFamily="monospace">100%</text>
-              <text x="4" y="33" fill="#71717a" fontSize="8" fontFamily="monospace">75%</text>
-              <text x="4" y="57" fill="#71717a" fontSize="8" fontFamily="monospace">50%</text>
-              <path
-                d="M 28 52 L 105 53 L 165 56 L 235 55 L 300 54 L 315 47 L 356 47 L 356 76 L 28 76 Z"
-                fill="rgba(245,158,11,0.12)"
-              />
-              <polyline
-                fill="none"
-                stroke="#f59e0b"
-                strokeWidth="1.75"
-                points="28,52 105,53 165,56 235,55 300,54 315,47 356,47"
-              />
-            </svg>
+          <div className="grid grid-cols-3 gap-2 pt-1 font-mono">
+            <div className="rounded-lg border border-[#242424] bg-[#05060A] p-2.5">
+              <div className="text-[10px] text-zinc-500">TABLES</div>
+              <div className="text-sm font-semibold text-white mt-0.5">{tableCount}</div>
+            </div>
+            <div className="rounded-lg border border-[#242424] bg-[#05060A] p-2.5">
+              <div className="text-[10px] text-zinc-500">LIVE ROWS</div>
+              <div className="text-sm font-semibold text-white mt-0.5">{totalRows.toLocaleString()}</div>
+            </div>
+            <div className="rounded-lg border border-[#242424] bg-[#05060A] p-2.5">
+              <div className="text-[10px] text-zinc-500">REST STATUS</div>
+              <div className="text-sm font-semibold text-white mt-0.5">{isLive ? "OK" : "—"}</div>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
-                <span className="size-1.5 rounded-full bg-zinc-400" />
-                <span>DISK</span>
-                <HelpCircle className="size-3 text-zinc-500" />
-              </div>
-              <div className="text-xl font-bold text-white mt-0.5 font-mono">14%</div>
+        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+              <span className="size-1.5 rounded-full bg-zinc-400" />
+              <span>HOST OS METRICS</span>
             </div>
-
-            <div className="flex items-center gap-4 text-right font-mono">
-              <div>
-                <div className="text-[10px] text-zinc-500">DATABASE</div>
-                <div className="text-sm font-semibold text-white">25.9 MB</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-zinc-500">WAL</div>
-                <div className="text-sm font-semibold text-white">80 MB</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-zinc-500">SYSTEM</div>
-                <div className="text-sm font-semibold text-white">167.5 MB</div>
-              </div>
-            </div>
+            <span className="text-[10px] font-mono text-zinc-500">Not exposed via REST</span>
           </div>
-
-          <div className="h-28 relative rounded-md bg-[#05060A] border border-[#242424] px-2 pt-2 pb-1">
-            <svg viewBox="0 0 360 80" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-              <line x1="28" y1="8" x2="356" y2="8" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-              <line x1="28" y1="30" x2="356" y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-              <line x1="28" y1="54" x2="356" y2="54" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-              <text x="0" y="12" fill="#71717a" fontSize="8" fontFamily="monospace">100%</text>
-              <text x="4" y="33" fill="#71717a" fontSize="8" fontFamily="monospace">75%</text>
-              <text x="4" y="57" fill="#71717a" fontSize="8" fontFamily="monospace">50%</text>
-              <path
-                d="M 28 65 L 140 65 L 220 63 L 356 62 L 356 76 L 28 76 Z"
-                fill="rgba(163,230,53,0.12)"
-              />
-              <polyline
-                fill="none"
-                stroke="#A3E635"
-                strokeWidth="1.75"
-                points="28,65 140,65 220,63 356,62"
-              />
-            </svg>
-          </div>
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Host CPU, RAM, Disk, and WAL metrics are not exposed over the public PostgREST API.
+            Only live database tables, row counts, and measured REST latency are displayed here.
+          </p>
         </div>
       </div>
     </div>
@@ -1137,10 +1076,37 @@ export function SovereignDatabaseStudio({
     | "settings"
     | "api";
 
-  const [studioTables, setStudioTables] = useState<StudioTableMeta[]>(INITIAL_STUDIO_TABLES);
+  const isPlatformAdmin = sessionUser?.admin === "yes";
+  const [studioTables, setStudioTables] = useState<StudioTableMeta[]>(() =>
+    isPlatformAdmin ? INITIAL_STUDIO_TABLES : []
+  );
   const [activeSection, setActiveSection] = useState<StudioSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-  const [selectedTable, setSelectedTable] = useState<string>("app_users");
+  const [selectedTable, setSelectedTable] = useState<string>(() =>
+    isPlatformAdmin ? "app_users" : ""
+  );
+
+  useEffect(() => {
+    let customTables: StudioTableMeta[] = [];
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem(`spx_custom_tables_${tenantSlug}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) customTables = parsed;
+        }
+      } catch {
+        // ignore storage errors
+      }
+    }
+    const nextTables = isPlatformAdmin
+      ? [...customTables, ...INITIAL_STUDIO_TABLES]
+      : customTables;
+    setStudioTables(nextTables);
+    setSelectedTable((prev) =>
+      nextTables.some((t) => t.name === prev) ? prev : (nextTables[0]?.name ?? "")
+    );
+  }, [isPlatformAdmin, tenantSlug]);
   const [tableSidebarFilter, setTableSidebarFilter] = useState<string>("");
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [tableCounts, setTableCounts] = useState<Record<string, number>>({});
@@ -1765,7 +1731,20 @@ export function SovereignDatabaseStudio({
       defaultRow: defaultObj,
     };
 
-    setStudioTables((prev) => [newMeta, ...prev]);
+    setStudioTables((prev) => {
+      const next = [newMeta, ...prev];
+      if (typeof window !== "undefined") {
+        try {
+          const customOnly = next.filter(
+            (t) => !INITIAL_STUDIO_TABLES.some((init) => init.name === t.name)
+          );
+          localStorage.setItem(`spx_custom_tables_${tenantSlug}`, JSON.stringify(customOnly));
+        } catch {
+          // ignore storage errors
+        }
+      }
+      return next;
+    });
     setSelectedTable(cleanName);
     setRows([defaultObj]);
     setTableCounts((prev) => ({ ...prev, [cleanName]: 1 }));
@@ -3283,7 +3262,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             className="flex items-center gap-1.5 hover:opacity-85 transition-opacity cursor-pointer shrink-0"
             title="SparrowX Cloud DB Landing"
           >
-            <img src="/logos/sparrowx-db.jpg" alt="SparrowX DB" className="size-7 rounded-md object-cover shrink-0 border border-[#A3E635]/30" />
+            <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={28} height={28} className="size-7 rounded-md object-cover shrink-0 border border-[#A3E635]/30" />
           </button>
 
           <span className="text-zinc-600 font-light hidden sm:inline">/</span>
@@ -3961,35 +3940,40 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
               </div>
 
-              {/* Status 2x2 Cards matching Screenshot 10 */}
+              {/* Status 2x2 Cards (Live Measured Data Only) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                   {
                     icon: CheckCircle2,
                     label: "STATUS",
-                    value: "Healthy",
-                    sub: `PgBouncer Port ${activeProject.poolerPort}`,
-                    accent: "text-[#A3E635]",
+                    value: pingStatus.postgrest !== null ? "Connected" : "Checking...",
+                    sub:
+                      pingStatus.postgrest !== null
+                        ? `${pingStatus.postgrest}ms REST RTT`
+                        : "Probing PostgREST /rest/v1",
+                    accent: pingStatus.postgrest !== null ? "text-[#A3E635]" : "text-zinc-300",
                   },
                   {
                     icon: Cpu,
-                    label: "COMPUTE SIZE",
-                    value: "NANO",
-                    sub: "Shared NVMe • Postgres 16.2",
+                    label: "ENGINE",
+                    value: "PostgreSQL",
+                    sub: `PostgREST • ${studioTables.length} table(s)`,
                     accent: "text-white",
                   },
                   {
                     icon: GitBranch,
-                    label: "RECENT BRANCH",
+                    label: "WORKSPACE",
                     value: activeProject.cfg.branch,
-                    sub: "Active sovereign cluster",
+                    sub: activeProject.dbName,
                     accent: "text-white",
                   },
                   {
                     icon: Clock,
-                    label: "LAST BACKUP",
-                    value: "Today 02:00 UTC",
-                    sub: "Nightly snapshot verified",
+                    label: "LIVE RECORDS",
+                    value: `${Object.values(tableCounts)
+                      .reduce((a, b) => a + b, 0)
+                      .toLocaleString()} rows`,
+                    sub: `Across ${studioTables.length} table(s)`,
                     accent: "text-white",
                   },
                 ].map((stat) => {
@@ -4019,6 +4003,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 region={projectRegion}
                 envLabel={activeProject.environment}
                 pingMs={pingStatus.postgrest}
+                tableCount={studioTables.length}
+                totalRows={Object.values(tableCounts).reduce((a, b) => a + b, 0)}
+                host={activeProject.host}
               />
 
               {/* Quick Table Stats Summary Strip */}
@@ -4226,6 +4213,19 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <td colSpan={tableColumns.length + 1} className="p-8 text-center text-zinc-500">
                           <RefreshCw className="size-5 animate-spin mx-auto mb-2 text-[#A3E635]" />
                           Querying table {selectedTable}...
+                        </td>
+                      </tr>
+                    ) : !selectedTable ? (
+                      <tr>
+                        <td colSpan={Math.max(tableColumns.length + 1, 2)} className="p-8 text-center text-zinc-400">
+                          <p className="mb-3">No tables created yet in this workspace.</p>
+                          <button
+                            type="button"
+                            onClick={() => setShowCreateTableModal(true)}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] px-3 py-1.5 text-xs font-semibold text-black hover:bg-[#bef264] cursor-pointer"
+                          >
+                            + New table
+                          </button>
                         </td>
                       </tr>
                     ) : paginatedRows.length === 0 ? (
@@ -5496,6 +5496,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 region={projectRegion}
                 envLabel={activeProject.environment}
                 pingMs={pingStatus.postgrest}
+                tableCount={studioTables.length}
+                totalRows={Object.values(tableCounts).reduce((a, b) => a + b, 0)}
+                host={activeProject.host}
               />
             </div>
           )}
