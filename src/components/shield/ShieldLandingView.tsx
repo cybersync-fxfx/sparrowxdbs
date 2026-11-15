@@ -28,7 +28,7 @@ import {
 } from "@/components/GrowthAndMonetizationHub";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 
-export const GAMESEC_URL = "/game";
+export const GAMESEC_URL = "https://gamesec.sparrowx.net";
 
 export interface ShieldLandingViewProps {
   activeUser: AppUser | null;
@@ -440,13 +440,15 @@ export function ShieldLandingView({
                   Want to secure your game? Need to protect your server from DDoS attack?
                 </h2>
                 <p className="max-w-2xl text-xs sm:text-sm text-[#F4F6FA]/65 leading-relaxed">
-                  FiveM, Minecraft, SA-MP, Rust, and raw TCP/UDP game servers require dedicated Anycast L4 packet scrubbing and stateful RakNet/ENet filtering. Launch our dedicated Game DDoS Defense platform on <span className="font-mono text-[#F4F6FA]">sparrowx.net/game</span>.
+                  FiveM, Minecraft, SA-MP, Rust, and raw TCP/UDP game servers require dedicated Anycast L4 packet scrubbing and stateful RakNet/ENet filtering. Launch our dedicated Game DDoS Defense platform on <span className="font-mono text-[#F4F6FA]">gamesec.sparrowx.net</span>.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
                 <a
                   href={GAMESEC_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F9103A] to-[#F96246] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(249,16,58,0.34)] hover:brightness-110 transition-all"
                 >
                   <Server className="size-4" />
@@ -454,7 +456,7 @@ export function ShieldLandingView({
                   <ArrowRight className="size-4" />
                 </a>
                 <span className="text-center font-mono text-[11px] text-[#F4F6FA]/50">
-                  Direct Game &amp; DDoS Platform
+                  Redirects to gamesec.sparrowx.net
                 </span>
               </div>
             </div>

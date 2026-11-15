@@ -41,8 +41,9 @@ describe("SparrowX Security (sec.sparrowx.net) Landing -> Client Area -> SOC Das
 
     const gameSecLinks = screen
       .getAllByRole("link")
-      .filter((el) => el.getAttribute("href") === "/game");
+      .filter((el) => el.getAttribute("href") === "https://gamesec.sparrowx.net");
     expect(gameSecLinks.length).toBeGreaterThanOrEqual(1);
+    expect(gameSecLinks.every((el) => el.getAttribute("target") === "_blank")).toBe(true);
 
     // Strict no-fake-data check: zero demo SOC telemetry or fake incidents
     expect(screen.queryByText(/FIN-WS-0419/i)).not.toBeInTheDocument();
@@ -60,6 +61,9 @@ describe("SparrowX Security (sec.sparrowx.net) Landing -> Client Area -> SOC Das
     // Strict rule: unintegrated modules stay Off / Not Configured
     expect(screen.getAllByText(/Not Configured/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText(/^Off$/i).length).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getAllByRole("link").filter((el) => el.getAttribute("href") === "https://gamesec.sparrowx.net").length,
+    ).toBeGreaterThanOrEqual(1);
 
     // Must not render the SOC dashboard view before clicking Dashboard button
     expect(screen.queryByRole("navigation", { name: /SOC Dashboard Sections/i })).not.toBeInTheDocument();
@@ -75,6 +79,9 @@ describe("SparrowX Security (sec.sparrowx.net) Landing -> Client Area -> SOC Das
     // Functional tools inside SOC Dashboard & zero fake incidents
     expect(screen.getAllByRole("button", { name: /Client Area/i }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByRole("button", { name: /Run Origin Audit/i })).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("link").filter((el) => el.getAttribute("href") === "https://gamesec.sparrowx.net").length,
+    ).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText(/FIN-WS-0419/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/INC-4127/i)).not.toBeInTheDocument();
   });

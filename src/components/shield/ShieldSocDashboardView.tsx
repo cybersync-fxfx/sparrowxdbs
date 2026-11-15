@@ -248,7 +248,7 @@ export function ShieldSocDashboardView({
             <a href="#shield-soc-workbench" className="hover:text-[#F4F6FA]">SOC Triage</a>
             <a href="#shield-threat-map" className="hover:text-[#F4F6FA]">Origin Audit &amp; Map</a>
             <a href="#shield-defense-tools" className="hover:text-[#F4F6FA]">AI Guardrail &amp; Firewall</a>
-            <a href={GAMESEC_URL} className="text-[#F96246] hover:text-[#F9103A] flex items-center gap-1">
+            <a href={GAMESEC_URL} target="_blank" rel="noopener noreferrer" className="text-[#F96246] hover:text-[#F9103A] flex items-center gap-1">
               <Gamepad2 className="size-3.5" /> Game DDoS
             </a>
           </nav>
@@ -678,16 +678,18 @@ export function ShieldSocDashboardView({
                 Need L4 Game Server DDoS Protection?
               </p>
               <p className="text-xs text-[#F4F6FA]/55">
-                Launch our dedicated FiveM / Minecraft / UDP protection portal at sparrowx.net/game.
+                Launch our dedicated FiveM / Minecraft / UDP protection portal at gamesec.sparrowx.net.
               </p>
             </div>
           </div>
           <a
             href={GAMESEC_URL}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-xl bg-[#F96246] px-4 py-2 text-xs font-semibold text-[#090B11] hover:brightness-110 transition-all"
           >
             <Server className="size-3.5" />
-            <span>Open Game DDoS Platform</span>
+            <span>Open gamesec.sparrowx.net</span>
             <ArrowRight className="size-3.5" />
           </a>
         </section>

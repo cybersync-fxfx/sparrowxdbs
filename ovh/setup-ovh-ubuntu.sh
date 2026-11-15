@@ -370,7 +370,15 @@ cat > "${ZONE_FILE}" <<EOF
 ; Glue & Host A Records
 @               IN  A       ${SPARROWX_PUBLIC_IP}
 www             IN  A       ${SPARROWX_PUBLIC_IP}
+db              IN  A       ${SPARROWX_PUBLIC_IP}
+sec             IN  A       ${SPARROWX_PUBLIC_IP}
+file            IN  A       ${SPARROWX_PUBLIC_IP}
+password        IN  A       ${SPARROWX_PUBLIC_IP}
 api             IN  A       ${SPARROWX_PUBLIC_IP}
+game            IN  A       ${SPARROWX_PUBLIC_IP}
+game.dash       IN  A       ${SPARROWX_PUBLIC_IP}
+game.panel      IN  A       ${SPARROWX_PUBLIC_IP}
+gamesec         IN  A       ${SPARROWX_PUBLIC_IP}
 ns1             IN  A       ${SPARROWX_PUBLIC_IP}
 ns2             IN  A       ${SPARROWX_PUBLIC_IP}
 
@@ -502,13 +510,38 @@ EOF
 # STEP 8: WRITE .ENV & CONFIGURE FIREWALL (ALLOWING DYNAMIC PORTS + SSH)
 # ============================================================================
 log_info "[Step 7/9] Writing .env & opening active ports in firewall..."
+DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
+DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
+GAMESEC_PORT="${GAMESEC_PORT:-3005}"
+GAMESEC_REPO_URL="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
+GAMESEC_DIR="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
+if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${SPARROWX_DOMAIN}" ]; then
+  DOMAIN_GAME="game.panel.${SPARROWX_DOMAIN}"
+fi
+
 if [ -f .env ] && grep -q "^POSTGRES_PASSWORD=" .env; then
   DB_PASS="$(grep '^POSTGRES_PASSWORD=' .env | cut -d'=' -f2-)"
   API_SECRET="$(grep '^SPARROWX_API_SECRET=' .env | cut -d'=' -f2- || openssl rand -hex 16)"
+  PTERO_SSO_SECRET="$(grep '^PTERO_SSO_SECRET=' .env | cut -d'=' -f2- || true)"
+  SAVED_GAME_DOM="$(grep '^DOMAIN_GAME=' .env | cut -d'=' -f2- || true)"
+  if [ -n "${SAVED_GAME_DOM}" ] && [ "${SAVED_GAME_DOM}" != "game.${SPARROWX_DOMAIN}" ]; then
+    DOMAIN_GAME="${SAVED_GAME_DOM}"
+  fi
+  SAVED_GAME_WEB="$(grep '^DOMAIN_GAME_WEB=' .env | cut -d'=' -f2- || true)"
+  [ -n "${SAVED_GAME_WEB}" ] && DOMAIN_GAME_WEB="${SAVED_GAME_WEB}"
+  SAVED_GAME_DASH="$(grep '^DOMAIN_GAME_DASH=' .env | cut -d'=' -f2- || true)"
+  [ -n "${SAVED_GAME_DASH}" ] && DOMAIN_GAME_DASH="${SAVED_GAME_DASH}"
+  SAVED_GAMESEC="$(grep '^DOMAIN_GAMESEC=' .env | cut -d'=' -f2- || true)"
+  [ -n "${SAVED_GAMESEC}" ] && DOMAIN_GAMESEC="${SAVED_GAMESEC}"
+  SAVED_GAMESEC_PORT="$(grep '^GAMESEC_PORT=' .env | cut -d'=' -f2- || true)"
+  [ -n "${SAVED_GAMESEC_PORT}" ] && GAMESEC_PORT="${SAVED_GAMESEC_PORT}"
 else
   DB_PASS="$(openssl rand -hex 20)"
   API_SECRET="spx_ovh_$(openssl rand -hex 16)"
 fi
+PTERO_SSO_SECRET="${PTERO_SSO_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')}"
+PTERO_URL="https://${DOMAIN_GAME}"
 
 cat > .env <<EOF
 POSTGRES_USER=sparrowx
@@ -516,6 +549,16 @@ POSTGRES_PASSWORD=${DB_PASS}
 POSTGRES_DB=sparrowx_db
 SPARROWX_API_SECRET=${API_SECRET}
 SPARROWX_DOMAIN=${SPARROWX_DOMAIN}
+DOMAIN_GAME=${DOMAIN_GAME}
+DOMAIN_GAME_WEB=${DOMAIN_GAME_WEB}
+DOMAIN_GAME_DASH=${DOMAIN_GAME_DASH}
+DOMAIN_GAMESEC=${DOMAIN_GAMESEC}
+GAMESEC_PORT=${GAMESEC_PORT}
+GAMESEC_REPO_URL=${GAMESEC_REPO_URL}
+GAMESEC_DIR=${GAMESEC_DIR}
+GAMESEC_UPSTREAM_URL=${GAMESEC_UPSTREAM_URL:-}
+PTERO_URL=${PTERO_URL}
+PTERO_SSO_SECRET=${PTERO_SSO_SECRET}
 SPARROWX_PUBLIC_IP=${SPARROWX_PUBLIC_IP}
 SPARROWX_NS1=${SPARROWX_NS1}
 SPARROWX_NS2=${SPARROWX_NS2}
@@ -540,6 +583,8 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${DNS_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${DNS_PORT}"/udp >/dev/null 2>&1 || true
+  ufw allow in from 127.0.0.1 to any port "${GAMESEC_PORT:-3005}" proto tcp >/dev/null 2>&1 || true
+  ufw allow in from 172.16.0.0/12 to any port "${GAMESEC_PORT:-3005}" proto tcp >/dev/null 2>&1 || true
   ufw --force enable >/dev/null 2>&1 || true
 elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
   firewall-cmd --permanent --add-port=22/tcp >/dev/null 2>&1 || true
@@ -673,6 +718,7 @@ echo -e "${C_GREEN}=============================================================
 echo -e "  • Dashboard (HTTPS) : ${C_BOLD}https://${SPARROWX_DOMAIN}${HTTPS_SUFFIX}${C_RESET}"
 echo -e "  • Dashboard (HTTP)  : ${C_BOLD}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}${C_RESET}"
 echo -e "  • Supabase Studio   : ${C_BOLD}https://${SPARROWX_STUDIO_DOMAIN}${HTTPS_SUFFIX}${C_RESET} (or http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/?studio=1)"
+echo -e "  • Game DDoS Portal  : ${C_BOLD}https://${DOMAIN_GAMESEC}${HTTPS_SUFFIX}${C_RESET}"
 echo -e "  • Terminal DB TUI   : Run ${C_BOLD}./manage-db.sh${C_RESET} (or ${C_BOLD}sparrowx-db${C_RESET})"
 echo -e "  • Per-User DB Root  : ${INSTALL_DIR}/data/users/<username>/"
 echo -e "  • REST DB API       : ${C_BOLD}http://${SPARROWX_PUBLIC_IP}${HTTP_SUFFIX}/rest/v1/${C_RESET}"

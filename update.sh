@@ -299,6 +299,181 @@ EOF_NATIVE
   sleep 2
 }
 
+ensure_gamesec_landing_running() {
+  local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN:-sparrowx.net}}"
+  local gamesec_dir="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
+  local gamesec_repo="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
+  local gamesec_p="${GAMESEC_PORT:-3005}"
+
+  if [ -n "${GAMESEC_UPSTREAM_URL:-}" ]; then
+    log_ok "Game DDoS Defense (${gamesec_domain}) configured for external upstream ${GAMESEC_UPSTREAM_URL}"
+    return 0
+  fi
+
+  if ! command -v git >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get install -y -qq git >/dev/null 2>&1 || true
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    log_warn "git unavailable; skipping ${gamesec_domain} source deployment"
+    return 1
+  fi
+
+  mkdir -p "$(dirname "${gamesec_dir}")" 2>/dev/null || true
+  if [ ! -d "${gamesec_dir}/.git" ]; then
+    if [ -d "${gamesec_dir}" ] && [ ! -f "${gamesec_dir}/package.json" ]; then
+      rm -rf "${gamesec_dir}" 2>/dev/null || true
+    fi
+    if [ ! -d "${gamesec_dir}" ]; then
+      log_info "Cloning Game DDoS Defense portal (${gamesec_repo}) -> ${gamesec_dir}..."
+      git clone --depth 1 "${gamesec_repo}" "${gamesec_dir}" >/dev/null 2>&1 || \
+        log_warn "Failed to clone ${gamesec_repo}; preserving any existing ${gamesec_dir} bundle"
+    fi
+  else
+    git config --global --add safe.directory "${gamesec_dir}" >/dev/null 2>&1 || true
+    git -C "${gamesec_dir}" checkout -- vite.config.ts package-lock.json >/dev/null 2>&1 || true
+    git -C "${gamesec_dir}" pull --ff-only >/dev/null 2>&1 || true
+  fi
+
+  if [ ! -f "${gamesec_dir}/package.json" ]; then
+    log_warn "Missing ${gamesec_dir}/package.json; cannot build ${gamesec_domain} portal"
+    return 1
+  fi
+
+  local cur_rev="" built_rev="" need_build="no"
+  cur_rev="$(git -C "${gamesec_dir}" rev-parse HEAD 2>/dev/null || echo 'local')"
+  [ -f "${gamesec_dir}/.sparrowx-built-rev" ] && built_rev="$(cat "${gamesec_dir}/.sparrowx-built-rev" 2>/dev/null | tr -d '[:space:]' || true)"
+  if [ ! -s "${gamesec_dir}/.output/server/index.mjs" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${GAMESEC_REBUILD:-0}" = "1" ]; then
+    need_build="yes"
+  fi
+
+  local docker_ok="no"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker_ok="yes"
+  fi
+
+  if [ "${need_build}" = "yes" ]; then
+    log_info "Building ${gamesec_domain} (sbs-detrion-landing) with Nitro node-server preset..."
+    if [ -f "${gamesec_dir}/vite.config.ts" ]; then
+      cp -f "${gamesec_dir}/vite.config.ts" "${gamesec_dir}/.vite.config.ts.bak" 2>/dev/null || true
+      sed -i -E 's/preset:[[:space:]]*["'\'']vercel["'\'']/preset: "node-server"/g' "${gamesec_dir}/vite.config.ts"
+    fi
+
+    local build_rc=1
+    if [ "${docker_ok}" = "yes" ]; then
+      if docker run --rm \
+        -e NODE_OPTIONS="--max-old-space-size=1536" \
+        -v "${gamesec_dir}:/app" -w /app \
+        node:22-slim sh -c 'npm install --legacy-peer-deps --no-audit --no-fund && npm run build' >/dev/null 2>&1; then
+        build_rc=0
+      fi
+    fi
+
+    if [ "${build_rc}" -ne 0 ]; then
+      if { ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 20 ] || ! command -v npm >/dev/null 2>&1; } && command -v apt-get >/dev/null 2>&1; then
+        export DEBIAN_FRONTEND=noninteractive
+        curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | bash - >/dev/null 2>&1 || true
+        apt-get install -y -qq nodejs npm >/dev/null 2>&1 || apt-get install -y -qq nodejs >/dev/null 2>&1 || true
+      fi
+      if command -v npm >/dev/null 2>&1; then
+        (cd "${gamesec_dir}" && NODE_OPTIONS="--max-old-space-size=1536" npm install --legacy-peer-deps --no-audit --no-fund && npm run build) >/dev/null 2>&1 && build_rc=0 || true
+      fi
+    fi
+
+    if [ -f "${gamesec_dir}/.vite.config.ts.bak" ]; then
+      mv -f "${gamesec_dir}/.vite.config.ts.bak" "${gamesec_dir}/vite.config.ts" 2>/dev/null || true
+    elif [ -d "${gamesec_dir}/.git" ]; then
+      git -C "${gamesec_dir}" checkout -- vite.config.ts >/dev/null 2>&1 || true
+    fi
+
+    if [ "${build_rc}" -eq 0 ] && [ -s "${gamesec_dir}/.output/server/index.mjs" ]; then
+      echo "${cur_rev}" > "${gamesec_dir}/.sparrowx-built-rev"
+      log_ok "Built ${gamesec_domain} Nitro server bundle (.output/server/index.mjs)"
+    else
+      log_warn "Build failed for ${gamesec_dir}; preserving previous build if present"
+      [ -s "${gamesec_dir}/.output/server/index.mjs" ] || return 1
+    fi
+  fi
+
+  local env_args=()
+  [ -s "${gamesec_dir}/.env" ] && env_args=(--env-file "${gamesec_dir}/.env")
+
+  local edge_net="sparrowx_net"
+  if [ "${docker_ok}" = "yes" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+    local detected_net=""
+    detected_net="$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' sparrowx-nginx 2>/dev/null | awk 'NF {print; exit}' || true)"
+    [ -n "${detected_net}" ] && edge_net="${detected_net}"
+  fi
+
+  local gamesec_started="no"
+  if [ "${docker_ok}" = "yes" ]; then
+    if [ "${need_build}" != "yes" ] && \
+       docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-gamesec" && \
+       docker inspect -f '{{json .NetworkSettings.Networks}}' sparrowx-gamesec 2>/dev/null | grep -q "\"${edge_net}\"" && \
+       curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${gamesec_p}/" 2>/dev/null; then
+      gamesec_started="yes"
+      log_ok "Game DDoS Defense (${gamesec_domain}) container sparrowx-gamesec already healthy on :${gamesec_p}"
+    else
+      docker network create "${edge_net}" >/dev/null 2>&1 || true
+      docker rm -f sparrowx-gamesec >/dev/null 2>&1 || true
+      free_docker_port_conflicts "${gamesec_p}" "sparrowx-gamesec"
+      systemctl stop sparrowx-gamesec.service >/dev/null 2>&1 || true
+      if docker run -d --name sparrowx-gamesec --restart unless-stopped \
+        --network "${edge_net}" --network-alias sparrowx-gamesec \
+        -p "127.0.0.1:${gamesec_p}:3000" \
+        -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=3000 -e NITRO_HOST=0.0.0.0 -e NITRO_PORT=3000 \
+        "${env_args[@]}" \
+        -v "${gamesec_dir}:/app" -w /app \
+        node:22-slim node .output/server/index.mjs >/dev/null 2>&1; then
+        sleep 2
+        if docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-gamesec"; then
+          gamesec_started="yes"
+          log_ok "Game DDoS Defense (${gamesec_domain}) container live on ${edge_net} & 127.0.0.1:${gamesec_p}"
+        fi
+      fi
+    fi
+  fi
+
+  if [ "${gamesec_started}" != "yes" ]; then
+    if { ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 20 ]; } && command -v apt-get >/dev/null 2>&1; then
+      export DEBIAN_FRONTEND=noninteractive
+      curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | bash - >/dev/null 2>&1 || true
+      apt-get install -y -qq nodejs >/dev/null 2>&1 || true
+    fi
+    local node_bin=""
+    node_bin="$(command -v node || echo /usr/bin/node)"
+    if [ -x "${node_bin}" ] && [ -s "${gamesec_dir}/.output/server/index.mjs" ]; then
+      if [ -d /etc/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+        cat > /etc/systemd/system/sparrowx-gamesec.service <<EOF_GAMESEC
+[Unit]
+Description=SparrowX Game DDoS Defense Portal (${gamesec_domain})
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${gamesec_dir}
+EnvironmentFile=-${gamesec_dir}/.env
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=${gamesec_p}
+Environment=NITRO_HOST=0.0.0.0
+Environment=NITRO_PORT=${gamesec_p}
+ExecStart=${node_bin} ${gamesec_dir}/.output/server/index.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF_GAMESEC
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl enable --now sparrowx-gamesec.service >/dev/null 2>&1 || systemctl restart sparrowx-gamesec.service >/dev/null 2>&1 || true
+        gamesec_started="yes"
+        log_ok "Game DDoS Defense (${gamesec_domain}) systemd service live on :${gamesec_p}"
+      fi
+    fi
+  fi
+}
+
 set_ptero_env_key() {
   local key="$1"
   local val="$2"
@@ -675,6 +850,7 @@ ensure_game_letsencrypt_ssl() {
   local game_panel_domain="${DOMAIN_GAME:-game.panel.${SPARROWX_DOMAIN}}"
   local game_web_domain="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
   local game_dash_domain="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+  local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
 
@@ -700,6 +876,7 @@ ensure_game_letsencrypt_ssl() {
   fi
   issue_le_cert_to_ovh_ssl "${game_web_domain}" "game-web"
   issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
+  issue_le_cert_to_ovh_ssl "${gamesec_domain}" "gamesec"
 }
 
 ensure_core_letsencrypt_ssl() {
@@ -907,6 +1084,14 @@ PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
 DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
+GAMESEC_REPO_URL="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
+GAMESEC_DIR="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
+GAMESEC_UPSTREAM_URL="${GAMESEC_UPSTREAM_URL:-}"
+GAMESEC_PORT="${GAMESEC_PORT:-3005}"
+if port_held_by_other "${GAMESEC_PORT}" "sparrowx-gamesec"; then
+  GAMESEC_PORT="$(find_next_free_port 3015)"
+fi
 if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${SPARROWX_DOMAIN}" ]; then
   DOMAIN_GAME="game.panel.${SPARROWX_DOMAIN}"
 fi
@@ -952,6 +1137,11 @@ ensure_env_key "DOMAIN_STUDIO" "${SPARROWX_STUDIO_DOMAIN}"
 ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
 ensure_env_key "DOMAIN_GAME_WEB" "${DOMAIN_GAME_WEB}"
 ensure_env_key "DOMAIN_GAME_DASH" "${DOMAIN_GAME_DASH}"
+ensure_env_key "DOMAIN_GAMESEC" "${DOMAIN_GAMESEC}"
+ensure_env_key "GAMESEC_PORT" "${GAMESEC_PORT}"
+ensure_env_key "GAMESEC_REPO_URL" "${GAMESEC_REPO_URL}"
+ensure_env_key "GAMESEC_DIR" "${GAMESEC_DIR}"
+ensure_env_key "GAMESEC_UPSTREAM_URL" "${GAMESEC_UPSTREAM_URL:-}"
 ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
 ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
 ensure_env_key "HTTP_PORT" "${HTTP_PORT}"
@@ -972,7 +1162,7 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${PTERO_DB_NAME}" ] && ensure_env_key "PTERO_DB_NAME" "${PTERO_DB_NAME}"
 [ -n "${PTERO_DB_USER}" ] && ensure_env_key "PTERO_DB_USER" "${PTERO_DB_USER}"
 [ -n "${PTERO_DB_PASSWORD}" ] && ensure_env_key "PTERO_DB_PASSWORD" "${PTERO_DB_PASSWORD}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -1082,6 +1272,8 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow 443/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
+  ufw allow in from 127.0.0.1 to any port "${GAMESEC_PORT:-3005}" proto tcp >/dev/null 2>&1 || true
+  ufw allow in from 172.16.0.0/12 to any port "${GAMESEC_PORT:-3005}" proto tcp >/dev/null 2>&1 || true
   ufw allow in from 127.0.0.1 to any port "${APP_HOST_PORT}" proto tcp >/dev/null 2>&1 || true
   ufw allow in from 172.16.0.0/12 to any port "${APP_HOST_PORT}" proto tcp >/dev/null 2>&1 || true
   ufw allow in from 127.0.0.1 to any port "${PTERO_PORT}" proto tcp >/dev/null 2>&1 || true
@@ -1108,7 +1300,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -1120,7 +1312,7 @@ if is_pterodactyl_installed; then
   heal_pterodactyl_host_nginx
 fi
 
-for _cert_prefix in ptero game-web game-dash; do
+for _cert_prefix in ptero game-web game-dash gamesec; do
   if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
     cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
   fi
@@ -1149,6 +1341,54 @@ render_sparrowx_nginx_conf() {
   if [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-privkey.pem" ]; then
     game_dash_ssl_cert="/etc/nginx/ssl/game-dash-fullchain.pem"
     game_dash_ssl_key="/etc/nginx/ssl/game-dash-privkey.pem"
+  fi
+  local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local gamesec_p="${GAMESEC_PORT:-3005}"
+  local gamesec_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local gamesec_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/gamesec-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/gamesec-privkey.pem" ]; then
+    gamesec_ssl_cert="/etc/nginx/ssl/gamesec-fullchain.pem"
+    gamesec_ssl_key="/etc/nginx/ssl/gamesec-privkey.pem"
+  fi
+  local gamesec_backend=""
+  if [ -n "${GAMESEC_UPSTREAM_URL:-}" ]; then
+    gamesec_backend="    location / {
+        proxy_pass ${GAMESEC_UPSTREAM_URL};
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$proxy_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
+  else
+    gamesec_backend="    location / {
+        set \$upstream_gamesec http://sparrowx-gamesec:3000;
+        proxy_pass \$upstream_gamesec;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @gamesec_host_fallback;
+    }
+
+    location @gamesec_host_fallback {
+        set \$fallback_gamesec http://${docker_host_ip}:${gamesec_p};
+        proxy_pass \$fallback_gamesec;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
   fi
   local ptero_backend=""
   if is_pterodactyl_installed; then
@@ -1483,11 +1723,30 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
+
+# 7. Game DDoS Defense (${gamesec_domain})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${gamesec_domain};
+    ssl_certificate ${gamesec_ssl_cert};
+    ssl_certificate_key ${gamesec_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 50M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+${gamesec_backend}
+}
 EOF
 }
 
 render_sparrowx_nginx_conf
-log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH} & ${DOMAIN_GAME}"
+log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC} & ${DOMAIN_GAME}"
 
 # ==============================================================================
 # STEP 5/7: Auto-Upgrade Systemd Daemon & CLI Symlinks
@@ -1681,6 +1940,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 
+  ensure_gamesec_landing_running || true
   ensure_game_letsencrypt_ssl
   ensure_core_letsencrypt_ssl
   render_sparrowx_nginx_conf
@@ -1701,6 +1961,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
 else
   log_info "Docker unavailable — rebuilding native Node.js SparrowX server..."
   ensure_native_fallback_running || true
+  ensure_gamesec_landing_running || true
 fi
 
 # ==============================================================================
@@ -1790,6 +2051,15 @@ if is_pterodactyl_installed; then
   PTERO_STATUS="$(echo "${PTERO_EDGE_CODE}" | grep -qE "^(200|301|302)$" && echo "ONLINE (:${PTERO_PORT})" || echo "CHECK (HTTP ${PTERO_EDGE_CODE})")"
 fi
 
+GAMESEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAMESEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+if echo "${GAMESEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
+  GAMESEC_STATUS="ONLINE (HTTP ${GAMESEC_EDGE_CODE} -> :${GAMESEC_PORT})"
+elif [ -n "${GAMESEC_UPSTREAM_URL:-}" ]; then
+  GAMESEC_STATUS="CHECK UPSTREAM (HTTP ${GAMESEC_EDGE_CODE})"
+else
+  GAMESEC_STATUS="CHECK (HTTP ${GAMESEC_EDGE_CODE} -> :${GAMESEC_PORT})"
+fi
+
 echo ""
 echo -e "${C_GREEN}╔══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}${C_WHITE}✅ ALL UPDATES APPLIED & FULL-STACK OVH SYSTEM IS LIVE (A-TO-Z)${C_RESET}         ${C_GREEN}║${C_RESET}"
@@ -1797,6 +2067,7 @@ echo -e "${C_GREEN}╠═══════════════════�
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Git Commit" "$(git rev-parse --short HEAD 2>/dev/null || echo local) (origin/main)"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Auto-Healed Fixes" "${HEALED_COUNT} issue(s) resolved automatically"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Web / PostgREST / Edge" "$([ "${HEALTH_OK}" = "true" ] && echo "ONLINE" || echo "WARN") / ${PGRST_STATUS} / ${EDGE_STATUS}"
+printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Game DDoS Defense" "${GAMESEC_STATUS}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Pterodactyl Panel" "${PTERO_STATUS}"
 fi
@@ -1811,6 +2082,7 @@ printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game DDoS Portal : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAMESEC}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
 fi

@@ -141,3 +141,16 @@ if systemctl is-enabled --quiet sparrowx-native.service 2>/dev/null; then
     systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
   fi
 fi
+
+# 7. Game DDoS Defense portal (sparrowx-gamesec) keepalive
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-gamesec"; then
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-gamesec"; then
+    log_wd "HEAL: Starting stopped sparrowx-gamesec container..."
+    docker start sparrowx-gamesec >/dev/null 2>&1 || true
+  fi
+elif systemctl is-enabled --quiet sparrowx-gamesec.service 2>/dev/null; then
+  if ! systemctl is-active --quiet sparrowx-gamesec.service 2>/dev/null; then
+    log_wd "HEAL: Restarting sparrowx-gamesec.service..."
+    systemctl restart sparrowx-gamesec.service >/dev/null 2>&1 || true
+  fi
+fi

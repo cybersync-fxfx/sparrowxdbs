@@ -51,6 +51,14 @@ import {
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
+import { matchProductSubdomain } from "@/lib/routing";
+
+/** Returns the clean Vault base path for the current host and removes /f/:id from history. */
+function resetDropVaultHistoryPath(): void {
+  if (typeof window === "undefined" || !window.location.pathname.startsWith("/f/")) return;
+  const sub = matchProductSubdomain(window.location.hostname);
+  window.history.pushState({}, "", sub?.product === "drop" ? "/" : "/drop");
+}
 
 function readInitialVaultUser(): AppUser | null {
   if (typeof window === "undefined") return null;
@@ -516,12 +524,18 @@ export function SparrowxDropEngine() {
       setSecretKeyHex(keyHex);
 
       const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
-      const isFileDomain = typeof window !== "undefined" && window.location.hostname.includes("file.");
+      const isFileDomain =
+        typeof window !== "undefined" &&
+        (window.location.hostname.startsWith("file.") ||
+          window.location.hostname.startsWith("drop.") ||
+          window.location.hostname.startsWith("share."));
 
       // Canonical link on file.sparrowx.net
       const canonicalLink = `https://file.sparrowx.net/?drop=${dropId}#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
       // Direct origin link (guaranteed to work immediately on current domain)
-      const currentHostLink = `${origin}/?drop=${dropId}#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
+      const currentHostLink = isFileDomain
+        ? `${origin}/?drop=${dropId}#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`
+        : `${origin}/drop?drop=${dropId}#key=${keyHex}&name=${encodeURIComponent(rawFile.name)}`;
 
       setEphemeralShareLink(isFileDomain ? canonicalLink : currentHostLink);
       setDirectShareLink(currentHostLink);
@@ -907,9 +921,7 @@ export function SparrowxDropEngine() {
                   type="button"
                   onClick={() => {
                     setIncomingPersistentId(null);
-                    if (typeof window !== "undefined" && window.location.pathname.startsWith("/f/")) {
-                      window.history.pushState({}, "", "/");
-                    }
+                    resetDropVaultHistoryPath();
                   }}
                   className="px-6 py-3 rounded-xl bg-[#A855F7] hover:bg-[#9333EA] text-white font-bold text-xs cursor-pointer shadow-lg transition-all"
                 >
@@ -987,9 +999,7 @@ export function SparrowxDropEngine() {
                     type="button"
                     onClick={() => {
                       setIncomingPersistentId(null);
-                      if (typeof window !== "undefined" && window.location.pathname.startsWith("/f/")) {
-                        window.history.pushState({}, "", "/");
-                      }
+                      resetDropVaultHistoryPath();
                     }}
                     className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold transition-colors cursor-pointer"
                   >
@@ -997,7 +1007,7 @@ export function SparrowxDropEngine() {
                   </button>
                 </div>
 
-                {/* Direct Link & Origin Fallback */}
+                {/* Direct Link & Download Endpoint */}
                 <div className="p-4 rounded-xl bg-[#05060A] border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono">
                   <div className="text-zinc-400 flex items-center gap-2 truncate w-full sm:w-auto">
                     <span className="text-zinc-500 shrink-0">Direct Link:</span>
@@ -1021,14 +1031,14 @@ export function SparrowxDropEngine() {
                       <span>{copiedPersistentId === persistentFileInfo.id ? "Copied!" : "Copy Link"}</span>
                     </button>
                     <a
-                      href={`http://139.99.131.135:3000/api/storage/download/${persistentFileInfo.id}`}
+                      href={`/api/storage/download/${persistentFileInfo.id}`}
                       className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors flex items-center gap-1.5"
                       target="_blank"
                       rel="noreferrer"
-                      title="Direct Origin IP Fallback"
+                      title="Direct File Stream"
                     >
                       <ExternalLink className="size-3.5" />
-                      <span>Direct Origin IP</span>
+                      <span>Raw Stream</span>
                     </a>
                   </div>
                 </div>
@@ -1146,9 +1156,7 @@ export function SparrowxDropEngine() {
                 onClick={() => {
                   setIncomingDrop(null);
                   setIncomingPersistentId(null);
-                  if (typeof window !== "undefined" && window.location.pathname.startsWith("/f/")) {
-                    window.history.pushState({}, "", "/");
-                  }
+                  resetDropVaultHistoryPath();
                 }}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-white/[0.08] text-xs font-medium transition-all cursor-pointer"
               >

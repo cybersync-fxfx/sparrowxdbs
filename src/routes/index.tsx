@@ -177,33 +177,25 @@ import {
   type Vulnerability,
 } from "@/lib/supabase";
 
+import { resolveRootRedirectTarget } from "@/lib/routing";
+
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): Record<string, unknown> => search,
-  beforeLoad: ({ search }) => {
-    if (typeof window !== "undefined") {
-      const h = window.location.hostname.toLowerCase();
-      if (h.startsWith("db.") || h.startsWith("studio.")) throw redirect({ to: "/db" });
-      if (h.startsWith("sec.") || h.startsWith("shield.")) throw redirect({ to: "/shield" });
-      if (h.startsWith("file.") || h.startsWith("drop.") || h.startsWith("share.")) throw redirect({ to: "/drop" });
-      if (h.startsWith("password.") || h.startsWith("passwd.") || h.startsWith("keys.")) throw redirect({ to: "/keys" });
-      if (h.startsWith("game.dash.") || h.startsWith("game-dash.")) throw redirect({ to: "/game/dashboard" });
-      if (h.startsWith("game.") && !h.startsWith("game.panel.")) throw redirect({ to: "/game" });
-    }
-    const s = search as Record<string, unknown>;
-    if (s.db === "1" || s.studio === "1" || s.studio === "true" || s.sparrowbase === "1") {
-      throw redirect({ to: "/db" });
-    }
-    if (s.shield === "1" || s.sec === "1") {
-      throw redirect({ to: "/shield" });
-    }
-    if (s.file === "1" || s.drop === "1") {
-      throw redirect({ to: "/drop" });
-    }
-    if (s.keys === "1" || s.password === "1" || s.passwd === "1") {
-      throw redirect({ to: "/keys" });
-    }
-    if (s.game === "1") {
-      throw redirect({ to: "/game" });
+  beforeLoad: ({ search, location }) => {
+    const hostname = typeof window !== "undefined" ? window.location.hostname : "";
+    const hash = typeof window !== "undefined" ? window.location.hash : location.hash;
+    const target = resolveRootRedirectTarget({
+      hostname,
+      search: search as Record<string, unknown>,
+      hash,
+    });
+    if (target) {
+      throw redirect({
+        to: target.to,
+        search: target.search as never,
+        ...(target.hash ? { hash: target.hash } : {}),
+        replace: true,
+      });
     }
   },
   head: () => ({
@@ -1566,6 +1558,16 @@ function Dashboard() {
       setActiveNav("System Status");
       return;
     }
+    if (navLabel === "SIEM Rules") {
+      setPortalMode(authSession.role === "admin" ? "soc" : "client");
+      setActiveNav("SIEM & Detection Rules");
+      return;
+    }
+    if (navLabel === "CVEs & Patch Tracker") {
+      setPortalMode(authSession.role === "admin" ? "soc" : "client");
+      setActiveNav("Vulnerabilities");
+      return;
+    }
     if (
       navLabel === "Activity History" ||
       navLabel === "Activity & Operations History" ||
@@ -1872,7 +1874,7 @@ function Dashboard() {
                 sec: "/shield",
                 shield: "/shield",
                 game: "/game",
-                api: "/db",
+                api: "/gateway",
               };
               const dest = directRoutes[target] || "/";
               window.location.href = dest;

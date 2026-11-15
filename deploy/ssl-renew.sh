@@ -28,7 +28,12 @@ DOMAIN_SEC="${DOMAIN_SEC:-sec.${DOMAIN_ROOT}}"
 DOMAIN_FILE="${DOMAIN_FILE:-file.${DOMAIN_ROOT}}"
 DOMAIN_PASSWORD="${DOMAIN_PASSWORD:-password.${DOMAIN_ROOT}}"
 DOMAIN_API="${DOMAIN_API:-api.${DOMAIN_ROOT}}"
-DOMAIN_GAME="${DOMAIN_GAME:-game.${DOMAIN_ROOT}}"
+DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${DOMAIN_ROOT}}"
+DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${DOMAIN_ROOT}}"
+DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT}}"
+if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${DOMAIN_ROOT}" ]; then
+  DOMAIN_GAME="game.panel.${DOMAIN_ROOT}"
+fi
 SPARROWX_ADMIN_EMAIL="${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}"
 SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP:-}"
 WEBROOT="${INSTALL_DIR}/ovh/certbot-www"
@@ -62,8 +67,11 @@ CANDIDATE_DOMAINS=(
   "passwd.${DOMAIN_ROOT}"
   "keys.${DOMAIN_ROOT}"
   "${DOMAIN_API}"
+  "${DOMAIN_GAME_WEB}"
+  "${DOMAIN_GAME_DASH}"
   "${DOMAIN_GAME}"
   "panel.${DOMAIN_ROOT}"
+  "${DOMAIN_GAMESEC}"
 )
 
 CERTBOT_ARGS=()
@@ -119,29 +127,36 @@ else
   fi
 fi
 
-# Dedicated issuance/renewal for Pterodactyl Game Panel (${DOMAIN_GAME}) via port 80
-if [ -n "${DOMAIN_GAME}" ] && [[ "${DOMAIN_GAME}" != *.local ]] && { [ -f /var/www/pterodactyl/artisan ] || [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAME} " ]]; }; then
-  GAME_LIVE_DIR="/etc/letsencrypt/live/${DOMAIN_GAME}"
-  GAME_EMAIL="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}}"
+# Dedicated issuance/renewal for Game Hosting Storefront, Client Dashboard & Pterodactyl Panel via port 80
+renew_dedicated_game_cert() {
+  local target_domain="$1"
+  local cert_prefix="$2"
+  local nginx_marker="$3"
+  local game_live_dir="/etc/letsencrypt/live/${target_domain}"
+  local game_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${DOMAIN_ROOT}}}"
 
-  if [ -s "${GAME_LIVE_DIR}/fullchain.pem" ] && [ -s "${GAME_LIVE_DIR}/privkey.pem" ]; then
+  if [ -z "${target_domain}" ] || [[ "${target_domain}" == *.local ]] || [ "${target_domain}" = "localhost" ]; then
+    return 0
+  fi
+
+  if [ -s "${game_live_dir}/fullchain.pem" ] && [ -s "${game_live_dir}/privkey.pem" ]; then
     certbot certonly \
       --webroot -w "${WEBROOT}" \
       --non-interactive \
       --agree-tos \
       --keep-until-expiring \
-      --cert-name "${DOMAIN_GAME}" \
-      -m "${GAME_EMAIL}" \
-      -d "${DOMAIN_GAME}" >> "${LOG_FILE}" 2>&1 || true
+      --cert-name "${target_domain}" \
+      -m "${game_email}" \
+      -d "${target_domain}" >> "${LOG_FILE}" 2>&1 || true
   else
-    log_ssl "Requesting Let's Encrypt SSL for ${DOMAIN_GAME} (port 80 webroot -> standalone fallback)..."
+    log_ssl "Requesting Let's Encrypt SSL for ${target_domain} (port 80 webroot -> standalone fallback)..."
     if ! certbot certonly \
       --webroot -w "${WEBROOT}" \
       --non-interactive \
       --agree-tos \
-      --cert-name "${DOMAIN_GAME}" \
-      -m "${GAME_EMAIL}" \
-      -d "${DOMAIN_GAME}" >> "${LOG_FILE}" 2>&1; then
+      --cert-name "${target_domain}" \
+      -m "${game_email}" \
+      -d "${target_domain}" >> "${LOG_FILE}" 2>&1; then
       docker stop sparrowx-nginx >/dev/null 2>&1 || true
       systemctl stop nginx >/dev/null 2>&1 || true
       command -v fuser >/dev/null 2>&1 && fuser -k 80/tcp >/dev/null 2>&1 || true
@@ -150,30 +165,30 @@ if [ -n "${DOMAIN_GAME}" ] && [[ "${DOMAIN_GAME}" != *.local ]] && { [ -f /var/w
         --standalone --preferred-challenges http \
         --non-interactive \
         --agree-tos \
-        --cert-name "${DOMAIN_GAME}" \
-        -m "${GAME_EMAIL}" \
-        -d "${DOMAIN_GAME}" >> "${LOG_FILE}" 2>&1 || true
+        --cert-name "${target_domain}" \
+        -m "${game_email}" \
+        -d "${target_domain}" >> "${LOG_FILE}" 2>&1 || true
       [ -f /var/www/pterodactyl/artisan ] && systemctl start nginx >/dev/null 2>&1 || true
       docker start sparrowx-nginx >/dev/null 2>&1 || true
     fi
   fi
 
-  if [ -s "${GAME_LIVE_DIR}/fullchain.pem" ] && [ -s "${GAME_LIVE_DIR}/privkey.pem" ]; then
-    cp -fL "${GAME_LIVE_DIR}/fullchain.pem" "${SSL_DIR}/ptero-fullchain.pem"
-    cp -fL "${GAME_LIVE_DIR}/privkey.pem" "${SSL_DIR}/ptero-privkey.pem"
-    chmod 644 "${SSL_DIR}/ptero-fullchain.pem"
-    chmod 600 "${SSL_DIR}/ptero-privkey.pem"
+  if [ -s "${game_live_dir}/fullchain.pem" ] && [ -s "${game_live_dir}/privkey.pem" ]; then
+    cp -fL "${game_live_dir}/fullchain.pem" "${SSL_DIR}/${cert_prefix}-fullchain.pem"
+    cp -fL "${game_live_dir}/privkey.pem" "${SSL_DIR}/${cert_prefix}-privkey.pem"
+    chmod 644 "${SSL_DIR}/${cert_prefix}-fullchain.pem"
+    chmod 600 "${SSL_DIR}/${cert_prefix}-privkey.pem"
     mkdir -p /etc/ssl
-    ln -sf "${GAME_LIVE_DIR}/fullchain.pem" "/etc/ssl/${DOMAIN_GAME}.pem" 2>/dev/null || true
-    ln -sf "${GAME_LIVE_DIR}/privkey.pem" "/etc/ssl/${DOMAIN_GAME}.key" 2>/dev/null || true
+    ln -sf "${game_live_dir}/fullchain.pem" "/etc/ssl/${target_domain}.pem" 2>/dev/null || true
+    ln -sf "${game_live_dir}/privkey.pem" "/etc/ssl/${target_domain}.key" 2>/dev/null || true
 
-    if [ -f "${INSTALL_DIR}/ovh/nginx.conf" ] && grep -q "${DOMAIN_GAME}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
+    if [ -n "${nginx_marker}" ] && [ -f "${INSTALL_DIR}/ovh/nginx.conf" ] && grep -q "${target_domain}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
       TMP_CONF="$(mktemp)"
-      awk '
-        /# 4\. Pterodactyl Game Panel/ { in_ptero=1 }
-        in_ptero && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/ptero-fullchain.pem;") }
-        in_ptero && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/ptero-privkey.pem;") }
-        in_ptero && /^}/ { in_ptero=0 }
+      awk -v marker="${nginx_marker}" -v prefix="${cert_prefix}" '
+        $0 ~ marker { in_blk=1 }
+        in_blk && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/" prefix "-fullchain.pem;") }
+        in_blk && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/" prefix "-privkey.pem;") }
+        in_blk && /^}/ { in_blk=0 }
         { print }
       ' "${INSTALL_DIR}/ovh/nginx.conf" > "${TMP_CONF}" && cat "${TMP_CONF}" > "${INSTALL_DIR}/ovh/nginx.conf"
       rm -f "${TMP_CONF}"
@@ -184,6 +199,19 @@ if [ -n "${DOMAIN_GAME}" ] && [[ "${DOMAIN_GAME}" != *.local ]] && { [ -f /var/w
         docker restart "${proxy_name}" >/dev/null 2>&1 || docker exec "${proxy_name}" nginx -s reload >/dev/null 2>&1 || true
       fi
     done
-    log_ssl "SUCCESS: Live Let's Encrypt SSL wired for ${DOMAIN_GAME}"
+    log_ssl "SUCCESS: Live Let's Encrypt SSL wired for ${target_domain}"
   fi
+}
+
+if [ -n "${DOMAIN_GAME}" ] && [[ "${DOMAIN_GAME}" != *.local ]] && { [ -f /var/www/pterodactyl/artisan ] || [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAME} " ]]; }; then
+  renew_dedicated_game_cert "${DOMAIN_GAME}" "ptero" "# 4\\. (Pterodactyl )?Game Panel"
+fi
+if [ -n "${DOMAIN_GAME_WEB}" ] && [[ "${DOMAIN_GAME_WEB}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAME_WEB} " ]]; then
+  renew_dedicated_game_cert "${DOMAIN_GAME_WEB}" "game-web" "# 5\\. Game Hosting Storefront"
+fi
+if [ -n "${DOMAIN_GAME_DASH}" ] && [[ "${DOMAIN_GAME_DASH}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAME_DASH} " ]]; then
+  renew_dedicated_game_cert "${DOMAIN_GAME_DASH}" "game-dash" "# 6\\. Game Client Dashboard"
+fi
+if [ -n "${DOMAIN_GAMESEC:-}" ] && [[ "${DOMAIN_GAMESEC}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAMESEC} " ]]; then
+  renew_dedicated_game_cert "${DOMAIN_GAMESEC}" "gamesec" "# 7\\. Game DDoS Defense"
 fi

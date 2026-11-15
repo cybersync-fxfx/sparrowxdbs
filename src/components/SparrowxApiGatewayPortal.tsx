@@ -445,10 +445,19 @@ print(response.json())`;
             </form>
 
             <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-[#64748B]">
-              <a href="https://sparrowx.net" className="hover:text-white transition-colors">
+              <a
+                href={
+                  typeof window !== "undefined" &&
+                  (window.location.hostname.startsWith("api.") ||
+                    window.location.hostname.startsWith("rest."))
+                    ? "https://sparrowx.net"
+                    : "/"
+                }
+                className="hover:text-white transition-colors"
+              >
                 ← sparrowx.net
               </a>
-              <a href="https://db.sparrowx.net" className="text-emerald-400 hover:underline">
+              <a href="/db" className="text-emerald-400 hover:underline">
                 Manage in DB Studio →
               </a>
             </div>

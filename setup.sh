@@ -335,7 +335,15 @@ init_ptero_credentials() {
   PTERO_DB_USER="${existing_user:-${PTERO_DB_USER:-pterodactyl}}"
   PTERO_DB_PASSWORD="${existing_pass:-${PTERO_DB_PASSWORD:-$(openssl rand -hex 16 2>/dev/null || echo 'spx_ptero_db_pass_2026')}}"
   PTERO_TIMEZONE="${PTERO_TIMEZONE:-UTC}"
-  export PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE
+  if [ -z "${PTERO_SSO_SECRET:-}" ] && [ -f "/var/www/pterodactyl/.env" ]; then
+    PTERO_SSO_SECRET="$(awk -F= '/^SPARROWX_SSO_SECRET=/{sub(/^[^=]*=/,""); print; exit}' /var/www/pterodactyl/.env 2>/dev/null | tr -d "\"'\r" || true)"
+  fi
+  if [ -z "${PTERO_SSO_SECRET:-}" ] && [ -f "${INSTALL_DIR}/.env" ]; then
+    PTERO_SSO_SECRET="$(awk -F= '/^PTERO_SSO_SECRET=/{sub(/^[^=]*=/,""); print; exit}' "${INSTALL_DIR}/.env" 2>/dev/null | tr -d "\"'\r" || true)"
+  fi
+  PTERO_SSO_SECRET="${PTERO_SSO_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')}"
+  PTERO_URL="https://${DOMAIN_GAME:-game.panel.${DOMAIN_ROOT:-sparrowx.local}}"
+  export PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE PTERO_SSO_SECRET PTERO_URL
 }
 
 write_ptero_credentials_file() {
@@ -466,6 +474,8 @@ open_ptero_ufw_rules() {
 
 render_sparrowx_nginx_conf() {
   local ptero_p="${PTERO_PORT:-8090}"
+  local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT:-${SPARROWX_DOMAIN:-sparrowx.local}}}"
+  local gamesec_p="${GAMESEC_PORT:-3005}"
   local docker_host_ip
   docker_host_ip="$(get_docker_host_ip)"
   local ptero_ssl_cert="/etc/nginx/ssl/fullchain.pem"
@@ -474,6 +484,65 @@ render_sparrowx_nginx_conf() {
   if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
     ptero_ssl_cert="/etc/nginx/ssl/ptero-fullchain.pem"
     ptero_ssl_key="/etc/nginx/ssl/ptero-privkey.pem"
+  fi
+  local game_web_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local game_web_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/game-web-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-web-privkey.pem" ]; then
+    game_web_ssl_cert="/etc/nginx/ssl/game-web-fullchain.pem"
+    game_web_ssl_key="/etc/nginx/ssl/game-web-privkey.pem"
+  fi
+  local game_dash_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local game_dash_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-privkey.pem" ]; then
+    game_dash_ssl_cert="/etc/nginx/ssl/game-dash-fullchain.pem"
+    game_dash_ssl_key="/etc/nginx/ssl/game-dash-privkey.pem"
+  fi
+  local gamesec_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local gamesec_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/gamesec-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/gamesec-privkey.pem" ]; then
+    gamesec_ssl_cert="/etc/nginx/ssl/gamesec-fullchain.pem"
+    gamesec_ssl_key="/etc/nginx/ssl/gamesec-privkey.pem"
+  fi
+
+  local gamesec_backend_block=""
+  if [ -n "${GAMESEC_UPSTREAM_URL:-}" ]; then
+    gamesec_backend_block="    location / {
+        proxy_pass ${GAMESEC_UPSTREAM_URL};
+        proxy_http_version 1.1;
+        proxy_ssl_server_name on;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$proxy_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
+  else
+    gamesec_backend_block="    location / {
+        set \$upstream_gamesec http://sparrowx-gamesec:3000;
+        proxy_pass \$upstream_gamesec;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @gamesec_host_fallback;
+    }
+
+    location @gamesec_host_fallback {
+        set \$fallback_gamesec http://${docker_host_ip}:${gamesec_p};
+        proxy_pass \$fallback_gamesec;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }"
   fi
 
   local ptero_backend_block=""
@@ -650,6 +719,81 @@ server {
 
 ${ptero_backend_block}
 }
+
+# 5. Game Hosting Storefront (${DOMAIN_GAME_WEB})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME_WEB};
+    ssl_certificate ${game_web_ssl_cert};
+    ssl_certificate_key ${game_web_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 6. Game Client Dashboard (${DOMAIN_GAME_DASH})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME_DASH};
+    ssl_certificate ${game_dash_ssl_cert};
+    ssl_certificate_key ${game_dash_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        proxy_pass http://sparrowx:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 7. Game DDoS Defense (${gamesec_domain})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${gamesec_domain};
+    ssl_certificate ${gamesec_ssl_cert};
+    ssl_certificate_key ${gamesec_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 50M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+${gamesec_backend_block}
+}
 EOF
 }
 
@@ -723,6 +867,9 @@ heal_pterodactyl_host_nginx() {
       set_ptero_env_key "HASHIDS_SALT" "$(openssl rand -hex 10 2>/dev/null || echo 'spx_hashids_salt_2026')"
     fi
     set_ptero_env_key "HASHIDS_LENGTH" "8"
+    if [ -n "${PTERO_SSO_SECRET:-}" ]; then
+      set_ptero_env_key "SPARROWX_SSO_SECRET" "${PTERO_SSO_SECRET}"
+    fi
 
     local redis_ready="false"
     if command -v redis-cli >/dev/null 2>&1 && redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -qi "PONG"; then
@@ -795,7 +942,11 @@ heal_pterodactyl_host_nginx() {
     (cd "${ptero_dir}" && "${php_bin}" artisan queue:restart >/dev/null 2>&1 || true)
   fi
 
-  mkdir -p "${ptero_dir}/storage/logs" "${ptero_dir}/storage/framework/sessions" "${ptero_dir}/storage/framework/views" "${ptero_dir}/storage/framework/cache/data" "${ptero_dir}/bootstrap/cache"
+  mkdir -p "${ptero_dir}/storage/logs" "${ptero_dir}/storage/framework/sessions" "${ptero_dir}/storage/framework/views" "${ptero_dir}/storage/framework/cache/data" "${ptero_dir}/bootstrap/cache" "${ptero_dir}/public"
+  if [ -f "${INSTALL_DIR}/ovh/sparrowx-sso.php" ]; then
+    cp -f "${INSTALL_DIR}/ovh/sparrowx-sso.php" "${ptero_dir}/public/sparrowx-sso.php" 2>/dev/null || true
+    chmod 644 "${ptero_dir}/public/sparrowx-sso.php" 2>/dev/null || true
+  fi
   if id -u www-data >/dev/null 2>&1; then
     chown -R www-data:www-data "${ptero_dir}" 2>/dev/null || true
   fi
@@ -919,21 +1070,86 @@ EOF
   log_ok "Host Pterodactyl Nginx shifted cleanly onto port ${ptero_p} (PHP-FPM: ${php_sock})."
 }
 
-ensure_game_letsencrypt_ssl() {
+issue_le_cert_to_ovh_ssl() {
+  local target_domain="$1"
+  local cert_prefix="$2"
   local root_domain="${DOMAIN_ROOT:-${SPARROWX_DOMAIN:-sparrowx.local}}"
-  local game_domain="${DOMAIN_GAME:-game.${root_domain}}"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
-  local live_dir="/etc/letsencrypt/live/${game_domain}"
+  local live_dir="/etc/letsencrypt/live/${target_domain}"
   local ssl_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${root_domain}}}"
 
-  if [ -z "${game_domain}" ] || [[ "${game_domain}" == *.local ]] || [ "${game_domain}" = "localhost" ]; then
+  if [ -z "${target_domain}" ] || [[ "${target_domain}" == *.local ]] || [ "${target_domain}" = "localhost" ]; then
     return 0
   fi
 
   if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
     ssl_email="admin@${root_domain}"
   fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+    log_info "Requesting Let's Encrypt SSL for ${target_domain} via HTTP-01 port 80..."
+
+    if certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos \
+      -m "${ssl_email}" \
+      --cert-name "${target_domain}" \
+      -d "${target_domain}" >/dev/null 2>&1; then
+      log_ok "Issued Let's Encrypt SSL for ${target_domain} via port 80 webroot"
+    else
+      log_warn "Webroot challenge deferred; retrying ${target_domain} via standalone port 80 listener..."
+      docker stop sparrowx-nginx >/dev/null 2>&1 || true
+      systemctl stop nginx >/dev/null 2>&1 || true
+      if command -v fuser >/dev/null 2>&1; then
+        fuser -k 80/tcp >/dev/null 2>&1 || true
+      fi
+      sleep 1
+
+      if certbot certonly \
+        --standalone --preferred-challenges http \
+        --non-interactive --agree-tos \
+        -m "${ssl_email}" \
+        --cert-name "${target_domain}" \
+        -d "${target_domain}" >/dev/null 2>&1; then
+        log_ok "Issued Let's Encrypt SSL for ${target_domain} via standalone port 80 challenge"
+      else
+        log_warn "Let's Encrypt HTTP-01 challenge failed for ${target_domain} (verify DNS A record & external port 80)"
+      fi
+
+      if is_pterodactyl_installed; then
+        systemctl start nginx >/dev/null 2>&1 || true
+      fi
+      docker start sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
+    fi
+  else
+    certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos --keep-until-expiring \
+      -m "${ssl_email}" \
+      --cert-name "${target_domain}" \
+      -d "${target_domain}" >/dev/null 2>&1 || true
+  fi
+
+  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/${cert_prefix}-fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/${cert_prefix}-privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/${cert_prefix}-fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/${cert_prefix}-privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${target_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${target_domain}.key" 2>/dev/null || true
+    log_ok "Live Let's Encrypt SSL wired for https://${target_domain}"
+  fi
+}
+
+ensure_game_letsencrypt_ssl() {
+  local root_domain="${DOMAIN_ROOT:-${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local game_panel_domain="${DOMAIN_GAME:-game.panel.${root_domain}}"
+  local game_web_domain="${DOMAIN_GAME_WEB:-game.${root_domain}}"
+  local game_dash_domain="${DOMAIN_GAME_DASH:-game.dash.${root_domain}}"
+  local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${root_domain}}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
 
   mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
 
@@ -947,64 +1163,189 @@ ensure_game_letsencrypt_ssl() {
   fi
 
   if ! command -v certbot >/dev/null 2>&1; then
-    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for ${game_domain}"
+    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for game domains"
     return 0
   fi
 
-  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
-    log_info "Requesting Let's Encrypt SSL for ${game_domain} via HTTP-01 port 80..."
+  if is_pterodactyl_installed; then
+    issue_le_cert_to_ovh_ssl "${game_panel_domain}" "ptero"
+  fi
+  issue_le_cert_to_ovh_ssl "${game_web_domain}" "game-web"
+  issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
+  issue_le_cert_to_ovh_ssl "${gamesec_domain}" "gamesec"
+  render_sparrowx_nginx_conf
+  docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+}
 
-    if certbot certonly \
-      --webroot -w "${webroot}" \
-      --non-interactive --agree-tos \
-      -m "${ssl_email}" \
-      --cert-name "${game_domain}" \
-      -d "${game_domain}" >/dev/null 2>&1; then
-      log_ok "Issued Let's Encrypt SSL for ${game_domain} via port 80 webroot"
-    else
-      log_warn "Webroot challenge deferred; retrying ${game_domain} via standalone port 80 listener..."
-      docker stop sparrowx-nginx >/dev/null 2>&1 || true
-      systemctl stop nginx >/dev/null 2>&1 || true
-      if command -v fuser >/dev/null 2>&1; then
-        fuser -k 80/tcp >/dev/null 2>&1 || true
-      fi
-      sleep 1
+ensure_gamesec_landing_running() {
+  local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT:-${SPARROWX_DOMAIN:-sparrowx.local}}}"
+  local gamesec_dir="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
+  local gamesec_repo="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
+  local gamesec_p="${GAMESEC_PORT:-3005}"
 
-      if certbot certonly \
-        --standalone --preferred-challenges http \
-        --non-interactive --agree-tos \
-        -m "${ssl_email}" \
-        --cert-name "${game_domain}" \
-        -d "${game_domain}" >/dev/null 2>&1; then
-        log_ok "Issued Let's Encrypt SSL for ${game_domain} via standalone port 80 challenge"
-      else
-        log_warn "Let's Encrypt HTTP-01 challenge failed for ${game_domain} (verify DNS A record & external port 80)"
-      fi
-
-      if is_pterodactyl_installed; then
-        systemctl start nginx >/dev/null 2>&1 || true
-      fi
-      docker start sparrowx-nginx >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps nginx >/dev/null 2>&1 || true
-    fi
-  else
-    certbot certonly \
-      --webroot -w "${webroot}" \
-      --non-interactive --agree-tos --keep-until-expiring \
-      -m "${ssl_email}" \
-      --cert-name "${game_domain}" \
-      -d "${game_domain}" >/dev/null 2>&1 || true
+  if [ -n "${GAMESEC_UPSTREAM_URL:-}" ]; then
+    log_ok "Game DDoS Defense (${gamesec_domain}) configured for external upstream ${GAMESEC_UPSTREAM_URL}."
+    return 0
   fi
 
-  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
-    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
-    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
-    chmod 644 "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
-    chmod 600 "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
-    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${game_domain}.pem" 2>/dev/null || true
-    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
-    render_sparrowx_nginx_conf
-    docker restart sparrowx-nginx >/dev/null 2>&1 || docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
-    log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
+  if ! command -v git >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then
+    retry_pkg_install git
+  fi
+  if ! command -v git >/dev/null 2>&1; then
+    log_warn "git unavailable; skipping ${gamesec_domain} source deployment."
+    return 1
+  fi
+
+  mkdir -p "$(dirname "${gamesec_dir}")" 2>/dev/null || true
+  if [ ! -d "${gamesec_dir}/.git" ]; then
+    if [ -d "${gamesec_dir}" ] && [ ! -f "${gamesec_dir}/package.json" ]; then
+      rm -rf "${gamesec_dir}" 2>/dev/null || true
+    fi
+    if [ ! -d "${gamesec_dir}" ]; then
+      log_info "Cloning Game DDoS Defense portal (${gamesec_repo}) -> ${gamesec_dir}..."
+      git clone --depth 1 "${gamesec_repo}" "${gamesec_dir}" >/dev/null 2>&1 || \
+        log_warn "Failed to clone ${gamesec_repo}; preserving any existing ${gamesec_dir} bundle."
+    fi
+  else
+    git config --global --add safe.directory "${gamesec_dir}" >/dev/null 2>&1 || true
+    git -C "${gamesec_dir}" checkout -- vite.config.ts package-lock.json >/dev/null 2>&1 || true
+    git -C "${gamesec_dir}" pull --ff-only >/dev/null 2>&1 || true
+  fi
+
+  if [ ! -f "${gamesec_dir}/package.json" ]; then
+    log_warn "Missing ${gamesec_dir}/package.json; cannot build ${gamesec_domain} portal."
+    return 1
+  fi
+
+  local cur_rev="" built_rev="" need_build="no"
+  cur_rev="$(git -C "${gamesec_dir}" rev-parse HEAD 2>/dev/null || echo 'local')"
+  [ -f "${gamesec_dir}/.sparrowx-built-rev" ] && built_rev="$(cat "${gamesec_dir}/.sparrowx-built-rev" 2>/dev/null | tr -d '[:space:]' || true)"
+  if [ ! -s "${gamesec_dir}/.output/server/index.mjs" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${GAMESEC_REBUILD:-0}" = "1" ]; then
+    need_build="yes"
+  fi
+
+  local docker_ok="no"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    docker_ok="yes"
+  fi
+
+  if [ "${need_build}" = "yes" ]; then
+    log_info "Building ${gamesec_domain} (sbs-detrion-landing) with Nitro node-server preset..."
+    if [ -f "${gamesec_dir}/vite.config.ts" ]; then
+      cp -f "${gamesec_dir}/vite.config.ts" "${gamesec_dir}/.vite.config.ts.bak" 2>/dev/null || true
+      sed -i -E 's/preset:[[:space:]]*["'\'']vercel["'\'']/preset: "node-server"/g' "${gamesec_dir}/vite.config.ts"
+    fi
+
+    local build_rc=1
+    if [ "${docker_ok}" = "yes" ]; then
+      if docker run --rm \
+        -e NODE_OPTIONS="--max-old-space-size=1536" \
+        -v "${gamesec_dir}:/app" -w /app \
+        node:22-slim sh -c 'npm install --legacy-peer-deps --no-audit --no-fund && npm run build' >/dev/null 2>&1; then
+        build_rc=0
+      fi
+    fi
+
+    if [ "${build_rc}" -ne 0 ]; then
+      if { ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 20 ] || ! command -v npm >/dev/null 2>&1; } && command -v apt-get >/dev/null 2>&1; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | bash - >/dev/null 2>&1 || true
+        retry_pkg_install nodejs
+      fi
+      if command -v npm >/dev/null 2>&1; then
+        (cd "${gamesec_dir}" && NODE_OPTIONS="--max-old-space-size=1536" npm install --legacy-peer-deps --no-audit --no-fund && npm run build) >/dev/null 2>&1 && build_rc=0 || true
+      fi
+    fi
+
+    if [ -f "${gamesec_dir}/.vite.config.ts.bak" ]; then
+      mv -f "${gamesec_dir}/.vite.config.ts.bak" "${gamesec_dir}/vite.config.ts" 2>/dev/null || true
+    elif [ -d "${gamesec_dir}/.git" ]; then
+      git -C "${gamesec_dir}" checkout -- vite.config.ts >/dev/null 2>&1 || true
+    fi
+
+    if [ "${build_rc}" -eq 0 ] && [ -s "${gamesec_dir}/.output/server/index.mjs" ]; then
+      echo "${cur_rev}" > "${gamesec_dir}/.sparrowx-built-rev"
+      log_ok "Built ${gamesec_domain} Nitro server bundle (.output/server/index.mjs)."
+    else
+      log_warn "Build failed for ${gamesec_dir}; preserving previous build if present."
+      [ -s "${gamesec_dir}/.output/server/index.mjs" ] || return 1
+    fi
+  fi
+
+  local env_args=()
+  [ -s "${gamesec_dir}/.env" ] && env_args=(--env-file "${gamesec_dir}/.env")
+
+  local edge_net="sparrowx_net"
+  if [ "${docker_ok}" = "yes" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-nginx"; then
+    local detected_net=""
+    detected_net="$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' sparrowx-nginx 2>/dev/null | awk 'NF {print; exit}' || true)"
+    [ -n "${detected_net}" ] && edge_net="${detected_net}"
+  fi
+
+  local gamesec_started="no"
+  if [ "${docker_ok}" = "yes" ]; then
+    if [ "${need_build}" != "yes" ] && \
+       docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-gamesec" && \
+       docker inspect -f '{{json .NetworkSettings.Networks}}' sparrowx-gamesec 2>/dev/null | grep -q "\"${edge_net}\"" && \
+       curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${gamesec_p}/" 2>/dev/null; then
+      gamesec_started="yes"
+      log_ok "Game DDoS Defense (${gamesec_domain}) container sparrowx-gamesec already healthy on :${gamesec_p}."
+    else
+      docker network create "${edge_net}" >/dev/null 2>&1 || true
+      docker rm -f sparrowx-gamesec >/dev/null 2>&1 || true
+      free_docker_port_conflicts "${gamesec_p}" "sparrowx-gamesec"
+      systemctl stop sparrowx-gamesec.service >/dev/null 2>&1 || true
+      if docker run -d --name sparrowx-gamesec --restart unless-stopped \
+        --network "${edge_net}" --network-alias sparrowx-gamesec \
+        -p "127.0.0.1:${gamesec_p}:3000" \
+        -e NODE_ENV=production -e HOST=0.0.0.0 -e PORT=3000 -e NITRO_HOST=0.0.0.0 -e NITRO_PORT=3000 \
+        "${env_args[@]}" \
+        -v "${gamesec_dir}:/app" -w /app \
+        node:22-slim node .output/server/index.mjs >/dev/null 2>&1; then
+        sleep 2
+        if docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-gamesec"; then
+          gamesec_started="yes"
+          log_ok "Game DDoS Defense (${gamesec_domain}) container live on ${edge_net} & :${gamesec_p}"
+        fi
+      fi
+    fi
+  fi
+
+  if [ "${gamesec_started}" != "yes" ]; then
+    if { ! command -v node >/dev/null 2>&1 || [ "$(node -v | cut -d'.' -f1 | tr -d 'v')" -lt 20 ]; } && command -v apt-get >/dev/null 2>&1; then
+      curl -fsSL https://deb.nodesource.com/setup_22.x 2>/dev/null | bash - >/dev/null 2>&1 || true
+      retry_pkg_install nodejs
+    fi
+    local node_bin=""
+    node_bin="$(command -v node || echo /usr/bin/node)"
+    if [ -x "${node_bin}" ] && [ -s "${gamesec_dir}/.output/server/index.mjs" ]; then
+      if [ -d /etc/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+        cat > /etc/systemd/system/sparrowx-gamesec.service <<EOF_GAMESEC
+[Unit]
+Description=SparrowX Game DDoS Defense Portal (${gamesec_domain})
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=${gamesec_dir}
+EnvironmentFile=-${gamesec_dir}/.env
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=${gamesec_p}
+Environment=NITRO_HOST=0.0.0.0
+Environment=NITRO_PORT=${gamesec_p}
+ExecStart=${node_bin} ${gamesec_dir}/.output/server/index.mjs
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF_GAMESEC
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl enable --now sparrowx-gamesec.service >/dev/null 2>&1 || systemctl restart sparrowx-gamesec.service >/dev/null 2>&1 || true
+        gamesec_started="yes"
+        log_ok "Game DDoS Defense (${gamesec_domain}) systemd service live on :${gamesec_p}"
+      fi
+    fi
   fi
 }
 
@@ -1144,14 +1485,33 @@ if [[ "$(echo "${CUSTOM_SUBS}" | tr '[:upper:]' '[:lower:]')" == "custom" ]]; th
   DOMAIN_FILE="$(ask_prompt "    -> File Drop & Vault Domain" "${DOMAIN_FILE:-file.${DOMAIN_ROOT}}")"
   DOMAIN_PASSWORD="$(ask_prompt "    -> Keys Password Generator Domain" "${DOMAIN_PASSWORD:-password.${DOMAIN_ROOT}}")"
   DOMAIN_API="$(ask_prompt "    -> PostgREST API Gateway Domain" "${DOMAIN_API:-api.${DOMAIN_ROOT}}")"
-  DOMAIN_GAME="$(ask_prompt "    -> Pterodactyl Game Panel Domain" "${DOMAIN_GAME:-game.${DOMAIN_ROOT}}")"
+  DOMAIN_GAME_WEB="$(ask_prompt "    -> Game Hosting Storefront Domain" "${DOMAIN_GAME_WEB:-game.${DOMAIN_ROOT}}")"
+  DOMAIN_GAME_DASH="$(ask_prompt "    -> Game Client Dashboard Domain" "${DOMAIN_GAME_DASH:-game.dash.${DOMAIN_ROOT}}")"
+  DOMAIN_GAMESEC="$(ask_prompt "    -> Game DDoS Defense Portal Domain" "${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT}}")"
+  if [ "${DOMAIN_GAME:-}" = "game.${DOMAIN_ROOT}" ]; then
+    DOMAIN_GAME="game.panel.${DOMAIN_ROOT}"
+  fi
+  DOMAIN_GAME="$(ask_prompt "    -> Pterodactyl Game Panel Domain" "${DOMAIN_GAME:-game.panel.${DOMAIN_ROOT}}")"
 else
   DOMAIN_STUDIO="db.${DOMAIN_ROOT}"
   DOMAIN_SEC="sec.${DOMAIN_ROOT}"
   DOMAIN_FILE="file.${DOMAIN_ROOT}"
   DOMAIN_PASSWORD="password.${DOMAIN_ROOT}"
   DOMAIN_API="api.${DOMAIN_ROOT}"
-  DOMAIN_GAME="game.${DOMAIN_ROOT}"
+  DOMAIN_GAME_WEB="game.${DOMAIN_ROOT}"
+  DOMAIN_GAME_DASH="game.dash.${DOMAIN_ROOT}"
+  DOMAIN_GAMESEC="gamesec.${DOMAIN_ROOT}"
+  DOMAIN_GAME="game.panel.${DOMAIN_ROOT}"
+fi
+DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${DOMAIN_ROOT}}"
+DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${DOMAIN_ROOT}}"
+DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT}}"
+GAMESEC_PORT="${GAMESEC_PORT:-3005}"
+GAMESEC_REPO_URL="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
+GAMESEC_DIR="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
+GAMESEC_UPSTREAM_URL="${GAMESEC_UPSTREAM_URL:-}"
+if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${DOMAIN_ROOT}" ]; then
+  DOMAIN_GAME="game.panel.${DOMAIN_ROOT}"
 fi
 SPARROWX_STUDIO_DOMAIN="${DOMAIN_STUDIO}"
 
@@ -1191,7 +1551,7 @@ fi
 init_ptero_credentials
 
 echo ""
-log_ok "Blueprint Locked: ${DOMAIN_ROOT} (db / sec / file / password / api / ${DOMAIN_GAME}) @ ${SPARROWX_PUBLIC_IP}"
+log_ok "Blueprint Locked: ${DOMAIN_ROOT} (db / sec / file / password / api / ${DOMAIN_GAME_WEB} / ${DOMAIN_GAME_DASH} / ${DOMAIN_GAMESEC} / ${DOMAIN_GAME}) @ ${SPARROWX_PUBLIC_IP}"
 
 # ==============================================================================
 # STEP 3: SYNC & VERIFY REPOSITORY + OPTIONAL PTERODACTYL INSTALLER
@@ -1346,7 +1706,8 @@ if [ "${SPARROWX_ALREADY_HEALTHY}" = "yes" ]; then
   PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
   PG_HOST_PORT="${PG_HOST_PORT:-5432}"
   PG_POOL_PORT="${PG_POOL_PORT:-6543}"
-  log_ok "Keeping active port map untouched (HTTP:${HTTP_PORT} HTTPS:${HTTPS_PORT} APP:${APP_HOST_PORT} PGRST:${PGRST_HOST_PORT} PG:${PG_HOST_PORT})."
+  GAMESEC_PORT="${GAMESEC_PORT:-3005}"
+  log_ok "Keeping active port map untouched (HTTP:${HTTP_PORT} HTTPS:${HTTPS_PORT} APP:${APP_HOST_PORT} PGRST:${PGRST_HOST_PORT} PG:${PG_HOST_PORT} GAMESEC:${GAMESEC_PORT})."
 else
   HTTP_PORT="$(find_free_port "${HTTP_PORT:-80}" 8180 "HTTP Edge Proxy" "sparrowx-nginx")"
   HTTPS_PORT="$(find_free_port "${HTTPS_PORT:-443}" 8444 "HTTPS SSL Edge Proxy" "sparrowx-nginx")"
@@ -1354,10 +1715,12 @@ else
   PGRST_HOST_PORT="$(find_free_port "${PGRST_HOST_PORT:-3001}" 3020 "PostgREST Gateway" "sparrowx-postgrest")"
   PG_HOST_PORT="$(find_free_port "${PG_HOST_PORT:-5432}" 5433 "PostgreSQL 16 + pgvector" "sparrowx-postgres")"
   PG_POOL_PORT="$(find_free_port "${PG_POOL_PORT:-6543}" 6544 "PgBouncer Pooler")"
+  GAMESEC_PORT="$(find_free_port "${GAMESEC_PORT:-3005}" 3015 "Game DDoS Defense Portal" "sparrowx-gamesec")"
 fi
 
 echo -e "  ${C_GREEN}• Public HTTP / HTTPS   :${C_RESET} ${C_BOLD}${HTTP_PORT} / ${HTTPS_PORT}${C_RESET}"
 echo -e "  ${C_GREEN}• SparrowX App Server   :${C_RESET} 127.0.0.1:${APP_HOST_PORT}"
+echo -e "  ${C_GREEN}• Game DDoS Defense     :${C_RESET} 127.0.0.1:${GAMESEC_PORT} (${DOMAIN_GAMESEC})"
 echo -e "  ${C_GREEN}• PostgREST API Engine  :${C_RESET} 127.0.0.1:${PGRST_HOST_PORT}"
 echo -e "  ${C_GREEN}• PostgreSQL 16 DB      :${C_RESET} 127.0.0.1:${PG_HOST_PORT}"
 if is_pterodactyl_installed; then
@@ -1402,6 +1765,7 @@ keys            IN  A       ${SPARROWX_PUBLIC_IP}
 api             IN  A       ${SPARROWX_PUBLIC_IP}
 game            IN  A       ${SPARROWX_PUBLIC_IP}
 panel           IN  A       ${SPARROWX_PUBLIC_IP}
+gamesec         IN  A       ${SPARROWX_PUBLIC_IP}
 ns1             IN  A       ${SPARROWX_PUBLIC_IP}
 ns2             IN  A       ${SPARROWX_PUBLIC_IP}
 
@@ -1453,12 +1817,12 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${DOMAIN_ROOT}" \
-    -addext "subjectAltName=DNS:${DOMAIN_ROOT},DNS:www.${DOMAIN_ROOT},DNS:${DOMAIN_STUDIO},DNS:${DOMAIN_SEC},DNS:shield.${DOMAIN_ROOT},DNS:${DOMAIN_FILE},DNS:drop.${DOMAIN_ROOT},DNS:${DOMAIN_PASSWORD},DNS:passwd.${DOMAIN_ROOT},DNS:keys.${DOMAIN_ROOT},DNS:${DOMAIN_API},DNS:${DOMAIN_GAME},DNS:panel.${DOMAIN_ROOT},IP:${SPARROWX_PUBLIC_IP}" >/dev/null 2>&1 || \
+    -addext "subjectAltName=DNS:${DOMAIN_ROOT},DNS:www.${DOMAIN_ROOT},DNS:${DOMAIN_STUDIO},DNS:${DOMAIN_SEC},DNS:shield.${DOMAIN_ROOT},DNS:${DOMAIN_FILE},DNS:drop.${DOMAIN_ROOT},DNS:${DOMAIN_PASSWORD},DNS:passwd.${DOMAIN_ROOT},DNS:keys.${DOMAIN_ROOT},DNS:${DOMAIN_API},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_GAME},DNS:panel.${DOMAIN_ROOT},IP:${SPARROWX_PUBLIC_IP}" >/dev/null 2>&1 || \
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${DOMAIN_ROOT}" >/dev/null 2>&1
-  log_ok "Initial SAN TLS certificate generated (including ${DOMAIN_GAME})."
+  log_ok "Initial SAN TLS certificate generated (including ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_GAME})."
 else
   log_ok "Existing valid TLS certificate preserved."
 fi
@@ -1467,8 +1831,17 @@ if is_pterodactyl_installed; then
   heal_pterodactyl_host_nginx
 fi
 
+for _cert_prefix in ptero game-web game-dash gamesec; do
+  if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
+    cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
+  fi
+  if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-privkey.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
+    cp -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-privkey.pem" 2>/dev/null || true
+  fi
+done
+
 render_sparrowx_nginx_conf
-log_ok "Multi-domain Nginx proxy configuration synchronized (including ${DOMAIN_GAME})."
+log_ok "Multi-domain Nginx proxy configuration synchronized (including ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_GAME})."
 
 # ==============================================================================
 # STEP 8: ENVIRONMENT (.ENV) & HARDENED FIREWALL (INCLUDING PTERO/WINGS PORTS)
@@ -1492,6 +1865,12 @@ ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
+if [ -z "${PTERO_SSO_SECRET:-}" ]; then
+  PTERO_SSO_SECRET="$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')"
+fi
+PTERO_URL="https://${DOMAIN_GAME}"
+ensure_env_key "PTERO_URL" "${PTERO_URL}"
+ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 ensure_env_key "DOMAIN_ROOT" "${DOMAIN_ROOT}"
 ensure_env_key "SPARROWX_DOMAIN" "${DOMAIN_ROOT}"
 ensure_env_key "DOMAIN_STUDIO" "${DOMAIN_STUDIO}"
@@ -1501,6 +1880,13 @@ ensure_env_key "DOMAIN_FILE" "${DOMAIN_FILE}"
 ensure_env_key "DOMAIN_PASSWORD" "${DOMAIN_PASSWORD}"
 ensure_env_key "DOMAIN_API" "${DOMAIN_API}"
 ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
+ensure_env_key "DOMAIN_GAME_WEB" "${DOMAIN_GAME_WEB}"
+ensure_env_key "DOMAIN_GAME_DASH" "${DOMAIN_GAME_DASH}"
+ensure_env_key "DOMAIN_GAMESEC" "${DOMAIN_GAMESEC}"
+ensure_env_key "GAMESEC_PORT" "${GAMESEC_PORT}"
+ensure_env_key "GAMESEC_REPO_URL" "${GAMESEC_REPO_URL}"
+ensure_env_key "GAMESEC_DIR" "${GAMESEC_DIR}"
+ensure_env_key "GAMESEC_UPSTREAM_URL" "${GAMESEC_UPSTREAM_URL:-}"
 ensure_env_key "PTERO_PORT" "${PTERO_PORT}"
 ensure_env_key "SPARROWX_PUBLIC_IP" "${SPARROWX_PUBLIC_IP}"
 ensure_env_key "SPARROWX_NS1" "${SPARROWX_NS1}"
@@ -1525,8 +1911,10 @@ chmod 600 "${INSTALL_DIR}/.env"
 
 export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET \
   DOMAIN_ROOT SPARROWX_DOMAIN DOMAIN_STUDIO SPARROWX_STUDIO_DOMAIN DOMAIN_SEC DOMAIN_FILE \
-  DOMAIN_PASSWORD DOMAIN_API DOMAIN_GAME PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_NS1 SPARROWX_NS2 \
-  SPARROWX_ADMIN_EMAIL HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT PG_POOL_PORT
+  DOMAIN_PASSWORD DOMAIN_API DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC \
+  GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL PTERO_PORT PTERO_URL PTERO_SSO_SECRET \
+  SPARROWX_PUBLIC_IP SPARROWX_NS1 SPARROWX_NS2 SPARROWX_ADMIN_EMAIL HTTP_PORT HTTPS_PORT APP_HOST_PORT \
+  PGRST_HOST_PORT PG_HOST_PORT PG_POOL_PORT
 
 ACTIVE_SSH_PORT="$(ss -tulnp 2>/dev/null | awk '/sshd/ {print $5}' | sed -E 's/.*:([0-9]+)$/\1/' | head -n 1 || echo 22)"
 [ -z "${ACTIVE_SSH_PORT}" ] && ACTIVE_SSH_PORT=22
@@ -1537,6 +1925,8 @@ if command -v ufw >/dev/null 2>&1; then
   ufw allow "${HTTP_PORT}"/tcp >/dev/null 2>&1 || true
   ufw allow "${HTTPS_PORT}"/tcp >/dev/null 2>&1 || true
   open_ptero_ufw_rules
+  ufw allow in from 127.0.0.1 to any port "${GAMESEC_PORT}" proto tcp >/dev/null 2>&1 || true
+  ufw allow in from 172.16.0.0/12 to any port "${GAMESEC_PORT}" proto tcp >/dev/null 2>&1 || true
   if [[ "$(echo "${ENABLE_DNS_SERVER}" | tr '[:upper:]' '[:lower:]')" == "y"* ]]; then
     ufw allow 53/tcp >/dev/null 2>&1 || true
     ufw allow 53/udp >/dev/null 2>&1 || true
@@ -1674,6 +2064,8 @@ EOF
   systemctl enable --now sparrowx-native.service >/dev/null 2>&1 || true
 fi
 
+ensure_gamesec_landing_running || true
+
 # ==============================================================================
 # STEP 10: LIVE SSL, CRON FLEET & END-TO-END PING TEST + AUTO-HEALING
 # ==============================================================================
@@ -1701,9 +2093,7 @@ EOF
   log_ok "Autonomous cron jobs installed (/etc/cron.d/sparrowx-automation)."
 
   log_info "Checking DNS propagation & requesting Let's Encrypt SSL certificates..."
-  if is_pterodactyl_installed; then
-    ensure_game_letsencrypt_ssl
-  fi
+  ensure_game_letsencrypt_ssl
   bash "${INSTALL_DIR}/deploy/ssl-renew.sh" || true
 fi
 
@@ -1774,6 +2164,9 @@ probe_and_heal "Shield WAF (${DOMAIN_SEC})"     "https://127.0.0.1:${HTTPS_PORT}
 probe_and_heal "File Vault (${DOMAIN_FILE})"    "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_FILE}"
 probe_and_heal "Keys (${DOMAIN_PASSWORD})"      "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_PASSWORD}"
 probe_and_heal "API (${DOMAIN_API})"            "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_API}"
+probe_and_heal "Game Hosting (${DOMAIN_GAME_WEB})"  "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_GAME_WEB}"
+probe_and_heal "Game Client Dash (${DOMAIN_GAME_DASH})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_GAME_DASH}"
+probe_and_heal "Game DDoS Defense (${DOMAIN_GAMESEC})" "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_GAMESEC}"
 if is_pterodactyl_installed; then
   probe_and_heal "Pterodactyl Internal (: ${PTERO_PORT})" "http://127.0.0.1:${PTERO_PORT}/" "${DOMAIN_GAME}" "ptero"
   probe_and_heal "Game Panel (${DOMAIN_GAME})"            "https://127.0.0.1:${HTTPS_PORT}/" "${DOMAIN_GAME}" "ptero"
@@ -1796,6 +2189,9 @@ echo -e "    • Shield WAF     : ${C_CYAN}https://${DOMAIN_SEC}${HTTPS_SUFFIX}$
 echo -e "    • File Drop/Vault: ${C_CYAN}https://${DOMAIN_FILE}${HTTPS_SUFFIX}${C_RESET}"
 echo -e "    • Offline Keys   : ${C_CYAN}https://${DOMAIN_PASSWORD}${HTTPS_SUFFIX}${C_RESET}"
 echo -e "    • API Gateway    : ${C_CYAN}https://${DOMAIN_API}${HTTPS_SUFFIX}${C_RESET}"
+echo -e "    • Game Hosting   : ${C_CYAN}https://${DOMAIN_GAME_WEB}${HTTPS_SUFFIX}${C_RESET}"
+echo -e "    • Game Client    : ${C_CYAN}https://${DOMAIN_GAME_DASH}${HTTPS_SUFFIX}${C_RESET}"
+echo -e "    • Game DDoS Prot : ${C_CYAN}https://${DOMAIN_GAMESEC}${HTTPS_SUFFIX}${C_RESET}"
 if is_pterodactyl_installed; then
   echo -e "    • Game Panel     : ${C_GREEN}https://${DOMAIN_GAME}${HTTPS_SUFFIX}${C_RESET} -> Host Nginx :${PTERO_PORT}"
 else
