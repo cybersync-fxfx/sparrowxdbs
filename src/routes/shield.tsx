@@ -39,8 +39,8 @@ export const Route = createFileRoute("/shield")({
     links: [
       { rel: "canonical", href: "https://sec.sparrowx.net" },
       { rel: "icon", href: "/logos/sparrowx-shield.jpg", type: "image/jpeg" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-shield.jpg" },
+      { rel: "apple-touch-icon", href: "/logos/sparrowx-shield.jpg" },
     ],
     scripts: [
       {

@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportSparrowxError } from "../lib/sparrowx-error-reporting";
+import { useServiceFavicon } from "../lib/service-favicon";
 
 function NotFoundComponent() {
   return (
@@ -290,6 +291,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useServiceFavicon();
 
   return (
     <QueryClientProvider client={queryClient}>

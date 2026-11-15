@@ -39,8 +39,8 @@ export const Route = createFileRoute("/keys")({
     links: [
       { rel: "canonical", href: "https://password.sparrowx.net" },
       { rel: "icon", href: "/logos/sparrowx-keys.jpg", type: "image/jpeg" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-keys.jpg" },
+      { rel: "apple-touch-icon", href: "/logos/sparrowx-keys.jpg" },
     ],
     scripts: [
       {

@@ -20,7 +20,8 @@ export const Route = createFileRoute("/f/$id")({
     ],
     links: [
       { rel: "icon", href: "/logos/sparrowx-drop.jpg", type: "image/jpeg" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-drop.jpg" },
+      { rel: "apple-touch-icon", href: "/logos/sparrowx-drop.jpg" },
     ],
   }),
   component: SparrowxFileDownloadRoute,
