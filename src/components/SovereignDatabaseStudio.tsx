@@ -17,6 +17,17 @@ import {
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
+  SiAstro,
+  SiNextdotjs,
+  SiNuxt,
+  SiReact,
+  SiRedwoodjs,
+  SiSolid,
+  SiSvelte,
+  SiTanstack,
+  SiVuedotjs,
+} from "react-icons/si";
+import {
   Activity,
   AlertCircle,
   Archive,
@@ -442,6 +453,7 @@ interface FrameworkGuide {
   id: "react" | "nextjs" | "tanstack" | "astro" | "vue" | "nuxt" | "sveltekit" | "solidjs" | "redwood";
   label: string;
   badge: string;
+  icon: React.ComponentType<{ className?: string }>;
   accent: string;
   snippet: (restBase: string, anonKey: string) => string;
 }
@@ -451,6 +463,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "react",
     label: "React",
     badge: "Re",
+    icon: SiReact,
     accent: "text-sky-400 border-sky-500/30 bg-sky-500/10",
     snippet: (restBase, anonKey) =>
       `// src/lib/sparrowx-db.ts\nimport { createClient } from '@supabase/supabase-js'\n\nexport const db = createClient(\n  '${restBase.replace("/rest/v1", "")}',\n  '${anonKey}'\n)\n\n// Usage inside a React component:\nconst { data: users } = await db.from('app_users').select('id, email, full_name')`,
@@ -459,6 +472,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "nextjs",
     label: "Next.js",
     badge: "Nx",
+    icon: SiNextdotjs,
     accent: "text-white border-white/25 bg-white/10",
     snippet: (restBase, anonKey) =>
       `// app/api/health/route.ts (Server Route)\nimport { createClient } from '@supabase/supabase-js'\n\nconst client = createClient(\n  process.env.SPARROWX_URL ?? '${restBase.replace("/rest/v1", "")}',\n  process.env.SPARROWX_ANON_KEY ?? '${anonKey}'\n)\n\nexport async function GET() {\n  const { data } = await client.from('client_tenants').select('*').limit(10)\n  return Response.json({ data })\n}`,
@@ -467,6 +481,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "tanstack",
     label: "TanStack Start",
     badge: "TS",
+    icon: SiTanstack,
     accent: "text-amber-300 border-amber-400/30 bg-amber-500/10",
     snippet: (restBase, anonKey) =>
       `// src/server/db.ts\nimport { createServerFn } from '@tanstack/react-start'\n\nexport const fetchAuditLogs = createServerFn({ method: 'GET' }).handler(async () => {\n  const res = await fetch('${restBase}/audit_logs?select=*&limit=25', {\n    headers: { apikey: '${anonKey}' },\n  })\n  return res.json()\n})`,
@@ -475,6 +490,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "astro",
     label: "Astro",
     badge: "As",
+    icon: SiAstro,
     accent: "text-orange-400 border-orange-500/30 bg-orange-500/10",
     snippet: (restBase, anonKey) =>
       `---\n// src/pages/index.astro\nconst res = await fetch('${restBase}/protected_services?select=*', {\n  headers: { apikey: '${anonKey}' }\n});\nconst services = await res.json();\n---`,
@@ -483,6 +499,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "vue",
     label: "Vue",
     badge: "Vu",
+    icon: SiVuedotjs,
     accent: "text-lime-400 border-lime-500/30 bg-lime-500/10",
     snippet: (restBase, anonKey) =>
       `<!-- src/components/TenantList.vue -->\n<script setup lang="ts">\nimport { ref, onMounted } from 'vue'\nconst tenants = ref([])\nonMounted(async () => {\n  const r = await fetch('${restBase}/client_tenants?select=*', {\n    headers: { apikey: '${anonKey}' }\n  })\n  tenants.value = await r.json()\n})\n</script>`,
@@ -491,6 +508,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "nuxt",
     label: "Nuxt",
     badge: "Nu",
+    icon: SiNuxt,
     accent: "text-lime-300 border-lime-400/30 bg-lime-500/10",
     snippet: (restBase, anonKey) =>
       `// server/api/tenants.ts\nexport default defineEventHandler(async () => {\n  return await $fetch('${restBase}/client_tenants?select=*', {\n    headers: { apikey: '${anonKey}' }\n  })\n})`,
@@ -499,6 +517,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "sveltekit",
     label: "SvelteKit",
     badge: "Sv",
+    icon: SiSvelte,
     accent: "text-rose-400 border-rose-500/30 bg-rose-500/10",
     snippet: (restBase, anonKey) =>
       `// src/routes/+page.server.ts\nexport async function load({ fetch }) {\n  const res = await fetch('${restBase}/ai_embeddings?select=*', {\n    headers: { apikey: '${anonKey}' }\n  });\n  return { embeddings: await res.json() };\n}`,
@@ -507,6 +526,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "solidjs",
     label: "SolidJS",
     badge: "So",
+    icon: SiSolid,
     accent: "text-blue-400 border-blue-500/30 bg-blue-500/10",
     snippet: (restBase, anonKey) =>
       `// src/App.tsx\nimport { createResource } from 'solid-js'\nconst [rows] = createResource(() =>\n  fetch('${restBase}/app_users?select=id,email,full_name', {\n    headers: { apikey: '${anonKey}' }\n  }).then((r) => r.json())\n)`,
@@ -515,6 +535,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     id: "redwood",
     label: "RedwoodJS",
     badge: "Rw",
+    icon: SiRedwoodjs,
     accent: "text-red-400 border-red-500/30 bg-red-500/10",
     snippet: (restBase, anonKey) =>
       `// api/src/lib/db.ts\nimport { PrismaClient } from '@prisma/client'\n// Connect via PgBouncer Port 6543 or PostgREST ${restBase}\n// apikey=${anonKey}\nexport const db = new PrismaClient()`,
@@ -2302,7 +2323,7 @@ export function SovereignDatabaseStudio({
                       onClick={() => setLandingAuthMode("register")}
                       className="text-[#A3E635] hover:underline font-semibold cursor-pointer"
                     >
-                      Provision free project
+                      Sign up for a free database for your project
                     </button>
                   </p>
                 </form>
@@ -2801,9 +2822,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       }`}
                     >
                       <span
-                        className={`size-9 rounded-lg border font-mono text-xs font-bold grid place-items-center shrink-0 ${fw.accent}`}
+                        className={`size-9 rounded-lg border grid place-items-center shrink-0 ${fw.accent}`}
                       >
-                        {fw.badge}
+                        <fw.icon className="size-4.5" />
                       </span>
                       <span className="text-sm font-medium text-white">{fw.label}</span>
                     </button>
