@@ -1059,6 +1059,118 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
 }
 
+ensure_core_letsencrypt_ssl() {
+  local root_domain="${SPARROWX_DOMAIN:-}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
+  local live_dir="/etc/letsencrypt/live/${root_domain}"
+  local ssl_email="${SPARROWX_ADMIN_EMAIL:-${PTERO_ADMIN_EMAIL:-admin@${root_domain}}}"
+
+  if [ -z "${root_domain}" ] || [[ "${root_domain}" == *.local ]] || [ "${root_domain}" = "localhost" ]; then
+    return 0
+  fi
+
+  if [ -z "${ssl_email}" ] || [[ "${ssl_email}" == *.local ]]; then
+    ssl_email="admin@${root_domain}"
+  fi
+
+  mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local -a candidate_domains=(
+    "${root_domain}"
+    "db.${root_domain}"
+    "sec.${root_domain}"
+    "file.${root_domain}"
+    "password.${root_domain}"
+    "api.${root_domain}"
+  )
+  if getent ahosts "www.${root_domain}" >/dev/null 2>&1; then
+    candidate_domains+=("www.${root_domain}")
+  fi
+
+  local -a domain_args=()
+  local d
+  for d in "${candidate_domains[@]}"; do
+    if ! command -v getent >/dev/null 2>&1 || getent ahosts "${d}" >/dev/null 2>&1; then
+      domain_args+=("-d" "${d}")
+    fi
+  done
+
+  if [ "${#domain_args[@]}" -eq 0 ]; then
+    domain_args=("-d" "${root_domain}")
+  fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
+    log_scan "Requesting Let's Encrypt SAN SSL for ${root_domain} & core subdomains via HTTP-01..."
+    local cb_err=""
+    if cb_err="$(certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos --expand \
+      -m "${ssl_email}" \
+      --cert-name "${root_domain}" \
+      "${domain_args[@]}" 2>&1)"; then
+      log_fix "Issued Let's Encrypt SAN SSL for ${root_domain} via port 80 webroot"
+    else
+      log_scan "Webroot challenge deferred; retrying ${root_domain} via standalone port 80 listener..."
+      docker stop "${EDGE_CTR:-sparrowx-nginx}" sparrowx-nginx sparrowx_edge_proxy >/dev/null 2>&1 || true
+      systemctl stop nginx >/dev/null 2>&1 || true
+      if command -v fuser >/dev/null 2>&1; then
+        fuser -k 80/tcp >/dev/null 2>&1 || true
+      fi
+      sleep 1
+
+      if cb_err="$(certbot certonly \
+        --standalone --preferred-challenges http \
+        --non-interactive --agree-tos --expand \
+        -m "${ssl_email}" \
+        --cert-name "${root_domain}" \
+        "${domain_args[@]}" 2>&1)"; then
+        log_fix "Issued Let's Encrypt SAN SSL for ${root_domain} via standalone port 80 challenge"
+      else
+        # Fallback: issue for root_domain alone so main site is never stuck on self-signed
+        if certbot certonly \
+          --standalone --preferred-challenges http \
+          --non-interactive --agree-tos \
+          -m "${ssl_email}" \
+          --cert-name "${root_domain}" \
+          -d "${root_domain}" >/dev/null 2>&1; then
+          log_fix "Issued Let's Encrypt SSL for ${root_domain} (root domain fallback)"
+        else
+          local cb_reason
+          cb_reason="$(printf '%s\n' "${cb_err}" | grep -E "Detail:|DNS|NXDOMAIN|Timeout|Connection refused|rate limit|too many" | head -n 2 | tr '\n' ' ' | sed 's/  */ /g')"
+          log_warn "Let's Encrypt HTTP-01 failed for ${root_domain}${cb_reason:+ (${cb_reason})}"
+        fi
+      fi
+
+      if is_pterodactyl_installed; then
+        systemctl start nginx >/dev/null 2>&1 || true
+      fi
+      docker start "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${EDGE_SVC:-nginx}" >/dev/null 2>&1 || true
+    fi
+  else
+    certbot certonly \
+      --webroot -w "${webroot}" \
+      --non-interactive --agree-tos --keep-until-expiring \
+      -m "${ssl_email}" \
+      --cert-name "${root_domain}" \
+      "${domain_args[@]}" >/dev/null 2>&1 || true
+  fi
+
+  if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${root_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${root_domain}.key" 2>/dev/null || true
+    log_ok "Live Let's Encrypt SAN SSL wired for https://${root_domain} (+ db/sec/file/password/api)"
+  fi
+}
+
 compose_cmd() {
   if docker compose version >/dev/null 2>&1; then
     docker compose "$@"
@@ -2085,8 +2197,9 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     ensure_native_fallback_running || true
   fi
 
-  # Ensure Let's Encrypt SSL certificates via port 80 for game.sparrowx.net, game.dash.sparrowx.net & game.panel.sparrowx.net
+  # Ensure Let's Encrypt SSL certificates via port 80 for all SparrowX core + game domains
   ensure_game_letsencrypt_ssl
+  ensure_core_letsencrypt_ssl
   render_sparrowx_nginx_conf
   docker restart "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || docker exec "${EDGE_CTR:-sparrowx-nginx}" nginx -s reload >/dev/null 2>&1 || true
   if systemctl list-unit-files wings.service >/dev/null 2>&1 && [ -f /etc/pterodactyl/config.yml ] && ! systemctl is-active --quiet wings 2>/dev/null; then
