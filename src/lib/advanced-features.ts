@@ -420,6 +420,53 @@ export type SessionTokenPayload = {
   permissions: string[];
 };
 
+const UNIFIED_SESSION_COOKIE = "spx_unified_session";
+
+function resolveCookieDomainAttribute(): string {
+  if (typeof window === "undefined") return "";
+  const host = window.location.hostname.toLowerCase();
+  if (host === "sparrowx.net" || host.endsWith(".sparrowx.net")) {
+    return "; Domain=.sparrowx.net";
+  }
+  return "";
+}
+
+function writeUnifiedSessionCookie(jwt: string, maxAgeSeconds: number): void {
+  if (typeof document === "undefined") return;
+  const domainAttr = resolveCookieDomainAttribute();
+  const secureAttr =
+    typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${UNIFIED_SESSION_COOKIE}=${encodeURIComponent(jwt)}; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax${domainAttr}${secureAttr}`;
+}
+
+function readUnifiedSessionCookie(): string | null {
+  if (typeof document === "undefined" || !document.cookie) return null;
+  const prefix = `${UNIFIED_SESSION_COOKIE}=`;
+  const parts = document.cookie.split(";");
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(prefix)) {
+      try {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      } catch {
+        return trimmed.slice(prefix.length);
+      }
+    }
+  }
+  return null;
+}
+
+function clearUnifiedSessionCookie(): void {
+  if (typeof document === "undefined") return;
+  const domainAttr = resolveCookieDomainAttribute();
+  const secureAttr =
+    typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${UNIFIED_SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${domainAttr}${secureAttr}`;
+  if (domainAttr) {
+    document.cookie = `${UNIFIED_SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secureAttr}`;
+  }
+}
+
 export function issueSignedSessionToken(user: {
   id: string;
   email: string;
@@ -453,13 +500,16 @@ export function issueSignedSessionToken(user: {
 
   if (typeof window !== "undefined") {
     window.localStorage.setItem(JWT_STORAGE_KEY, jwt);
+    writeUnifiedSessionCookie(jwt, 24 * 60 * 60);
   }
   return jwt;
 }
 
 export function verifySessionToken(): SessionTokenPayload | null {
   if (typeof window !== "undefined") {
-    const raw = window.localStorage.getItem(JWT_STORAGE_KEY);
+    const localRaw = window.localStorage.getItem(JWT_STORAGE_KEY);
+    const cookieRaw = localRaw ? null : readUnifiedSessionCookie();
+    const raw = localRaw || cookieRaw;
     if (!raw) return null;
     try {
       const parts = raw.split(".");
@@ -467,7 +517,11 @@ export function verifySessionToken(): SessionTokenPayload | null {
       const payload: SessionTokenPayload = JSON.parse(atob(parts[1] ?? ""));
       if (Date.now() > payload.expiresAt) {
         window.localStorage.removeItem(JWT_STORAGE_KEY);
+        clearUnifiedSessionCookie();
         return null;
+      }
+      if (!localRaw && cookieRaw) {
+        window.localStorage.setItem(JWT_STORAGE_KEY, cookieRaw);
       }
       return payload;
     } catch {
@@ -480,5 +534,6 @@ export function verifySessionToken(): SessionTokenPayload | null {
 export function clearSessionToken(): void {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(JWT_STORAGE_KEY);
+    clearUnifiedSessionCookie();
   }
 }

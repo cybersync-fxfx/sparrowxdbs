@@ -154,7 +154,7 @@ function OperatorLoginDialog({
         name: cleanOrg,
         contactEmail: emailClean,
         primaryDomain: `${tenantId.toLowerCase()}.sparrowx.net`,
-        planTier: "Developer Starter",
+        planTier: "SparrowX Edge Core",
         status: "Active",
         enabledModules: ["cloud_security", "web_security", "ai_shield"],
         apiKey: generateSecureSparrowKey("spx_live"),
@@ -176,6 +176,18 @@ function OperatorLoginDialog({
         tenantId,
       };
       await persistAppUserToBackend(newUser);
+
+      // Provision dedicated isolated PostgreSQL database for this unified account
+      void fetch("/api/db/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenantId,
+          userId: newUser.id,
+          email: emailClean,
+          projectName: cleanOrg,
+        }),
+      }).catch(() => {});
 
       const safeUser: AppUser = { ...newUser, password: "" };
       issueSignedSessionToken({
@@ -491,7 +503,7 @@ export function SparrowxMasterLanding({
     keys: "/keys",
     sec: "/shield",
     shield: "/shield",
-    api: "/db",
+    api: "/gateway",
     game: "/game",
   };
 
@@ -931,7 +943,7 @@ export function SparrowxMasterLanding({
           </div>
 
           {/* Right Column: Why Developers Love Us Card */}
-          <div className="lg:col-span-5 border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
+          <div id="status" className="scroll-mt-24 lg:col-span-5 border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-white/15 pb-3">
               <span className="text-xs font-mono text-white font-bold uppercase tracking-wider">
                 Why Builders Choose SparrowX
