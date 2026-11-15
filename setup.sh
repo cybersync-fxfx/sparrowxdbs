@@ -779,10 +779,12 @@ heal_pterodactyl_host_nginx() {
           --admin=1 >/dev/null 2>&1 || true)
       fi
 
-      local bcrypt_pw=""
-      bcrypt_pw="$(SPX_PASS="${PTERO_ADMIN_PASSWORD}" "${php_bin}" -r 'echo password_hash(getenv("SPX_PASS"), PASSWORD_BCRYPT);' 2>/dev/null || true)"
-      if [ -n "${bcrypt_pw}" ]; then
-        "${db_cli}" -u root -e "UPDATE \`${PTERO_DB_NAME}\`.users SET password='${bcrypt_pw}', root_admin=1 WHERE username IN ('${PTERO_ADMIN_USER}', 'admin', 'root') OR root_admin=1;" >/dev/null 2>&1 || true
+      if [ "${RESET_PTERO_ADMIN_PASS:-false}" = "true" ] && [ -n "${PTERO_ADMIN_PASSWORD:-}" ]; then
+        local bcrypt_pw=""
+        bcrypt_pw="$(SPX_PASS="${PTERO_ADMIN_PASSWORD}" "${php_bin}" -r 'echo password_hash(getenv("SPX_PASS"), PASSWORD_BCRYPT);' 2>/dev/null || true)"
+        if [ -n "${bcrypt_pw}" ]; then
+          "${db_cli}" -u root -e "UPDATE \`${PTERO_DB_NAME}\`.users SET password='${bcrypt_pw}', root_admin=1 WHERE username IN ('${PTERO_ADMIN_USER}', 'admin', 'root') OR root_admin=1;" >/dev/null 2>&1 || true
+        fi
       fi
     fi
 
