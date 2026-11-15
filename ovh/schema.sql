@@ -349,7 +349,17 @@ GRANT SELECT ON public.promo_codes TO web_anon;
 GRANT EXECUTE ON FUNCTION public.spend_coins(UUID, INTEGER, TEXT) TO web_anon;
 GRANT EXECUTE ON FUNCTION public.credit_coins(UUID, INTEGER, TEXT, TEXT, TEXT) TO web_anon;
 
--- 17. NetSec DDoS Control Panel (netsec.sparrowx.net) tables backed by sovereign PostgreSQL
+-- 17. NetSec DDoS Control Panel (netsec.sparrowx.net / sparrowx.sbs) tables backed by sovereign PostgreSQL
+CREATE TABLE IF NOT EXISTS public.sbs_users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  raw_user_meta_data JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_sign_in_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_sbs_users_email ON public.sbs_users (LOWER(email));
+
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username TEXT UNIQUE NOT NULL,

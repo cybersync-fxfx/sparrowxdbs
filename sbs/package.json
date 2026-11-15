@@ -1,0 +1,37 @@
+{
+  "name": "sparrowx",
+  "version": "1.0.0",
+  "description": "Sparrowx autonomous infrastructure security panel",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "health": "curl -s http://localhost:3001/api/health | node -e \"process.stdin.resume();process.stdin.setEncoding('utf8');let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d)))\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cybersync-fxfx/sbs.detriot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cybersync-fxfx/sbs.detriot/issues"
+  },
+  "homepage": "https://github.com/cybersync-fxfx/sbs.detriot#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.103.3",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "geoip-lite": "^2.0.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.16.0",
+    "ws": "^8.20.0"
+  }
+}

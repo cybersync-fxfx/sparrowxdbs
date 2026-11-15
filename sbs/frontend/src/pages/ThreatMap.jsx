@@ -1,0 +1,551 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { ComposableMap, Geographies, Geography, Marker, Line } from 'react-simple-maps';
+import { useTelemetry } from '../context/TelemetryContext';
+
+const geoUrl = "/countries-110m.json";
+
+export default function ThreatMap({ token }) {
+  const { viewMode } = useTelemetry();
+  const [data, setData] = useState({ liveScores: [], stats: { scannedToday: 0, blockedToday: 0 } });
+  const [hoveredMarker, setHoveredMarker] = useState(null);
+  const [terminalLogs, setTerminalLogs] = useState([]);
+  const [selectedIp, setSelectedIp] = useState(null);
+  const [lookupInput, setLookupInput] = useState('');
+  const [lookupData, setLookupData] = useState(null);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState('');
+  const logEndRef = useRef(null);
+  
+  useEffect(() => {
+    if (!token) return;
+    const fetchStats = () => {
+      const scope = viewMode === 'global' ? 'global' : 'agent';
+      fetch(`/api/radar/stats?scope=${scope}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d) {
+            setData({
+              liveScores: Array.isArray(d.liveScores) ? d.liveScores : [],
+              stats: d.stats || { scannedToday: 0, blockedToday: 0 }
+            });
+          }
+        })
+        .catch(console.error);
+    };
+    fetchStats();
+    const id = setInterval(fetchStats, 3000);
+    return () => clearInterval(id);
+  }, [token]);
+
+  const inspectIp = (ip) => {
+    const target = String(ip || '').trim();
+    if (!target || !token) return;
+    setSelectedIp(target);
+    setLookupInput(target);
+    setLookupData(null);
+    setLookupLoading(true);
+    setLookupError('');
+
+    fetch(`/api/radar/ip/${encodeURIComponent(target)}`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
+      .then(d => setLookupData(d))
+      .catch(err => {
+        setLookupError(err?.error || 'IP lookup failed');
+        setLookupData(null);
+      })
+      .finally(() => setLookupLoading(false));
+  };
+
+  // Build a real-time operations terminal feed
+  useEffect(() => {
+    if (data.liveScores.length === 0) return;
+    
+    const protocols = ['TCP', 'UDP', 'ICMP', 'SYN-FLOOD'];
+    const actions = ['[INTERCEPTED]', '[BLOCKED]', '[ROUTING]', '[ANALYZING]'];
+    
+    const timer = setInterval(() => {
+      const target = data.liveScores[Math.floor(Math.random() * data.liveScores.length)];
+      if (!target) return;
+
+      const proto = protocols[Math.floor(Math.random() * protocols.length)];
+      const act = actions[Math.floor(Math.random() * actions.length)];
+      const port = Math.floor(Math.random() * 65535);
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
+
+      const newLog = {
+        id: Math.random(),
+        text: `[${timestamp}] ${act} ${proto} request from ${target.ip} to Port ${port} (Threat Level: ${target.score})`,
+        type: target.action === 'banned' ? 'danger' : (target.action === 'watched' ? 'warning' : 'info')
+      };
+
+      setTerminalLogs(prev => [...prev.slice(-25), newLog]);
+    }, 1200);
+
+    return () => clearInterval(timer);
+  }, [data.liveScores]);
+
+  // Scroll terminal to bottom WITHOUT scrolling page
+  useEffect(() => {
+    if (logEndRef.current) {
+      const parent = logEndRef.current.parentNode;
+      if (parent) parent.scrollTop = parent.scrollHeight;
+    }
+  }, [terminalLogs]);
+
+  const liveScores = data.liveScores;
+  const markers = liveScores.filter(item => item.lat !== null && item.lon !== null && item.lat !== undefined);
+
+  const getColor = (action, score) => {
+    if (action === 'banned' || score >= 90) return '#ff3333'; 
+    if (action === 'watched' || score >= 55) return '#ffb833'; 
+    return '#33ff77'; 
+  };
+
+  const formatDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString();
+  };
+
+  const compactValue = (value) => {
+    if (value === null || value === undefined || value === '') return '-';
+    return String(value);
+  };
+
+  const lookupColor = lookupData ? getColor(lookupData.action, lookupData.score) : '#00d8ff';
+  const locationParts = lookupData
+    ? [lookupData.geo?.city, lookupData.geo?.region, lookupData.geo?.country].filter(Boolean)
+    : [];
+
+  return (
+    <div className="page-shell" style={{ maxWidth: '1600px', margin: '0 auto', padding: '20px' }}>
+      
+      {/* Dynamic Elite Cyber Header */}
+      <section className="hero-panel compact" style={{
+        background: 'linear-gradient(135deg, rgba(20,20,25,0.8), rgba(10,10,12,0.9))',
+        border: '1px solid rgba(0, 216, 255, 0.15)',
+        boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5)',
+        borderRadius: '12px',
+        padding: '25px',
+        marginBottom: '25px',
+        backdropFilter: 'blur(8px)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+          <div>
+            <p className="eyebrow" style={{ color: '#00d8ff', letterSpacing: '2px', fontSize: '0.75rem', textTransform: 'uppercase' }}>Operational Node View</p>
+            <h1 className="page-title" style={{ fontSize: '2rem', margin: '5px 0 0 0', background: 'linear-gradient(to right, #fff, #888)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              Sparrowx EYE radar
+            </h1>
+          </div>
+          <div style={{ display: 'flex', gap: '15px' }}>
+            <div style={{ background: 'rgba(255, 51, 51, 0.1)', border: '1px solid rgba(255, 51, 51, 0.3)', borderRadius: '8px', padding: '10px 20px', textAlign: 'center' }}>
+              <div style={{ color: '#ff3333', fontSize: '1.2rem', fontWeight: 'bold' }}>{markers.length}</div>
+              <div style={{ color: '#888', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '2px' }}>Active Vectors</div>
+            </div>
+            <div style={{ background: 'rgba(0, 216, 255, 0.1)', border: '1px solid rgba(0, 216, 255, 0.3)', borderRadius: '8px', padding: '10px 20px', textAlign: 'center' }}>
+              <div style={{ color: '#00d8ff', fontSize: '1.2rem', fontWeight: 'bold' }}>{data.stats.scannedToday || 0}</div>
+              <div style={{ color: '#888', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '1px', marginTop: '2px' }}>Scanned Today</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="content-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '20px', marginBottom: '20px' }}>
+        
+        {/* Premium Interactive Laser Map */}
+        <section className="glass-panel" style={{
+          padding: 0, 
+          overflow: 'hidden', 
+          background: '#070709', 
+          border: '1px solid rgba(255,255,255,0.05)',
+          borderRadius: '12px',
+          boxShadow: 'inset 0 0 60px rgba(0,0,0,0.8)',
+          position: 'relative'
+        }}>
+          
+          {/* Futuristic Scanner Grid Lines */}
+          <div style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundImage: 'linear-gradient(rgba(0, 216, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 216, 255, 0.03) 1px, transparent 1px)',
+            backgroundSize: '25px 25px',
+            pointerEvents: 'none',
+            zIndex: 1
+          }} />
+
+          <ComposableMap projectionConfig={{ scale: 165 }} style={{ width: '100%', height: '540px', outline: 'none', position: 'relative', zIndex: 2 }}>
+            <Geographies geography={geoUrl}>
+              {({ geographies }) =>
+                geographies.map((geo) => (
+                  <Geography
+                    key={geo.rsmKey}
+                    geography={geo}
+                    fill="#0d0f13"
+                    stroke="#1a222d"
+                    strokeWidth={0.6}
+                    style={{
+                      default: { outline: 'none' },
+                      hover: { fill: '#131821', outline: 'none' },
+                      pressed: { outline: 'none' },
+                    }}
+                  />
+                ))
+              }
+            </Geographies>
+
+            {/* Central Target Node (The User's VPS) */}
+            <Marker coordinates={[data.agentLocation?.lon || 103.8198, data.agentLocation?.lat || 1.3521]}>
+              <circle r={25} fill="#00d8ff" opacity={0.08} className="radar-pulse" />
+              <circle r={10} fill="#00d8ff" opacity={0.2} />
+              <circle r={4} fill="#00d8ff" />
+              <text textAnchor="middle" y={-18} style={{ fontFamily: "monospace", fill: "#00d8ff", fontSize: "11px", fontWeight: 'bold', letterSpacing: '2px', textShadow: "0 0 8px rgba(0, 216, 255, 0.8)" }}>
+                PROTECTED VPS ({data.agentLocation?.city || 'GUARD'})
+              </text>
+            </Marker>
+            
+            {markers.map((marker) => {
+              const color = getColor(marker.action, marker.score);
+              const destCoord = [data.agentLocation?.lon || 103.8198, data.agentLocation?.lat || 1.3521];
+              return (
+                <React.Fragment key={marker.id}>
+                  {/* Multilayered Laser Beams (Outer glow, Inner glow, Core beam) */}
+                  <Line
+                    from={[marker.lon, marker.lat]}
+                    to={destCoord}
+                    stroke={color}
+                    strokeWidth={4}
+                    className="laser-glow-outer"
+                    style={{ opacity: 0.12, pointerEvents: 'none' }}
+                  />
+                  <Line
+                    from={[marker.lon, marker.lat]}
+                    to={destCoord}
+                    stroke={color}
+                    strokeWidth={2}
+                    className="laser-glow-inner"
+                    style={{ opacity: 0.35, pointerEvents: 'none' }}
+                  />
+                  <Line
+                    from={[marker.lon, marker.lat]}
+                    to={destCoord}
+                    stroke={color}
+                    strokeWidth={1}
+                    strokeLinecap="round"
+                    className="laser-core"
+                    style={{ opacity: 0.9 }}
+                  />
+
+                  {/* Attacker Node and HUD Overlay */}
+                  <Marker 
+                    coordinates={[marker.lon, marker.lat]}
+                    onMouseEnter={() => setHoveredMarker(marker.id)}
+                    onMouseLeave={() => setHoveredMarker(null)}
+                    onClick={() => inspectIp(marker.ip)}
+                  >
+                    <circle r={4} fill={color} style={{ cursor: 'pointer' }} />
+                    <circle r={15} fill={color} opacity={0.3} className="ping-anim" style={{ pointerEvents: 'none' }} />
+                    
+                    {/* Floating Target HUD Data */}
+                    {hoveredMarker === marker.id && (
+                      <g transform="translate(12, -12)" style={{ cursor: 'default', pointerEvents: 'none' }}>
+                        <rect width="125" height="35" rx="6" fill="rgba(6, 8, 12, 0.95)" stroke={color} strokeWidth="1.5" style={{ filter: 'drop-shadow(0px 4px 8px rgba(0,0,0,0.5))' }} />
+                        <text x="8" y="14" style={{ fontFamily: "monospace", fill: "#ffffff", fontSize: "9px", fontWeight: "bold" }}>{marker.ip}</text>
+                        <text x="8" y="26" style={{ fontFamily: "monospace", fill: color, fontSize: "7.5px", fontWeight: "bold", letterSpacing: '0.5px' }}>
+                          {marker.city ? `${marker.city} ` : ''}RISK: {marker.score}
+                        </text>
+                      </g>
+                    )}
+                  </Marker>
+                </React.Fragment>
+              );
+            })}
+          </ComposableMap>
+          
+          <style>{`
+            @keyframes ping {
+              0% { transform: scale(0.2); opacity: 1; }
+              80% { transform: scale(2.8); opacity: 0; }
+              100% { transform: scale(2.8); opacity: 0; }
+            }
+            @keyframes radarPulse {
+              0% { transform: scale(0.8); opacity: 0.2; }
+              50% { transform: scale(1.5); opacity: 0.05; }
+              100% { transform: scale(0.8); opacity: 0.2; }
+            }
+            .ping-anim {
+              animation: ping 2.2s infinite cubic-bezier(0, 0, 0.2, 1);
+              transform-origin: center;
+            }
+            .radar-pulse {
+              animation: radarPulse 4s infinite ease-in-out;
+              transform-origin: center;
+            }
+            @keyframes laser {
+              0% { stroke-dashoffset: 100; }
+              100% { stroke-dashoffset: 0; }
+            }
+            .laser-core {
+              stroke-dasharray: 10 15;
+              animation: laser 1.5s linear infinite;
+            }
+          `}</style>
+        </section>
+
+        {/* Threat Ledger Sidebar */}
+        <section className="glass-panel" style={{
+          maxHeight: '540px', 
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#090b10',
+          border: '1px solid rgba(255,255,255,0.03)',
+          borderRadius: '12px'
+        }}>
+          <div style={{ padding: '18px 20px', background: '#0d0f15', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', color: '#fff', letterSpacing: '0.5px' }}>IP Intelligence</h3>
+            <p style={{ margin: '5px 0 0 0', fontSize: '0.75rem', color: '#888' }}>Live lookup from radar, guard, DNS, and history</p>
+          </div>
+
+          <div style={{
+            padding: '14px',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            background: selectedIp ? 'rgba(0,216,255,0.025)' : 'rgba(255,255,255,0.01)'
+          }}>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                inspectIp(lookupInput);
+              }}
+              style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}
+            >
+              <input
+                value={lookupInput}
+                onChange={(event) => setLookupInput(event.target.value)}
+                placeholder="Enter IP to inspect"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  background: '#050609',
+                  border: '1px solid rgba(0,216,255,0.2)',
+                  borderRadius: '6px',
+                  color: '#fff',
+                  fontFamily: 'monospace',
+                  fontSize: '0.78rem',
+                  padding: '9px 10px',
+                  outline: 'none'
+                }}
+              />
+              <button
+                type="submit"
+                disabled={lookupLoading || !lookupInput.trim()}
+                style={{
+                  background: lookupInput.trim() ? 'rgba(0,216,255,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(0,216,255,0.35)',
+                  borderRadius: '6px',
+                  color: lookupInput.trim() ? '#00d8ff' : '#666',
+                  cursor: lookupInput.trim() ? 'pointer' : 'default',
+                  fontFamily: 'monospace',
+                  fontSize: '0.72rem',
+                  fontWeight: 800,
+                  letterSpacing: '0.5px',
+                  padding: '0 12px',
+                  textTransform: 'uppercase'
+                }}
+              >
+                Lookup
+              </button>
+            </form>
+
+            {!selectedIp && (
+              <div style={{ color: '#666', fontSize: '0.78rem', lineHeight: 1.5 }}>
+                Select any attack marker or ledger row.
+              </div>
+            )}
+
+            {selectedIp && (
+              <div style={{ border: `1px solid ${lookupColor}55`, borderRadius: '8px', padding: '12px', background: 'rgba(0,0,0,0.2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'flex-start' }}>
+                  <div>
+                    <div style={{ color: '#fff', fontSize: '1rem', fontWeight: 800, fontFamily: 'monospace' }}>{selectedIp}</div>
+                    <div style={{ color: '#888', fontSize: '0.68rem', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.8px' }}>
+                      {lookupLoading ? 'Lookup running' : (lookupData?.geo?.source || 'Waiting')}
+                    </div>
+                  </div>
+                  <div style={{
+                    color: lookupColor,
+                    border: `1px solid ${lookupColor}66`,
+                    background: `${lookupColor}18`,
+                    borderRadius: '999px',
+                    padding: '4px 9px',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {lookupData ? `${lookupData.action} ${lookupData.score}` : 'inspect'}
+                  </div>
+                </div>
+
+                {lookupError && (
+                  <div style={{ marginTop: '10px', color: '#ff6b6b', fontSize: '0.76rem' }}>{lookupError}</div>
+                )}
+
+                {lookupData && (
+                  <>
+                    <div style={{ marginTop: '12px', color: '#ddd', fontSize: '0.8rem', lineHeight: 1.45 }}>
+                      {locationParts.length ? locationParts.join(', ') : 'Location unknown'}
+                      {lookupData.geo?.timezone ? <span style={{ color: '#777' }}> / {lookupData.geo.timezone}</span> : null}
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginTop: '12px' }}>
+                      {[
+                        ['Guard', lookupData.guard?.blocked ? 'blocked' : 'clear'],
+                        ['Seen', compactValue(lookupData.history?.database?.count || lookupData.history?.local?.eventCount || 0)],
+                        ['SYN', compactValue(lookupData.live?.syn)],
+                        ['UDP', compactValue(lookupData.live?.udp)],
+                        ['Ports', compactValue(lookupData.live?.ports)],
+                        ['Delta', compactValue(lookupData.live?.delta)],
+                      ].map(([label, value]) => (
+                        <div key={label} style={{ border: '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', padding: '7px 8px', background: 'rgba(255,255,255,0.015)' }}>
+                          <div style={{ color: '#666', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.8px' }}>{label}</div>
+                          <div style={{ color: label === 'Guard' && value === 'blocked' ? '#ff3333' : '#fff', fontSize: '0.8rem', marginTop: '2px', fontFamily: 'monospace' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div style={{ marginTop: '10px', color: '#aaa', fontSize: '0.72rem', lineHeight: 1.45 }}>
+                      <div>Last seen: {formatDate(lookupData.history?.lastSeen)}</div>
+                      <div>PTR: {lookupData.reverseDns?.length ? lookupData.reverseDns.join(', ') : '-'}</div>
+                      <div>Reason: {lookupData.reasons?.length ? lookupData.reasons.join(', ') : '-'}</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: '12px 15px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <h3 style={{ margin: 0, fontSize: '0.85rem', fontWeight: 'bold', color: '#fff', letterSpacing: '0.5px' }}>Live Access Ledger</h3>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }} className="custom-scrollbar">
+            {liveScores.map(item => {
+              const color = getColor(item.action, item.score);
+              return (
+                <button key={item.id} type="button" onClick={() => inspectIp(item.ip)} style={{
+                  background: 'rgba(255,255,255,0.01)',
+                  border: `1px solid rgba(255,255,255,0.03)`,
+                  borderLeft: `4px solid ${color}`,
+                  borderRadius: '6px',
+                  padding: '12px',
+                  marginBottom: '10px',
+                  transition: 'all 0.2s ease-in-out',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  width: '100%',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                  textAlign: 'left'
+                }}>
+                  <div>
+                    <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '0.85rem', fontFamily: 'monospace' }}>{item.ip}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#aaa', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span>{item.city ? `${item.city}, ` : ''}{item.country !== 'Unknown' ? item.country : 'Unknown'}</span>
+                      <span>/</span>
+                      <span style={{ color: '#777' }}>{item.reason}</span>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: color, fontWeight: 'bold', fontSize: '0.9rem', fontFamily: 'monospace' }}>{item.score}</div>
+                    <div style={{
+                      fontSize: '0.6rem',
+                      fontWeight: 'bold',
+                      marginTop: '4px',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      background: `${color}20`,
+                      color: color,
+                      display: 'inline-block',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}>
+                      {item.action}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+
+            {liveScores.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#555', fontSize: '0.8rem', padding: '40px 20px', fontStyle: 'italic' }}>
+                Matrix idle. No hostile connections identified.
+              </div>
+            )}
+          </div>
+        </section>
+
+      </div>
+
+      {/* Real-Time Event Interceptor Stream */}
+      <section className="glass-panel" style={{
+        background: '#050609',
+        border: '1px solid rgba(0, 216, 255, 0.05)',
+        borderRadius: '12px',
+        padding: '15px 20px',
+        fontFamily: 'monospace'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', borderBottom: '1px solid rgba(0, 216, 255, 0.1)', paddingBottom: '8px' }}>
+          <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00d8ff', animation: 'pulse 1.5s infinite' }} />
+          <span style={{ color: '#00d8ff', fontSize: '0.75rem', fontWeight: 'bold', letterSpacing: '1px' }}>REAL-TIME OPERATIONS FEED</span>
+        </div>
+
+        <div style={{
+          height: '120px',
+          overflowY: 'auto',
+          fontSize: '0.75rem',
+          lineHeight: '1.5rem',
+          color: '#aab',
+          paddingRight: '10px'
+        }} className="custom-scrollbar">
+          {terminalLogs.map(log => (
+            <div key={log.id} style={{
+              color: log.type === 'danger' ? '#ff4444' : (log.type === 'warning' ? '#ffaa00' : '#66ff99'),
+              borderLeft: `2px solid ${log.type === 'danger' ? '#ff4444' : (log.type === 'warning' ? '#ffaa00' : '#66ff99')}`,
+              paddingLeft: '10px',
+              marginBottom: '4px',
+              background: 'rgba(255,255,255,0.01)'
+            }}>
+              {log.text}
+            </div>
+          ))}
+          {terminalLogs.length === 0 && <div style={{ color: '#555', fontStyle: 'italic' }}>Listening for raw traffic payloads...</div>}
+          <div ref={logEndRef} />
+        </div>
+      </section>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0,0,0,0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(0, 216, 255, 0.2);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 216, 255, 0.4);
+        }
+        @keyframes pulse {
+          0% { opacity: 0.4; }
+          50% { opacity: 1; }
+          100% { opacity: 0.4; }
+        }
+      `}</style>
+
+    </div>
+  );
+}

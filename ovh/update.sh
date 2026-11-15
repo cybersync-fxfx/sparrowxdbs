@@ -533,6 +533,15 @@ ensure_netsec_dashboard_running() {
     git -C "${netsec_dir}" pull --ff-only >/dev/null 2>&1 || { git -C "${netsec_dir}" fetch origin --depth 1 >/dev/null 2>&1 && git -C "${netsec_dir}" reset --hard origin/main >/dev/null 2>&1; } || true
   fi
 
+  local local_sbs_src="${INSTALL_DIR:-/opt/sparrowxdbs}/sbs"
+  if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
+    mkdir -p "${netsec_dir}" 2>/dev/null || true
+    cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
+    cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
+    cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
+    cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
+  fi
+
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then
     log_warn "Missing ${netsec_dir}/package.json or server.js; cannot build ${netsec_domain}"
     return 1
@@ -2449,8 +2458,8 @@ if echo "${NETSEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
   NETSEC_STATUS="ONLINE (HTTP ${NETSEC_EDGE_CODE} -> :${NETSEC_PORT})"
 elif [ -n "${NETSEC_UPSTREAM_URL:-}" ]; then
   NETSEC_STATUS="CHECK UPSTREAM (HTTP ${NETSEC_EDGE_CODE})"
-elif [ ! -s "${NETSEC_DIR}/.env" ] || ! grep -qE '^SUPABASE_URL=.+' "${NETSEC_DIR}/.env" 2>/dev/null || ! grep -qE '^SUPABASE_ANON_KEY=.+' "${NETSEC_DIR}/.env" 2>/dev/null; then
-  NETSEC_STATUS="NEEDS SUPABASE (${NETSEC_DIR}/.env)"
+elif [ ! -s "${NETSEC_DIR}/.env" ] || { ! grep -qE '^DATABASE_URL=.+' "${NETSEC_DIR}/.env" 2>/dev/null && ! grep -qE '^SUPABASE_URL=.+' "${NETSEC_DIR}/.env" 2>/dev/null; }; then
+  NETSEC_STATUS="NEEDS DB CONFIG (${NETSEC_DIR}/.env)"
 else
   NETSEC_STATUS="CHECK (HTTP ${NETSEC_EDGE_CODE} -> :${NETSEC_PORT})"
 fi
