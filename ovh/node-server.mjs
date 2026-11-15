@@ -168,6 +168,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+    // Block null-byte / path-traversal / raw exploit probes at edge
+    const rawUrl = req.url || "/";
+    if (
+      rawUrl.includes("%00") ||
+      rawUrl.includes("\0") ||
+      /(?:\.\.\/|\.\.%2f|%2e%2e%2f){2,}/i.test(rawUrl)
+    ) {
+      res.writeHead(403, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+      res.end(JSON.stringify({ error: "Blocked: malicious path traversal payload rejected by SparrowX WAF" }));
+      return;
+    }
+
     // Fast-path <1ms health check before SSR / upstream checks
     if (isHealthRoute && (req.method === "GET" || req.method === "HEAD")) {
       const payload = JSON.stringify({
