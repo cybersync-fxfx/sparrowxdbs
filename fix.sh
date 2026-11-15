@@ -973,12 +973,13 @@ issue_le_cert_to_ovh_ssl() {
 
   if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
     log_scan "Requesting Let's Encrypt SSL for ${target_domain} via HTTP-01 port 80..."
-    if certbot certonly \
+    local cb_err=""
+    if cb_err="$(certbot certonly \
       --webroot -w "${webroot}" \
       --non-interactive --agree-tos \
       -m "${ssl_email}" \
       --cert-name "${target_domain}" \
-      -d "${target_domain}" >/dev/null 2>&1; then
+      -d "${target_domain}" 2>&1)"; then
       log_fix "Issued Let's Encrypt SSL for ${target_domain} via port 80 webroot"
     else
       log_scan "Webroot challenge deferred; retrying ${target_domain} via standalone port 80 listener..."
@@ -989,15 +990,17 @@ issue_le_cert_to_ovh_ssl() {
       fi
       sleep 1
 
-      if certbot certonly \
+      if cb_err="$(certbot certonly \
         --standalone --preferred-challenges http \
         --non-interactive --agree-tos \
         -m "${ssl_email}" \
         --cert-name "${target_domain}" \
-        -d "${target_domain}" >/dev/null 2>&1; then
+        -d "${target_domain}" 2>&1)"; then
         log_fix "Issued Let's Encrypt SSL for ${target_domain} via standalone port 80 challenge"
       else
-        log_warn "Let's Encrypt HTTP-01 challenge failed for ${target_domain} (verify DNS A record & external port 80)"
+        local cb_reason
+        cb_reason="$(printf '%s\n' "${cb_err}" | grep -E "Detail:|DNS|NXDOMAIN|Timeout|Connection refused|rate limit|too many" | head -n 2 | tr '\n' ' ' | sed 's/  */ /g')"
+        log_warn "Let's Encrypt HTTP-01 failed for ${target_domain}${cb_reason:+ (${cb_reason})}"
       fi
 
       if is_pterodactyl_installed; then
@@ -2325,10 +2328,6 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
       -keyout "${INSTALL_DIR}/ovh/ssl/privkey.pem" \
       -out "${INSTALL_DIR}/ovh/ssl/fullchain.pem" \
       -subj "/CN=${SPARROWX_DOMAIN}" >/dev/null 2>&1 || true
-  fi
-  if [ ! -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
-    cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" 2>/dev/null || true
-    cp -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" 2>/dev/null || true
   fi
 
   # Ensure nothing else on host is holding 80/443
