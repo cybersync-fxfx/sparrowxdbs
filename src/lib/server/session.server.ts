@@ -1,4 +1,5 @@
 import { useSession as getH3Session } from "@tanstack/react-start/server";
+import { sessionSecret } from "./config.server";
 import type { Subscription, Transaction } from "../portal-types";
 
 export type DemoState = {
@@ -25,12 +26,8 @@ export type SessionData = {
 };
 
 function sessionConfig() {
-  const password =
-    process.env["SESSION_SECRET"] && process.env["SESSION_SECRET"].length >= 32
-      ? process.env["SESSION_SECRET"]
-      : "sparrowx-game-portal-preview-session-secret-key-2026";
   return {
-    password,
+    password: sessionSecret(),
     name: "sx_session",
     maxAge: 60 * 60 * 24 * 14,
     cookie: {

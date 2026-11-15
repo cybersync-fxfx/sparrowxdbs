@@ -26,4 +26,9 @@ export function panelUrl(): string {
   return (env("PTERO_URL") ?? "https://game.panel.sparrowx.net").replace(/\/+$/, "");
 }
 
+export function sessionSecret(): string {
+  const s = env("SESSION_SECRET");
+  return s && s.length >= 32 ? s : "sparrowx-game-portal-preview-session-secret-key-2026";
+}
+
 export { env };

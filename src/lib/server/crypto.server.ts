@@ -1,14 +1,10 @@
+import { sessionSecret } from "./config.server";
+
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-function secret(): string {
-  const s = process.env["SESSION_SECRET"];
-  if (!s || s.length < 32) throw new Error("SESSION_SECRET is not configured");
-  return s;
-}
-
 async function aesKey(): Promise<CryptoKey> {
-  const raw = await crypto.subtle.digest("SHA-256", enc.encode(`${secret()}:ptero-password:v1`));
+  const raw = await crypto.subtle.digest("SHA-256", enc.encode(`${sessionSecret()}:ptero-password:v1`));
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
