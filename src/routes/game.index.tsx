@@ -51,9 +51,9 @@ export const Route = createFileRoute("/game/")({
     ],
     links: [
       { rel: "canonical", href: "https://game.sparrowx.net" },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+      { rel: "icon", href: "/logos/sparrowx-main.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-main.png" },
+      { rel: "apple-touch-icon", href: "/logos/sparrowx-main.png", sizes: "180x180" },
     ],
     scripts: [
       {

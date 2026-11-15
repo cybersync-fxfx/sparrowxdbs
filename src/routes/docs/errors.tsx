@@ -29,8 +29,8 @@ export const Route = createFileRoute("/docs/errors")({
     ],
     links: [
       { rel: "canonical", href: "https://sparrowx.net/docs/errors" },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "icon", href: "/logos/sparrowx-silver.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-silver.png" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
     ],
     scripts: [

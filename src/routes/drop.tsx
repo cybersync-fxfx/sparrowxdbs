@@ -38,9 +38,9 @@ export const Route = createFileRoute("/drop")({
     ],
     links: [
       { rel: "canonical", href: "https://file.sparrowx.net" },
-      { rel: "icon", href: "/logos/sparrowx-drop.jpg", type: "image/jpeg" },
-      { rel: "shortcut icon", href: "/logos/sparrowx-drop.jpg" },
-      { rel: "apple-touch-icon", href: "/logos/sparrowx-drop.jpg" },
+      { rel: "icon", href: "/logos/sparrowx-drop.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-drop.png" },
+      { rel: "apple-touch-icon", href: "/logos/sparrowx-drop.png" },
     ],
     scripts: [
       {

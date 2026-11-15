@@ -15,7 +15,7 @@ export function resolveServiceFavicon(
   const params = new URLSearchParams(search);
 
   if (host.startsWith("db.") || path === "/db" || params.get("db") === "1") {
-    return { href: "/logos/sparrowx-db.jpg", type: "image/jpeg" };
+    return { href: "/logos/sparrowx-db.png", type: "image/png" };
   }
 
   if (
@@ -25,7 +25,7 @@ export function resolveServiceFavicon(
     params.get("shield") === "1" ||
     params.get("sec") === "1"
   ) {
-    return { href: "/logos/sparrowx-shield.jpg", type: "image/jpeg" };
+    return { href: "/logos/sparrowx-shield.png", type: "image/png" };
   }
 
   if (
@@ -37,7 +37,7 @@ export function resolveServiceFavicon(
     params.get("file") === "1" ||
     params.get("drop") === "1"
   ) {
-    return { href: "/logos/sparrowx-drop.jpg", type: "image/jpeg" };
+    return { href: "/logos/sparrowx-drop.png", type: "image/png" };
   }
 
   if (
@@ -48,7 +48,7 @@ export function resolveServiceFavicon(
     params.get("password") === "1" ||
     params.get("keys") === "1"
   ) {
-    return { href: "/logos/sparrowx-keys.jpg", type: "image/jpeg" };
+    return { href: "/logos/sparrowx-keys.png", type: "image/png" };
   }
 
   if (
@@ -56,14 +56,18 @@ export function resolveServiceFavicon(
     host.startsWith("rest.") ||
     params.get("api") === "1"
   ) {
-    return { href: "/sparrowx-api-logo.svg", type: "image/svg+xml" };
+    return { href: "/logos/sparrowx-network.png", type: "image/png" };
+  }
+
+  if (host.startsWith("game.") || path === "/game" || path.startsWith("/game/")) {
+    return { href: "/logos/sparrowx-main.png", type: "image/png" };
   }
 
   if (path === "/story") {
-    return { href: "/logos/sparrowx-network.jpg", type: "image/jpeg" };
+    return { href: "/logos/sparrowx-network.png", type: "image/png" };
   }
 
-  return { href: "/sparrowx-logo.png", type: "image/png" };
+  return { href: "/logos/sparrowx-silver.png", type: "image/png" };
 }
 
 export function applyServiceFavicon(meta: ServiceFaviconMeta): void {
