@@ -31,6 +31,7 @@ DOMAIN_API="${DOMAIN_API:-api.${DOMAIN_ROOT}}"
 DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${DOMAIN_ROOT}}"
 DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${DOMAIN_ROOT}}"
 DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT}}"
+DOMAIN_NETSEC="${DOMAIN_NETSEC:-netsec.${DOMAIN_ROOT}}"
 if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${DOMAIN_ROOT}" ]; then
   DOMAIN_GAME="game.panel.${DOMAIN_ROOT}"
 fi
@@ -72,6 +73,7 @@ CANDIDATE_DOMAINS=(
   "${DOMAIN_GAME}"
   "panel.${DOMAIN_ROOT}"
   "${DOMAIN_GAMESEC}"
+  "${DOMAIN_NETSEC}"
 )
 
 CERTBOT_ARGS=()
@@ -214,4 +216,7 @@ if [ -n "${DOMAIN_GAME_DASH}" ] && [[ "${DOMAIN_GAME_DASH}" != *.local ]] && [[ 
 fi
 if [ -n "${DOMAIN_GAMESEC:-}" ] && [[ "${DOMAIN_GAMESEC}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_GAMESEC} " ]]; then
   renew_dedicated_game_cert "${DOMAIN_GAMESEC}" "gamesec" "# 7\\. Game DDoS Defense"
+fi
+if [ -n "${DOMAIN_NETSEC:-}" ] && [[ "${DOMAIN_NETSEC}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_NETSEC} " ]]; then
+  renew_dedicated_game_cert "${DOMAIN_NETSEC}" "netsec" "# 8\\. Network DDoS Dashboard"
 fi

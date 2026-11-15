@@ -154,3 +154,16 @@ elif systemctl is-enabled --quiet sparrowx-gamesec.service 2>/dev/null; then
     systemctl restart sparrowx-gamesec.service >/dev/null 2>&1 || true
   fi
 fi
+
+# 8. Network DDoS Dashboard (sparrowx-netsec) keepalive
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-netsec"; then
+  if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-netsec"; then
+    log_wd "HEAL: Starting stopped sparrowx-netsec container..."
+    docker start sparrowx-netsec >/dev/null 2>&1 || true
+  fi
+elif systemctl is-enabled --quiet sparrowx-netsec.service 2>/dev/null; then
+  if ! systemctl is-active --quiet sparrowx-netsec.service 2>/dev/null; then
+    log_wd "HEAL: Restarting sparrowx-netsec.service..."
+    systemctl restart sparrowx-netsec.service >/dev/null 2>&1 || true
+  fi
+fi

@@ -52,25 +52,25 @@ describe("SparrowX Monetization & 6 Subscription Plans", () => {
     const hyper = getPlanById("plan-hyperscale-defense");
 
     expect(dev.maxDomains).toBe(1);
-    expect(dev.monthlyPrice).toBe(29);
+    expect(dev.monthlyPrice).toBe(5);
     expect(dev.requestQuotaMonthly).toBe(250_000);
 
     expect(startup.maxDomains).toBe(3);
-    expect(startup.monthlyPrice).toBe(79);
+    expect(startup.monthlyPrice).toBe(12);
     expect(startup.requestQuotaMonthly).toBe(1_000_000);
 
     expect(biz.maxDomains).toBe(10);
-    expect(biz.monthlyPrice).toBe(199);
+    expect(biz.monthlyPrice).toBe(25);
     expect(biz.popular).toBe(true);
 
     expect(ai.maxDomains).toBe(15);
-    expect(ai.monthlyPrice).toBe(399);
+    expect(ai.monthlyPrice).toBe(39);
 
     expect(ent.maxDomains).toBe(50);
-    expect(ent.monthlyPrice).toBe(799);
+    expect(ent.monthlyPrice).toBe(59);
 
     expect(hyper.maxDomains).toBe(-1); // Unlimited
-    expect(hyper.monthlyPrice).toBe(1499);
+    expect(hyper.monthlyPrice).toBe(79);
     expect(hyper.requestQuotaMonthly).toBe(250_000_000);
   });
 
@@ -84,7 +84,7 @@ describe("SparrowX Monetization & 6 Subscription Plans", () => {
     // Upgrade to SparrowX Sentinel SOC
     const upgraded = subscribeToPlan("plan-business-pro", "monthly", "Corporate Card", "tenant-test-1");
     expect(upgraded.planName).toBe("SparrowX Sentinel SOC");
-    expect(upgraded.priceUsd).toBe(199);
+    expect(upgraded.priceUsd).toBe(25);
     expect(upgraded.maxDomains).toBe(10);
 
     const retrieved = getClientActiveSubscription("tenant-test-1");

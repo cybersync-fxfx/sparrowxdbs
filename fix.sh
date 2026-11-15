@@ -1126,6 +1126,7 @@ ensure_game_letsencrypt_ssl() {
 
 ensure_gamesec_landing_running() {
   local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN:-sparrowx.net}}"
+  local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN:-sparrowx.net}}"
   local gamesec_dir="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
   local gamesec_repo="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
   local gamesec_p="${GAMESEC_PORT:-3005}"
@@ -1156,7 +1157,7 @@ ensure_gamesec_landing_running() {
     fi
   else
     git config --global --add safe.directory "${gamesec_dir}" >/dev/null 2>&1 || true
-    git -C "${gamesec_dir}" checkout -- vite.config.ts package-lock.json >/dev/null 2>&1 || true
+    git -C "${gamesec_dir}" checkout -- vite.config.ts package-lock.json src >/dev/null 2>&1 || true
     git -C "${gamesec_dir}" pull --ff-only >/dev/null 2>&1 || true
   fi
 
@@ -1165,10 +1166,11 @@ ensure_gamesec_landing_running() {
     return 1
   fi
 
-  local cur_rev="" built_rev="" need_build="no"
+  local cur_rev="" built_rev="" build_stamp="" need_build="no"
   cur_rev="$(git -C "${gamesec_dir}" rev-parse HEAD 2>/dev/null || echo 'local')"
+  build_stamp="${cur_rev}:${netsec_domain}"
   [ -f "${gamesec_dir}/.sparrowx-built-rev" ] && built_rev="$(cat "${gamesec_dir}/.sparrowx-built-rev" 2>/dev/null | tr -d '[:space:]' || true)"
-  if [ ! -s "${gamesec_dir}/.output/server/index.mjs" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${GAMESEC_REBUILD:-0}" = "1" ]; then
+  if [ ! -s "${gamesec_dir}/.output/server/index.mjs" ] || [ "${build_stamp}" != "${built_rev}" ] || [ "${GAMESEC_REBUILD:-0}" = "1" ] || grep -rq 'sparrowx\.sbs' "${gamesec_dir}/.output" 2>/dev/null; then
     need_build="yes"
   fi
 
@@ -1182,6 +1184,9 @@ ensure_gamesec_landing_running() {
     if [ -f "${gamesec_dir}/vite.config.ts" ]; then
       cp -f "${gamesec_dir}/vite.config.ts" "${gamesec_dir}/.vite.config.ts.bak" 2>/dev/null || true
       sed -i -E 's/preset:[[:space:]]*["'\'']vercel["'\'']/preset: "node-server"/g' "${gamesec_dir}/vite.config.ts"
+    fi
+    if [ -d "${gamesec_dir}/src" ]; then
+      find "${gamesec_dir}/src" -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -exec sed -i -E "s|https?://sparrowx\.sbs|https://${netsec_domain}|g" {} + 2>/dev/null || true
     fi
 
     local build_rc=1
@@ -1210,9 +1215,12 @@ ensure_gamesec_landing_running() {
     elif [ -d "${gamesec_dir}/.git" ]; then
       git -C "${gamesec_dir}" checkout -- vite.config.ts >/dev/null 2>&1 || true
     fi
+    if [ -d "${gamesec_dir}/.git" ]; then
+      git -C "${gamesec_dir}" checkout -- src >/dev/null 2>&1 || true
+    fi
 
     if [ "${build_rc}" -eq 0 ] && [ -s "${gamesec_dir}/.output/server/index.mjs" ]; then
-      echo "${cur_rev}" > "${gamesec_dir}/.sparrowx-built-rev"
+      echo "${build_stamp}" > "${gamesec_dir}/.sparrowx-built-rev"
       log_ok "Built ${gamesec_domain} Nitro server bundle (.output/server/index.mjs)"
     else
       log_warn "Build failed for ${gamesec_dir}; preserving previous build if present"
@@ -2380,12 +2388,8 @@ render_sparrowx_nginx_conf() {
 
   cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 # ============================================================================
-# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (AUTO-HEALED + L7 DDOS SHIELD)
+# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (AUTO-HEALED)
 # ============================================================================
-limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=45r/s;
-limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=25r/s;
-limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
-
 # 1. Master Portal + Fallback Default (${SPARROWX_DOMAIN})
 server {
     listen 80 default_server;
@@ -2394,27 +2398,13 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
-    reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
-
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
-    limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-SparrowX-WAF "ACTIVE" always;
-    add_header X-SparrowX-Shield "PROTECTED" always;
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -3009,30 +2999,22 @@ fi
 # ==============================================================================
 draw_progress 11 12 "Firewall, Kernel & Auto-Update"
 
-cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
-# SparrowX L3/L4 DDoS, SYN-Flood & Anti-Spoofing Kernel Profile
+if [ ! -f /etc/sysctl.d/99-sparrowx-hardening.conf ]; then
+  cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
 net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_synack_retries = 2
-net.ipv4.tcp_syn_retries = 3
-net.ipv4.tcp_fin_timeout = 15
-net.ipv4.tcp_rfc1337 = 1
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.icmp_echo_ignore_broadcasts = 1
-net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
 net.ipv4.conf.all.send_redirects = 0
 net.ipv4.conf.default.send_redirects = 0
-net.ipv4.conf.all.log_martians = 1
 net.core.somaxconn = 65535
-net.core.netdev_max_backlog = 16384
 net.ipv4.tcp_max_syn_backlog = 65535
-net.core.default_qdisc = fq
-net.ipv4.tcp_congestion_control = bbr
 EOF
-sysctl --system >/dev/null 2>&1 || true
-log_ok "Applied optimized kernel SYN-cookie, BBR & anti-spoofing sysctl profile"
+  sysctl --system >/dev/null 2>&1 || true
+  log_fix "Installed kernel SYN-cookie & anti-spoofing sysctl profile"
+fi
 
 if command -v ufw >/dev/null 2>&1; then
   ufw allow 22/tcp >/dev/null 2>&1 || true

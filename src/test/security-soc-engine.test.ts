@@ -98,28 +98,28 @@ describe("SparrowX Hardened Security & SOC Engine (Cryptographic Chaining & Cont
     expect(SPARROWX_PLANS).toHaveLength(6);
 
     const dev = getTenantPlanEntitlements("DEV_STARTER");
-    expect(dev?.monthlyPrice).toBe(29);
+    expect(dev?.monthlyPrice).toBe(5);
     expect(dev?.maxDomains).toBe(1);
 
     const startup = getTenantPlanEntitlements("STARTUP_SHIELD");
-    expect(startup?.monthlyPrice).toBe(79);
+    expect(startup?.monthlyPrice).toBe(12);
     expect(startup?.maxDomains).toBe(3);
 
     const biz = getTenantPlanEntitlements("BIZ_PRO");
     expect(biz?.popular).toBe(true);
-    expect(biz?.monthlyPrice).toBe(199);
+    expect(biz?.monthlyPrice).toBe(25);
     expect(biz?.requestQuotaMonthly).toBe(5_000_000);
 
     const ai = getTenantPlanEntitlements("AI_AGENT_SHIELD");
     expect(ai?.tier).toBe("AI Native");
-    expect(ai?.monthlyPrice).toBe(399);
+    expect(ai?.monthlyPrice).toBe(39);
 
     const enterprise = getTenantPlanEntitlements("ENTERPRISE_SOC");
-    expect(enterprise?.monthlyPrice).toBe(799);
+    expect(enterprise?.monthlyPrice).toBe(59);
     expect(enterprise?.maxDomains).toBe(50);
 
     const hyperscale = getTenantPlanEntitlements("HYPERSCALE_DEFENSE");
-    expect(hyperscale?.monthlyPrice).toBe(1499);
+    expect(hyperscale?.monthlyPrice).toBe(79);
     expect(hyperscale?.maxDomains).toBe(-1);
   });
 });
