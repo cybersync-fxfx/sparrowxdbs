@@ -34,6 +34,10 @@ import {
   ArrowUpRight,
   Layers,
   Database,
+  Eye,
+  EyeOff,
+  Mail,
+  User,
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
@@ -115,6 +119,15 @@ export function SparrowxDropEngine() {
   const [authPassword, setAuthPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    fullName?: string;
+    email?: string;
+    password?: string;
+  }>({});
+  const authNameRef = useRef<HTMLInputElement | null>(null);
+  const authEmailRef = useRef<HTMLInputElement | null>(null);
+  const authPasswordRef = useRef<HTMLInputElement | null>(null);
 
   // =========================================================================
   // 1. PERSISTENT CLOUD STORAGE STATE (MediaFire style)
@@ -1153,95 +1166,112 @@ export function SparrowxDropEngine() {
           <div className="space-y-6">
             {!isVaultAuthenticated ? (
               /* 10 GB FREE VAULT UNLOCK FRAME (LOGGED OUT) */
-              <div className="border border-white/[0.08] bg-[#090B12] rounded-md overflow-hidden shadow-xl">
-                {/* Asymmetric Header */}
-                <div className="border-b border-white/[0.08] bg-[#14171F] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-purple-400" />
+              <div className="border border-white/10 bg-[#090B12] rounded-xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.65)]">
+                {/* Asymmetric Header with subtle radial accent */}
+                <div className="relative border-b border-white/[0.08] bg-[#12151E] px-6 py-5 flex flex-col md:flex-row md:items-center justify-between gap-3 overflow-hidden">
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(168,85,247,0.14),transparent_60%)]"
+                  />
+                  <div className="relative space-y-1">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.8)]" />
                       <h2 className="text-base font-bold text-white font-mono uppercase tracking-tight">
                         Persistent Sovereign Vault // 10 GB Free Tier
                       </h2>
                     </div>
-                    <p className="text-xs text-[#9CA3AF]">
+                    <p className="text-xs text-zinc-300">
                       Unlock permanent file hosting, hit telemetry, and password-protected direct links.
                     </p>
                   </div>
-                  <span className="text-[10px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded w-fit">
-                    ACCOUNT SIGN-IN REQUIRED
+                  <span className="relative text-[10px] font-mono font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/30 px-3 py-1.5 rounded-md w-fit">
+                    10 GB FREE NVME VAULT
                   </span>
                 </div>
 
                 {/* Visual Storage Allocation Bar */}
-                <div className="p-6 border-b border-white/[0.08] bg-[#05060A] space-y-2">
+                <div className="px-6 py-4 border-b border-white/[0.08] bg-[#06080E] space-y-2">
                   <div className="flex items-center justify-between text-xs font-mono">
-                    <span className="text-[#9CA3AF]">Storage Allocation:</span>
-                    <span className="text-white font-bold tabular-nums">0.00 GB / 10.00 GB Allocated</span>
+                    <span className="text-zinc-400">Storage Allocation</span>
+                    <span className="text-white font-semibold tabular-nums">0.00 GB / 10.00 GB Available</span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-[#14171F] border border-white/[0.08] overflow-hidden">
-                    <div className="h-full bg-purple-500 w-[2%]" />
+                    <div className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-500 w-0 transition-all duration-300" />
                   </div>
-                  <div className="flex justify-between text-[10px] font-mono text-[#64748B]">
-                    <span>0 GB</span>
+                  <div className="flex justify-between text-[11px] font-mono text-zinc-400">
+                    <span>0 GB used</span>
                     <span>Free Sovereign Tier (Permanent NVMe Storage)</span>
-                    <span>10 GB Quota</span>
+                    <span>10 GB quota</span>
                   </div>
                 </div>
 
                 {/* 4 Feature Breakdown Grid (Hairline exposed) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/[0.08] border-b border-white/[0.08] bg-[#090B12]">
-                  <div className="p-4 space-y-1">
-                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <ExternalLink className="size-3.5 text-purple-400" />
-                      Permanent URLs
-                    </span>
-                    <p className="text-[11px] text-[#64748B]">
-                      Unique URLs like <code className="text-[#9CA3AF]">file.sparrowx.net/f/&lt;id&gt;</code> that never expire.
+                  <div className="p-5 space-y-2 hover:bg-white/[0.02] transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-7 rounded-md bg-purple-500/10 border border-purple-500/25 flex items-center justify-center shrink-0">
+                        <ExternalLink className="size-3.5 text-purple-400" aria-hidden="true" />
+                      </span>
+                      <span className="text-xs font-bold text-white font-mono">Permanent URLs</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Unique links like <code className="text-zinc-200 bg-white/[0.05] px-1 py-0.5 rounded">file.sparrowx.net/f/&lt;id&gt;</code> that never expire.
                     </p>
                   </div>
-                  <div className="p-4 space-y-1">
-                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <Activity className="size-3.5 text-purple-400" />
-                      Download Analytics
-                    </span>
-                    <p className="text-[11px] text-[#64748B]">
+                  <div className="p-5 space-y-2 hover:bg-white/[0.02] transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-7 rounded-md bg-purple-500/10 border border-purple-500/25 flex items-center justify-center shrink-0">
+                        <Activity className="size-3.5 text-purple-400" aria-hidden="true" />
+                      </span>
+                      <span className="text-xs font-bold text-white font-mono">Download Analytics</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
                       Real-time hit counters and bandwidth telemetry per hosted file.
                     </p>
                   </div>
-                  <div className="p-4 space-y-1">
-                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <Lock className="size-3.5 text-purple-400" />
-                      Password Shares
-                    </span>
-                    <p className="text-[11px] text-[#64748B]">
+                  <div className="p-5 space-y-2 hover:bg-white/[0.02] transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-7 rounded-md bg-purple-500/10 border border-purple-500/25 flex items-center justify-center shrink-0">
+                        <Lock className="size-3.5 text-purple-400" aria-hidden="true" />
+                      </span>
+                      <span className="text-xs font-bold text-white font-mono">Password Shares</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
                       Optional AES passphrase protection on sensitive download files.
                     </p>
                   </div>
-                  <div className="p-4 space-y-1">
-                    <span className="text-xs font-bold text-white font-mono flex items-center gap-1.5">
-                      <HardDrive className="size-3.5 text-purple-400" />
-                      RAID-1 Redundancy
-                    </span>
-                    <p className="text-[11px] text-[#64748B]">
-                      Stored on mirrored bare-metal NVMe drives on our Sydney cluster.
+                  <div className="p-5 space-y-2 hover:bg-white/[0.02] transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <span className="size-7 rounded-md bg-purple-500/10 border border-purple-500/25 flex items-center justify-center shrink-0">
+                        <HardDrive className="size-3.5 text-purple-400" aria-hidden="true" />
+                      </span>
+                      <span className="text-xs font-bold text-white font-mono">RAID-1 Redundancy</span>
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed">
+                      Stored on mirrored bare-metal NVMe drives on our cluster.
                     </p>
                   </div>
                 </div>
 
-                {/* Inline Sign-In / Account Provision Form */}
-                <div className="p-6 sm:p-8 bg-[#0B0D13]">
-                  <div className="max-w-md mx-auto space-y-4">
-                    <div className="grid grid-cols-2 gap-1.5 rounded bg-[#14171F] border border-white/10 p-1 font-mono text-xs">
+                {/* Inline Sign-In / Account Provision Card */}
+                <div className="relative p-6 sm:p-10 bg-[#07090F] overflow-hidden">
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_center,rgba(168,85,247,0.10),transparent_70%)]"
+                  />
+                  <div className="relative max-w-md mx-auto rounded-xl border border-white/10 bg-[#0D1017]/95 p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.6),0_0_40px_rgba(168,85,247,0.08)] space-y-5">
+                    <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-[#14171F] border border-white/10 p-1 font-mono text-xs">
                       <button
                         type="button"
                         onClick={() => {
                           setVaultAuthMode("signin");
                           setAuthError("");
+                          setFieldErrors({});
                         }}
-                        className={`py-2 rounded font-semibold transition-colors cursor-pointer ${
+                        className={`py-2.5 rounded-md font-semibold transition-all cursor-pointer ${
                           vaultAuthMode === "signin"
-                            ? "bg-white text-black"
-                            : "text-[#9CA3AF] hover:text-white"
+                            ? "bg-purple-500 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         Sign In
@@ -1251,24 +1281,28 @@ export function SparrowxDropEngine() {
                         onClick={() => {
                           setVaultAuthMode("register");
                           setAuthError("");
+                          setFieldErrors({});
                         }}
-                        className={`py-2 rounded font-semibold transition-colors cursor-pointer ${
+                        className={`py-2.5 rounded-md font-semibold transition-all cursor-pointer ${
                           vaultAuthMode === "register"
-                            ? "bg-purple-500 text-white"
-                            : "text-[#9CA3AF] hover:text-white"
+                            ? "bg-purple-500 text-white shadow-sm"
+                            : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         Create Free Vault
                       </button>
                     </div>
 
-                    <div className="text-center space-y-1">
-                      <h3 className="text-sm font-bold text-white font-mono uppercase tracking-tight">
+                    <div className="text-center space-y-1.5">
+                      <h3
+                        id="vault-auth-heading"
+                        className="text-base font-bold text-white font-mono uppercase tracking-tight"
+                      >
                         {vaultAuthMode === "signin"
                           ? "Sign In to Unlock Your 10 GB Vault"
                           : "Create Your Free 10 GB Vault Account"}
                       </h3>
-                      <p className="text-xs text-[#9CA3AF]">
+                      <p className="text-xs text-zinc-400 leading-relaxed">
                         {vaultAuthMode === "signin"
                           ? "Use your SparrowX credentials to access your persistent storage."
                           : "Provision an encrypted NVMe vault backed by your SparrowX account."}
@@ -1276,27 +1310,51 @@ export function SparrowxDropEngine() {
                     </div>
 
                     {authError && (
-                      <div className="p-3 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-mono">
-                        {authError}
+                      <div
+                        role="alert"
+                        aria-live="polite"
+                        className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-mono flex items-start gap-2"
+                      >
+                        <AlertCircle className="size-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <span>{authError}</span>
                       </div>
                     )}
 
                     <form
+                      noValidate
+                      aria-labelledby="vault-auth-heading"
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        setAuthLoading(true);
                         setAuthError("");
                         const emailClean = authEmail.trim().toLowerCase();
+                        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        const nextErrors: {
+                          fullName?: string;
+                          email?: string;
+                          password?: string;
+                        } = {};
+
+                        if (vaultAuthMode === "register" && !authFullName.trim()) {
+                          nextErrors.fullName = "Enter your full name or display label.";
+                        }
+                        if (!emailPattern.test(emailClean)) {
+                          nextErrors.email = "Enter an email address in the format you@example.com.";
+                        }
+                        if (!authPassword || authPassword.length < 6) {
+                          nextErrors.password = "Password must be at least 6 characters.";
+                        }
+
+                        if (Object.keys(nextErrors).length > 0) {
+                          setFieldErrors(nextErrors);
+                          if (nextErrors.fullName) authNameRef.current?.focus();
+                          else if (nextErrors.email) authEmailRef.current?.focus();
+                          else if (nextErrors.password) authPasswordRef.current?.focus();
+                          return;
+                        }
+
+                        setFieldErrors({});
+                        setAuthLoading(true);
                         try {
-                          const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                          if (!emailPattern.test(emailClean)) {
-                            setAuthError("Please enter a valid email address.");
-                            return;
-                          }
-                          if (!authPassword || authPassword.length < 6) {
-                            setAuthError("Password must be at least 6 characters.");
-                            return;
-                          }
                           if (vaultAuthMode === "signin") {
                             const res = await authenticateAppUserFromBackend(
                               emailClean,
@@ -1320,12 +1378,6 @@ export function SparrowxDropEngine() {
                               setAuthError(res.error || "Invalid email or password.");
                             }
                           } else {
-                            if (!emailClean || authPassword.length < 6) {
-                              setAuthError(
-                                "Provide a valid email and a password of at least 6 characters.",
-                              );
-                              return;
-                            }
                             const existing = await fetchAppUserByEmailFromBackend(emailClean);
                             if (existing) {
                               setAuthError(
@@ -1362,41 +1414,211 @@ export function SparrowxDropEngine() {
                           setAuthLoading(false);
                         }
                       }}
-                      className="space-y-3 font-mono text-xs"
+                      className="space-y-4 text-xs"
                     >
                       {vaultAuthMode === "register" && (
-                        <input
-                          type="text"
-                          required
-                          value={authFullName}
-                          onChange={(e) => setAuthFullName(e.target.value)}
-                          placeholder="Full Name / Display Label"
-                          className="w-full px-3.5 py-2.5 rounded bg-[#14171F] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
-                        />
+                        <div className="space-y-1.5">
+                          <label
+                            htmlFor="vault-full-name"
+                            className="block font-mono text-[11px] font-semibold text-zinc-300"
+                          >
+                            Full Name / Display Label <span aria-hidden="true" className="text-purple-400">*</span>
+                          </label>
+                          <div className="relative">
+                            <User
+                              className="size-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                              aria-hidden="true"
+                            />
+                            <input
+                              ref={authNameRef}
+                              id="vault-full-name"
+                              name="name"
+                              type="text"
+                              required
+                              autoComplete="name"
+                              enterKeyHint="next"
+                              value={authFullName}
+                              onChange={(e) => {
+                                setAuthFullName(e.target.value);
+                                if (fieldErrors.fullName && e.target.value.trim()) {
+                                  setFieldErrors((prev) => ({ ...prev, fullName: undefined }));
+                                }
+                              }}
+                              onBlur={(e) => {
+                                if (e.target.value && !e.target.value.trim()) {
+                                  setFieldErrors((prev) => ({
+                                    ...prev,
+                                    fullName: "Enter your full name or display label.",
+                                  }));
+                                }
+                              }}
+                              aria-invalid={Boolean(fieldErrors.fullName)}
+                              aria-describedby={fieldErrors.fullName ? "vault-name-error" : undefined}
+                              placeholder="Alex Mercer"
+                              className={`w-full min-h-[44px] pl-10 pr-3.5 py-2.5 rounded-lg bg-[#14171F] border text-base sm:text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 transition-colors ${
+                                fieldErrors.fullName
+                                  ? "border-red-500/70 focus-visible:border-red-400"
+                                  : "border-white/10 focus-visible:border-purple-400"
+                              }`}
+                            />
+                          </div>
+                          {fieldErrors.fullName && (
+                            <p id="vault-name-error" className="text-[11px] text-red-400 font-mono flex items-center gap-1.5">
+                              <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                              <span>{fieldErrors.fullName}</span>
+                            </p>
+                          )}
+                        </div>
                       )}
-                      <input
-                        type="email"
-                        required
-                        value={authEmail}
-                        onChange={(e) => setAuthEmail(e.target.value)}
-                        placeholder="developer@yourdomain.com"
-                        className="w-full px-3.5 py-2.5 rounded bg-[#14171F] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
-                      />
-                      <input
-                        type="password"
-                        required
-                        minLength={vaultAuthMode === "register" ? 6 : undefined}
-                        value={authPassword}
-                        onChange={(e) => setAuthPassword(e.target.value)}
-                        placeholder="Password"
-                        className="w-full px-3.5 py-2.5 rounded bg-[#14171F] border border-white/10 text-white placeholder-[#64748B] focus:outline-none focus:border-white/30"
-                      />
+
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor="vault-email"
+                          className="block font-mono text-[11px] font-semibold text-zinc-300"
+                        >
+                          Email Address <span aria-hidden="true" className="text-purple-400">*</span>
+                        </label>
+                        <div className="relative">
+                          <Mail
+                            className="size-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                            aria-hidden="true"
+                          />
+                          <input
+                            ref={authEmailRef}
+                            id="vault-email"
+                            name="email"
+                            type="email"
+                            required
+                            autoComplete={vaultAuthMode === "signin" ? "username" : "email"}
+                            spellCheck={false}
+                            autoCorrect="off"
+                            autoCapitalize="none"
+                            enterKeyHint="next"
+                            value={authEmail}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAuthEmail(val);
+                              if (fieldErrors.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
+                                setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const val = e.target.value.trim();
+                              if (val && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                                setFieldErrors((prev) => ({
+                                  ...prev,
+                                  email: "Enter an email address in the format you@example.com.",
+                                }));
+                              }
+                            }}
+                            aria-invalid={Boolean(fieldErrors.email)}
+                            aria-describedby={fieldErrors.email ? "vault-email-error" : undefined}
+                            placeholder="developer@yourdomain.com"
+                            className={`w-full min-h-[44px] pl-10 pr-3.5 py-2.5 rounded-lg bg-[#14171F] border text-base sm:text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 transition-colors ${
+                              fieldErrors.email
+                                ? "border-red-500/70 focus-visible:border-red-400"
+                                : "border-white/10 focus-visible:border-purple-400"
+                            }`}
+                          />
+                        </div>
+                        {fieldErrors.email && (
+                          <p id="vault-email-error" className="text-[11px] text-red-400 font-mono flex items-center gap-1.5">
+                            <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span>{fieldErrors.email}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label
+                            htmlFor="vault-password"
+                            className="block font-mono text-[11px] font-semibold text-zinc-300"
+                          >
+                            Password <span aria-hidden="true" className="text-purple-400">*</span>
+                          </label>
+                          {vaultAuthMode === "register" && (
+                            <span id="vault-password-hint" className="font-mono text-[11px] text-zinc-400">
+                              Min. 6 characters
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <Lock
+                            className="size-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                            aria-hidden="true"
+                          />
+                          <input
+                            ref={authPasswordRef}
+                            id="vault-password"
+                            name="password"
+                            type={showAuthPassword ? "text" : "password"}
+                            required
+                            minLength={vaultAuthMode === "register" ? 6 : undefined}
+                            autoComplete={
+                              vaultAuthMode === "signin" ? "current-password" : "new-password"
+                            }
+                            enterKeyHint="done"
+                            value={authPassword}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAuthPassword(val);
+                              if (fieldErrors.password && val.length >= 6) {
+                                setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                              }
+                            }}
+                            onBlur={(e) => {
+                              const val = e.target.value;
+                              if (val && val.length < 6) {
+                                setFieldErrors((prev) => ({
+                                  ...prev,
+                                  password: "Password must be at least 6 characters.",
+                                }));
+                              }
+                            }}
+                            aria-invalid={Boolean(fieldErrors.password)}
+                            aria-describedby={
+                              [
+                                vaultAuthMode === "register" ? "vault-password-hint" : "",
+                                fieldErrors.password ? "vault-password-error" : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" ") || undefined
+                            }
+                            placeholder="••••••••"
+                            className={`w-full min-h-[44px] pl-10 pr-11 py-2.5 rounded-lg bg-[#14171F] border text-base sm:text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 transition-colors ${
+                              fieldErrors.password
+                                ? "border-red-500/70 focus-visible:border-red-400"
+                                : "border-white/10 focus-visible:border-purple-400"
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAuthPassword((prev) => !prev)}
+                            aria-label={showAuthPassword ? "Hide password" : "Show password"}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-zinc-400 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 cursor-pointer"
+                          >
+                            {showAuthPassword ? (
+                              <EyeOff className="size-4" aria-hidden="true" />
+                            ) : (
+                              <Eye className="size-4" aria-hidden="true" />
+                            )}
+                          </button>
+                        </div>
+                        {fieldErrors.password && (
+                          <p id="vault-password-error" className="text-[11px] text-red-400 font-mono flex items-center gap-1.5">
+                            <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span>{fieldErrors.password}</span>
+                          </p>
+                        )}
+                      </div>
+
                       <button
                         type="submit"
                         disabled={authLoading}
-                        className="w-full py-2.5 rounded bg-white text-black font-semibold hover:bg-neutral-200 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full min-h-[44px] py-2.5 px-4 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-60 text-white font-mono text-xs font-semibold shadow-[0_0_24px_rgba(168,85,247,0.3)] transition-all cursor-pointer flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
                       >
-                        {authLoading && <RefreshCw className="size-3.5 animate-spin" />}
+                        {authLoading && <RefreshCw className="size-3.5 animate-spin" aria-hidden="true" />}
                         <span>
                           {vaultAuthMode === "signin"
                             ? "Unlock Free 10 GB Vault"
