@@ -78,12 +78,12 @@ describe("SparrowX Monetization & 6 Subscription Plans", () => {
     localStorage.clear();
 
     const initial = getClientActiveSubscription("tenant-test-1");
-    expect(initial.planName).toBe("Startup Shield");
+    expect(initial.planName).toBe("SparrowX Shield Pulse");
     expect(initial.status).toBe("active");
 
-    // Upgrade to Business Pro
+    // Upgrade to SparrowX Sentinel SOC
     const upgraded = subscribeToPlan("plan-business-pro", "monthly", "Corporate Card", "tenant-test-1");
-    expect(upgraded.planName).toBe("Business Pro");
+    expect(upgraded.planName).toBe("SparrowX Sentinel SOC");
     expect(upgraded.priceUsd).toBe(199);
     expect(upgraded.maxDomains).toBe(10);
 

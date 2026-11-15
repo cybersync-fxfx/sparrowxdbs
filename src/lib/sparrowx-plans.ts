@@ -39,7 +39,7 @@ export interface SparrowxPlan {
 export const SPARROWX_PLANS: SparrowxPlan[] = [
   {
     id: "plan-developer-starter",
-    name: "Developer Starter",
+    name: "SparrowX Edge Core",
     code: "DEV_STARTER",
     tier: "Developer",
     tagline: "Essential Edge WAF and automated perimeter defense for solo developers & indie hackers.",
@@ -81,7 +81,7 @@ export const SPARROWX_PLANS: SparrowxPlan[] = [
   },
   {
     id: "plan-startup-shield",
-    name: "Startup Shield",
+    name: "SparrowX Shield Pulse",
     code: "STARTUP_SHIELD",
     tier: "Startup",
     tagline: "Comprehensive edge protection and initial AI prompt guardrails for scaling SaaS apps.",
@@ -123,7 +123,7 @@ export const SPARROWX_PLANS: SparrowxPlan[] = [
   },
   {
     id: "plan-business-pro",
-    name: "Business Pro",
+    name: "SparrowX Sentinel SOC",
     code: "BIZ_PRO",
     tier: "Business",
     badge: "Most Popular",
@@ -167,7 +167,7 @@ export const SPARROWX_PLANS: SparrowxPlan[] = [
   },
   {
     id: "plan-ai-agent-shield",
-    name: "AI Agent & LLM Shield",
+    name: "SparrowX Neural Guard",
     code: "AI_AGENT_SHIELD",
     tier: "AI Native",
     badge: "AI Native",
@@ -210,7 +210,7 @@ export const SPARROWX_PLANS: SparrowxPlan[] = [
   },
   {
     id: "plan-enterprise-soc",
-    name: "Enterprise Sovereign SOC",
+    name: "SparrowX Sovereign Vault",
     code: "ENTERPRISE_SOC",
     tier: "Enterprise",
     badge: "Enterprise Grade",
@@ -253,7 +253,7 @@ export const SPARROWX_PLANS: SparrowxPlan[] = [
   },
   {
     id: "plan-hyperscale-defense",
-    name: "Hyperscale Defense & Custom Mesh",
+    name: "SparrowX Apex Mesh",
     code: "HYPERSCALE_DEFENSE",
     tier: "Hyperscale",
     badge: "Mission Critical",
