@@ -1,5 +1,6 @@
 import { env } from "./config.server";
 import { timingSafeEqual } from "./crypto.server";
+import { readMasterSsoFromRequest } from "./master-sso.server";
 import { getAppSession } from "./session.server";
 
 export interface DbAuthContext {
@@ -95,6 +96,18 @@ export async function authorizeDbRequest(
       authorized: true,
       isAdmin: true,
       actorId: "local-dev-admin",
+    };
+  }
+
+  const masterSso = await readMasterSsoFromRequest(request).catch(() => null);
+  if (masterSso) {
+    const resolvedTenantId = masterSso.tenantId ?? options?.targetTenantId;
+    return {
+      authorized: true,
+      isAdmin: masterSso.role === "admin",
+      actorId: masterSso.sub,
+      actorEmail: masterSso.email,
+      ...(resolvedTenantId ? { tenantId: resolvedTenantId } : {}),
     };
   }
 

@@ -60,6 +60,14 @@ import {
 } from "@/components/GrowthAndMonetizationHub";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
 import {
+  DEVELOPER_CONNECTION_EVENT,
+  ensureDeveloperConnection,
+  getCachedDeveloperConnection,
+  getNetsecSsoUrl,
+  syncMasterSsoSession,
+  type DeveloperDbConnectionInfo,
+} from "@/lib/developer-connection";
+import {
   calculateServiceCost,
   downloadPrintableInvoiceHtml,
   downloadTransactionReceipt,
@@ -256,6 +264,60 @@ export function ClientPortalView({
   const [autoRenewBilling, setAutoRenewBilling] = useState(true);
   const activeTenant = tenants.find((t) => t.id === selectedTenantId) ?? tenants[0] ?? null;
   const [integrationTenant, setIntegrationTenant] = useState<ClientTenant | null>(null);
+  const [devDbConnection, setDevDbConnection] = useState<DeveloperDbConnectionInfo | null>(() =>
+    currentUser?.email
+      ? getCachedDeveloperConnection(activeTenant?.id ?? null, currentUser.email)
+      : null,
+  );
+  const [syncingDevDb, setSyncingDevDb] = useState(false);
+  const [copiedDevUri, setCopiedDevUri] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser?.email) {
+      setDevDbConnection(null);
+      return;
+    }
+    let active = true;
+    setSyncingDevDb(true);
+    void ensureDeveloperConnection({
+      id: activeTenant?.id || `USR-${currentUser.email.slice(0, 6)}`,
+      email: currentUser.email,
+      ...(currentUser.fullName ? { fullName: currentUser.fullName } : {}),
+      tenantId: activeTenant?.id ?? null,
+      ...(activeTenant?.name ? { projectName: activeTenant.name } : {}),
+    }).then((info) => {
+      if (!active) return;
+      if (info) setDevDbConnection(info);
+      setSyncingDevDb(false);
+    });
+
+    const handleConnectionEvent = (ev: Event) => {
+      const detail = (ev as CustomEvent<DeveloperDbConnectionInfo | null>).detail;
+      if (detail) setDevDbConnection(detail);
+    };
+    window.addEventListener(DEVELOPER_CONNECTION_EVENT, handleConnectionEvent);
+    return () => {
+      active = false;
+      window.removeEventListener(DEVELOPER_CONNECTION_EVENT, handleConnectionEvent);
+    };
+  }, [currentUser?.email, currentUser?.fullName, activeTenant?.id, activeTenant?.name]);
+
+  const handleCopyDevUri = async () => {
+    const uri =
+      devDbConnection?.connectionString ||
+      (devDbConnection
+        ? `postgresql://${devDbConnection.dbUser}@${devDbConnection.dbHost}:${devDbConnection.dbPort}/${devDbConnection.dbName}`
+        : "");
+    if (!uri || typeof navigator === "undefined" || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(uri);
+      setCopiedDevUri(true);
+      showToast("PostgreSQL Developer Connection URI copied");
+      setTimeout(() => setCopiedDevUri(false), 2000);
+    } catch {
+      // Clipboard blocked
+    }
+  };
   const [creditBalance, setCreditBalance] = useState<number>(() =>
     getStoredCreditBalance(activeTenant?.id),
   );
@@ -467,6 +529,64 @@ export function ClientPortalView({
             </Button>
             <Button onClick={onSignOut} size="sm" variant="outline">
               <LockKeyhole className="size-3.5" /> Log Out
+            </Button>
+          </div>
+        </section>
+
+        {/* Developer Connection & Cross-Subdomain SSO Card */}
+        <section className="rounded-xl border border-emerald-500/30 bg-card/80 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Database className="size-4 text-emerald-400" aria-hidden="true" />
+              <span>Developer Database &amp; NetSec Connection</span>
+              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-300">
+                {devDbConnection ? "POSTGRES CONNECTED" : syncingDevDb ? "CONNECTING..." : "READY"}
+              </span>
+            </div>
+            {devDbConnection ? (
+              <p className="text-xs font-mono text-muted-foreground break-all">
+                {devDbConnection.dbName} · {devDbConnection.dbHost}:{devDbConnection.dbPort} · User:{" "}
+                {devDbConnection.dbUser} ({devDbConnection.planName || "PostgreSQL Cluster"})
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Your SparrowX Master login links automatically to your sovereign PostgreSQL workspace and{" "}
+                <span className="font-mono text-foreground">netsec.sparrowx.net</span> defense panel.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {devDbConnection && (
+              <Button type="button" size="sm" variant="outline" onClick={handleCopyDevUri} className="gap-1.5 font-mono text-xs">
+                {copiedDevUri ? <Check className="size-3.5 text-emerald-400" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+                <span>{copiedDevUri ? "Copied URI" : "Copy Postgres URI"}</span>
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.href = "/db";
+              }}
+              className="gap-1.5 text-xs"
+            >
+              <Database className="size-3.5" aria-hidden="true" />
+              <span>Open DB Studio</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.open(getNetsecSsoUrl({ autoSso: true }), "_blank", "noopener,noreferrer");
+                }
+              }}
+              className="gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs"
+            >
+              <Shield className="size-3.5" aria-hidden="true" />
+              <span>Launch NetSec DDoS Panel</span>
+              <ArrowUpRight className="size-3.5" aria-hidden="true" />
             </Button>
           </div>
         </section>
@@ -3582,6 +3702,20 @@ export function PortalLoginScreen({
       }
     }
 
+    await syncMasterSsoSession({
+      email: result.user.email,
+      password: loginPassword,
+      mode: "signin",
+      id: result.user.id,
+      fullName: result.user.fullName,
+      tenantId: result.user.tenantId,
+    });
+    await ensureDeveloperConnection({
+      id: result.user.id,
+      email: result.user.email,
+      fullName: result.user.fullName,
+      tenantId: result.user.tenantId,
+    });
     onUserAuthenticated(result.user);
   };
 

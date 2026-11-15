@@ -23,6 +23,7 @@ import { Route as FIdRouteImport } from './routes/f.$id'
 import { Route as GameIndexRouteImport } from './routes/game.index'
 import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
 import { Route as GamePanelLaunchRouteImport } from './routes/game.panel-launch'
+import { Route as ApiAuthMasterSsoRouteImport } from './routes/api/auth/master-sso'
 import { Route as ApiDbHealthRouteImport } from './routes/api/db/health'
 import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
@@ -103,6 +104,11 @@ const GamePanelLaunchRoute = GamePanelLaunchRouteImport.update({
   path: '/game/panel-launch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthMasterSsoRoute = ApiAuthMasterSsoRouteImport.update({
+  id: '/api/auth/master-sso',
+  path: '/api/auth/master-sso',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDbHealthRoute = ApiDbHealthRouteImport.update({
   id: '/api/db/health',
   path: '/api/db/health',
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
+  '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/game/panel-launch'
     | '/f/'
     | '/game/'
+    | '/api/auth/master-sso'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/game/panel-launch'
     | '/f'
     | '/game'
+    | '/api/auth/master-sso'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/game/panel-launch'
     | '/f/'
     | '/game/'
+    | '/api/auth/master-sso'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -321,6 +333,7 @@ export interface RootRouteChildren {
   GamePanelLaunchRoute: typeof GamePanelLaunchRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
+  ApiAuthMasterSsoRoute: typeof ApiAuthMasterSsoRoute
   ApiDbHealthRoute: typeof ApiDbHealthRoute
   ApiDbLifecycleRoute: typeof ApiDbLifecycleRoute
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
@@ -432,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamePanelLaunchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/master-sso': {
+      id: '/api/auth/master-sso'
+      path: '/api/auth/master-sso'
+      fullPath: '/api/auth/master-sso'
+      preLoaderRoute: typeof ApiAuthMasterSsoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/db/health': {
       id: '/api/db/health'
       path: '/api/db/health'
@@ -513,6 +533,7 @@ const rootRouteChildren: RootRouteChildren = {
   GamePanelLaunchRoute: GamePanelLaunchRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
+  ApiAuthMasterSsoRoute: ApiAuthMasterSsoRoute,
   ApiDbHealthRoute: ApiDbHealthRoute,
   ApiDbLifecycleRoute: ApiDbLifecycleRoute,
   ApiDbProvisionRoute: ApiDbProvisionRoute,

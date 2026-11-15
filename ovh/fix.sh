@@ -1353,8 +1353,9 @@ ensure_netsec_dashboard_running() {
     fi
   else
     git config --global --add safe.directory "${netsec_dir}" >/dev/null 2>&1 || true
-    git -C "${netsec_dir}" checkout -- package-lock.json frontend/package-lock.json >/dev/null 2>&1 || true
-    git -C "${netsec_dir}" pull --ff-only >/dev/null 2>&1 || true
+    git -C "${netsec_dir}" checkout -- package-lock.json frontend/package-lock.json frontend/dist node_modules/.package-lock.json >/dev/null 2>&1 || true
+    git -C "${netsec_dir}" clean -fd frontend/dist >/dev/null 2>&1 || true
+    git -C "${netsec_dir}" pull --ff-only >/dev/null 2>&1 || { git -C "${netsec_dir}" fetch origin --depth 1 >/dev/null 2>&1 && git -C "${netsec_dir}" reset --hard origin/main >/dev/null 2>&1; } || true
   fi
 
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then
@@ -1366,7 +1367,7 @@ ensure_netsec_dashboard_running() {
   local cur_rev="" built_rev="" need_build="no"
   cur_rev="$(git -C "${netsec_dir}" rev-parse HEAD 2>/dev/null || echo 'local')"
   [ -f "${netsec_dir}/.sparrowx-built-rev" ] && built_rev="$(cat "${netsec_dir}/.sparrowx-built-rev" 2>/dev/null | tr -d '[:space:]' || true)"
-  if [ ! -s "${netsec_dir}/frontend/dist/index.html" ] || [ ! -d "${netsec_dir}/node_modules/express" ] || [ ! -d "${netsec_dir}/node_modules/bcrypt" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${NETSEC_REBUILD:-0}" = "1" ]; then
+  if [ ! -s "${netsec_dir}/frontend/dist/index.html" ] || [ ! -f "${netsec_dir}/pg-compat.js" ] || [ ! -d "${netsec_dir}/node_modules/express" ] || [ ! -d "${netsec_dir}/node_modules/bcrypt" ] || [ ! -d "${netsec_dir}/node_modules/pg" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${NETSEC_REBUILD:-0}" = "1" ]; then
     need_build="yes"
   fi
 
@@ -1447,9 +1448,34 @@ ensure_netsec_dashboard_running() {
     fi
   fi
 
-  if [ -z "${ns_jwt}" ]; then
-    ns_jwt="$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_netsec_jwt_secret_2026_32c')"
+  local install_env="${INSTALL_DIR:-/opt/sparrowxdbs}/.env"
+  local pg_user="${POSTGRES_USER:-}" pg_pass="${POSTGRES_PASSWORD:-}" pg_db="${POSTGRES_DB:-}" pg_host_port="${PG_HOST_PORT:-}" spx_jwt="${SPARROWX_JWT_SECRET:-}" root_dom="${SPARROWX_DOMAIN:-sparrowx.net}"
+  if [ -s "${install_env}" ]; then
+    [ -z "${pg_user}" ] && pg_user="$(awk -F= '/^POSTGRES_USER=/{sub(/^[^=]*=/,""); print; exit}' "${install_env}" 2>/dev/null | tr -d "\"'\r" || true)"
+    [ -z "${pg_pass}" ] && pg_pass="$(awk -F= '/^POSTGRES_PASSWORD=/{sub(/^[^=]*=/,""); print; exit}' "${install_env}" 2>/dev/null | tr -d "\"'\r" || true)"
+    [ -z "${pg_db}" ] && pg_db="$(awk -F= '/^POSTGRES_DB=/{sub(/^[^=]*=/,""); print; exit}' "${install_env}" 2>/dev/null | tr -d "\"'\r" || true)"
+    [ -z "${pg_host_port}" ] && pg_host_port="$(awk -F= '/^PG_HOST_PORT=/{sub(/^[^=]*=/,""); print; exit}' "${install_env}" 2>/dev/null | tr -d "\"'\r" || true)"
+    [ -z "${spx_jwt}" ] && spx_jwt="$(awk -F= '/^SPARROWX_JWT_SECRET=/{sub(/^[^=]*=/,""); print; exit}' "${install_env}" 2>/dev/null | tr -d "\"'\r" || true)"
+    local env_dom=""
+    env_dom="$(awk -F= '/^SPARROWX_DOMAIN=/{sub(/^[^=]*=/,""); print; exit}' "${install_env}" 2>/dev/null | tr -d "\"'\r" || true)"
+    [ -n "${env_dom}" ] && root_dom="${env_dom}"
   fi
+  pg_user="${pg_user:-sparrowx}"
+  pg_pass="${pg_pass:-sparrowx_ovh_secret_2026}"
+  pg_db="${pg_db:-sparrowx_db}"
+  pg_host_port="${pg_host_port:-5432}"
+
+  local pg_host="127.0.0.1" pg_port="${pg_host_port}"
+  if [ "${docker_ok}" = "yes" ] && docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+    pg_host="sparrowx-postgres"
+    pg_port="5432"
+  fi
+  local pg_url="postgresql://${pg_user}:${pg_pass}@${pg_host}:${pg_port}/${pg_db}"
+
+  if [ -z "${ns_jwt}" ]; then
+    ns_jwt="${spx_jwt:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_netsec_jwt_secret_2026_32c')}"
+  fi
+  local ns_sso_secret="${SPARROWX_MASTER_SSO_SECRET:-${spx_jwt:-${ns_jwt}}}"
   if [ -z "${ns_guard}" ]; then
     ns_guard="${SPARROWX_PUBLIC_IP:-}"
   fi
@@ -1457,18 +1483,29 @@ ensure_netsec_dashboard_running() {
   upsert_env_kv_file "${netsec_env}" "PORT" "${netsec_p}"
   upsert_env_kv_file "${netsec_env}" "NODE_ENV" "production"
   upsert_env_kv_file "${netsec_env}" "SPARROWX_DOMAIN" "${netsec_domain}"
-  upsert_env_kv_file "${netsec_env}" "SUPABASE_URL" "${ns_url}"
-  upsert_env_kv_file "${netsec_env}" "SUPABASE_ANON_KEY" "${ns_anon}"
+  upsert_env_kv_file "${netsec_env}" "SPARROWX_MASTER_URL" "https://${root_dom}"
+  upsert_env_kv_file "${netsec_env}" "DATABASE_URL" "${pg_url}"
+  upsert_env_kv_file "${netsec_env}" "POSTGRES_HOST" "${pg_host}"
+  upsert_env_kv_file "${netsec_env}" "POSTGRES_PORT" "${pg_port}"
+  upsert_env_kv_file "${netsec_env}" "POSTGRES_USER" "${pg_user}"
+  upsert_env_kv_file "${netsec_env}" "POSTGRES_PASSWORD" "${pg_pass}"
+  upsert_env_kv_file "${netsec_env}" "POSTGRES_DB" "${pg_db}"
+  upsert_env_kv_file "${netsec_env}" "SPARROWX_JWT_SECRET" "${ns_sso_secret}"
+  upsert_env_kv_file "${netsec_env}" "SPARROWX_MASTER_SSO_SECRET" "${ns_sso_secret}"
+  upsert_env_kv_file "${netsec_env}" "NETSEC_AUTO_APPROVE" "${NETSEC_AUTO_APPROVE:-true}"
+  [ -n "${ns_url}" ] && upsert_env_kv_file "${netsec_env}" "SUPABASE_URL" "${ns_url}"
+  [ -n "${ns_anon}" ] && upsert_env_kv_file "${netsec_env}" "SUPABASE_ANON_KEY" "${ns_anon}"
   [ -n "${ns_svc}" ] && upsert_env_kv_file "${netsec_env}" "SUPABASE_SERVICE_KEY" "${ns_svc}"
   upsert_env_kv_file "${netsec_env}" "JWT_SECRET" "${ns_jwt}"
   [ -n "${ns_guard}" ] && upsert_env_kv_file "${netsec_env}" "GUARD_PUBLIC_IP" "${ns_guard}"
   chmod 600 "${netsec_env}" 2>/dev/null || true
 
-  if [ -z "${ns_url}" ] || [ -z "${ns_anon}" ] || \
-     echo "${ns_url}" | grep -qiE '(your-project|your_supabase|replace_me|example\.supabase)' || \
-     echo "${ns_anon}" | grep -qiE '(your_supabase|your-anon|replace_me)'; then
-    log_warn "Network DDoS Dashboard (${netsec_domain}) built at ${netsec_dir}, waiting for Supabase credentials."
-    log_warn "  Set SUPABASE_URL, SUPABASE_ANON_KEY & SUPABASE_SERVICE_KEY in ${netsec_env} (or NETSEC_SUPABASE_* in ${INSTALL_DIR:-/opt/sparrowxdbs}/.env), then run: sparrowx-fix --auto"
+  local pg_ready="no"
+  if [ -n "${pg_pass}" ] && [ -n "${pg_db}" ]; then
+    pg_ready="yes"
+  fi
+  if [ "${pg_ready}" != "yes" ] && { [ -z "${ns_url}" ] || [ -z "${ns_anon}" ]; }; then
+    log_warn "Network DDoS Dashboard (${netsec_domain}) built at ${netsec_dir}, waiting for PostgreSQL or Supabase credentials."
     return 1
   fi
 
@@ -1484,6 +1521,8 @@ ensure_netsec_dashboard_running() {
     if [ "${need_build}" != "yes" ] && \
        docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-netsec" && \
        docker inspect -f '{{json .NetworkSettings.Networks}}' sparrowx-netsec 2>/dev/null | grep -q "\"${edge_net}\"" && \
+       docker exec sparrowx-netsec env 2>/dev/null | grep -q "POSTGRES_HOST=" && \
+       docker exec sparrowx-netsec env 2>/dev/null | grep -q "SPARROWX_MASTER_SSO_SECRET=" && \
        curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${netsec_p}/api/health" 2>/dev/null; then
       netsec_started="yes"
       log_ok "Network DDoS Dashboard (${netsec_domain}) container sparrowx-netsec already healthy on :${netsec_p}"

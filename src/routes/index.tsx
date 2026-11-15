@@ -139,6 +139,11 @@ import {
   type FirewallFormat,
 } from "@/lib/advanced-features";
 import {
+  clearMasterSsoSession,
+  ensureDeveloperConnection,
+  syncMasterSsoSession,
+} from "@/lib/developer-connection";
+import {
   type AppUser,
   type Asset,
   type AuditLogEntry,
@@ -1422,6 +1427,7 @@ function Dashboard() {
 
   const handleSignOut = () => {
     clearSessionToken();
+    void clearMasterSsoSession();
     setCurrentUser(null);
     setAuthSession({ role: "unauthenticated" });
     setMenuOpen(false);
@@ -1637,6 +1643,12 @@ function Dashboard() {
       email: user.email,
       fullName: user.fullName || user.email.split("@")[0] || "Operator",
       role: user.admin === "yes" ? "admin" : "client",
+      tenantId: user.tenantId,
+    });
+    void ensureDeveloperConnection({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
       tenantId: user.tenantId,
     });
     setCurrentUser(user);
@@ -1947,6 +1959,23 @@ function Dashboard() {
             };
 
             await persistAppUserToBackend(createdUser);
+            await Promise.all([
+              syncMasterSsoSession({
+                email: createdUser.email,
+                password: input.password,
+                mode: "register",
+                id: createdUser.id,
+                fullName: createdUser.fullName,
+                tenantId: createdTenant?.id ?? null,
+              }),
+              ensureDeveloperConnection({
+                id: createdUser.id,
+                email: createdUser.email,
+                fullName: createdUser.fullName,
+                tenantId: createdTenant?.id ?? null,
+                projectName: createdTenant?.name ?? createdUser.fullName,
+              }),
+            ]);
             await recordAudit(
               `Registered user ${createdUser.email} (admin=no)`,
               createdTenant?.name ?? createdUser.email,

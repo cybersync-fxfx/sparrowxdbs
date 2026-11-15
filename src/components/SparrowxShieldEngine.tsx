@@ -35,6 +35,11 @@ import {
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
+import {
+  clearMasterSsoSession,
+  ensureDeveloperConnection,
+  syncMasterSsoSession,
+} from "@/lib/developer-connection";
 import { ShieldLandingView } from "./shield/ShieldLandingView";
 import { ShieldClientAreaView } from "./shield/ShieldClientAreaView";
 import { ShieldSocDashboardView } from "./shield/ShieldSocDashboardView";
@@ -150,6 +155,7 @@ export function SparrowxShieldEngine({
 
   const handleShieldSignOut = () => {
     clearSessionToken();
+    void clearMasterSsoSession();
     if (typeof window !== "undefined") {
       localStorage.removeItem("sparrowx_auth_user");
     }
@@ -353,6 +359,20 @@ export function SparrowxShieldEngine({
                     authPassword,
                   );
                   if (res.user) {
+                    await syncMasterSsoSession({
+                      email: res.user.email,
+                      password: authPassword,
+                      mode: "signin",
+                      id: res.user.id,
+                      fullName: res.user.fullName,
+                      tenantId: res.user.tenantId,
+                    });
+                    void ensureDeveloperConnection({
+                      id: res.user.id,
+                      email: res.user.email,
+                      fullName: res.user.fullName,
+                      tenantId: res.user.tenantId,
+                    });
                     completeAuthTransition(res.user);
                   } else {
                     setAuthError(res.error || "Invalid sign-in credentials.");
@@ -376,6 +396,20 @@ export function SparrowxShieldEngine({
                     tenantId: `TENANT-SHIELD-${Date.now().toString().slice(-4)}`,
                   };
                   await persistAppUserToBackend(newUser);
+                  await syncMasterSsoSession({
+                    email: emailClean,
+                    password: authPassword,
+                    mode: "register",
+                    id: newUser.id,
+                    fullName: newUser.fullName,
+                    tenantId: newUser.tenantId,
+                  });
+                  void ensureDeveloperConnection({
+                    id: newUser.id,
+                    email: emailClean,
+                    fullName: newUser.fullName,
+                    tenantId: newUser.tenantId,
+                  });
                   completeAuthTransition({ ...newUser, password: "" });
                 }
               } catch {

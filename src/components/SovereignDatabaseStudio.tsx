@@ -14,6 +14,11 @@ import {
   verifySessionToken,
   clearSessionToken,
 } from "@/lib/advanced-features";
+import {
+  clearMasterSsoSession,
+  ensureDeveloperConnection,
+  syncMasterSsoSession,
+} from "@/lib/developer-connection";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
@@ -1080,6 +1085,7 @@ export function SovereignDatabaseStudio({
 
   const handleLockWorkspace = () => {
     clearSessionToken();
+    void clearMasterSsoSession();
     setSessionUser(null);
     setViewMode("landing");
     if (typeof window !== "undefined") {
@@ -1334,6 +1340,33 @@ export function SovereignDatabaseStudio({
       } catch {
         // Ignore malformed cache
       }
+      let active = true;
+      void ensureDeveloperConnection({
+        id: sessionUser.id,
+        email: sessionUser.email,
+        fullName: sessionUser.fullName,
+        tenantId: sessionUser.tenantId,
+      }).then((connected) => {
+        if (!active || !connected) return;
+        setProvisionedDb((prev) => ({
+          dbName: connected.dbName,
+          dbUser: connected.dbUser,
+          dbPassword: prev?.dbPassword || connected.dbPassword || "",
+          dbHost: connected.dbHost,
+          dbPort: connected.dbPort,
+          connectionString:
+            prev?.connectionString ||
+            connected.connectionString ||
+            `postgresql://${connected.dbUser}@${connected.dbHost}:${connected.dbPort}/${connected.dbName}?sslmode=require`,
+          planId: connected.planId,
+          planName: connected.planName,
+          storageLimitMb: connected.storageLimitMb,
+          maxConnections: connected.maxConnections,
+        }));
+      });
+      return () => {
+        active = false;
+      };
     }
   }, [sessionUser]);
 
@@ -2363,6 +2396,14 @@ export function SovereignDatabaseStudio({
                           role: res.user.admin === "yes" ? "admin" : "client",
                           tenantId: res.user.tenantId,
                         });
+                        await syncMasterSsoSession({
+                          email: emailClean,
+                          password: landingAuthPassword,
+                          mode: "signin",
+                          id: res.user.id,
+                          fullName: res.user.fullName,
+                          tenantId: res.user.tenantId,
+                        });
                         setSessionUser(res.user);
                         setViewMode("studio");
                         if (onUserAuthenticated) {
@@ -2484,6 +2525,14 @@ export function SovereignDatabaseStudio({
                         tenantId,
                       };
                       await persistAppUserToBackend(newUser);
+                      await syncMasterSsoSession({
+                        email: emailClean,
+                        password: landingRegisterPassword,
+                        mode: "register",
+                        id: newUser.id,
+                        fullName: newUser.fullName,
+                        tenantId,
+                      });
                       await provisionIsolatedPgDatabase({
                         tenantId,
                         userId: newUser.id,

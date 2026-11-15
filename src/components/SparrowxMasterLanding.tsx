@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff,
   Building2,
+  Copy,
 } from "lucide-react";
 import { ComparisonSection } from "./landing/ComparisonSection";
 import { ContactSection } from "./landing/ContactSection";
@@ -51,6 +52,15 @@ import {
   issueSignedSessionToken,
   verifySessionToken,
 } from "@/lib/advanced-features";
+import {
+  clearMasterSsoSession,
+  DEVELOPER_CONNECTION_EVENT,
+  ensureDeveloperConnection,
+  getCachedDeveloperConnection,
+  getNetsecSsoUrl,
+  syncMasterSsoSession,
+  type DeveloperDbConnectionInfo,
+} from "@/lib/developer-connection";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 
@@ -99,7 +109,6 @@ function OperatorLoginDialog({
 
     try {
       const res = await authenticateAppUserFromBackend(emailClean, password);
-      setLoading(false);
 
       if (res.user) {
         issueSignedSessionToken({
@@ -109,11 +118,29 @@ function OperatorLoginDialog({
           role: res.user.admin === "yes" ? "admin" : "client",
           tenantId: res.user.tenantId,
         });
+        await Promise.all([
+          syncMasterSsoSession({
+            email: emailClean,
+            password,
+            mode: "signin",
+            id: res.user.id,
+            fullName: res.user.fullName,
+            tenantId: res.user.tenantId,
+          }),
+          ensureDeveloperConnection({
+            id: res.user.id,
+            email: res.user.email,
+            fullName: res.user.fullName,
+            tenantId: res.user.tenantId,
+          }),
+        ]);
+        setLoading(false);
         onOpenChange(false);
         if (onSuccess) {
           onSuccess(res.user);
         }
       } else {
+        setLoading(false);
         setError(res.error || "Invalid sign-in credentials.");
       }
     } catch {
@@ -177,17 +204,22 @@ function OperatorLoginDialog({
       };
       await persistAppUserToBackend(newUser);
 
-      // Provision dedicated isolated PostgreSQL database for this unified account
-      void fetch("/api/db/provision", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantId,
-          userId: newUser.id,
-          email: emailClean,
-          projectName: cleanOrg,
-        }),
-      }).catch(() => {});
+      // Issue cross-subdomain Master SSO cookie + provision isolated PostgreSQL Developer DB
+      await syncMasterSsoSession({
+        email: emailClean,
+        password,
+        mode: "register",
+        id: newUser.id,
+        fullName: newUser.fullName,
+        tenantId,
+      });
+      await ensureDeveloperConnection({
+        id: newUser.id,
+        email: emailClean,
+        fullName: newUser.fullName,
+        tenantId,
+        projectName: cleanOrg,
+      });
 
       const safeUser: AppUser = { ...newUser, password: "" };
       issueSignedSessionToken({
@@ -269,7 +301,11 @@ function OperatorLoginDialog({
         </div>
 
         {error && (
-          <div className="mx-6 mb-4 rounded-xl bg-white/10 border border-white/35 px-3.5 py-2.5 text-zinc-100 text-xs flex items-start gap-2.5">
+          <div
+            role="alert"
+            aria-live="polite"
+            className="mx-6 mb-4 rounded-xl bg-white/10 border border-white/35 px-3.5 py-2.5 text-zinc-100 text-xs flex items-start gap-2.5"
+          >
             <AlertCircle className="size-4 shrink-0 text-white mt-0.5" aria-hidden="true" />
             <span>{error}</span>
           </div>
@@ -279,12 +315,15 @@ function OperatorLoginDialog({
           {authTab === "register" && (
             <>
               <div className="space-y-1.5 text-left">
-                <label className="text-xs font-medium text-zinc-200 block">Full Name</label>
+                <label htmlFor="spx-master-fullname" className="text-xs font-medium text-zinc-200 block">Full Name</label>
                 <div className="relative group">
                   <User className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
                   <input
+                    id="spx-master-fullname"
+                    name="name"
                     type="text"
                     required
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Alex Turner"
@@ -293,13 +332,16 @@ function OperatorLoginDialog({
                 </div>
               </div>
               <div className="space-y-1.5 text-left">
-                <label className="text-xs font-medium text-zinc-200 block">
+                <label htmlFor="spx-master-org" className="text-xs font-medium text-zinc-200 block">
                   Workspace / Organization <span className="text-zinc-400">(Optional)</span>
                 </label>
                 <div className="relative group">
                   <Building2 className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
                   <input
+                    id="spx-master-org"
+                    name="organization"
                     type="text"
+                    autoComplete="organization"
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
                     placeholder="Acme Cloud Lab"
@@ -311,12 +353,18 @@ function OperatorLoginDialog({
           )}
 
           <div className="space-y-1.5 text-left">
-            <label className="text-xs font-medium text-zinc-200 block">Account Email</label>
+            <label htmlFor="spx-master-email" className="text-xs font-medium text-zinc-200 block">Account Email</label>
             <div className="relative group">
               <Mail className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input
+                id="spx-master-email"
+                name="email"
                 type="email"
                 required
+                autoComplete="email"
+                inputMode="email"
+                spellCheck={false}
+                autoCapitalize="none"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@yourdomain.com"
@@ -326,15 +374,18 @@ function OperatorLoginDialog({
           </div>
 
           <div className="space-y-1.5 text-left">
-            <label className="text-xs font-medium text-zinc-200 block">
+            <label htmlFor="spx-master-password" className="text-xs font-medium text-zinc-200 block">
               Password <span className="text-zinc-400">(min 6 chars)</span>
             </label>
             <div className="relative group">
               <Lock className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
               <input
+                id="spx-master-password"
+                name="password"
                 type={showPassword ? "text" : "password"}
                 required
                 minLength={6}
+                autoComplete={authTab === "signin" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
@@ -420,6 +471,41 @@ export function SparrowxMasterLanding({
       tenantId: verified.tenantId,
     };
   });
+  const [devConnection, setDevConnection] = useState<DeveloperDbConnectionInfo | null>(() => {
+    const verified = verifySessionToken();
+    return verified ? getCachedDeveloperConnection(verified.tenantId, verified.email) : null;
+  });
+  const [connectingDb, setConnectingDb] = useState(false);
+  const [copiedUri, setCopiedUri] = useState(false);
+
+  useEffect(() => {
+    if (!sessionUser) {
+      setDevConnection(null);
+      return;
+    }
+    let active = true;
+    setConnectingDb(true);
+    void ensureDeveloperConnection({
+      id: sessionUser.id,
+      email: sessionUser.email,
+      fullName: sessionUser.fullName,
+      tenantId: sessionUser.tenantId,
+    }).then((info) => {
+      if (!active) return;
+      if (info) setDevConnection(info);
+      setConnectingDb(false);
+    });
+
+    const onUpdate = (ev: Event) => {
+      const detail = (ev as CustomEvent<DeveloperDbConnectionInfo | null>).detail;
+      if (detail) setDevConnection(detail);
+    };
+    window.addEventListener(DEVELOPER_CONNECTION_EVENT, onUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener(DEVELOPER_CONNECTION_EVENT, onUpdate);
+    };
+  }, [sessionUser?.email, sessionUser?.tenantId]);
 
   // Highlight the nav link for the section currently in view.
   useEffect(() => {
@@ -519,7 +605,25 @@ export function SparrowxMasterLanding({
 
   const handleLandingSignOut = () => {
     clearSessionToken();
+    void clearMasterSsoSession();
+    setDevConnection(null);
     setSessionUser(null);
+  };
+
+  const handleCopyDbUri = async () => {
+    const uri =
+      devConnection?.connectionString ||
+      (devConnection
+        ? `postgresql://${devConnection.dbUser}@${devConnection.dbHost}:${devConnection.dbPort}/${devConnection.dbName}`
+        : "");
+    if (!uri || typeof navigator === "undefined" || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(uri);
+      setCopiedUri(true);
+      setTimeout(() => setCopiedUri(false), 2000);
+    } catch {
+      // Clipboard blocked in non-secure context
+    }
   };
 
   return (
@@ -891,6 +995,75 @@ export function SparrowxMasterLanding({
           </div>
         )}
       </header>
+
+      {/* ACTIVE DEVELOPER CONNECTION STRIP WHEN SIGNED IN ON MASTER PAGE */}
+      {sessionUser && (
+        <section
+          aria-label="Active Developer Connection"
+          className="relative z-20 border-b border-white/15 bg-[#090B10]/95 backdrop-blur-md px-4 sm:px-6 py-3"
+        >
+          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-semibold text-emerald-300">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+                DEVELOPER CONNECTED
+              </span>
+              <span className="font-semibold text-white">
+                {sessionUser.fullName || sessionUser.email}
+              </span>
+              <span className="font-mono text-[11px] text-zinc-400">{sessionUser.email}</span>
+              {devConnection ? (
+                <span className="inline-flex items-center gap-1.5 rounded bg-white/5 border border-white/15 px-2.5 py-1 font-mono text-[11px] text-zinc-200">
+                  <Database className="size-3.5 text-emerald-400" aria-hidden="true" />
+                  <span>
+                    {devConnection.dbName} @ {devConnection.dbHost}:{devConnection.dbPort}
+                  </span>
+                </span>
+              ) : (
+                <span className="font-mono text-[11px] text-zinc-400">
+                  {connectingDb ? "Connecting PostgreSQL instance..." : "PostgreSQL Developer Workspace Ready"}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {devConnection && (
+                <button
+                  type="button"
+                  onClick={handleCopyDbUri}
+                  className="px-3 py-1.5 rounded-md border border-white/20 bg-[#05060A] hover:border-white/50 text-[11px] font-mono text-zinc-200 hover:text-white inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  {copiedUri ? <Check className="size-3.5 text-emerald-400" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
+                  <span>{copiedUri ? "URI Copied" : "Copy Postgres URI"}</span>
+                </button>
+              )}
+              <a
+                href="/db"
+                className="px-3 py-1.5 rounded-md border border-white/20 bg-[#05060A] hover:border-white/50 text-[11px] font-mono text-white inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Database className="size-3.5" aria-hidden="true" />
+                <span>DB Studio</span>
+              </a>
+              <a
+                href={getNetsecSsoUrl({ autoSso: true })}
+                className="px-3 py-1.5 rounded-md border border-red-500/40 bg-red-500/10 hover:bg-red-500/20 text-[11px] font-mono font-semibold text-red-200 inline-flex items-center gap-1.5 transition-colors"
+              >
+                <Shield className="size-3.5 text-red-400" aria-hidden="true" />
+                <span>NetSec DDoS Panel</span>
+                <ArrowUpRight className="size-3.5" aria-hidden="true" />
+              </a>
+              <button
+                type="button"
+                onClick={() => onOpenLogin()}
+                className="px-3.5 py-1.5 rounded-md bg-white hover:bg-zinc-200 text-black font-semibold text-[11px] inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+              >
+                <span>Open Console</span>
+                <ArrowUpRight className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* SECTION 2: EMOTIONAL STARTUP HERO */}
       <section className="border-b border-white/15 bg-gradient-to-b from-black/80 via-black/60 to-transparent px-4 sm:px-6 py-10 sm:py-20 relative z-10 overflow-hidden">

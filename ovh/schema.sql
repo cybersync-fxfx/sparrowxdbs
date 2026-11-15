@@ -348,3 +348,39 @@ GRANT SELECT, INSERT, UPDATE ON public.clients, public.subscriptions, public.coi
 GRANT SELECT ON public.promo_codes TO web_anon;
 GRANT EXECUTE ON FUNCTION public.spend_coins(UUID, INTEGER, TEXT) TO web_anon;
 GRANT EXECUTE ON FUNCTION public.credit_coins(UUID, INTEGER, TEXT, TEXT, TEXT) TO web_anon;
+
+-- 17. NetSec DDoS Control Panel (netsec.sparrowx.net) tables backed by sovereign PostgreSQL
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username TEXT UNIQUE NOT NULL,
+  email TEXT UNIQUE,
+  password_hash TEXT,
+  master_user_id TEXT,
+  tenant_id TEXT,
+  api_key TEXT UNIQUE NOT NULL,
+  agent_id TEXT UNIQUE NOT NULL,
+  role TEXT NOT NULL DEFAULT 'user',
+  status TEXT NOT NULL DEFAULT 'approved',
+  tunnel_status TEXT DEFAULT 'inactive',
+  client_ip TEXT,
+  tunnel_created_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_user_profiles_email ON public.user_profiles (LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_user_profiles_agent_id ON public.user_profiles (agent_id);
+
+CREATE TABLE IF NOT EXISTS public.threat_radar (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip TEXT NOT NULL,
+  score INTEGER DEFAULT 0,
+  reason TEXT DEFAULT '',
+  country TEXT DEFAULT '',
+  abuseipdb_score INTEGER DEFAULT 0,
+  action TEXT DEFAULT 'watched',
+  target_ip TEXT,
+  target_agent_id TEXT,
+  detected_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_threat_radar_ip ON public.threat_radar (ip);
+CREATE INDEX IF NOT EXISTS idx_threat_radar_detected_at ON public.threat_radar (detected_at DESC);
