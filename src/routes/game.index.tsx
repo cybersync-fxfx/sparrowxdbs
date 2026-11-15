@@ -36,7 +36,7 @@ export const Route = createFileRoute("/game/")({
           "Deploy FiveM, SA-MP, Minecraft, and Discord bot servers in seconds with dedicated NVMe Gen4 speed, sub-second DDoS filtering, and Pterodactyl panel.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://game.sparrowx.net" },
+      { property: "og:url", content: "https://sparrowx.net/game" },
       { property: "og:image", content: "https://sparrowx.net/assets/logo-game-A5Nnak65.png" },
       { property: "og:image:alt", content: "SparrowX Game Hosting — High Performance Game Servers" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -50,7 +50,7 @@ export const Route = createFileRoute("/game/")({
       { name: "twitter:image:alt", content: "SparrowX Game Hosting — High Performance Game Servers" },
     ],
     links: [
-      { rel: "canonical", href: "https://game.sparrowx.net" },
+      { rel: "canonical", href: "https://sparrowx.net/game" },
       { rel: "icon", href: "/logos/sparrowx-main.png", type: "image/png" },
       { rel: "shortcut icon", href: "/logos/sparrowx-main.png" },
       { rel: "apple-touch-icon", href: "/logos/sparrowx-main.png", sizes: "180x180" },
@@ -66,7 +66,7 @@ export const Route = createFileRoute("/game/")({
               "name": "SparrowX Game Hosting",
               "applicationCategory": "GameServerHosting",
               "operatingSystem": "All",
-              "url": "https://game.sparrowx.net",
+              "url": "https://sparrowx.net/game",
               "description":
                 "Enterprise NVMe Gen4 game server hosting for FiveM, SA-MP, Minecraft, and Discord bots with instant Pterodactyl deployment and sub-second DDoS defense.",
               "offers": {

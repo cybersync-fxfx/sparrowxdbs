@@ -1108,7 +1108,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -1120,6 +1120,15 @@ if is_pterodactyl_installed; then
   heal_pterodactyl_host_nginx
 fi
 
+for _cert_prefix in ptero game-web game-dash; do
+  if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
+    cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
+  fi
+  if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-privkey.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/privkey.pem" ]; then
+    cp -f "${INSTALL_DIR}/ovh/ssl/privkey.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-privkey.pem" 2>/dev/null || true
+  fi
+done
+
 render_sparrowx_nginx_conf() {
   local docker_host_ip
   docker_host_ip="$(get_docker_host_ip)"
@@ -1128,6 +1137,18 @@ render_sparrowx_nginx_conf() {
   if [ -s "${INSTALL_DIR}/ovh/ssl/ptero-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/ptero-privkey.pem" ]; then
     ptero_ssl_cert="/etc/nginx/ssl/ptero-fullchain.pem"
     ptero_ssl_key="/etc/nginx/ssl/ptero-privkey.pem"
+  fi
+  local game_web_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local game_web_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/game-web-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-web-privkey.pem" ]; then
+    game_web_ssl_cert="/etc/nginx/ssl/game-web-fullchain.pem"
+    game_web_ssl_key="/etc/nginx/ssl/game-web-privkey.pem"
+  fi
+  local game_dash_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local game_dash_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-privkey.pem" ]; then
+    game_dash_ssl_cert="/etc/nginx/ssl/game-dash-fullchain.pem"
+    game_dash_ssl_key="/etc/nginx/ssl/game-dash-privkey.pem"
   fi
   local ptero_backend=""
   if is_pterodactyl_installed; then
@@ -1376,11 +1397,97 @@ server {
 
 ${ptero_backend}
 }
+
+# 5. Game Hosting Storefront (${DOMAIN_GAME_WEB})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME_WEB};
+    ssl_certificate ${game_web_ssl_cert};
+    ssl_certificate_key ${game_web_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 6. Game Client Dashboard (${DOMAIN_GAME_DASH})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME_DASH};
+    ssl_certificate ${game_dash_ssl_cert};
+    ssl_certificate_key ${game_dash_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
 EOF
 }
 
 render_sparrowx_nginx_conf
-log_ok "Nginx reverse proxy configured for all SparrowX domains & ${DOMAIN_GAME}"
+log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH} & ${DOMAIN_GAME}"
 
 # ==============================================================================
 # STEP 5/7: Auto-Upgrade Systemd Daemon & CLI Symlinks
@@ -1572,12 +1679,14 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     docker start sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
     render_sparrowx_nginx_conf
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
-    if is_pterodactyl_installed; then
-      ensure_game_letsencrypt_ssl
-    fi
-    if [ -x "${INSTALL_DIR}/deploy/ssl-renew.sh" ]; then
-      bash "${INSTALL_DIR}/deploy/ssl-renew.sh" >/dev/null 2>&1 || true
-    fi
+  fi
+
+  ensure_game_letsencrypt_ssl
+  ensure_core_letsencrypt_ssl
+  render_sparrowx_nginx_conf
+  docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+  if [ -x "${INSTALL_DIR}/deploy/ssl-renew.sh" ]; then
+    bash "${INSTALL_DIR}/deploy/ssl-renew.sh" >/dev/null 2>&1 || true
   fi
 
   if [ "${BUILD_FAILED}" = "true" ]; then
@@ -1700,6 +1809,8 @@ printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Drop Vault       : ${C_
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Password Vault   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://password.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://sec.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
 fi

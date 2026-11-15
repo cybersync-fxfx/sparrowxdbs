@@ -55,12 +55,12 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
   },
   {
     label: "Game Hosting",
-    sublabel: "game.sparrowx.net",
+    sublabel: "sparrowx.net/game",
     href: "/game",
   },
   {
     label: "Game Client Dashboard",
-    sublabel: "game.dash.sparrowx.net",
+    sublabel: "sparrowx.net/game/dashboard",
     href: "/game/dashboard",
   },
   {
