@@ -72,6 +72,13 @@ services:
       POSTGREST_PORT: 3001
       POSTGREST_INTERNAL_URL: http://postgrest:3001
       SPARROWX_DB_REST_URL: http://postgrest:3001
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-sparrowx}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-sparrowx_db}
+      SPARROWX_DB_PUBLIC_HOST: db.${SPARROWX_DOMAIN:-sparrowx.net}
+      PG_HOST_PORT: ${PG_HOST_PORT:-5432}
       SPARROWX_DATA_DIR: /app/data
       SPARROWX_DOMAIN: ${SPARROWX_DOMAIN:-localhost}
       SPARROWX_PUBLIC_IP: ${SPARROWX_PUBLIC_IP:-127.0.0.1}

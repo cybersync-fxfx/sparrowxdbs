@@ -99,6 +99,151 @@ provision_user_folder() {
   echo -e "${C_EMERALD}[OK]${C_RESET} Dedicated user database folder ready: ${C_BOLD}${udir}/${C_RESET}"
 }
 
+detect_pg_container() {
+  for cname in "sparrowx_postgres" "sparrowx-postgres"; do
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "${cname}"; then
+      echo "${cname}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+pg_exec_sql() {
+  local target_db="${1:-${PG_DB}}"
+  local sql="$2"
+  local pg_ctr=""
+  pg_ctr="$(detect_pg_container || true)"
+  if [ -n "${pg_ctr}" ]; then
+    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "${pg_ctr}" psql -U "${PG_USER}" -d "${target_db}" -v ON_ERROR_STOP=1 -c "${sql}"
+  elif command -v psql >/dev/null 2>&1; then
+    sudo -u postgres psql -d "${target_db}" -v ON_ERROR_STOP=1 -c "${sql}"
+  else
+    echo -e "${C_RED}PostgreSQL container or psql client not found.${C_RESET}" >&2
+    return 1
+  fi
+}
+
+pg_query_scalar() {
+  local target_db="${1:-${PG_DB}}"
+  local sql="$2"
+  local pg_ctr=""
+  pg_ctr="$(detect_pg_container || true)"
+  if [ -n "${pg_ctr}" ]; then
+    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-}" "${pg_ctr}" psql -U "${PG_USER}" -d "${target_db}" -tAc "${sql}" 2>/dev/null | tr -d '[:space:]'
+  elif command -v psql >/dev/null 2>&1; then
+    sudo -u postgres psql -d "${target_db}" -tAc "${sql}" 2>/dev/null | tr -d '[:space:]'
+  else
+    echo "0"
+  fi
+}
+
+provision_pg_user_db_cli() {
+  local email_or_slug="$1"
+  local slug
+  slug="$(echo "${email_or_slug}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/_/g; s/__*/_/g; s/^_//; s/_$//' | cut -c1-32)"
+  [ -z "${slug}" ] && slug="tenant_$(date +%s)"
+  local db_name="spx_db_${slug}"
+  local db_user="spx_u_${slug}"
+  local db_pass
+  db_pass="$(openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | cut -c1-24 || echo "Spx$(date +%s)Pass")"
+
+  pg_exec_sql "${PG_DB}" "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='${db_user}') THEN CREATE ROLE \"${db_user}\" WITH LOGIN PASSWORD '${db_pass}' NOSUPERUSER NOCREATEDB NOCREATEROLE; ELSE ALTER ROLE \"${db_user}\" WITH PASSWORD '${db_pass}'; END IF; END \$\$;" || return 1
+  if [ "$(pg_query_scalar "${PG_DB}" "SELECT 1 FROM pg_database WHERE datname='${db_name}';")" != "1" ]; then
+    pg_exec_sql "${PG_DB}" "CREATE DATABASE \"${db_name}\" OWNER \"${db_user}\";" || return 1
+  fi
+  pg_exec_sql "${PG_DB}" "REVOKE ALL ON DATABASE \"${db_name}\" FROM PUBLIC; GRANT ALL PRIVILEGES ON DATABASE \"${db_name}\" TO \"${db_user}\";" >/dev/null 2>&1 || true
+  pg_exec_sql "${db_name}" "CREATE EXTENSION IF NOT EXISTS vector; GRANT ALL ON SCHEMA public TO \"${db_user}\";" >/dev/null 2>&1 || true
+  pg_exec_sql "${PG_DB}" "CREATE TABLE IF NOT EXISTS public.provisioned_databases (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, user_id TEXT NOT NULL, user_email TEXT NOT NULL, db_name TEXT UNIQUE NOT NULL, db_user TEXT UNIQUE NOT NULL, db_host TEXT NOT NULL, db_port INTEGER NOT NULL DEFAULT 5432, status TEXT NOT NULL DEFAULT 'Active', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());" >/dev/null 2>&1 || true
+  pg_exec_sql "${PG_DB}" "INSERT INTO public.provisioned_databases (id, tenant_id, user_id, user_email, db_name, db_user, db_host, db_port, status) VALUES ('PDB-${slug}', 'TNT-${slug}', 'USR-${slug}', '${email_or_slug}', '${db_name}', '${db_user}', 'db.${SPARROWX_DOMAIN:-sparrowx.net}', ${PG_HOST_PORT:-5432}, 'Active') ON CONFLICT (db_name) DO NOTHING;" >/dev/null 2>&1 || true
+
+  echo -e "${C_EMERALD}[OK] Provisioned isolated PostgreSQL database:${C_RESET}"
+  echo -e "  Database : ${C_BOLD}${db_name}${C_RESET}"
+  echo -e "  Role     : ${C_BOLD}${db_user}${C_RESET}"
+  echo -e "  Password : ${C_YELLOW}${db_pass}${C_RESET}"
+  echo -e "  URI      : postgresql://${db_user}:${db_pass}@db.${SPARROWX_DOMAIN:-sparrowx.net}:${PG_HOST_PORT:-5432}/${db_name}?sslmode=prefer"
+}
+
+show_spaxdb_user_manager() {
+  while true; do
+    local total_users total_user_dbs total_pg_dbs
+    total_users="$(pg_query_scalar "${PG_DB}" "SELECT COUNT(*) FROM public.app_users;")"
+    total_user_dbs="$(pg_query_scalar "${PG_DB}" "SELECT COUNT(*) FROM pg_database WHERE datname LIKE 'spx_db_%';")"
+    total_pg_dbs="$(pg_query_scalar "${PG_DB}" "SELECT COUNT(*) FROM pg_database WHERE NOT datistemplate;")"
+
+    echo ""
+    echo -e "${C_EMERALD}========================================================================${C_RESET}"
+    echo -e "${C_BOLD}  SPARROWX SPAXDB — USER DATABASES & ISOLATED INSTANCES MANAGER${C_RESET}"
+    echo -e "${C_EMERALD}========================================================================${C_RESET}"
+    echo -e "  Registered Users (app_users)    : ${C_BOLD}${C_CYAN}${total_users:-0}${C_RESET}"
+    echo -e "  Isolated User DBs (spx_db_*)    : ${C_BOLD}${C_EMERALD}${total_user_dbs:-0}${C_RESET}"
+    echo -e "  Total Server PostgreSQL DBs     : ${C_BOLD}${total_pg_dbs:-0}${C_RESET}"
+    echo -e "${C_EMERALD}------------------------------------------------------------------------${C_RESET}"
+
+    pg_exec_sql "${PG_DB}" "
+      SELECT
+        d.datname AS db_name,
+        pg_get_userbyid(d.datdba) AS owner_role,
+        COALESCE(p.user_email, '-') AS user_email,
+        COALESCE(p.tenant_id, '-') AS tenant_id,
+        pg_size_pretty(pg_database_size(d.datname)) AS size,
+        (SELECT COUNT(*) FROM pg_stat_activity a WHERE a.datname = d.datname) AS conns
+      FROM pg_database d
+      LEFT JOIN public.provisioned_databases p ON p.db_name = d.datname
+      WHERE d.datname LIKE 'spx_db_%' OR d.datname = '${PG_DB}'
+      ORDER BY (d.datname = '${PG_DB}') DESC, d.datname ASC;
+    " 2>/dev/null || echo -e "${C_YELLOW}  (No user databases or PostgreSQL unavailable)${C_RESET}"
+
+    echo -e "${C_EMERALD}------------------------------------------------------------------------${C_RESET}"
+    echo -e "  ${C_BOLD}[a]${C_RESET} Provision New Isolated User DB + Role"
+    echo -e "  ${C_BOLD}[i]${C_RESET} Inspect Tables in a User DB"
+    echo -e "  ${C_BOLD}[p]${C_RESET} Reset User DB Role Password"
+    echo -e "  ${C_BOLD}[d]${C_RESET} Drop a User DB & Role"
+    echo -e "  ${C_BOLD}[b]${C_RESET} Back to Main Menu"
+    read -r -p "Select spaxdb action [a/i/p/d/b]: " SUB </dev/tty || return 0
+    case "${SUB}" in
+      a|A)
+        read -r -p "Enter user email or project slug: " NEW_OWNER </dev/tty || true
+        [ -n "${NEW_OWNER}" ] && provision_pg_user_db_cli "${NEW_OWNER}"
+        ;;
+      i|I)
+        read -r -p "Enter database name (e.g. spx_db_tnt_1234): " INSP_DB </dev/tty || true
+        if [[ "${INSP_DB}" =~ ^[a-z0-9_]+$ ]]; then
+          pg_exec_sql "${INSP_DB}" "\dt+" || true
+        fi
+        ;;
+      p|P)
+        read -r -p "Enter role name (e.g. spx_u_tnt_1234): " RST_ROLE </dev/tty || true
+        if [[ "${RST_ROLE}" =~ ^spx_u_[a-z0-9_]+$ ]]; then
+          local new_pw
+          new_pw="$(openssl rand -base64 18 2>/dev/null | tr -dc 'A-Za-z0-9' | cut -c1-24 || echo "Spx$(date +%s)Pass")"
+          pg_exec_sql "${PG_DB}" "ALTER ROLE \"${RST_ROLE}\" WITH PASSWORD '${new_pw}';" && \
+            echo -e "${C_EMERALD}[OK] New password for ${RST_ROLE}: ${C_YELLOW}${new_pw}${C_RESET}"
+        fi
+        ;;
+      d|D)
+        read -r -p "Enter user DB name to DROP (must start with spx_db_): " DROP_DB </dev/tty || true
+        if [[ "${DROP_DB}" =~ ^spx_db_[a-z0-9_]+$ ]]; then
+          local drop_role="spx_u_${DROP_DB#spx_db_}"
+          read -r -p "Type DROP to permanently delete ${DROP_DB} and role ${drop_role}: " CONF </dev/tty || true
+          if [ "${CONF}" = "DROP" ]; then
+            pg_exec_sql "${PG_DB}" "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${DROP_DB}';" >/dev/null 2>&1 || true
+            pg_exec_sql "${PG_DB}" "DROP DATABASE IF EXISTS \"${DROP_DB}\";" && \
+              pg_exec_sql "${PG_DB}" "DROP ROLE IF EXISTS \"${drop_role}\";" && \
+              pg_exec_sql "${PG_DB}" "DELETE FROM public.provisioned_databases WHERE db_name='${DROP_DB}';" >/dev/null 2>&1 || true
+            echo -e "${C_EMERALD}[OK] Dropped ${DROP_DB} and ${drop_role}.${C_RESET}"
+          fi
+        else
+          echo -e "${C_RED}Refused: only spx_db_* user databases may be dropped here.${C_RESET}"
+        fi
+        ;;
+      b|B|0|"")
+        return 0
+        ;;
+    esac
+  done
+}
+
 sync_cloud_to_local() {
   echo -e "${C_CYAN}[SYNC]${C_RESET} Shifting Cloud Supabase records & creating per-user database folders..."
   if command -v node >/dev/null 2>&1 && [ -f "${INSTALL_DIR}/ovh/migrate-from-supabase.mjs" ]; then
@@ -115,7 +260,10 @@ if [ "${1:-}" = "sync" ] || [ "${1:-}" = "migrate-db" ]; then
   sync_cloud_to_local
   exit 0
 elif [ "${1:-}" = "create-user-db" ] && [ -n "${2:-}" ]; then
-  provision_user_folder "$2"
+  provision_pg_user_db_cli "$2"
+  exit 0
+elif [ "${1:-}" = "users" ] || [ "${1:-}" = "spaxdb" ]; then
+  show_spaxdb_user_manager
   exit 0
 elif [ "${1:-}" = "status" ]; then
   echo -e "${C_EMERALD}=== SPARROWX SOVEREIGN DATABASE STATUS ===${C_RESET}"
@@ -145,9 +293,10 @@ while true; do
   echo -e "  ${C_BOLD}[6]${C_RESET} Shift / Sync Cloud Supabase -> Local OVH Database"
   echo -e "  ${C_BOLD}[7]${C_RESET} Open Interactive PostgreSQL SQL Shell (psql)"
   echo -e "  ${C_BOLD}[8]${C_RESET} Backup Entire Local Database to ${BACKUP_DIR}"
+  echo -e "  ${C_BOLD}[9]${C_RESET} User Databases Manager (spaxdb — Users, DB Counts & Sizes)"
   echo -e "  ${C_BOLD}[0]${C_RESET} Exit Terminal Studio"
   echo -e "${C_EMERALD}------------------------------------------------------------------------${C_RESET}"
-  read -r -p "Select option [0-8]: " OPT </dev/tty || exit 0
+  read -r -p "Select option [0-9]: " OPT </dev/tty || exit 0
 
   case "${OPT}" in
     1)
@@ -226,6 +375,9 @@ while true; do
       fi
       tar -czf "${BACKUP_DIR}/sparrowx-user-dbs-${STAMP}.tar.gz" -C "${DATA_DIR}" . 2>/dev/null || true
       echo -e "${C_EMERALD}[OK] Backup saved in ${BACKUP_DIR} (${STAMP})${C_RESET}"
+      ;;
+    9)
+      show_spaxdb_user_manager
       ;;
     0)
       echo -e "${C_EMERALD}Exiting SparrowX Terminal Database Studio.${C_RESET}"

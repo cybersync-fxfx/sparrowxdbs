@@ -1229,11 +1229,74 @@ export function SovereignDatabaseStudio({
   const [newUserRole, setNewUserRole] = useState<"no" | "yes">("no");
   const [newUserTenantId, setNewUserTenantId] = useState<string>("");
   const [creatingAccount, setCreatingAccount] = useState<boolean>(false);
+  const [provisioningDb, setProvisioningDb] = useState<boolean>(false);
+  const [provisionedDb, setProvisionedDb] = useState<{
+    dbName: string;
+    dbUser: string;
+    dbPassword: string;
+    dbHost: string;
+    dbPort: number;
+    connectionString: string;
+  } | null>(null);
+
+  const provisionIsolatedPgDatabase = async (payload: {
+    tenantId: string;
+    userId: string;
+    email: string;
+    projectName?: string;
+  }) => {
+    setProvisioningDb(true);
+    try {
+      const res = await fetch("/api/db/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as {
+        ok?: boolean;
+        database?: {
+          dbName: string;
+          dbUser: string;
+          dbPassword: string;
+          dbHost: string;
+          dbPort: number;
+          connectionString: string;
+        };
+      };
+      if (data.ok && data.database) {
+        setProvisionedDb(data.database);
+        try {
+          localStorage.setItem(
+            `sparrowx_provisioned_db_${payload.tenantId}`,
+            JSON.stringify(data.database),
+          );
+        } catch {
+          // Ignore storage quota issues
+        }
+        return data.database;
+      }
+    } catch {
+      // Best-effort when backend PostgreSQL is unreachable in offline/test mode
+    } finally {
+      setProvisioningDb(false);
+    }
+    return null;
+  };
 
   useEffect(() => {
     if (sessionUser) {
       setAccountDisplayName(sessionUser.fullName || "");
-      setNewUserTenantId((prev) => prev || sessionUser.tenantId || "TENANT-SPARROWX");
+      const tid = sessionUser.tenantId || "TENANT-SPARROWX";
+      setNewUserTenantId((prev) => prev || tid);
+      try {
+        const cached = localStorage.getItem(`sparrowx_provisioned_db_${tid}`);
+        if (cached) {
+          setProvisionedDb(JSON.parse(cached));
+        }
+      } catch {
+        // Ignore malformed cache
+      }
     }
   }, [sessionUser]);
 
@@ -1551,6 +1614,16 @@ export function SovereignDatabaseStudio({
         tenantId: newUserTenantId.trim() || sessionUser?.tenantId || "TENANT-SPARROWX",
       };
       const synced = await persistAppUserToBackend(createdUser);
+      await fetch("/api/db/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tenantId: createdUser.tenantId || "TENANT-SPARROWX",
+          userId: createdUser.id,
+          email: createdUser.email,
+          projectName: createdUser.fullName,
+        }),
+      }).catch(() => null);
       setNewUserFullName("");
       setNewUserEmail("");
       setNewUserPassword("");
@@ -2367,6 +2440,12 @@ export function SovereignDatabaseStudio({
                         tenantId,
                       };
                       await persistAppUserToBackend(newUser);
+                      await provisionIsolatedPgDatabase({
+                        tenantId,
+                        userId: newUser.id,
+                        email: emailClean,
+                        projectName: orgClean,
+                      });
 
                       issueSignedSessionToken({
                         id: newUser.id,
@@ -4843,6 +4922,88 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         Sorted by user ID
                       </span>
                     </div>
+                  </div>
+
+                  {/* Dedicated Isolated PostgreSQL Database Card */}
+                  <div className="rounded-xl border border-[#A3E635]/30 bg-[#0A0D14] p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262629] pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Database className="size-4 text-[#A3E635]" />
+                        <span className="text-xs font-bold text-white font-mono">
+                          Dedicated Isolated PostgreSQL Database (Per-User Instance)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={provisioningDb}
+                        onClick={async () => {
+                          const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+                          const res = await provisionIsolatedPgDatabase({
+                            tenantId: tid,
+                            userId: sessionUser.id,
+                            email: sessionUser.email,
+                            projectName: sessionUser.fullName,
+                          });
+                          setStatusBanner({
+                            type: res ? "success" : "error",
+                            message: res
+                              ? `Provisioned dedicated PostgreSQL database ${res.dbName} (role: ${res.dbUser}).`
+                              : "Unable to reach PostgreSQL provisioner (/api/db/provision).",
+                          });
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-[11px] font-mono cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw className={`size-3 ${provisioningDb ? "animate-spin" : ""}`} />
+                        <span>
+                          {provisioningDb
+                            ? "Provisioning..."
+                            : provisionedDb
+                              ? "Rotate DB Password"
+                              : "Provision Dedicated DB"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {provisionedDb ? (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs font-mono">
+                        <div className="rounded bg-[#101013] border border-[#26262A] p-2.5">
+                          <span className="text-[10px] text-zinc-500 uppercase block">Database Name</span>
+                          <span className="text-[#A3E635] font-bold">{provisionedDb.dbName}</span>
+                        </div>
+                        <div className="rounded bg-[#101013] border border-[#26262A] p-2.5">
+                          <span className="text-[10px] text-zinc-500 uppercase block">Dedicated Role</span>
+                          <span className="text-white font-semibold">{provisionedDb.dbUser}</span>
+                        </div>
+                        <div className="rounded bg-[#101013] border border-[#26262A] p-2.5">
+                          <span className="text-[10px] text-zinc-500 uppercase block">Endpoint</span>
+                          <span className="text-zinc-200">{provisionedDb.dbHost}:{provisionedDb.dbPort}</span>
+                        </div>
+                        <div className="md:col-span-3 flex flex-wrap items-center justify-between gap-2 rounded bg-[#07090E] border border-[#26262A] px-3 py-2">
+                          <code className="text-[11px] text-zinc-300 break-all">
+                            {provisionedDb.connectionString}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(provisionedDb.connectionString);
+                              setStatusBanner({
+                                type: "success",
+                                message: "Copied dedicated PostgreSQL connection URI to clipboard.",
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-[#18181D] border border-[#2E2E34] text-[10px] text-white hover:border-[#A3E635] cursor-pointer shrink-0"
+                          >
+                            <Copy className="size-3" />
+                            <span>Copy URI</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-400 font-mono">
+                        No dedicated database credentials cached for this browser session yet. Click{" "}
+                        <span className="text-[#A3E635]">Provision Dedicated DB</span> to create or rotate your isolated PostgreSQL database and role on the server.
+                      </p>
+                    )}
                   </div>
 
                   {/* Account Management & Provisioning 2-Card Panel */}
