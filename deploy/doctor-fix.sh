@@ -955,14 +955,15 @@ EOF_PTERO
   done
 }
 
-ensure_game_letsencrypt_ssl() {
-  local game_domain="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+issue_le_cert_to_ovh_ssl() {
+  local target_domain="$1"
+  local cert_prefix="$2"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
-  local live_dir="/etc/letsencrypt/live/${game_domain}"
+  local live_dir="/etc/letsencrypt/live/${target_domain}"
   local ssl_email="${PTERO_ADMIN_EMAIL:-${SPARROWX_ADMIN_EMAIL:-admin@${SPARROWX_DOMAIN}}}"
 
-  if [ -z "${game_domain}" ] || [[ "${game_domain}" == *.local ]] || [ "${game_domain}" = "localhost" ]; then
+  if [ -z "${target_domain}" ] || [[ "${target_domain}" == *.local ]] || [ "${target_domain}" = "localhost" ]; then
     return 0
   fi
 
@@ -970,39 +971,17 @@ ensure_game_letsencrypt_ssl() {
     ssl_email="admin@${SPARROWX_DOMAIN}"
   fi
 
-  mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
-
-  # Ensure UFW allows ports 80/443 for ACME HTTP-01 validation
-  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
-    ufw allow 80/tcp >/dev/null 2>&1 || true
-    ufw allow 443/tcp >/dev/null 2>&1 || true
-  fi
-
-  if ! command -v certbot >/dev/null 2>&1; then
-    DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true
-    DEBIAN_FRONTEND=noninteractive apt-get install -y certbot >/dev/null 2>&1 || true
-  fi
-
-  if ! command -v certbot >/dev/null 2>&1; then
-    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for ${game_domain}"
-    return 0
-  fi
-
-  # If cert does not exist yet, issue via webroot (:80 on sparrowx-nginx) or standalone fallback
   if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
-    log_scan "Requesting Let's Encrypt SSL for ${game_domain} via HTTP-01 port 80..."
-
-    # Attempt 1: Zero-downtime webroot through sparrowx-nginx on port 80
+    log_scan "Requesting Let's Encrypt SSL for ${target_domain} via HTTP-01 port 80..."
     if certbot certonly \
       --webroot -w "${webroot}" \
       --non-interactive --agree-tos \
       -m "${ssl_email}" \
-      --cert-name "${game_domain}" \
-      -d "${game_domain}" >/dev/null 2>&1; then
-      log_fix "Issued Let's Encrypt SSL for ${game_domain} via port 80 webroot"
+      --cert-name "${target_domain}" \
+      -d "${target_domain}" >/dev/null 2>&1; then
+      log_fix "Issued Let's Encrypt SSL for ${target_domain} via port 80 webroot"
     else
-      # Attempt 2: Briefly yield port 80 from ${EDGE_CTR:-sparrowx-nginx} for Certbot standalone challenge
-      log_scan "Webroot challenge deferred; retrying ${game_domain} via standalone port 80 listener..."
+      log_scan "Webroot challenge deferred; retrying ${target_domain} via standalone port 80 listener..."
       docker stop "${EDGE_CTR:-sparrowx-nginx}" sparrowx-nginx sparrowx_edge_proxy >/dev/null 2>&1 || true
       systemctl stop nginx >/dev/null 2>&1 || true
       if command -v fuser >/dev/null 2>&1; then
@@ -1014,11 +993,11 @@ ensure_game_letsencrypt_ssl() {
         --standalone --preferred-challenges http \
         --non-interactive --agree-tos \
         -m "${ssl_email}" \
-        --cert-name "${game_domain}" \
-        -d "${game_domain}" >/dev/null 2>&1; then
-        log_fix "Issued Let's Encrypt SSL for ${game_domain} via standalone port 80 challenge"
+        --cert-name "${target_domain}" \
+        -d "${target_domain}" >/dev/null 2>&1; then
+        log_fix "Issued Let's Encrypt SSL for ${target_domain} via standalone port 80 challenge"
       else
-        log_warn "Let's Encrypt HTTP-01 challenge failed for ${game_domain} (verify DNS A record & external port 80)"
+        log_warn "Let's Encrypt HTTP-01 challenge failed for ${target_domain} (verify DNS A record & external port 80)"
       fi
 
       if is_pterodactyl_installed; then
@@ -1027,38 +1006,54 @@ ensure_game_letsencrypt_ssl() {
       docker start "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps "${EDGE_SVC:-nginx}" >/dev/null 2>&1 || true
     fi
   else
-    # Keep certificate current and migrate any prior nginx authenticator to webroot
     certbot certonly \
       --webroot -w "${webroot}" \
       --non-interactive --agree-tos --keep-until-expiring \
       -m "${ssl_email}" \
-      --cert-name "${game_domain}" \
-      -d "${game_domain}" >/dev/null 2>&1 || true
+      --cert-name "${target_domain}" \
+      -d "${target_domain}" >/dev/null 2>&1 || true
   fi
 
   if [ -s "${live_dir}/fullchain.pem" ] && [ -s "${live_dir}/privkey.pem" ]; then
-    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
-    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
-    chmod 644 "${ssl_dir}/ptero-fullchain.pem" 2>/dev/null || true
-    chmod 600 "${ssl_dir}/ptero-privkey.pem" 2>/dev/null || true
-    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${game_domain}.pem" 2>/dev/null || true
-    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${game_domain}.key" 2>/dev/null || true
-
-    if [ -f "${INSTALL_DIR}/ovh/nginx.conf" ] && grep -q "${game_domain}" "${INSTALL_DIR}/ovh/nginx.conf" 2>/dev/null; then
-      local tmp_nginx=""
-      tmp_nginx="$(mktemp)"
-      awk -v dom="${game_domain}" '
-        /(# 4\. Pterodactyl Game Panel|# 4\. Game Panel Domain)/ { in_ptero=1 }
-        in_ptero && /ssl_certificate / { sub(/ssl_certificate .*/, "ssl_certificate /etc/nginx/ssl/ptero-fullchain.pem;") }
-        in_ptero && /ssl_certificate_key / { sub(/ssl_certificate_key .*/, "ssl_certificate_key /etc/nginx/ssl/ptero-privkey.pem;") }
-        in_ptero && /^}/ { in_ptero=0 }
-        { print }
-      ' "${INSTALL_DIR}/ovh/nginx.conf" > "${tmp_nginx}" && cat "${tmp_nginx}" > "${INSTALL_DIR}/ovh/nginx.conf"
-      rm -f "${tmp_nginx}"
-      docker restart "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || docker exec "${EDGE_CTR:-sparrowx-nginx}" nginx -s reload >/dev/null 2>&1 || true
-    fi
-    log_ok "Live Let's Encrypt SSL wired for https://${game_domain}"
+    cp -fL "${live_dir}/fullchain.pem" "${ssl_dir}/${cert_prefix}-fullchain.pem" 2>/dev/null || true
+    cp -fL "${live_dir}/privkey.pem" "${ssl_dir}/${cert_prefix}-privkey.pem" 2>/dev/null || true
+    chmod 644 "${ssl_dir}/${cert_prefix}-fullchain.pem" 2>/dev/null || true
+    chmod 600 "${ssl_dir}/${cert_prefix}-privkey.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/fullchain.pem" "/etc/ssl/${target_domain}.pem" 2>/dev/null || true
+    ln -sf "${live_dir}/privkey.pem" "/etc/ssl/${target_domain}.key" 2>/dev/null || true
+    log_ok "Live Let's Encrypt SSL wired for https://${target_domain}"
   fi
+}
+
+ensure_game_letsencrypt_ssl() {
+  local game_panel_domain="${DOMAIN_GAME:-game.panel.${SPARROWX_DOMAIN}}"
+  local game_web_domain="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
+  local game_dash_domain="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+  local webroot="${INSTALL_DIR}/ovh/certbot-www"
+  local ssl_dir="${INSTALL_DIR}/ovh/ssl"
+
+  mkdir -p "${webroot}/.well-known/acme-challenge" "${ssl_dir}" /etc/ssl
+
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow 80/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true
+    DEBIAN_FRONTEND=noninteractive apt-get install -y certbot >/dev/null 2>&1 || true
+  fi
+
+  if ! command -v certbot >/dev/null 2>&1; then
+    log_warn "Certbot unavailable; skipping Let's Encrypt issuance for game domains"
+    return 0
+  fi
+
+  if is_pterodactyl_installed; then
+    issue_le_cert_to_ovh_ssl "${game_panel_domain}" "ptero"
+  fi
+  issue_le_cert_to_ovh_ssl "${game_web_domain}" "game-web"
+  issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
 }
 
 compose_cmd() {
@@ -1588,6 +1583,18 @@ render_sparrowx_nginx_conf() {
     ptero_ssl_cert="/etc/nginx/ssl/ptero-fullchain.pem"
     ptero_ssl_key="/etc/nginx/ssl/ptero-privkey.pem"
   fi
+  local game_web_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local game_web_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/game-web-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-web-privkey.pem" ]; then
+    game_web_ssl_cert="/etc/nginx/ssl/game-web-fullchain.pem"
+    game_web_ssl_key="/etc/nginx/ssl/game-web-privkey.pem"
+  fi
+  local game_dash_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local game_dash_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/game-dash-privkey.pem" ]; then
+    game_dash_ssl_cert="/etc/nginx/ssl/game-dash-fullchain.pem"
+    game_dash_ssl_key="/etc/nginx/ssl/game-dash-privkey.pem"
+  fi
   local ptero_backend=""
   if is_pterodactyl_installed; then
     ptero_backend="    location / {
@@ -1762,11 +1769,11 @@ server {
     }
 }
 
-# 3. Standalone Product Subdomains (Drop, Keys, Shield, API, Game Hosting, Game Client Dashboard)
+# 3. Standalone Product Subdomains (Drop, Keys, Shield, API)
 server {
     listen 80;
     listen 443 ssl;
-    server_name file.${SPARROWX_DOMAIN} drop.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} passwd.${SPARROWX_DOMAIN} keys.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} shield.${SPARROWX_DOMAIN} api.${SPARROWX_DOMAIN} rest.${SPARROWX_DOMAIN} ${DOMAIN_GAME_WEB} ${DOMAIN_GAME_DASH};
+    server_name file.${SPARROWX_DOMAIN} drop.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} passwd.${SPARROWX_DOMAIN} keys.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} shield.${SPARROWX_DOMAIN} api.${SPARROWX_DOMAIN} rest.${SPARROWX_DOMAIN};
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -1842,6 +1849,96 @@ server {
     }
 
 ${ptero_backend}
+}
+
+# 5. Game Hosting Storefront (${DOMAIN_GAME_WEB})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME_WEB};
+    ssl_certificate ${game_web_ssl_cert};
+    ssl_certificate_key ${game_web_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 6. Game Client Dashboard (${DOMAIN_GAME_DASH})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${DOMAIN_GAME_DASH};
+    ssl_certificate ${game_dash_ssl_cert};
+    ssl_certificate_key ${game_dash_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    client_max_body_size 150M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 }
 EOF
 }
@@ -1985,10 +2082,10 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     ensure_native_fallback_running || true
   fi
 
-  # Ensure Let's Encrypt SSL certificates via port 80 (webroot + standalone fallback for game.<domain>)
-  if is_pterodactyl_installed; then
-    ensure_game_letsencrypt_ssl
-  fi
+  # Ensure Let's Encrypt SSL certificates via port 80 for game.sparrowx.net, game.dash.sparrowx.net & game.panel.sparrowx.net
+  ensure_game_letsencrypt_ssl
+  render_sparrowx_nginx_conf
+  docker restart "${EDGE_CTR:-sparrowx-nginx}" >/dev/null 2>&1 || docker exec "${EDGE_CTR:-sparrowx-nginx}" nginx -s reload >/dev/null 2>&1 || true
   if systemctl list-unit-files wings.service >/dev/null 2>&1 && [ -f /etc/pterodactyl/config.yml ] && ! systemctl is-active --quiet wings 2>/dev/null; then
     systemctl start wings >/dev/null 2>&1 || true
   fi
