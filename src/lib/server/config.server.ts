@@ -23,7 +23,7 @@ export function getMode(): Mode {
 }
 
 export function panelUrl(): string {
-  return (env("PTERO_URL") ?? "https://game.panel.sparrowx.net").replace(/\/+$/, "");
+  return (env("PTERO_URL") ?? "https://game.sparrowx.net").replace(/\/+$/, "");
 }
 
 export function sessionSecret(): string {

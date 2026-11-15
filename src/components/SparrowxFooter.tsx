@@ -70,8 +70,8 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
   },
   {
     label: "Game Server Panel",
-    sublabel: "game.panel.sparrowx.net",
-    href: "https://game.panel.sparrowx.net",
+    sublabel: "game.sparrowx.net",
+    href: "https://game.sparrowx.net",
   },
 ];
 
@@ -160,7 +160,7 @@ export function SparrowxFooter({
               <h3 className="text-sm font-medium text-[#F4F6FA]">Products</h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 {PRODUCT_LINKS.map((item) => (
-                  <li key={item.sublabel} className="min-w-0">
+                  <li key={`${item.label}-${item.href}`} className="min-w-0">
                     <a
                       href={item.href}
                       target="_blank"

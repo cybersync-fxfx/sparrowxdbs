@@ -102,7 +102,7 @@ export const Route = createFileRoute("/game/")({
                   "acceptedAnswer": {
                     "@type": "Answer",
                     "text":
-                      "Each server is instantly linked to your Pterodactyl Game Panel account at game.panel.sparrowx.net with full file manager, console, restart controls, and database allocations.",
+                      "Each server is instantly linked to your Pterodactyl Game Panel account at game.sparrowx.net with full file manager, console, restart controls, and database allocations.",
                   },
                 },
               ],

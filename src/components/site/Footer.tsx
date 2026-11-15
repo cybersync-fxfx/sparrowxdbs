@@ -14,7 +14,7 @@ export function Footer() {
           <a href="#performance" className="hover:text-foreground">Performance</a>
           <a href="#pricing" className="hover:text-foreground">Pricing</a>
           <a href={LOGIN_HREF} className="hover:text-foreground">Client Area</a>
-          <a href="https://game.panel.sparrowx.net" target="_blank" rel="noreferrer" className="hover:text-foreground">Game Panel</a>
+          <a href="https://game.sparrowx.net" target="_blank" rel="noreferrer" className="hover:text-foreground">Game Panel</a>
         </nav>
       </div>
       <p className="pb-8 text-center text-xs text-muted-foreground">© {new Date().getFullYear()} SparrowX Game Hosting · sparrowx.net</p>

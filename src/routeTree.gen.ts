@@ -20,6 +20,8 @@ import { Route as FIndexRouteImport } from './routes/f.index'
 import { Route as FIdRouteImport } from './routes/f.$id'
 import { Route as GameIndexRouteImport } from './routes/game.index'
 import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
+import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
+import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
 import { Route as ApiPublicAuthDiscordCallbackRouteImport } from './routes/api/public/auth/discord/callback'
 import { Route as ApiPublicAuthDiscordLoginRouteImport } from './routes/api/public/auth/discord/login'
@@ -79,6 +81,16 @@ const GameDashboardRoute = GameDashboardRouteImport.update({
   path: '/game/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDbProvisionRoute = ApiDbProvisionRouteImport.update({
+  id: '/api/db/provision',
+  path: '/api/db/provision',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDbSummaryRoute = ApiDbSummaryRouteImport.update({
+  id: '/api/db/summary',
+  path: '/api/db/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicRazorpayWebhookRoute =
   ApiPublicRazorpayWebhookRouteImport.update({
     id: '/api/public/razorpay/webhook',
@@ -110,6 +122,8 @@ export interface FileRoutesByFullPath {
   '/game/dashboard': typeof GameDashboardRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/api/db/provision': typeof ApiDbProvisionRoute
+  '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -126,6 +140,8 @@ export interface FileRoutesByTo {
   '/game/dashboard': typeof GameDashboardRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
+  '/api/db/provision': typeof ApiDbProvisionRoute
+  '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -143,6 +159,8 @@ export interface FileRoutesById {
   '/game/dashboard': typeof GameDashboardRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/api/db/provision': typeof ApiDbProvisionRoute
+  '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -161,6 +179,8 @@ export interface FileRouteTypes {
     | '/game/dashboard'
     | '/f/'
     | '/game/'
+    | '/api/db/provision'
+    | '/api/db/summary'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -177,6 +197,8 @@ export interface FileRouteTypes {
     | '/game/dashboard'
     | '/f'
     | '/game'
+    | '/api/db/provision'
+    | '/api/db/summary'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -193,6 +215,8 @@ export interface FileRouteTypes {
     | '/game/dashboard'
     | '/f/'
     | '/game/'
+    | '/api/db/provision'
+    | '/api/db/summary'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -210,6 +234,8 @@ export interface RootRouteChildren {
   GameDashboardRoute: typeof GameDashboardRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
+  ApiDbProvisionRoute: typeof ApiDbProvisionRoute
+  ApiDbSummaryRoute: typeof ApiDbSummaryRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicAuthDiscordCallbackRoute: typeof ApiPublicAuthDiscordCallbackRoute
   ApiPublicAuthDiscordLoginRoute: typeof ApiPublicAuthDiscordLoginRoute
@@ -294,6 +320,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/db/provision': {
+      id: '/api/db/provision'
+      path: '/api/db/provision'
+      fullPath: '/api/db/provision'
+      preLoaderRoute: typeof ApiDbProvisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/db/summary': {
+      id: '/api/db/summary'
+      path: '/api/db/summary'
+      fullPath: '/api/db/summary'
+      preLoaderRoute: typeof ApiDbSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/razorpay/webhook': {
       id: '/api/public/razorpay/webhook'
       path: '/api/public/razorpay/webhook'
@@ -330,6 +370,8 @@ const rootRouteChildren: RootRouteChildren = {
   GameDashboardRoute: GameDashboardRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
+  ApiDbProvisionRoute: ApiDbProvisionRoute,
+  ApiDbSummaryRoute: ApiDbSummaryRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicAuthDiscordCallbackRoute: ApiPublicAuthDiscordCallbackRoute,
   ApiPublicAuthDiscordLoginRoute: ApiPublicAuthDiscordLoginRoute,
