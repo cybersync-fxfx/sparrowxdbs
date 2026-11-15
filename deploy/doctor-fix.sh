@@ -624,6 +624,18 @@ heal_pterodactyl_host_nginx() {
     set_ptero_env_key "DB_USERNAME" "${db_user}"
     [ -n "${db_pass}" ] && set_ptero_env_key "DB_PASSWORD" "${db_pass}"
 
+    # Prevent SocketStream 127.0.0.1:2525 Connection refused during p:user:make / panel emails if no local SMTP exists
+    local mail_host="" mail_port=""
+    mail_host="$(awk -F= '/^MAIL_HOST=/{sub(/^[^=]*=/,""); print; exit}' "${ptero_dir}/.env" 2>/dev/null | tr -d "\"'\r[:space:]" || true)"
+    mail_port="$(awk -F= '/^MAIL_PORT=/{sub(/^[^=]*=/,""); print; exit}' "${ptero_dir}/.env" 2>/dev/null | tr -d "\"'\r[:space:]" || true)"
+    mail_port="${mail_port:-2525}"
+    if [ -z "${mail_host}" ] || [ "${mail_host}" = "127.0.0.1" ] || [ "${mail_host}" = "localhost" ]; then
+      if ! is_port_busy "${mail_port}"; then
+        set_ptero_env_key "MAIL_MAILER" "log"
+        set_ptero_env_key "MAIL_DRIVER" "log"
+      fi
+    fi
+
     local existing_salt=""
     existing_salt="$(awk -F= '/^HASHIDS_SALT=/{sub(/^[^=]*=/,""); print; exit}' "${ptero_dir}/.env" 2>/dev/null | tr -d "\"'\r" || true)"
     if [ -z "${existing_salt}" ]; then
@@ -800,7 +812,7 @@ heal_pterodactyl_host_nginx() {
   fi
 
   # Remove ANY host nginx vhost other than pterodactyl.conf so nothing steals ports 80/443 from sparrowx-nginx
-  find /etc/nginx/sites-enabled -maxdepth 1 -type l -o -type f 2>/dev/null | grep -v '/pterodactyl\.conf$' | xargs -r rm -f 2>/dev/null || true
+  find /etc/nginx/sites-enabled -maxdepth 1 \( -type l -o -type f \) 2>/dev/null | grep -v '/pterodactyl\.conf$' | xargs -r rm -f 2>/dev/null || true
   find /etc/nginx/conf.d -maxdepth 1 -name '*.conf' 2>/dev/null | grep -v '/pterodactyl\.conf$' | xargs -r rm -f 2>/dev/null || true
   rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/pterodactyl.conf 2>/dev/null || true
   if [ -f /etc/nginx/sites-available/pterodactyl.conf ]; then
@@ -1330,7 +1342,8 @@ if command -v docker >/dev/null 2>&1; then
   fi
   if docker info >/dev/null 2>&1; then
     HAS_DOCKER="true"
-    docker network prune -f >/dev/null 2>&1 || true
+    # Never prune pterodactyl_nw used by Wings; only clean legacy default compose network if unused
+    docker network rm sparrowx_default >/dev/null 2>&1 || true
     log_ok "Docker engine healthy ($(docker version --format '{{.Server.Version}}' 2>/dev/null || echo ready))"
   else
     log_err "Docker daemon unavailable; will fall back to native runtime healing"
@@ -1400,6 +1413,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
       log_fix "Stopped & secured host daemon against port conflicts: ${host_svc}"
     fi
   done
+  pkill -9 -f "ovh/node-server\.mjs" >/dev/null 2>&1 || true
   for pg_unit in $(systemctl list-units --type=service --all --no-legend 'postgresql@*' 2>/dev/null | awk '{print $1}' || true); do
     if systemctl is-active --quiet "${pg_unit}" 2>/dev/null || systemctl is-enabled --quiet "${pg_unit}" 2>/dev/null; then
       systemctl stop "${pg_unit}" >/dev/null 2>&1 || true
@@ -1859,7 +1873,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     docker rm -f "${PG_CTR}" "${PGRST_CTR}" "${APP_CTR}" "${EDGE_CTR}" sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
     [ -n "${PGB_CTR}" ] && docker rm -f "${PGB_CTR}" >/dev/null 2>&1 || true
     [ -n "${REDIS_CTR}" ] && docker rm -f "${REDIS_CTR}" >/dev/null 2>&1 || true
-    docker network prune -f >/dev/null 2>&1 || true
+    docker network rm sparrowx_default >/dev/null 2>&1 || true
     free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
     free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
     free_docker_port_conflicts "${PG_HOST_PORT}" "${PG_CTR}"
@@ -1968,6 +1982,9 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   # Ensure Let's Encrypt SSL certificates via port 80 (webroot + standalone fallback for game.<domain>)
   if is_pterodactyl_installed; then
     ensure_game_letsencrypt_ssl
+  fi
+  if systemctl list-unit-files wings.service >/dev/null 2>&1 && [ -f /etc/pterodactyl/config.yml ] && ! systemctl is-active --quiet wings 2>/dev/null; then
+    systemctl start wings >/dev/null 2>&1 || true
   fi
   if [ -x "${INSTALL_DIR}/deploy/ssl-renew.sh" ]; then
     bash "${INSTALL_DIR}/deploy/ssl-renew.sh" >/dev/null 2>&1 || true
