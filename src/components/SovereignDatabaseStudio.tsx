@@ -2105,13 +2105,13 @@ export function SovereignDatabaseStudio({
         <header className="border-b border-white/10 bg-[#05060A]/90 sticky top-0 z-40 backdrop-blur-md">
           <div className="max-w-7xl mx-auto h-14 px-4 sm:px-6 flex items-center justify-between gap-4">
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="size-8 rounded-lg overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0 drop-shadow-[0_4px_12px_rgba(163,230,53,0.3)]">
-                <img
-                  src="/logos/sparrowx-db.jpg"
-                  alt="SparrowX DB"
-                  className="size-full object-cover scale-110"
-                />
-              </div>
+              <img
+                src="/sparrowx-logo.png"
+                alt="SparrowX DB"
+                width={34}
+                height={34}
+                className="size-8.5 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]"
+              />
               <span className="font-bold text-sm tracking-tight text-white">SparrowX</span>
               <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[10px] font-mono font-semibold text-[#A3E635]">
                 DB
@@ -3341,7 +3341,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             className="flex items-center gap-1.5 hover:opacity-85 transition-opacity cursor-pointer shrink-0"
             title="SparrowX Cloud DB Landing"
           >
-            <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={28} height={28} className="size-7 rounded-md object-cover shrink-0 border border-[#A3E635]/30" />
+            <img src="/sparrowx-logo.png" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={30} height={30} className="size-7.5 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(255,255,255,0.2)]" />
           </button>
 
           <span className="text-zinc-600 font-light hidden sm:inline">/</span>

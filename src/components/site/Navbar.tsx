@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { LayoutDashboard } from "lucide-react";
-import logo from "@/assets/logo-game.png";
 import { Button } from "@/components/ui/button";
 import { getSessionSummary } from "@/lib/portal.functions";
 import type { ServiceId } from "@/lib/services";
@@ -13,7 +12,7 @@ export const LOGIN_HREF = "/api/public/auth/discord/login";
 export function Brand() {
   return (
     <span className="flex items-center gap-2.5">
-      <img src={logo} alt="SparrowX logo" width={36} height={36} className="size-9 object-contain" />
+      <img src="/sparrowx-logo.png" alt="SparrowX logo" width={36} height={36} className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]" />
       <span className="leading-none">
         <span className="block font-display text-sm font-bold tracking-[0.18em]">SPARROWX</span>
         <span className="block text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">

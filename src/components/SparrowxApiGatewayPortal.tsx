@@ -316,9 +316,11 @@ print(response.json())`;
           <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img
-                src="/sparrowx-api-logo.svg"
+                src="/sparrowx-logo.png"
                 alt="SparrowX Private Database API"
-                className="size-9 object-contain shrink-0"
+                width={36}
+                height={36}
+                className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]"
               />
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-sm sm:text-base tracking-tight text-white font-mono">
@@ -463,9 +465,11 @@ print(response.json())`;
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <img
-              src="/sparrowx-api-logo.svg"
+              src="/sparrowx-logo.png"
               alt="SparrowX API Gateway"
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(129,140,248,0.3)]"
+              width={36}
+              height={36}
+              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]"
             />
             <div>
               <div className="flex items-center gap-2">

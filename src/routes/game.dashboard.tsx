@@ -2,7 +2,6 @@ import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-ro
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Coins, FlaskConical, Loader2, LogOut, Plus } from "lucide-react";
-import logo from "@/assets/logo-game.png";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
@@ -34,8 +33,8 @@ export const Route = createFileRoute("/game/dashboard")({
       { name: "robots", content: "noindex" },
     ],
     links: [
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "icon", href: "/logos/sparrowx-main.png", type: "image/png" },
+      { rel: "shortcut icon", href: "/logos/sparrowx-main.png" },
     ],
   }),
   pendingComponent: () => (
@@ -69,7 +68,7 @@ function GameDashboard() {
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3">
           <Link to="/game" search={{ service: undefined }} className="flex items-center gap-2.5">
-            <img src={logo} alt="SparrowX logo" width={32} height={32} className="size-8 object-contain" />
+            <img src="/sparrowx-logo.png" alt="SparrowX logo" width={34} height={34} className="size-8.5 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]" />
             <span className="hidden font-display text-sm font-bold tracking-[0.18em] sm:block">SPARROWX</span>
             <span className="rounded-md bg-primary/20 px-2 py-0.5 font-mono text-[10px] text-sheen">CLIENT</span>
           </Link>
