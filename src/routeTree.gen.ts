@@ -20,7 +20,10 @@ import { Route as FIndexRouteImport } from './routes/f.index'
 import { Route as FIdRouteImport } from './routes/f.$id'
 import { Route as GameIndexRouteImport } from './routes/game.index'
 import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
+import { Route as ApiDbHealthRouteImport } from './routes/api/db/health'
+import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
+import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
 import { Route as ApiPublicAuthDiscordCallbackRouteImport } from './routes/api/public/auth/discord/callback'
@@ -81,9 +84,24 @@ const GameDashboardRoute = GameDashboardRouteImport.update({
   path: '/game/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDbHealthRoute = ApiDbHealthRouteImport.update({
+  id: '/api/db/health',
+  path: '/api/db/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDbLifecycleRoute = ApiDbLifecycleRouteImport.update({
+  id: '/api/db/lifecycle',
+  path: '/api/db/lifecycle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDbProvisionRoute = ApiDbProvisionRouteImport.update({
   id: '/api/db/provision',
   path: '/api/db/provision',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDbQueryRoute = ApiDbQueryRouteImport.update({
+  id: '/api/db/query',
+  path: '/api/db/query',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDbSummaryRoute = ApiDbSummaryRouteImport.update({
@@ -122,7 +140,10 @@ export interface FileRoutesByFullPath {
   '/game/dashboard': typeof GameDashboardRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/api/db/health': typeof ApiDbHealthRoute
+  '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
+  '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
@@ -140,7 +161,10 @@ export interface FileRoutesByTo {
   '/game/dashboard': typeof GameDashboardRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
+  '/api/db/health': typeof ApiDbHealthRoute
+  '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
+  '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
@@ -159,7 +183,10 @@ export interface FileRoutesById {
   '/game/dashboard': typeof GameDashboardRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/api/db/health': typeof ApiDbHealthRoute
+  '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
+  '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
@@ -179,7 +206,10 @@ export interface FileRouteTypes {
     | '/game/dashboard'
     | '/f/'
     | '/game/'
+    | '/api/db/health'
+    | '/api/db/lifecycle'
     | '/api/db/provision'
+    | '/api/db/query'
     | '/api/db/summary'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
@@ -197,7 +227,10 @@ export interface FileRouteTypes {
     | '/game/dashboard'
     | '/f'
     | '/game'
+    | '/api/db/health'
+    | '/api/db/lifecycle'
     | '/api/db/provision'
+    | '/api/db/query'
     | '/api/db/summary'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
@@ -215,7 +248,10 @@ export interface FileRouteTypes {
     | '/game/dashboard'
     | '/f/'
     | '/game/'
+    | '/api/db/health'
+    | '/api/db/lifecycle'
     | '/api/db/provision'
+    | '/api/db/query'
     | '/api/db/summary'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
@@ -234,7 +270,10 @@ export interface RootRouteChildren {
   GameDashboardRoute: typeof GameDashboardRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
+  ApiDbHealthRoute: typeof ApiDbHealthRoute
+  ApiDbLifecycleRoute: typeof ApiDbLifecycleRoute
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
+  ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicAuthDiscordCallbackRoute: typeof ApiPublicAuthDiscordCallbackRoute
@@ -320,11 +359,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/db/health': {
+      id: '/api/db/health'
+      path: '/api/db/health'
+      fullPath: '/api/db/health'
+      preLoaderRoute: typeof ApiDbHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/db/lifecycle': {
+      id: '/api/db/lifecycle'
+      path: '/api/db/lifecycle'
+      fullPath: '/api/db/lifecycle'
+      preLoaderRoute: typeof ApiDbLifecycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/db/provision': {
       id: '/api/db/provision'
       path: '/api/db/provision'
       fullPath: '/api/db/provision'
       preLoaderRoute: typeof ApiDbProvisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/db/query': {
+      id: '/api/db/query'
+      path: '/api/db/query'
+      fullPath: '/api/db/query'
+      preLoaderRoute: typeof ApiDbQueryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/db/summary': {
@@ -370,7 +430,10 @@ const rootRouteChildren: RootRouteChildren = {
   GameDashboardRoute: GameDashboardRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
+  ApiDbHealthRoute: ApiDbHealthRoute,
+  ApiDbLifecycleRoute: ApiDbLifecycleRoute,
   ApiDbProvisionRoute: ApiDbProvisionRoute,
+  ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicAuthDiscordCallbackRoute: ApiPublicAuthDiscordCallbackRoute,

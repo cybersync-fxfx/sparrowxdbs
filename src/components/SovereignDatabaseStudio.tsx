@@ -1230,6 +1230,8 @@ export function SovereignDatabaseStudio({
   const [newUserTenantId, setNewUserTenantId] = useState<string>("");
   const [creatingAccount, setCreatingAccount] = useState<boolean>(false);
   const [provisioningDb, setProvisioningDb] = useState<boolean>(false);
+  const [selectedDbPlanId, setSelectedDbPlanId] = useState<string>("db-free");
+  const [creatingSnapshot, setCreatingSnapshot] = useState<boolean>(false);
   const [provisionedDb, setProvisionedDb] = useState<{
     dbName: string;
     dbUser: string;
@@ -1237,6 +1239,10 @@ export function SovereignDatabaseStudio({
     dbHost: string;
     dbPort: number;
     connectionString: string;
+    planId?: string;
+    planName?: string;
+    storageLimitMb?: number;
+    maxConnections?: number;
   } | null>(null);
 
   const provisionIsolatedPgDatabase = async (payload: {
@@ -1244,13 +1250,14 @@ export function SovereignDatabaseStudio({
     userId: string;
     email: string;
     projectName?: string;
+    planId?: string;
   }) => {
     setProvisioningDb(true);
     try {
       const res = await fetch("/api/db/provision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, planId: payload.planId || selectedDbPlanId }),
       });
       if (!res.ok) return null;
       const data = (await res.json()) as {
@@ -1262,6 +1269,10 @@ export function SovereignDatabaseStudio({
           dbHost: string;
           dbPort: number;
           connectionString: string;
+          planId?: string;
+          planName?: string;
+          storageLimitMb?: number;
+          maxConnections?: number;
         };
       };
       if (data.ok && data.database) {
@@ -4933,35 +4944,87 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           Dedicated Isolated PostgreSQL Database (Per-User Instance)
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        disabled={provisioningDb}
-                        onClick={async () => {
-                          const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
-                          const res = await provisionIsolatedPgDatabase({
-                            tenantId: tid,
-                            userId: sessionUser.id,
-                            email: sessionUser.email,
-                            projectName: sessionUser.fullName,
-                          });
-                          setStatusBanner({
-                            type: res ? "success" : "error",
-                            message: res
-                              ? `Provisioned dedicated PostgreSQL database ${res.dbName} (role: ${res.dbUser}).`
-                              : "Unable to reach PostgreSQL provisioner (/api/db/provision).",
-                          });
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-[11px] font-mono cursor-pointer disabled:opacity-50"
-                      >
-                        <RefreshCw className={`size-3 ${provisioningDb ? "animate-spin" : ""}`} />
-                        <span>
-                          {provisioningDb
-                            ? "Provisioning..."
-                            : provisionedDb
-                              ? "Rotate DB Password"
-                              : "Provision Dedicated DB"}
-                        </span>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label="Database Plan Tier"
+                          value={selectedDbPlanId}
+                          onChange={(e) => setSelectedDbPlanId(e.target.value)}
+                          className="rounded bg-[#101013] border border-[#2E2E34] px-2 py-1 text-[11px] font-mono text-zinc-200 focus:border-[#A3E635] focus:outline-none"
+                        >
+                          <option value="db-free">Sandbox (₹0 • 500MB • 10 conns)</option>
+                          <option value="db-starter">Starter (₹399/mo • 10GB • 35 conns)</option>
+                          <option value="db-pro">Pro Vector (₹1,199/mo • 50GB • 100 conns)</option>
+                          <option value="db-enterprise">Enterprise (₹3,999/mo • 250GB • 300 conns)</option>
+                        </select>
+                        {provisionedDb && (
+                          <button
+                            type="button"
+                            disabled={creatingSnapshot}
+                            onClick={async () => {
+                              setCreatingSnapshot(true);
+                              try {
+                                const res = await fetch("/api/db/lifecycle", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    action: "backup",
+                                    dbName: provisionedDb.dbName,
+                                    email: sessionUser.email,
+                                    label: "Manual Studio Snapshot",
+                                  }),
+                                });
+                                const data = await res.json();
+                                setStatusBanner({
+                                  type: data.ok ? "success" : "error",
+                                  message: data.ok
+                                    ? `Snapshot ${data.snapshot.id} created (${data.snapshot.sizePretty}, ${data.snapshot.tableCount} tables).`
+                                    : data.error || "Snapshot failed.",
+                                });
+                              } catch {
+                                setStatusBanner({
+                                  type: "error",
+                                  message: "Unable to reach snapshot lifecycle API (/api/db/lifecycle).",
+                                });
+                              } finally {
+                                setCreatingSnapshot(false);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#18181D] border border-[#2E2E34] hover:border-[#A3E635] text-zinc-200 font-bold text-[11px] font-mono cursor-pointer disabled:opacity-50"
+                          >
+                            <span>{creatingSnapshot ? "Snapshotting..." : "Snapshot"}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={provisioningDb}
+                          onClick={async () => {
+                            const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+                            const res = await provisionIsolatedPgDatabase({
+                              tenantId: tid,
+                              userId: sessionUser.id,
+                              email: sessionUser.email,
+                              projectName: sessionUser.fullName,
+                              planId: selectedDbPlanId,
+                            });
+                            setStatusBanner({
+                              type: res ? "success" : "error",
+                              message: res
+                                ? `Provisioned dedicated PostgreSQL database ${res.dbName} (${res.planName || selectedDbPlanId}, role: ${res.dbUser}).`
+                                : "Unable to reach PostgreSQL provisioner (/api/db/provision).",
+                            });
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-[11px] font-mono cursor-pointer disabled:opacity-50"
+                        >
+                          <RefreshCw className={`size-3 ${provisioningDb ? "animate-spin" : ""}`} />
+                          <span>
+                            {provisioningDb
+                              ? "Provisioning..."
+                              : provisionedDb
+                                ? "Rotate DB Password"
+                                : "Provision Dedicated DB"}
+                          </span>
+                        </button>
+                      </div>
                     </div>
 
                     {provisionedDb ? (
