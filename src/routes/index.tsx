@@ -195,6 +195,12 @@ export const Route = createFileRoute("/")({
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon.ico", sizes: "any" },
+      { rel: "shortcut icon", href: "/favicon.ico" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+    ],
   }),
   component: Dashboard,
 });
@@ -1673,6 +1679,16 @@ function Dashboard() {
       window.location.hostname.startsWith("sec.") ||
       new URLSearchParams(window.location.search).get("shield") === "1" ||
       new URLSearchParams(window.location.search).get("sec") === "1");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const h = window.location.hostname.toLowerCase();
+    if (h.startsWith("game.dash.") || h.startsWith("game-dash.")) {
+      window.location.replace(`/game/dashboard${window.location.search}`);
+    } else if (!h.startsWith("game.panel.") && (h.startsWith("game.") || h.startsWith("game-"))) {
+      window.location.replace(`/game${window.location.search}`);
+    }
+  }, []);
 
   if (!showAuthLogin) {
     // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio

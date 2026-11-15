@@ -454,6 +454,24 @@ const server = createServer(async (req, res) => {
 
     const isApiHost = host.startsWith("api.") || host.startsWith("api-");
     const isRestPath = pathname.startsWith("/rest/v1");
+    const isGameDashHost = host.startsWith("game.dash.") || host.startsWith("game-dash.");
+    const isGameWebHost =
+      !isGameDashHost &&
+      !host.startsWith("game.panel.") &&
+      (host.startsWith("game.") || host.startsWith("game-"));
+
+    if (isGameDashHost && pathname === "/") {
+      const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
+      res.writeHead(302, { Location: `/game/dashboard${qs}`, ...SECURITY_HEADERS });
+      res.end();
+      return;
+    }
+    if (isGameWebHost && pathname === "/") {
+      const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
+      res.writeHead(302, { Location: `/game${qs}`, ...SECURITY_HEADERS });
+      res.end();
+      return;
+    }
 
     // Unified SSR / TanStack Start renderer
     const handleViaAppEngine = async () => {
