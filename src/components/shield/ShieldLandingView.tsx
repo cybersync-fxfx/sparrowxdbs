@@ -247,20 +247,22 @@ export function ShieldLandingView({
               </div>
             </div>
 
-            {/* Interactive Live Perimeter Audit Card + 3D Floating Shield */}
-            <div className="space-y-4 min-w-0 w-full">
-              <Floating3DVisual
-                src="/3d/shield-waf-fortress.svg"
-                alt="3D floating obsidian cyber defense shield deflecting crimson DDoS attack packets"
-                accent="crimson"
-                size="md"
-                priority="lcp"
-                showMotionControl={true}
-                caption="Autonomous Edge WAF & XDP Deflection"
-                className="border border-[#F9103A]/20 bg-[#090C14]"
-                width={480}
-                height={480}
-              />
+            {/* Interactive Live Perimeter Audit Card + subtle floating 3D side accent */}
+            <div className="relative space-y-4 min-w-0 w-full">
+              <div
+                aria-hidden="true"
+                className="hidden xl:block pointer-events-none absolute -top-24 -right-12 w-40 opacity-85"
+              >
+                <Floating3DVisual
+                  src="/3d/shield-waf-fortress.svg"
+                  alt=""
+                  accent="crimson"
+                  size="sm"
+                  priority="lazy"
+                  width={200}
+                  height={200}
+                />
+              </div>
 
             <div
               id="shield-scanner"

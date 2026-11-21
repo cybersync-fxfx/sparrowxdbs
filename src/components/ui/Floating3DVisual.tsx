@@ -37,6 +37,7 @@ export interface Floating3DVisualProps {
   alt: string;
   accent?: AccentTone;
   size?: "sm" | "md" | "lg" | "hero";
+  variant?: "ambient" | "stage";
   priority?: "lcp" | "lazy" | "standard";
   caption?: string;
   showMotionControl?: boolean;
@@ -46,16 +47,16 @@ export interface Floating3DVisualProps {
 }
 
 /**
- * Interactive 3D floating studio stage for SparrowX hardware & cloud renders.
+ * Interactive 3D floating object stage for SparrowX hardware & cloud renders.
  * - Uses compositor-only transform/opacity animations gated inside `@media (prefers-reduced-motion: no-preference)`.
- * - Supports pointer-driven 3D perspective tilt without layout thrashing.
- * - Offers a WCAG 2.2.2 Play/Pause motion control for persistent hero animations.
+ * - Defaults to borderless, background-free `ambient` mode so 3D objects float cleanly on the side without dark boxes.
  */
 export function Floating3DVisual({
   src,
   alt,
   accent = "cyan",
   size = "md",
+  variant = "ambient",
   priority = "lazy",
   className = "",
   width = 512,
@@ -110,7 +111,9 @@ export function Floating3DVisual({
       data-tilted={tilted ? "true" : "false"}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
-      className={`spx-3d-stage relative select-none overflow-hidden rounded-xl ${sizeClass} ${className}`}
+      className={`spx-3d-stage relative select-none ${
+        variant === "stage" ? "overflow-hidden rounded-xl" : "overflow-visible bg-transparent"
+      } ${sizeClass} ${className}`}
       style={
         {
           "--spx-accent-glow": ACCENT_GLOW[accent],
@@ -118,20 +121,23 @@ export function Floating3DVisual({
         } as React.CSSProperties
       }
     >
-      {/* Soft radial studio depth glow */}
+      {/* Subtle radial halo behind floating 3D object */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at 50% 50%, var(--spx-accent-glow), transparent 70%)",
+            variant === "stage"
+              ? "radial-gradient(circle at 50% 50%, var(--spx-accent-glow), transparent 70%)"
+              : "radial-gradient(circle at 50% 50%, var(--spx-accent-glow), transparent 62%)",
+          opacity: variant === "stage" ? 1 : 0.65,
         }}
       />
 
-      {/* Soft ambient levitation floor glow */}
+      {/* Soft ambient levitation shadow under floating object */}
       <div
         aria-hidden="true"
-        className="spx-3d-orbit pointer-events-none absolute left-1/2 bottom-2 -translate-x-1/2 w-[56%] h-6 rounded-full blur-md"
+        className="spx-3d-orbit pointer-events-none absolute left-1/2 bottom-1 -translate-x-1/2 w-[50%] h-5 rounded-full blur-md"
         style={{
           background:
             "radial-gradient(ellipse at center, var(--spx-accent-ring) 0%, transparent 72%)",

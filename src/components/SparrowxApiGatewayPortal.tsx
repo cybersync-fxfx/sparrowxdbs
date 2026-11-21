@@ -34,6 +34,7 @@ import {
   clearSessionToken,
 } from "@/lib/advanced-features";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 
 const API_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -205,6 +206,11 @@ export function SparrowxApiGatewayPortal() {
           role: "client",
           tenantId: safeUser.tenantId,
         });
+        requestGlobalEmailVerification({
+          email: safeUser.email,
+          fullName: safeUser.fullName,
+          serviceName: "SparrowX PostgREST API",
+        });
         setSessionUser(safeUser);
       }
     } catch (err) {
@@ -348,24 +354,23 @@ print(response.json())`;
           </div>
         </header>
 
-        <main className="flex-1 flex items-center justify-center px-4 py-12">
-          <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-6 space-y-4">
-              <Floating3DVisual
-                src="/3d/api-gateway-nexus.svg"
-                alt="3D floating emerald optical API gateway router prism connecting relay nodes"
-                accent="emerald"
-                size="lg"
-                priority="lcp"
-                showMotionControl={true}
-                caption="api.sparrowx.net — Sovereign PostgREST Mesh"
-                className="border border-emerald-500/20 bg-[#0B0E14]"
-                width={512}
-                height={512}
-              />
-            </div>
+        <main className="relative flex-1 flex items-center justify-center px-4 py-12 overflow-hidden">
+          <div
+            aria-hidden="true"
+            className="hidden lg:block pointer-events-none absolute right-12 top-1/2 -translate-y-1/2 w-52 opacity-85"
+          >
+            <Floating3DVisual
+              src="/3d/api-gateway-nexus.svg"
+              alt=""
+              accent="emerald"
+              size="md"
+              priority="lazy"
+              width={260}
+              height={260}
+            />
+          </div>
 
-          <div className="lg:col-span-6 w-full max-w-md mx-auto border border-white/[0.1] bg-[#0E1015] rounded-lg p-6 sm:p-8 space-y-6 shadow-2xl">
+          <div className="relative z-10 w-full max-w-md border border-white/[0.1] bg-[#0E1015] rounded-lg p-6 sm:p-8 space-y-6 shadow-2xl">
             <div className="space-y-2 text-center">
               <div className="mx-auto size-11 rounded-lg bg-emerald-500/10 border border-emerald-500/30 grid place-items-center text-emerald-400">
                 <Lock className="size-5" />
@@ -497,7 +502,6 @@ print(response.json())`;
                 Manage in DB Studio →
               </a>
             </div>
-          </div>
           </div>
         </main>
       </div>

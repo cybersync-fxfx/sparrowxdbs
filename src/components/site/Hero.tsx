@@ -70,19 +70,21 @@ export function Hero({ service, onService }: { service: Service; onService: (s: 
           </div>
         </div>
 
-        <div className="flex flex-col items-center lg:items-end gap-5" style={{ perspective: 1200 }}>
-          <Floating3DVisual
-            src="/3d/game-server-node.svg"
-            alt={`3D floating high-frequency ${service.name} Ryzen NVMe game server blade`}
-            accent="orange"
-            size="md"
-            priority="lcp"
-            showMotionControl={true}
-            caption={`${service.name} · High-Frequency NVMe Node`}
-            className="w-full max-w-[380px] border border-white/12 bg-[#07090F]/80 backdrop-blur-md"
-            width={480}
-            height={480}
-          />
+        <div className="relative flex justify-center lg:justify-end" style={{ perspective: 1200 }}>
+          <div
+            aria-hidden="true"
+            className="hidden xl:block pointer-events-none absolute -top-24 -right-8 w-44 opacity-90"
+          >
+            <Floating3DVisual
+              src="/3d/game-server-node.svg"
+              alt=""
+              accent="orange"
+              size="sm"
+              priority="lazy"
+              width={220}
+              height={220}
+            />
+          </div>
           <TelemetryCard service={service} />
         </div>
       </div>

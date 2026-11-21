@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportSparrowxError } from "../lib/sparrowx-error-reporting";
 import { useServiceFavicon } from "../lib/service-favicon";
 import { clearSessionToken } from "../lib/advanced-features";
+import { GlobalEmailVerificationHost } from "../components/EmailVerificationModal";
 
 function NotFoundComponent() {
   return (
@@ -297,14 +298,60 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function useGlobalScrollReveal() {
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof IntersectionObserver === "undefined") return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const observed = new WeakSet<Element>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            entry.target.setAttribute("data-spx-reveal", "visible");
+            io.unobserve(entry.target);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -6% 0px", threshold: 0.06 },
+    );
+
+    const scan = () => {
+      const vh = window.innerHeight || 900;
+      const nodes = document.querySelectorAll("main section, section[id], article");
+      nodes.forEach((el) => {
+        if (observed.has(el)) return;
+        observed.add(el);
+        const rect = el.getBoundingClientRect();
+        // Keep above-the-fold sections visible immediately; animate below-the-fold sections on scroll
+        if (rect.top > vh * 0.92) {
+          el.setAttribute("data-spx-reveal", "pending");
+          io.observe(el);
+        }
+      });
+    };
+
+    scan();
+    const mo = new MutationObserver(() => scan());
+    mo.observe(document.body, { childList: true, subtree: true });
+
+    return () => {
+      mo.disconnect();
+      io.disconnect();
+    };
+  }, []);
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useServiceFavicon();
+  useGlobalScrollReveal();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <GlobalEmailVerificationHost />
     </QueryClientProvider>
   );
 }

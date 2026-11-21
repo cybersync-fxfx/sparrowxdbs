@@ -41,6 +41,7 @@ import {
   User,
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import {
   authenticateAppUserFromBackend,
   fetchAppUserByEmailFromBackend,
@@ -1425,6 +1426,11 @@ export function SparrowxDropEngine() {
                               role: "client",
                               tenantId: newUser.tenantId,
                             });
+                            requestGlobalEmailVerification({
+                              email: newUser.email,
+                              fullName: newUser.fullName,
+                              serviceName: "SparrowX Drop Vault",
+                            });
                             localStorage.setItem("sparrowx_vault_session", newUser.email);
                             setVaultUser({ ...newUser, password: "" });
                             setIsVaultAuthenticated(true);
@@ -1686,19 +1692,19 @@ export function SparrowxDropEngine() {
                   </button>
                 </div>
             {/* Header intro */}
-            <div className="text-center space-y-3 max-w-2xl mx-auto">
-              <div className="max-w-md mx-auto pb-2">
+            <div className="relative text-center space-y-3 max-w-2xl mx-auto">
+              <div
+                aria-hidden="true"
+                className="hidden lg:block pointer-events-none absolute -right-44 -top-6 w-36 opacity-90"
+              >
                 <Floating3DVisual
                   src="/3d/drop-encrypted-vault.svg"
-                  alt="3D floating encrypted NVMe file vault cube with luminous violet core"
+                  alt=""
                   accent="violet"
-                  size="md"
-                  priority="lcp"
-                  showMotionControl={true}
-                  caption="Sovereign NVMe Encrypted Vault"
-                  className="border border-purple-500/20 bg-[#080912]"
-                  width={440}
-                  height={440}
+                  size="sm"
+                  priority="lazy"
+                  width={200}
+                  height={200}
                 />
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-400">
@@ -1936,19 +1942,19 @@ export function SparrowxDropEngine() {
         {/* ================================================================= */}
         {activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
-            <div className="text-center space-y-3.5 max-w-2xl mx-auto">
-              <div className="max-w-md mx-auto pb-2">
+            <div className="relative text-center space-y-3.5 max-w-2xl mx-auto">
+              <div
+                aria-hidden="true"
+                className="hidden lg:block pointer-events-none absolute -right-44 -top-6 w-36 opacity-90"
+              >
                 <Floating3DVisual
                   src="/3d/drop-encrypted-vault.svg"
-                  alt="3D floating encrypted AES-256-GCM memory vault cube with glowing violet data shards"
+                  alt=""
                   accent="violet"
-                  size="md"
-                  priority="lcp"
-                  showMotionControl={true}
-                  caption="Zero-Disk AES-256-GCM RAM Vault"
-                  className="border border-purple-500/20 bg-[#080912]"
-                  width={440}
-                  height={440}
+                  size="sm"
+                  priority="lazy"
+                  width={200}
+                  height={200}
                 />
               </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-300">

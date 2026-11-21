@@ -708,6 +708,28 @@ html { scroll-behavior: smooth; }
 }
 
 /* ============================================================================
+   SPARROWX GLOBAL SCROLL-DRIVEN REVEAL ANIMATIONS (Compositor-Only)
+   ============================================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  [data-spx-reveal="pending"] {
+    opacity: 0;
+    transform: translate3d(0, 26px, 0) scale(0.985);
+    transition:
+      opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+
+  [data-spx-reveal="visible"] {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    transition:
+      opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* ============================================================================
    SPARROWX NATIVE <dialog> MODAL SCROLL CONTAINMENT (Modern Web Guidance)
    ============================================================================ */
 dialog.spx-native-dialog:modal {

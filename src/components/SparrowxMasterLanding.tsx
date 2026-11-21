@@ -62,7 +62,6 @@ import {
   type DeveloperDbConnectionInfo,
 } from "@/lib/developer-connection";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
-import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 interface SparrowxMasterLandingProps {
@@ -977,16 +976,16 @@ export function SparrowxMasterLanding({
                   setMobileMenuOpen(false);
                   handleLaunch("infra", "https://infra.sparrowx.net", "infra");
                 }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-sky-400/25 hover:border-sky-400/60 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-sky-500/15 border border-sky-500/35 grid place-items-center text-sky-400 shrink-0">
+                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-sky-400 shrink-0">
                   <Cpu className="size-4" aria-hidden="true" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud Infra</div>
                   <div className="text-[10px] text-zinc-400 truncate">Bare Metal, Dedicated Servers &amp; KVM VPS</div>
                 </div>
-                <span className="text-[10px] font-mono text-sky-300 shrink-0">infra.sparrowx.net</span>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">infra.sparrowx.net</span>
               </button>
 
               <button
@@ -1239,23 +1238,20 @@ export function SparrowxMasterLanding({
             </div>
           </div>
 
-          {/* Right Column: Interactive 3D Floating Server Hardware & Highlights */}
-          <div id="status" className="scroll-mt-24 lg:col-span-5 border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-xl p-5 space-y-4 shadow-2xl">
-            <Floating3DVisual
-              src="/3d/cloud-infra-server.jpg"
-              alt="3D floating SparrowX bare-metal server rack cluster with illuminated fiber uplinks"
-              accent="cyan"
-              size="md"
-              priority="lcp"
-              showMotionControl={true}
-              caption="Sovereign Bare-Metal & Cloud Mesh"
-              className="bg-[#05060A] border border-white/10"
-              width={512}
-              height={512}
-            />
+          {/* Right Column: Why Developers Love Us Card */}
+          <div id="status" className="scroll-mt-24 lg:col-span-5 border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-white/15 pb-3">
+              <span className="text-xs font-mono text-white font-bold uppercase tracking-wider">
+                Why Builders Choose SparrowX
+              </span>
+              <span className="text-white text-[10px] font-mono flex items-center gap-1">
+                <span className="size-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
+                ONLINE &amp; ACTIVE
+              </span>
+            </div>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="p-3 rounded-lg bg-[#05060A] border border-white/15 space-y-1">
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
                   <Zap className="size-3.5 text-white" aria-hidden="true" />
                   <span>Zero Forced Sign-Ups</span>
@@ -1265,13 +1261,23 @@ export function SparrowxMasterLanding({
                 </p>
               </div>
 
-              <div className="p-3 rounded-lg bg-[#05060A] border border-white/15 space-y-1">
+              <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
                   <Shield className="size-3.5 text-white" aria-hidden="true" />
-                  <span>DDoS Mitigation &amp; Bare-Metal Speed</span>
+                  <span>DDoS Mitigation &amp; Origin Protection</span>
                 </div>
                 <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  Rent dedicated silicon at infra.sparrowx.net or proxy your origin IP behind our XDP/eBPF shield with zero surprise egress bills.
+                  Proxy your origin server IP behind our reverse proxy to filter DDoS floods and inspect traffic in real time.
+                </p>
+              </div>
+
+              <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
+                <div className="font-bold text-white flex items-center gap-2">
+                  <Heart className="size-3.5 text-white" aria-hidden="true" />
+                  <span>Real Human Support</span>
+                </div>
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
+                  We are a small startup. When you reach out to us, you talk directly to the engineers building the product.
                 </p>
               </div>
             </div>
@@ -1295,16 +1301,14 @@ export function SparrowxMasterLanding({
           {/* 1. SparrowX Cloud DB */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/cloud-db-cluster.svg"
-                alt="3D floating PostgreSQL sovereign database core with orbiting vector cubes"
-                accent="lime"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-white/10"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-10 rounded-lg overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0">
+                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL with pgvector AI search" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  POSTGRES + VECTOR
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Cloud DB</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Fast, reliable managed PostgreSQL with built-in connection pooling and pgvector search. No sudden $1,000 bandwidth bills.
@@ -1323,16 +1327,14 @@ export function SparrowxMasterLanding({
           {/* 2. SparrowX Drop */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/drop-encrypted-vault.svg"
-                alt="3D floating encrypted file transfer vault cube with glowing violet data core"
-                accent="violet"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-white/10"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-10 rounded-lg overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0">
+                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted Ephemeral File Vault and Secure Sharing" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  FREE • NO LOGIN
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Drop</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Drop files instantly with zero login (auto-purged from memory for privacy) or unlock your persistent 10GB cloud vault.
@@ -1351,16 +1353,14 @@ export function SparrowxMasterLanding({
           {/* 3. SparrowX Keys */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/keys-crypto-module.jpg"
-                alt="3D floating obsidian and gold hardware security key and entropy prism"
-                accent="amber"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-white/10"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-10 rounded-lg overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0">
+                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — 100% Offline Cryptographic Password Generator" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  FREE • NO LOGIN
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Keys</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 100% offline cryptographic password generator. Press spacebar to regenerate. Runs directly in your browser with zero network calls.
@@ -1379,16 +1379,14 @@ export function SparrowxMasterLanding({
           {/* 4. SparrowX Shield */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/shield-waf-fortress.svg"
-                alt="3D floating obsidian cyber shield deflecting crimson DDoS attack packets"
-                accent="crimson"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-white/10"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-10 rounded-lg overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] shrink-0">
+                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF and Real-Time DDoS Threat Radar" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  EDGE DEFENSE
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Shield</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Shadowshield defense engine with our iconic 2D Dot-Matrix Threat Map. Sub-second DDoS deflection and complete origin IP cloaking.
@@ -1407,16 +1405,14 @@ export function SparrowxMasterLanding({
           {/* 5. SparrowX API Gateway */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/api-gateway-nexus.svg"
-                alt="3D floating emerald optical API gateway router prism with relay nodes"
-                accent="emerald"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-white/10"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
+                  <Terminal className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  REST &amp; SDKs
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX API Gateway</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Instant RESTful API for your database with one-click code generation in cURL, TypeScript, and Python with ultra-fast latency.
@@ -1432,28 +1428,26 @@ export function SparrowxMasterLanding({
             </button>
           </div>
 
-          {/* 6. SparrowX Cloud Infra (Bare Metal, Dedicated & VPS) */}
+          {/* 6. SparrowX Cloud Infra */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-t border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/cloud-infra-server.jpg"
-                alt="3D floating bare-metal server rack cluster with titanium drive bays"
-                accent="cyan"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-sky-400/25"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
+                  <Cpu className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  BARE METAL &amp; VPS
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Cloud Infra</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Single-tenant AMD Ryzen &amp; EPYC bare metal, dedicated servers, and instant NVMe KVM VPS with unmetered fiber in INR and USD.
+                Single-tenant AMD Ryzen &amp; EPYC bare metal, dedicated servers, and fast NVMe KVM VPS. Predictable flat monthly rates in INR and USD.
               </p>
             </div>
             <button
               type="button"
               onClick={() => handleLaunch("infra", "https://infra.sparrowx.net", "infra")}
-              className="w-full py-2 rounded bg-sky-400 hover:bg-sky-300 text-black font-bold text-xs font-mono transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <span>infra.sparrowx.net</span>
               <ArrowUpRight className="size-3" aria-hidden="true" />
@@ -1463,16 +1457,14 @@ export function SparrowxMasterLanding({
           {/* 7. SparrowX Game Hosting */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/game-server-node.svg"
-                alt="3D floating high-frequency Ryzen game server blade chassis"
-                accent="orange"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-white/10"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
+                  <Server className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  DISCORD + PTERO SSO
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Game Hosting</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Low-ping Asia-IN NVMe Gen4 servers for FiveM, SA-MP, Minecraft, and Discord bots with SparrowCoins wallet and 1-click Pterodactyl panel auto-login.
@@ -1491,16 +1483,14 @@ export function SparrowxMasterLanding({
           {/* 8. SparrowX GameSec L4 Defense */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/shield-waf-fortress.svg"
-                alt="3D floating Anycast Layer 4 game DDoS defense fortress"
-                accent="crimson"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-red-500/20"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-red-500/15 border border-red-500/35 grid place-items-center text-red-400">
+                  <Shield className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  L3/L4 ANYCAST
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX GameSec L4</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Dedicated Anycast L3/L4 packet scrubbing and stateful UDP/RakNet/ENet filtering engineered to keep multiplayer game servers online under flood attacks.
@@ -1518,16 +1508,14 @@ export function SparrowxMasterLanding({
           {/* 9. SparrowX NetSec Guard */}
           <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-t border-white/15">
             <div className="space-y-3">
-              <Floating3DVisual
-                src="/3d/vps-kvm-cubes.svg"
-                alt="3D floating Linux WireGuard mesh compute nodes"
-                accent="emerald"
-                size="sm"
-                priority="lazy"
-                className="bg-[#05060A] border border-emerald-500/20"
-                width={320}
-                height={320}
-              />
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400">
+                  <Globe className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  WIREGUARD + XDP
+                </span>
+              </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX NetSec Guard</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
                 Autonomous Linux security agent, WireGuard Guard tunnels, nftables firewall automation, and live IP threat radar connected via Master SSO.
@@ -1618,14 +1606,14 @@ export function SparrowxMasterLanding({
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
             <div className="space-y-1">
+              <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-wider block font-bold">
+                Affordable Cloud Hosting
+              </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-                Bare Metal, Dedicated &amp; High-Speed Cloud VPS
+                Simple, High-Speed Cloud VPS
               </h2>
               <p className="text-xs text-zinc-400">
-                Dedicated performance with fast NVMe storage and zero hidden egress bandwidth fees.{" "}
-                <a href="/infra" className="text-sky-400 hover:underline font-medium">
-                  Explore full bare-metal catalog at infra.sparrowx.net →
-                </a>
+                Dedicated performance with fast NVMe storage and zero hidden egress bandwidth fees.
               </p>
             </div>
 

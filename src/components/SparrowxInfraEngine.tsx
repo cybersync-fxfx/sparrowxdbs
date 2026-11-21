@@ -450,16 +450,14 @@ export function SparrowxInfraEngine() {
               </a>
             </div>
 
-            {/* Wide Interactive 3D Floating Hardware Stage above the fold */}
-            <div className="mt-10 sm:mt-12 mx-auto max-w-4xl rounded-2xl border border-white/12 bg-gradient-to-b from-[#0B0E16]/90 to-[#06080D]/95 p-4 sm:p-6 shadow-[0_30px_90px_rgba(0,0,0,0.8)]">
+            {/* Borderless Floating 3D Bare-Metal Hardware Object */}
+            <div className="mt-8 sm:mt-10 mx-auto max-w-3xl">
               <Floating3DVisual
                 src="/3d/cloud-infra-server.jpg"
                 alt="3D floating SparrowX bare-metal server rack cluster with anodized titanium blades and cyan fiber uplinks"
                 accent="cyan"
                 size="hero"
                 priority="lcp"
-                showMotionControl={true}
-                caption="infra.sparrowx.net — Bare Metal · Dedicated · KVM NVMe"
                 className="w-full"
                 width={768}
                 height={768}
@@ -495,7 +493,6 @@ export function SparrowxInfraEngine() {
                     accent={pillar.accent}
                     size="md"
                     priority="lazy"
-                    className="bg-[#05060A] border border-white/[0.06]"
                     width={420}
                     height={420}
                   />
@@ -899,7 +896,6 @@ export function SparrowxInfraEngine() {
                   accent="cyan"
                   size="lg"
                   priority="lazy"
-                  className="bg-[#05060A] border border-white/[0.06]"
                   width={512}
                   height={512}
                 />

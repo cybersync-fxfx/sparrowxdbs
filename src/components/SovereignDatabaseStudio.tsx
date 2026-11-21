@@ -23,6 +23,7 @@ import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import {
   SiAstro,
   SiNextdotjs,
@@ -2324,18 +2325,18 @@ export function SovereignDatabaseStudio({
                 </span>
               </div>
 
-              <Floating3DVisual
-                src="/3d/cloud-db-cluster.svg"
-                alt="3D floating PostgreSQL 16 sovereign database platters with orbiting pgvector glass cubes"
-                accent="lime"
-                size="md"
-                priority="lcp"
-                showMotionControl={true}
-                caption="PostgreSQL 16 + pgvector Sovereign Cluster"
-                className="border border-[#A3E635]/20 bg-[#06090F]"
-                width={480}
-                height={480}
-              />
+              {/* Subtle floating 3D side accent */}
+              <div className="hidden sm:block pointer-events-none max-w-[220px] pt-2 opacity-90">
+                <Floating3DVisual
+                  src="/3d/cloud-db-cluster.svg"
+                  alt="3D floating PostgreSQL 16 sovereign database platters with orbiting pgvector glass cubes"
+                  accent="lime"
+                  size="sm"
+                  priority="lazy"
+                  width={240}
+                  height={240}
+                />
+              </div>
             </div>
 
             {/* Right: Studio Strict Auth Card */}
@@ -2564,6 +2565,11 @@ export function SovereignDatabaseStudio({
                         fullName: newUser.fullName,
                         role: "client",
                         tenantId,
+                      });
+                      requestGlobalEmailVerification({
+                        email: newUser.email,
+                        fullName: newUser.fullName,
+                        serviceName: "SparrowX Cloud DB",
                       });
 
                       setSessionUser(newUser);
