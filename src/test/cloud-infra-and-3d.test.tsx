@@ -31,20 +31,17 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     expect(annual.cycleMonths).toBe(12);
   });
 
-  it("renders Floating3DVisual with LCP priority and keyboard-accessible Pause/Play toggle", () => {
+  it("renders Floating3DVisual cleanly without caption or pause overlay clutter", () => {
     render(
       <Floating3DVisual
         src="/3d/cloud-infra-server.jpg"
         alt="3D Server Cluster"
         priority="lcp"
-        showMotionControl={true}
       />,
     );
     const img = screen.getByAltText("3D Server Cluster");
     expect(img).toBeTruthy();
-    const pauseBtn = screen.getByRole("button", { name: "Pause 3D animation" });
-    fireEvent.click(pauseBtn);
-    expect(screen.getByRole("button", { name: "Play 3D animation" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Pause 3D animation/i })).toBeNull();
   });
 
   it("renders SparrowxInfraEngine with Bare Metal, Dedicated, and KVM VPS catalog tabs", () => {

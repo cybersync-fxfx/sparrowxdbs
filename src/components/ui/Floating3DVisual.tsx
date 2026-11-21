@@ -1,5 +1,4 @@
 import React, { useCallback, useId, useRef, useState } from "react";
-import { Pause, Play } from "lucide-react";
 
 export type AccentTone =
   | "cyan"
@@ -58,19 +57,16 @@ export function Floating3DVisual({
   accent = "cyan",
   size = "md",
   priority = "lazy",
-  caption,
-  showMotionControl = false,
   className = "",
   width = 512,
   height = 512,
 }: Floating3DVisualProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
-  const [paused, setPaused] = useState(false);
   const [tilted, setTilted] = useState(false);
   const stageId = useId();
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (paused || e.pointerType === "touch") return;
+    if (e.pointerType === "touch") return;
     const node = stageRef.current;
     if (!node) return;
     const rect = node.getBoundingClientRect();
@@ -82,7 +78,7 @@ export function Floating3DVisual({
     node.style.setProperty("--spx-glare-x", `${((nx + 0.5) * 100).toFixed(1)}%`);
     node.style.setProperty("--spx-glare-y", `${((ny + 0.5) * 100).toFixed(1)}%`);
     setTilted(true);
-  }, [paused]);
+  }, []);
 
   const handlePointerLeave = useCallback(() => {
     const node = stageRef.current;
@@ -105,13 +101,12 @@ export function Floating3DVisual({
   const imgLoading = priority === "lazy" ? "lazy" : undefined;
   const isRasterDarkBackdrop = /\.(jpe?g)$/i.test(src);
   const resolvedSrc = src.startsWith("/3d/") && !src.includes("?") ? `${src}?v=2` : src;
-  const hasFooterBar = Boolean(caption || showMotionControl);
 
   return (
     <div
       ref={stageRef}
       id={stageId}
-      data-paused={paused ? "true" : "false"}
+      data-paused="false"
       data-tilted={tilted ? "true" : "false"}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
@@ -133,12 +128,10 @@ export function Floating3DVisual({
         }}
       />
 
-      {/* Soft ambient levitation floor glow (zero hard pill border) */}
+      {/* Soft ambient levitation floor glow */}
       <div
         aria-hidden="true"
-        className={`spx-3d-orbit pointer-events-none absolute left-1/2 -translate-x-1/2 w-[56%] h-6 rounded-full blur-md ${
-          hasFooterBar ? "bottom-7" : "bottom-2"
-        }`}
+        className="spx-3d-orbit pointer-events-none absolute left-1/2 bottom-2 -translate-x-1/2 w-[56%] h-6 rounded-full blur-md"
         style={{
           background:
             "radial-gradient(ellipse at center, var(--spx-accent-ring) 0%, transparent 72%)",
@@ -148,8 +141,8 @@ export function Floating3DVisual({
       {/* 3D Floating & Pointer-Tilting Artwork */}
       <div
         className={`spx-3d-tilt relative z-10 flex size-full items-center justify-center p-2 ${
-          hasFooterBar ? "pb-9" : ""
-        } ${isRasterDarkBackdrop ? "spx-3d-blend" : ""}`}
+          isRasterDarkBackdrop ? "spx-3d-blend" : ""
+        }`}
       >
         <div className="spx-3d-float relative flex size-full items-center justify-center">
           <img
@@ -172,40 +165,6 @@ export function Floating3DVisual({
         aria-hidden="true"
         className="spx-3d-glare pointer-events-none absolute inset-0 z-20"
       />
-
-      {/* Bottom caption + WCAG 2.2.2 Pause / Play control bar (zero overlap on mobile) */}
-      {(caption || showMotionControl) && (
-        <div className="pointer-events-none absolute inset-x-3 bottom-2.5 z-30 flex items-center justify-between gap-2">
-          {caption ? (
-            <span className="min-w-0 truncate text-xs font-medium text-zinc-300/90 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-              {caption}
-            </span>
-          ) : (
-            <span />
-          )}
-
-          {showMotionControl && (
-            <button
-              type="button"
-              onClick={() => setPaused((prev) => !prev)}
-              aria-label={paused ? "Play 3D animation" : "Pause 3D animation"}
-              className="pointer-events-auto shrink-0 inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-[#090B10]/85 px-2.5 py-1 text-xs font-medium text-zinc-300 hover:border-white/35 hover:text-white backdrop-blur-md transition-colors duration-150 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-            >
-              {paused ? (
-                <>
-                  <Play className="size-3" aria-hidden="true" />
-                  <span>Play</span>
-                </>
-              ) : (
-                <>
-                  <Pause className="size-3" aria-hidden="true" />
-                  <span>Pause</span>
-                </>
-              )}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
