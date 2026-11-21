@@ -104,6 +104,7 @@ export function Floating3DVisual({
   const imgFetchPriority = priority === "lcp" ? "high" : undefined;
   const imgLoading = priority === "lazy" ? "lazy" : undefined;
   const isRasterDarkBackdrop = /\.(jpe?g)$/i.test(src);
+  const resolvedSrc = src.startsWith("/3d/") && !src.includes("?") ? `${src}?v=2` : src;
   const hasFooterBar = Boolean(caption || showMotionControl);
 
   return (
@@ -152,7 +153,7 @@ export function Floating3DVisual({
       >
         <div className="spx-3d-float relative flex size-full items-center justify-center">
           <img
-            src={src}
+            src={resolvedSrc}
             alt={alt}
             width={width}
             height={height}
