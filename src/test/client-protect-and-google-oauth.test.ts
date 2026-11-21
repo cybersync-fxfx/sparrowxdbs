@@ -55,4 +55,38 @@ describe("Client VPS Protection Bundle & Heartbeat Security Hardening", () => {
     expect(okHb?.hostname).toBe("vps-edge-01.sparrowx.net");
     expect(okHb?.synRecv).toBe(3);
   });
+
+  it("resolves official Google OAuth credentials, canonical .sparrowx.net callback URI, and cross-subdomain state cookie", async () => {
+    const {
+      googleOAuthCredentials,
+      resolveCanonicalGoogleRedirectUri,
+    } = await import("@/lib/server/config.server");
+    const { buildGoogleStateCookieHeader } = await import("@/lib/server/master-sso.server");
+
+    const creds = googleOAuthCredentials();
+    expect(creds.clientId).toContain(".apps.googleusercontent.com");
+    expect(creds.clientSecret.length).toBeGreaterThan(10);
+
+    expect(resolveCanonicalGoogleRedirectUri("https://netsec.sparrowx.net")).toBe(
+      "https://sparrowx.net/api/auth/google/callback",
+    );
+    expect(resolveCanonicalGoogleRedirectUri("https://db.sparrowx.net")).toBe(
+      "https://sparrowx.net/api/auth/google/callback",
+    );
+    expect(resolveCanonicalGoogleRedirectUri("http://localhost:3000")).toBe(
+      "http://localhost:3000/api/auth/google/callback",
+    );
+
+    const req = new Request("https://netsec.sparrowx.net/api/auth/google/login", {
+      headers: {
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "netsec.sparrowx.net",
+      },
+    });
+    const stateCookie = buildGoogleStateCookieHeader(req, "signed_state_value", 600);
+    expect(stateCookie).toContain("spx_google_oauth_state=");
+    expect(stateCookie).toContain("Domain=.sparrowx.net");
+    expect(stateCookie).toContain("HttpOnly");
+    expect(stateCookie).toContain("Secure");
+  });
 });

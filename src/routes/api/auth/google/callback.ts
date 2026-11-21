@@ -4,7 +4,10 @@ export const Route = createFileRoute("/api/auth/google/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { env } = await import("@/lib/server/config.server");
+        const {
+          googleOAuthCredentials,
+          resolveCanonicalGoogleRedirectUri,
+        } = await import("@/lib/server/config.server");
         const { timingSafeEqual } = await import("@/lib/server/crypto.server");
         const { resolveRequestOrigin } = await import("@/lib/server/http.server");
         const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
@@ -40,10 +43,8 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         const fallbackNext = sanitizeGoogleNextUrl(verifiedState?.next, origin);
 
         const failRedirect = (message: string) => {
-          const dest = new URL(`${origin}/api/auth/google/login`);
-          dest.searchParams.set("next", fallbackNext);
-          dest.searchParams.set("oauth_fallback", "1");
-          dest.searchParams.set("error_msg", message);
+          const dest = new URL(fallbackNext);
+          dest.searchParams.set("auth_error", message);
           const headers = new Headers();
           headers.set("Location", dest.toString());
           headers.set("Cache-Control", "no-store");
@@ -67,15 +68,13 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           return failRedirect("Google sign-in session expired. Please try again.");
         }
 
-        const clientId = env("GOOGLE_CLIENT_ID");
-        const clientSecret = env("GOOGLE_CLIENT_SECRET");
+        const { clientId, clientSecret } = googleOAuthCredentials();
         if (!clientId || !clientSecret) {
           return failRedirect("Google OAuth credentials are not configured on this server.");
         }
 
         try {
-          const redirectUri =
-            env("GOOGLE_REDIRECT_URI") || `${verifiedState.origin}/api/auth/google/callback`;
+          const redirectUri = resolveCanonicalGoogleRedirectUri(verifiedState.origin);
 
           const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
             method: "POST",

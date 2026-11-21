@@ -1183,12 +1183,22 @@ app.get('/api/auth/providers', (req, res) => {
     pgEnabled: PG_ENABLED,
     supabaseEnabled: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY),
     masterSsoEnabled: true,
+    googleOAuthEnabled: true,
     autoApprove: PG_ENABLED
       ? String(process.env.NETSEC_REQUIRE_APPROVAL || '').toLowerCase() !== 'true' &&
         String(process.env.NETSEC_AUTO_APPROVE || '').toLowerCase() !== 'false'
       : false,
     masterUrl: MASTER_PORTAL_URL,
   });
+});
+
+app.get('/api/auth/google/login', (req, res) => {
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || process.env.SPARROWX_DOMAIN || 'netsec.sparrowx.net').split(',')[0].trim();
+  const returnUrl = `${proto}://${host}/login?sso=master`;
+  const target = `${MASTER_PORTAL_URL}/api/auth/google/login?next=${encodeURIComponent(returnUrl)}`;
+  res.setHeader('Cache-Control', 'no-store');
+  return res.redirect(302, target);
 });
 
 app.get('/api/auth/master-sso', async (req, res) => {

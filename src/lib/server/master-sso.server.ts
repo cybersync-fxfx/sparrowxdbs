@@ -608,6 +608,7 @@ export function buildGoogleStateCookieHeader(
 ): string {
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const isHttps = forwardedProto === "https" || new URL(request.url).protocol === "https:";
+  const domain = resolveMasterCookieDomain(request);
   const attrs = [
     `${GOOGLE_OAUTH_STATE_COOKIE}=${encodeURIComponent(value)}`,
     "Path=/",
@@ -615,6 +616,7 @@ export function buildGoogleStateCookieHeader(
     "SameSite=Lax",
     `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`,
   ];
+  if (domain) attrs.push(`Domain=${domain}`);
   if (isHttps) attrs.push("Secure");
   return attrs.join("; ");
 }
