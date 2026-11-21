@@ -12,6 +12,7 @@ import {
   createServerConsoleSession,
   executeServerAction,
   listManagedInfraServers,
+  provisionServerFromPaidOrder,
 } from "./lib/server/proxmox.server";
 import {
   createUpiOrder,
@@ -630,6 +631,31 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
       status: 200,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
     });
+  }
+
+  if (url.pathname === "/api/infra/servers/provision" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as Parameters<typeof provisionServerFromPaidOrder>[0];
+      const server = provisionServerFromPaidOrder({
+        orderId: String(body.orderId || `SPX-${Date.now().toString(36).toUpperCase()}`),
+        planId: String(body.planId || "vps-starter"),
+        planName: String(body.planName || "VPS-Builder NVMe"),
+        category: body.category || "vps",
+        hostname: String(body.hostname || "node-01.sparrowx.net"),
+        region: String(body.region || "Mumbai IN-1"),
+        os: String(body.os || "Ubuntu 24.04 LTS (Hardened)"),
+        monthlyPriceInr: Number(body.monthlyPriceInr || 849),
+      });
+      return new Response(JSON.stringify({ ok: true, server }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch {
+      return new Response(JSON.stringify({ ok: false, message: "Invalid provision payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
   }
 
   if (url.pathname === "/api/infra/servers/action" && request.method === "POST") {

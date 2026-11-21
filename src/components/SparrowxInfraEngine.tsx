@@ -267,24 +267,40 @@ export function SparrowxInfraEngine() {
     const referenceId = `SPX-INFRA-${Date.now().toString(36).toUpperCase().slice(-6)}`;
 
     try {
-      await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: cleanEmail.split("@")[0] || "Infra Client",
-          email: cleanEmail,
-          company: hostnameInput.trim() || selectedPlan.id,
-          topic: `Cloud Infra Provisioning (${selectedPlan.category.toUpperCase()})`,
-          message: [
-            `Order Ref: ${referenceId}`,
-            `Server Plan: ${selectedPlan.name} (${selectedPlan.cpuModel}, ${selectedPlan.ram}, ${selectedPlan.storage})`,
-            `Datacenter: ${regionInfo.name} (${regionInfo.code})`,
-            `OS Image: ${selectedOsMeta.label}`,
-            `Billing: ${billingCycle} (${activePricing.formattedMonthly}/mo · Total ${activePricing.formattedTotal})`,
-            `Extra IPv4: +${extraIpv4} | SparrowXNet WireGuard Mesh: ${enableWireguardMesh ? "Yes" : "No"} | Nightly Backups: ${enableNightlyBackup ? "Yes" : "No"}`,
-          ].join("\n"),
+      await Promise.all([
+        fetch("/api/infra/servers/provision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderId: referenceId,
+            planId: selectedPlan.id,
+            planName: selectedPlan.name,
+            category: selectedPlan.category,
+            hostname: hostnameInput.trim() || `${selectedPlan.id}.sparrowx.net`,
+            region: regionInfo.name,
+            os: selectedOsMeta.label,
+            monthlyPriceInr: selectedPlan.priceMonthlyInr,
+          }),
         }),
-      });
+        fetch("/api/contact", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: cleanEmail.split("@")[0] || "Infra Client",
+            email: cleanEmail,
+            company: hostnameInput.trim() || selectedPlan.id,
+            topic: `Cloud Infra Provisioning (${selectedPlan.category.toUpperCase()})`,
+            message: [
+              `Order Ref: ${referenceId}`,
+              `Server Plan: ${selectedPlan.name} (${selectedPlan.cpuModel}, ${selectedPlan.ram}, ${selectedPlan.storage})`,
+              `Datacenter: ${regionInfo.name} (${regionInfo.code})`,
+              `OS Image: ${selectedOsMeta.label}`,
+              `Billing: ${billingCycle} (${activePricing.formattedMonthly}/mo · Total ${activePricing.formattedTotal})`,
+              `Extra IPv4: +${extraIpv4} | SparrowXNet WireGuard Mesh: ${enableWireguardMesh ? "Yes" : "No"} | Nightly Backups: ${enableNightlyBackup ? "Yes" : "No"}`,
+            ].join("\n"),
+          }),
+        }),
+      ]);
     } catch {
       // Proceed cleanly with local provisioning confirmation receipt even if mail relay is offline
     } finally {
@@ -358,12 +374,13 @@ export function SparrowxInfraEngine() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <a
               href="/infra/dashboard"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#0B0E15] hover:border-white/35 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-[#0B0E15] hover:bg-white hover:text-black px-3.5 py-2 text-sm font-semibold text-white transition-colors duration-150"
             >
-              <span>Cloud Panel</span>
+              <span>Dashboard</span>
+              <ArrowUpRight className="size-4" aria-hidden="true" />
             </a>
             <a
               href="#catalog"
@@ -978,10 +995,10 @@ export function SparrowxInfraEngine() {
                   </p>
                   <div className="flex flex-wrap gap-3 pt-2">
                     <a
-                      href={buildMasterHref("/")}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-white hover:bg-zinc-200 px-4 py-2 text-sm font-semibold text-black"
+                      href="/infra/dashboard"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 px-4 py-2 text-sm font-semibold text-black"
                     >
-                      <span>Open Client Console</span>
+                      <span>Open Cloud Dashboard</span>
                       <ArrowUpRight className="size-4" aria-hidden="true" />
                     </a>
                     <button

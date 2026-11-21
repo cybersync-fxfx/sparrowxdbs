@@ -49,143 +49,8 @@ export interface ProxmoxConfigStatus {
 
 const serverStore = new Map<string, ManagedInfraServer>();
 
-function ensureSeededServers(): void {
-  if (serverStore.size > 0) return;
-  const defaults: ManagedInfraServer[] = [
-    {
-      id: "srv-bm-9950x-01",
-      vmid: 101,
-      node: process.env.PVE_NODE || "pve-in-01",
-      name: "BM-Forge 9950X Production",
-      hostname: "bm-forge-01.sparrowx.net",
-      category: "bare-metal",
-      planId: "bm-ryzen-9950x",
-      planName: "BM-Forge 9950X",
-      region: "Mumbai IN-1",
-      os: "Ubuntu 24.04 LTS (Hardened)",
-      status: "running",
-      ipv4: "103.189.44.112",
-      extraIpv4s: ["103.189.44.113"],
-      ipv6: "2401:4900:8a12:101::/64",
-      rdns: "bm-forge-01.sparrowx.net",
-      sshUser: "root",
-      sshPort: 22,
-      sshKeys: [
-        {
-          id: "key-ops-1",
-          label: "sparrowx-admin@workstation",
-          fingerprint: "SHA256:9xK4mN2pQ8rT1vW5yZ7bC3dE6fG0hJ4kL8mP2nR6sU",
-          addedAt: "2026-11-18T10:15:00Z",
-        },
-      ],
-      wireguardEnabled: true,
-      wireguardIp: "10.66.0.11/24",
-      ddosMode: "XDP/eBPF Always-On",
-      cpuCores: 16,
-      cpuUsagePct: 24,
-      ramTotalGb: 192,
-      ramUsedGb: 54.6,
-      diskTotalGb: 3840,
-      diskUsedGb: 612,
-      bandwidthUsedTb: 4.8,
-      bandwidthQuotaTb: 100,
-      uptimeSeconds: 1843200,
-      monthlyPriceInr: 16690,
-      nextDueDate: "2026-12-21",
-      proxmoxBacked: Boolean(process.env.PVE_URL && process.env.PVE_TOKEN_ID),
-      snapshots: [
-        {
-          id: "snap-base-01",
-          name: "pre-kernel-xdp-upgrade",
-          createdAt: "2026-11-19T04:00:00Z",
-          sizeGb: 28.4,
-        },
-      ],
-    },
-    {
-      id: "srv-vps-builder-02",
-      vmid: 204,
-      node: process.env.PVE_NODE || "pve-in-01",
-      name: "VPS-Builder NVMe Cluster",
-      hostname: "vps-app-02.sparrowx.net",
-      category: "vps",
-      planId: "vps-starter",
-      planName: "VPS-Builder NVMe",
-      region: "Singapore SG-1",
-      os: "Debian 12 Bookworm",
-      status: "running",
-      ipv4: "139.99.82.47",
-      extraIpv4s: [],
-      ipv6: "2402:1f00:8001:204::/64",
-      rdns: "vps-app-02.sparrowx.net",
-      sshUser: "root",
-      sshPort: 22,
-      sshKeys: [],
-      wireguardEnabled: true,
-      wireguardIp: "10.66.0.24/24",
-      ddosMode: "XDP/eBPF Always-On",
-      cpuCores: 4,
-      cpuUsagePct: 16,
-      ramTotalGb: 8,
-      ramUsedGb: 3.1,
-      diskTotalGb: 100,
-      diskUsedGb: 29,
-      bandwidthUsedTb: 0.82,
-      bandwidthQuotaTb: 5,
-      uptimeSeconds: 612400,
-      monthlyPriceInr: 849,
-      nextDueDate: "2026-12-21",
-      proxmoxBacked: Boolean(process.env.PVE_URL && process.env.PVE_TOKEN_ID),
-      snapshots: [
-        {
-          id: "snap-vps-01",
-          name: "clean-docker-baseline",
-          createdAt: "2026-11-20T02:30:00Z",
-          sizeGb: 6.2,
-        },
-      ],
-    },
-    {
-      id: "srv-ded-arena-03",
-      vmid: 305,
-      node: process.env.PVE_NODE || "pve-eu-01",
-      name: "DED-Arena 9900X Game Node",
-      hostname: "arena-9900x.sparrowx.net",
-      category: "dedicated",
-      planId: "ded-game-9900x",
-      planName: "DED-Arena 9900X",
-      region: "Gravelines FR-OVH",
-      os: "Ubuntu 24.04 LTS (Hardened)",
-      status: "running",
-      ipv4: "51.195.142.88",
-      extraIpv4s: ["51.195.142.89", "51.195.142.90"],
-      ipv6: "2001:41d0:305:2100::/64",
-      rdns: "arena-9900x.sparrowx.net",
-      sshUser: "root",
-      sshPort: 22,
-      sshKeys: [],
-      wireguardEnabled: true,
-      wireguardIp: "10.66.0.35/24",
-      ddosMode: "GameSec L4 Strict",
-      cpuCores: 12,
-      cpuUsagePct: 41,
-      ramTotalGb: 128,
-      ramUsedGb: 46.2,
-      diskTotalGb: 1920,
-      diskUsedGb: 410,
-      bandwidthUsedTb: 11.4,
-      bandwidthQuotaTb: 100,
-      uptimeSeconds: 982100,
-      monthlyPriceInr: 11690,
-      nextDueDate: "2026-12-21",
-      proxmoxBacked: Boolean(process.env.PVE_URL && process.env.PVE_TOKEN_ID),
-      snapshots: [],
-    },
-  ];
-
-  for (const s of defaults) {
-    serverStore.set(s.id, s);
-  }
+export function clearInfraServerStoreForTests(): void {
+  serverStore.clear();
 }
 
 export function getProxmoxConfigStatus(): ProxmoxConfigStatus {
@@ -255,7 +120,7 @@ export async function listManagedInfraServers(): Promise<{
   proxmox: ProxmoxConfigStatus;
   servers: ManagedInfraServer[];
 }> {
-  ensureSeededServers();
+  // Return empty array until live Proxmox VMs exist or a server is deployed
   const proxmox = getProxmoxConfigStatus();
 
   // If live Proxmox VE credentials exist, merge live QEMU VMs from the configured node
@@ -334,7 +199,6 @@ export function provisionServerFromPaidOrder(input: {
   ramTotalGb?: number;
   diskTotalGb?: number;
 }): ManagedInfraServer {
-  ensureSeededServers();
   const nextVmid = 400 + serverStore.size + 1;
   const octet = 120 + (serverStore.size % 120);
   const id = `srv-${input.orderId.toLowerCase().replace(/[^a-z0-9-]/g, "")}`;
@@ -419,7 +283,6 @@ export async function executeServerAction(input: {
   generatedPassword?: string;
   proxmoxTask?: string;
 }> {
-  ensureSeededServers();
   const server = serverStore.get(input.serverId);
   if (!server) {
     return { ok: false, message: "Server instance not found." };
@@ -568,7 +431,6 @@ export async function createServerConsoleSession(serverId: string): Promise<{
   mode: "live" | "sandbox";
   error?: string;
 }> {
-  ensureSeededServers();
   const server = serverStore.get(serverId);
   if (!server) {
     return { ok: false, mode: "sandbox", error: "Server not found." };

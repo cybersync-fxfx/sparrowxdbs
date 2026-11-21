@@ -386,18 +386,24 @@ export function SparrowxInfraDashboard() {
               </a>
             </div>
 
-            <select
-              id="spx-server-switcher"
-              value={activeServer?.id ?? ""}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="w-full rounded-lg border border-white/15 bg-[#06080D] px-3 py-2 text-sm font-medium text-white focus:outline-none focus:border-sky-400"
-            >
-              {servers.map((srv) => (
-                <option key={srv.id} value={srv.id}>
-                  {srv.name} ({srv.ipv4})
-                </option>
-              ))}
-            </select>
+            {servers.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-white/15 bg-[#06080D] px-3 py-2.5 text-xs text-zinc-400">
+                No servers deployed yet
+              </div>
+            ) : (
+              <select
+                id="spx-server-switcher"
+                value={activeServer?.id ?? ""}
+                onChange={(e) => setSelectedId(e.target.value)}
+                className="w-full rounded-lg border border-white/15 bg-[#06080D] px-3 py-2 text-sm font-medium text-white focus:outline-none focus:border-sky-400"
+              >
+                {servers.map((srv) => (
+                  <option key={srv.id} value={srv.id}>
+                    {srv.name} ({srv.ipv4})
+                  </option>
+                ))}
+              </select>
+            )}
 
             {activeServer && (
               <div className="flex items-center justify-between text-xs pt-1">
@@ -448,13 +454,45 @@ export function SparrowxInfraDashboard() {
 
         {/* Right Workspace Content */}
         <main className="min-w-0 space-y-6">
-          {loading || !activeServer ? (
+          {loading ? (
             <div className="rounded-2xl border border-white/10 bg-[#0C1018] p-12 text-center text-sm text-zinc-400">
-              Loading your SparrowX Cloud Infrastructure fleet...
+              Checking your SparrowX Cloud Infrastructure fleet...
+            </div>
+          ) : !activeServer && section !== "billing" && section !== "proxmox" ? (
+            <div className="rounded-2xl border border-white/12 bg-[#0C1018] p-8 sm:p-12 text-center space-y-5">
+              <div className="mx-auto size-14 rounded-2xl border border-white/15 bg-[#06080D] grid place-items-center text-sky-400">
+                <Server className="size-7" aria-hidden="true" />
+              </div>
+              <div className="space-y-2 max-w-md mx-auto">
+                <h1 className="text-2xl font-bold tracking-tight text-white">
+                  No servers deployed yet
+                </h1>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Your Cloud Management Dashboard is empty until you deploy a Bare Metal server, Dedicated node, or KVM VPS — or link your live Proxmox VE cluster.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                <a
+                  href="/infra#catalog"
+                  className="inline-flex items-center gap-2 rounded-xl bg-sky-400 hover:bg-sky-300 px-5 py-2.5 text-sm font-semibold text-black transition-colors"
+                >
+                  <Plus className="size-4" aria-hidden="true" />
+                  <span>Deploy Your First Server</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setSection("proxmox")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#06080D] hover:border-white/30 px-4 py-2.5 text-sm font-medium text-zinc-200 hover:text-white cursor-pointer"
+                >
+                  <Settings className="size-4" aria-hidden="true" />
+                  <span>Connect Proxmox VE</span>
+                </button>
+              </div>
             </div>
           ) : (
             <>
-              {/* Persistent Top Server Action Banner (Hostinger hPanel style) */}
+              {/* Persistent Top Server Action Banner (shown only when a deployed server exists) */}
+              {activeServer && (
               <div className="rounded-2xl border border-white/10 bg-[#0C1018] p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div className="space-y-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2.5">
@@ -532,9 +570,10 @@ export function SparrowxInfraDashboard() {
                   </button>
                 </div>
               </div>
+              )}
 
               {/* SECTION: OVERVIEW */}
-              {section === "overview" && (
+              {activeServer && section === "overview" && (
                 <div className="space-y-6">
                   {/* 4 Live Resource Gauges */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -695,7 +734,7 @@ export function SparrowxInfraDashboard() {
               )}
 
               {/* SECTION: SSH & WEB TERMINAL */}
-              {section === "ssh" && (
+              {activeServer && section === "ssh" && (
                 <div className="space-y-5">
                   <div className="rounded-xl border border-white/10 bg-[#0C1018] p-5 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -838,7 +877,7 @@ export function SparrowxInfraDashboard() {
               )}
 
               {/* SECTION: IP & NETWORKING */}
-              {section === "network" && (
+              {activeServer && section === "network" && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                   <div className="rounded-xl border border-white/10 bg-[#0C1018] p-5 space-y-4">
                     <h2 className="text-base font-semibold text-white">
@@ -958,7 +997,7 @@ export function SparrowxInfraDashboard() {
               )}
 
               {/* SECTION: OS & REINSTALL */}
-              {section === "os" && (
+              {activeServer && section === "os" && (
                 <div className="rounded-xl border border-white/10 bg-[#0C1018] p-5 space-y-5">
                   <div>
                     <h2 className="text-base font-semibold text-white">
@@ -1008,7 +1047,7 @@ export function SparrowxInfraDashboard() {
               )}
 
               {/* SECTION: SNAPSHOTS */}
-              {section === "snapshots" && (
+              {activeServer && section === "snapshots" && (
                 <div className="rounded-xl border border-white/10 bg-[#0C1018] p-5 space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
@@ -1095,14 +1134,14 @@ export function SparrowxInfraDashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        setTopupAmount(activeServer.monthlyPriceInr);
+                        setTopupAmount(activeServer?.monthlyPriceInr ?? 849);
                         setUpiModalOpen(true);
                       }}
                       className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-black cursor-pointer shrink-0"
                     >
                       <QrCode className="size-4" aria-hidden="true" />
                       <span>
-                        Pay ₹{activeServer.monthlyPriceInr.toLocaleString("en-IN")} via UPI
+                        Pay ₹{(activeServer?.monthlyPriceInr ?? 849).toLocaleString("en-IN")} via UPI
                       </span>
                     </button>
                   </div>

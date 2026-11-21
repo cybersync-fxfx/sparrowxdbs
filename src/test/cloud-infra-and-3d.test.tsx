@@ -5,6 +5,7 @@ import { computePlanPrice, INFRA_PLANS } from "@/lib/infra-plans";
 import { SparrowxInfraEngine } from "@/components/SparrowxInfraEngine";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import {
+  clearInfraServerStoreForTests,
   executeServerAction,
   listManagedInfraServers,
 } from "@/lib/server/proxmox.server";
@@ -66,7 +67,11 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     expect(screen.queryByText("BM-Edge 7950X")).toBeNull();
   });
 
-  it("creates a UPI order, auto-confirms via webhook, and provisions a Proxmox server", async () => {
+  it("starts with an empty server list (zero mock data), then provisions on UPI webhook auto-confirmation", async () => {
+    clearInfraServerStoreForTests();
+    const initialFleet = await listManagedInfraServers();
+    expect(initialFleet.servers).toHaveLength(0);
+
     const order = createUpiOrder({
       service: "infra",
       planId: "vps-starter",
