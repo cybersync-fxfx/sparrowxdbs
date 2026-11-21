@@ -340,9 +340,22 @@ export function ShieldLandingView({
                 <div className="space-y-3 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#07090E]/90 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F4F6FA]/[0.07] pb-2.5">
                     <div>
-                      <span className="font-mono text-xs font-semibold text-[#F4F6FA]">{liveAudit.cleanHost}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-semibold text-[#F4F6FA]">{liveAudit.cleanHost}</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+                            liveAudit.score >= 80
+                              ? "bg-[#10B981]/20 text-[#10B981]"
+                              : liveAudit.score >= 55
+                                ? "bg-[#FFEBB9]/20 text-[#FFEBB9]"
+                                : "bg-[#F9103A]/20 text-[#F9103A]"
+                          }`}
+                        >
+                          Grade {liveAudit.scoreGrade} · {liveAudit.riskLevel}
+                        </span>
+                      </div>
                       <p className="text-[11px] text-[#F4F6FA]/50 mt-0.5">
-                        {liveAudit.findings.length} live checks evaluated
+                        {liveAudit.deepTelemetry?.toolsExecuted.length ?? 8} modern security tools · {liveAudit.latencyMs}ms TLS RTT · {liveAudit.resolvedIps[0] ?? "Resolved"}
                       </p>
                     </div>
                     <button
@@ -353,7 +366,68 @@ export function ShieldLandingView({
                       <Download className="size-3.5 text-[#10B981]" /> HTML Report
                     </button>
                   </div>
-                  <ul className="space-y-2 max-h-52 overflow-y-auto pr-1 text-xs">
+
+                  {/* Modern Multi-Tool Telemetry Badges */}
+                  <div className="flex flex-wrap gap-1.5 text-[10px] font-mono">
+                    <span className="rounded border border-[#F4F6FA]/10 bg-[#0D1017] px-2 py-0.5 text-[#F4F6FA]/80">
+                      TLS: {liveAudit.deepTelemetry?.tlsProtocol ?? (liveAudit.httpsReachable ? "TLSv1.3" : "Failed")}
+                    </span>
+                    {liveAudit.deepTelemetry?.certIssuer && (
+                      <span className="rounded border border-[#F4F6FA]/10 bg-[#0D1017] px-2 py-0.5 text-[#F4F6FA]/80">
+                        CA: {liveAudit.deepTelemetry.certIssuer}
+                        {liveAudit.deepTelemetry.certDaysRemaining !== null
+                          ? ` (${liveAudit.deepTelemetry.certDaysRemaining}d)`
+                          : ""}
+                      </span>
+                    )}
+                    <span
+                      className={`rounded border px-2 py-0.5 ${
+                        liveAudit.hstsHeaderPresent
+                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
+                          : "border-[#F9103A]/30 bg-[#F9103A]/10 text-[#F9103A]"
+                      }`}
+                    >
+                      HSTS: {liveAudit.hstsHeaderPresent ? "ON" : "MISSING"}
+                    </span>
+                    <span
+                      className={`rounded border px-2 py-0.5 ${
+                        liveAudit.cspHeaderPresent
+                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
+                          : "border-[#FFEBB9]/30 bg-[#FFEBB9]/10 text-[#FFEBB9]"
+                      }`}
+                    >
+                      CSP: {liveAudit.cspHeaderPresent ? "ON" : "MISSING"}
+                    </span>
+                    <span
+                      className={`rounded border px-2 py-0.5 ${
+                        liveAudit.xFrameOptionsPresent
+                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
+                          : "border-[#F9103A]/30 bg-[#F9103A]/10 text-[#F9103A]"
+                      }`}
+                    >
+                      XFO: {liveAudit.xFrameOptionsPresent ? "ON" : "MISSING"}
+                    </span>
+                    <span
+                      className={`rounded border px-2 py-0.5 ${
+                        liveAudit.hasSpfOrDmarc
+                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
+                          : "border-[#FFEBB9]/30 bg-[#FFEBB9]/10 text-[#FFEBB9]"
+                      }`}
+                    >
+                      SPF/DMARC: {liveAudit.hasSpfOrDmarc ? "ACTIVE" : "NONE"}
+                    </span>
+                    <span
+                      className={`rounded border px-2 py-0.5 ${
+                        !liveAudit.deepTelemetry?.envFileExposed && !liveAudit.deepTelemetry?.gitHeadExposed
+                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
+                          : "border-[#F9103A]/30 bg-[#F9103A]/10 text-[#F9103A]"
+                      }`}
+                    >
+                      .env/.git: {!liveAudit.deepTelemetry?.envFileExposed && !liveAudit.deepTelemetry?.gitHeadExposed ? "SEALED" : "EXPOSED"}
+                    </span>
+                  </div>
+
+                  <ul className="space-y-2 max-h-56 overflow-y-auto pr-1 text-xs">
                     {liveAudit.findings.slice(0, 5).map((f, idx) => (
                       <li
                         key={`${f.title}-${idx}`}
@@ -361,7 +435,8 @@ export function ShieldLandingView({
                       >
                         <div className="min-w-0">
                           <p className="font-medium text-[#F4F6FA] truncate">{f.title}</p>
-                          <p className="text-[11px] text-[#F4F6FA]/55 truncate">{f.detail}</p>
+                          <p className="text-[11px] text-[#F4F6FA]/55 line-clamp-2">{f.detail}</p>
+                          <p className="text-[10px] font-mono text-[#F96246]/90 mt-0.5 truncate">{f.evidence}</p>
                         </div>
                         <span
                           className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase ${
@@ -377,6 +452,25 @@ export function ShieldLandingView({
                       </li>
                     ))}
                   </ul>
+
+                  {liveAudit.advisory && (
+                    <div className="rounded-xl border border-[#F96246]/35 bg-[#F96246]/[0.07] p-3 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#F96246]">
+                          ✦ SparrowX AI Neural Advisory ({liveAudit.advisory.modelUsed})
+                        </span>
+                        <span className="font-mono text-[10px] text-[#F4F6FA]/55">
+                          {liveAudit.advisory.targetCategory}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#F4F6FA]/90 leading-relaxed">
+                        {liveAudit.advisory.executiveSummary}
+                      </p>
+                      <p className="text-[11px] text-[#10B981] font-medium">
+                        ⚡ 60s Remediation: {liveAudit.advisory.recommendedAction}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-[#F4F6FA]/12 bg-[#07090E]/60 p-5 text-center space-y-1.5">

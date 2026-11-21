@@ -26,6 +26,7 @@ import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
+import { querySparrowxCrossSystemAi } from "@/lib/sparrowx-ai-brain";
 import {
   SiAstro,
   SiNextdotjs,
@@ -1505,6 +1506,28 @@ export function SovereignDatabaseStudio({
     { id: "h-1", sql: SQL_TEMPLATES[0]?.sql ?? "SELECT 1;", time: "2m ago" },
     { id: "h-2", sql: SQL_TEMPLATES[1]?.sql ?? "SELECT 1;", time: "10m ago" },
   ]);
+  const [aiSqlPrompt, setAiSqlPrompt] = useState<string>("");
+  const [aiSqlGenerating, setAiSqlGenerating] = useState<boolean>(false);
+  const [aiSqlNote, setAiSqlNote] = useState<string | null>(null);
+
+  const handleGenerateAiSql = async () => {
+    const req = aiSqlPrompt.trim() || "Generate a hardened PostgreSQL 16 table with pgvector HNSW index and Row-Level Security";
+    setAiSqlGenerating(true);
+    setAiSqlNote(null);
+    try {
+      const res = await querySparrowxCrossSystemAi({
+        system: "db",
+        prompt: `${req}\n\nReturn valid PostgreSQL 16 SQL statement(s) ready to execute.`,
+        contextData: `Active Database: ${activeProject.dbName} | Current Editor SQL:\n${activeSql.slice(0, 500)}`,
+      });
+      const sqlMatch = res.text.match(/```(?:sql|postgresql)?\s*([\s\S]*?)```/i);
+      const extractedSql = sqlMatch?.[1]?.trim() || res.codeSnippet || `-- SparrowX AI Synthesized Query\n${res.text}`;
+      setActiveSql(extractedSql);
+      setAiSqlNote(`${res.modelUsed} synthesized query.`);
+    } finally {
+      setAiSqlGenerating(false);
+    }
+  };
 
   // Storage Bucket selection & modal
   const [storageBucketsList, setStorageBucketsList] = useState<StorageBucket[]>(STORAGE_BUCKETS);
@@ -4771,6 +4794,37 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               </div>
 
               <div className="flex-1 flex flex-col min-h-0">
+                {/* SparrowX AI SQL & pgvector Neural Copilot Bar */}
+                <div className="border-b border-[#242424] bg-[#0B0F17] px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[#A3E635] shrink-0">
+                    <Sparkles className="size-3.5" /> SparrowX AI SQL Copilot
+                  </span>
+                  <input
+                    type="text"
+                    value={aiSqlPrompt}
+                    onChange={(e) => setAiSqlPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleGenerateAiSql();
+                      }
+                    }}
+                    placeholder="Ask SparrowX AI to generate PostgreSQL 16 DDL, pgvector HNSW indexes, or RLS policies..."
+                    className="h-7 flex-1 min-w-[200px] rounded border border-[#2E2E2E] bg-[#05060A] px-2.5 font-mono text-[11px] text-zinc-200 placeholder-zinc-500 outline-none focus:border-[#A3E635]"
+                  />
+                  <button
+                    type="button"
+                    disabled={aiSqlGenerating}
+                    onClick={() => void handleGenerateAiSql()}
+                    className="h-7 rounded bg-[#A3E635]/15 border border-[#A3E635]/40 hover:bg-[#A3E635]/25 px-2.5 text-[11px] font-semibold text-[#A3E635] cursor-pointer disabled:opacity-50"
+                  >
+                    {aiSqlGenerating ? "Synthesizing..." : "Synthesize SQL"}
+                  </button>
+                  {aiSqlNote && (
+                    <span className="text-[10px] font-mono text-emerald-400">{aiSqlNote}</span>
+                  )}
+                </div>
+
                 {/* Editor with Line Numbers */}
                 <div className="h-[48%] min-h-[180px] flex border-b border-[#2E2E2E] bg-[#07090E]">
                   <div className="w-10 py-3 bg-[#141417] border-r border-[#222226] text-right pr-2 font-mono text-[11px] text-zinc-600 select-none overflow-hidden">

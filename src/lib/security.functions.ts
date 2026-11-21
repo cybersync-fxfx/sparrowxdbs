@@ -72,3 +72,27 @@ export const removeTenantFirewallRule = createServerFn({ method: "POST" })
     const { removeFirewallRule } = await import("./server/security-soc.server");
     return { success: removeFirewallRule(data.tenantId, data.ruleId) };
   });
+
+export const executeDeepSecurityScan = createServerFn({ method: "POST" })
+  .validator((d: { domain: string }) =>
+    z.object({ domain: z.string().min(1).max(255) }).parse(d),
+  )
+  .handler(async ({ data }) => {
+    const { runServerDeepDomainScan } = await import("./server/deep-domain-scanner.server");
+    return runServerDeepDomainScan(data.domain);
+  });
+
+const aiQuerySchema = z.object({
+  system: z.enum(["shield", "db", "drop", "keys", "game"]),
+  prompt: z.string().min(1).max(8000),
+  contextData: z.string().optional(),
+  model: z.enum(["gemini-3.8-flash", "gemini-4-argon"]).optional(),
+  previousInteractionId: z.string().optional(),
+});
+
+export const querySparrowxServerAi = createServerFn({ method: "POST" })
+  .validator((d: z.infer<typeof aiQuerySchema>) => aiQuerySchema.parse(d))
+  .handler(async ({ data }) => {
+    const { querySparrowxCrossSystemAi } = await import("./sparrowx-ai-brain");
+    return querySparrowxCrossSystemAi(data);
+  });

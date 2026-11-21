@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { querySparrowxCrossSystemAi, type CrossSystemAiResponse } from "@/lib/sparrowx-ai-brain";
 
 // EFF Long Wordlist excerpt for Diceware
 const EFF_WORDLIST = [
@@ -88,6 +89,26 @@ export function SparrowxKeysEngine() {
   // Telemetry
   const [networkDispatched] = useState<number>(0);
   const [generationCount, setGenerationCount] = useState<number>(1);
+  const [aiCryptoQuery, setAiCryptoQuery] = useState<string>("");
+  const [aiCryptoLoading, setAiCryptoLoading] = useState<boolean>(false);
+  const [aiCryptoAdvice, setAiCryptoAdvice] = useState<CrossSystemAiResponse | null>(null);
+
+  const handleRunCryptoAiAudit = async () => {
+    setAiCryptoLoading(true);
+    try {
+      const prompt =
+        aiCryptoQuery.trim() ||
+        `Audit current cryptographic profile: Mode=${mode}, PasswordLength=${pwdLength}, WordCount=${wordCount}. Recommend zero-trust rotation & Argon2id key derivation parameters.`;
+      const res = await querySparrowxCrossSystemAi({
+        system: "keys",
+        prompt,
+        contextData: `Active Generator Mode: ${mode} | Length: ${pwdLength} chars | Symbols: ${useSymbols} | Numbers: ${useNumbers}`,
+      });
+      setAiCryptoAdvice(res);
+    } finally {
+      setAiCryptoLoading(false);
+    }
+  };
 
   // Copy helper
   const handleCopy = (text: string, id: string) => {
@@ -798,6 +819,47 @@ export function SparrowxKeysEngine() {
             </div>
           </div>
         </div>
+
+        {/* SparrowX AI Cryptographic Policy & Key Rotation Advisor */}
+        <section className="rounded-sm border border-emerald-500/30 bg-[#0A0C10] p-6 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-emerald-400" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+                SparrowX AI Cryptographic Policy &amp; Entropy Advisor
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-sm">
+              Zero-Knowledge Neural Audit
+            </span>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              value={aiCryptoQuery}
+              onChange={(e) => setAiCryptoQuery(e.target.value)}
+              placeholder="Ask SparrowX AI about Argon2id parameters, JWT rotation policies, or post-quantum key entropy..."
+              className="h-9 flex-1 rounded-sm border border-white/15 bg-[#06070A] px-3 font-mono text-xs text-white placeholder-[#64748B] outline-none focus:border-emerald-400"
+            />
+            <button
+              type="button"
+              disabled={aiCryptoLoading}
+              onClick={() => void handleRunCryptoAiAudit()}
+              className="h-9 rounded-sm bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 px-4 text-xs font-mono font-semibold text-emerald-300 cursor-pointer disabled:opacity-50"
+            >
+              {aiCryptoLoading ? "Auditing..." : "Run AI Crypto Audit"}
+            </button>
+          </div>
+          {aiCryptoAdvice && (
+            <div className="rounded-sm border border-white/10 bg-[#06070A] p-4 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-[10px] font-mono text-emerald-400">
+                <span>✦ {aiCryptoAdvice.modelUsed}</span>
+                <span>{aiCryptoAdvice.liveAiGenerated ? "Live Neural Synthesis" : "Autonomous Core"}</span>
+              </div>
+              <p className="whitespace-pre-wrap text-zinc-200 leading-relaxed">{aiCryptoAdvice.text}</p>
+            </div>
+          )}
+        </section>
 
         {/* Standalone Plans & Enterprise Deployment */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">

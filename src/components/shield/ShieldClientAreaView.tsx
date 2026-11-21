@@ -75,7 +75,12 @@ export function ShieldClientAreaView({
   const [workspaceName, setWorkspaceName] = useState("");
   const [adding, setAdding] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
+
+  const toggleKeyVisibility = (id: string) => {
+    setRevealedKeys((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const webhooks = typeof window !== "undefined" ? getSavedWebhooks() : [];
   const activeIncidentsCount = incidents.filter((i) => i.status !== "Contained").length;
@@ -442,8 +447,19 @@ export function ShieldClientAreaView({
 
                       <div className="flex items-center gap-2">
                         <code className="rounded border border-[#F4F6FA]/10 bg-[#121622] px-2.5 py-1 font-mono text-[11px] text-[#F4F6FA]/80">
-                          {tenant.apiKey}
+                          {revealedKeys[tenant.id]
+                            ? tenant.apiKey
+                            : `${tenant.apiKey.slice(0, 8)}••••••••${tenant.apiKey.slice(-4)}`}
                         </code>
+                        <button
+                          type="button"
+                          onClick={() => toggleKeyVisibility(tenant.id)}
+                          aria-label={revealedKeys[tenant.id] ? `Hide API key for ${tenant.primaryDomain}` : `Reveal API key for ${tenant.primaryDomain}`}
+                          title={revealedKeys[tenant.id] ? "Hide API key" : "Reveal API key"}
+                          className="rounded-lg border border-[#F4F6FA]/12 bg-[#121622] p-1.5 text-[#F4F6FA]/70 hover:text-white cursor-pointer"
+                        >
+                          {revealedKeys[tenant.id] ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleCopy(tenant.id, tenant.apiKey, "Ingestion Key")}

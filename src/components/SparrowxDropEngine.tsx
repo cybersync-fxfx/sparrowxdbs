@@ -55,6 +55,7 @@ import {
   verifySessionToken,
 } from "@/lib/advanced-features";
 import { matchProductSubdomain } from "@/lib/routing";
+import { querySparrowxCrossSystemAi, type CrossSystemAiResponse } from "@/lib/sparrowx-ai-brain";
 
 /** Returns the clean Vault base path for the current host and removes /f/:id from history. */
 function resetDropVaultHistoryPath(): void {
@@ -2351,6 +2352,9 @@ export function SparrowxDropEngine() {
           </div>
         </div>
 
+        {/* SparrowX AI Zero-Knowledge Vault Guard & Transfer Policy Advisor */}
+        <SparrowxDropAiVaultGuard />
+
         {/* Standalone FAQ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
           <div className="rounded-lg border border-white/[0.06] bg-[#090B12]/70 p-4 space-y-1.5">
@@ -2375,6 +2379,70 @@ export function SparrowxDropEngine() {
       </section>
 
       <SparrowxFooter />
+    </div>
+  );
+}
+
+function SparrowxDropAiVaultGuard() {
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<CrossSystemAiResponse | null>(null);
+
+  const handleAudit = async () => {
+    setLoading(true);
+    try {
+      const prompt =
+        query.trim() ||
+        "Audit zero-knowledge file transfer policy for AES-256-GCM payload integrity, burn-after-reading expiry, and malware defense.";
+      const res = await querySparrowxCrossSystemAi({
+        system: "drop",
+        prompt,
+      });
+      setResult(res);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-purple-500/30 bg-[#090B12] p-5 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-purple-400" />
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-white">
+            SparrowX AI Zero-Knowledge Vault Guard &amp; Policy Advisor
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-purple-300 bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 rounded">
+          AES-256-GCM Neural Audit
+        </span>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ask SparrowX AI about AES-256-GCM share policies, link expiry hardening, or artifact compliance..."
+          className="h-9 flex-1 rounded-lg border border-white/10 bg-[#06070B] px-3 font-mono text-xs text-white placeholder-zinc-500 outline-none focus:border-purple-400"
+        />
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void handleAudit()}
+          className="h-9 rounded-lg bg-purple-500/20 border border-purple-500/40 hover:bg-purple-500/30 px-4 text-xs font-semibold text-purple-200 cursor-pointer disabled:opacity-50"
+        >
+          {loading ? "Analyzing..." : "Ask SparrowX AI"}
+        </button>
+      </div>
+      {result && (
+        <div className="rounded-lg border border-white/10 bg-[#06070B] p-3.5 space-y-1.5 text-xs">
+          <div className="flex items-center justify-between text-[10px] font-mono text-purple-400">
+            <span>✦ {result.modelUsed}</span>
+            <span>{result.liveAiGenerated ? "Live Neural Synthesis" : "Autonomous Core"}</span>
+          </div>
+          <p className="whitespace-pre-wrap text-zinc-200 leading-relaxed">{result.text}</p>
+        </div>
+      )}
     </div>
   );
 }

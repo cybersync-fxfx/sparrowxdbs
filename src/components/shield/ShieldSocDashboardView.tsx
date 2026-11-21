@@ -6,6 +6,8 @@ import {
   Check,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   FileCode2,
   Gamepad2,
   Globe,
@@ -47,6 +49,7 @@ import {
   type Incident,
 } from "@/lib/supabase";
 import { GAMESEC_URL } from "./ShieldLandingView";
+import { querySparrowxCrossSystemAi, type CrossSystemAiResponse } from "@/lib/sparrowx-ai-brain";
 
 export interface ShieldSocDashboardViewProps {
   activeUser: AppUser;
@@ -79,9 +82,30 @@ export function ShieldSocDashboardView({
   const [auditError, setAuditError] = useState<string | null>(null);
   const [liveAudit, setLiveAudit] = useState<LiveDomainAuditResult | null>(null);
 
-  // Prompt Injection & PII Firewall Sandbox
+  // Prompt Injection & PII Firewall Sandbox + SparrowX AI Neural Copilot
   const [promptInput, setPromptInput] = useState("");
   const [promptVerdict, setPromptVerdict] = useState<AiGuardrailTestResult | null>(null);
+  const [aiCopilotLoading, setAiCopilotLoading] = useState(false);
+  const [aiCopilotResult, setAiCopilotResult] = useState<CrossSystemAiResponse | null>(null);
+
+  const handleAskSparrowxAi = async (customPrompt?: string) => {
+    const query = (customPrompt ?? promptInput).trim();
+    if (!query) return;
+    setAiCopilotLoading(true);
+    try {
+      const ctx = liveAudit
+        ? `Audited Host: ${liveAudit.cleanHost} | Score: ${liveAudit.score}/100 (${liveAudit.scoreGrade}) | HSTS: ${liveAudit.hstsHeaderPresent} | CSP: ${liveAudit.cspHeaderPresent} | XFO: ${liveAudit.xFrameOptionsPresent} | WAF: ${liveAudit.deepTelemetry?.wafProvider ?? "Direct"}`
+        : `Active SOC Tenants: ${tenants.length} | Open Incidents: ${incidents.length}`;
+      const res = await querySparrowxCrossSystemAi({
+        system: "shield",
+        prompt: query,
+        contextData: ctx,
+      });
+      setAiCopilotResult(res);
+    } finally {
+      setAiCopilotLoading(false);
+    }
+  };
 
   // Firewall Blocklist Exporter
   const [iocInput, setIocInput] = useState("");
@@ -96,6 +120,13 @@ export function ShieldSocDashboardView({
   const [whName, setWhName] = useState("");
   const [whUrl, setWhUrl] = useState("");
   const [whChannel, setWhChannel] = useState<WebhookChannel>("discord");
+
+  // Single Server Production Armor configuration state
+  const [serverStack, setServerStack] = useState<"nginx" | "caddy" | "cloudflare" | "express">("nginx");
+  const [serverHost, setServerHost] = useState(tenants[0]?.primaryDomain || "yourdomain.com");
+  const [serverPort, setServerPort] = useState("3000");
+  const [revealSecret, setRevealSecret] = useState(false);
+  const [copiedServerSnippet, setCopiedServerSnippet] = useState(false);
 
   // Incident creator for live SOC verification
   const [eventTitle, setEventTitle] = useState("");
@@ -176,6 +207,27 @@ export function ShieldSocDashboardView({
     () => exportFirewallBlocklist(iocList, fwFormat),
     [iocList, fwFormat],
   );
+
+  const generatedServerSnippet = useMemo(() => {
+    const cleanHost = serverHost.trim() || "yourdomain.com";
+    const port = serverPort.trim() || "3000";
+    const key = tenants[0]?.apiKey || "spx_live_single_server_shield_key";
+
+    if (serverStack === "caddy") {
+      return `${cleanHost} {\n    header {\n        X-Content-Type-Options nosniff\n        X-Frame-Options SAMEORIGIN\n        X-SparrowX-Shield Active-SingleServer\n    }\n    reverse_proxy 127.0.0.1:${port} {\n        header_up Host {host}\n        header_up X-Real-IP {remote_host}\n        header_up X-SparrowX-Key "${key}"\n    }\n}`;
+    }
+
+    if (serverStack === "cloudflare") {
+      return `tunnel: spx-single-node\ncredentials-file: /root/.cloudflared/spx.json\n\ningress:\n  - hostname: ${cleanHost}\n    service: http://127.0.0.1:${port}\n    originRequest:\n      noTLSVerify: false\n      httpHostHeader: ${cleanHost}\n  - service: http_status:404`;
+    }
+
+    if (serverStack === "express") {
+      return `// SparrowX Single Server Node Middleware\nconst express = require('express');\nconst app = express();\n\napp.use((req, res, next) => {\n  res.setHeader('X-SparrowX-Shield', 'Active-v2');\n  const ua = req.headers['user-agent'] || '';\n  if (/sqlmap|nikto|acunetix|masscan/i.test(ua)) {\n    return res.status(403).json({ error: 'Blocked by SparrowX Perimeter WAF' });\n  }\n  next();\n});\n\napp.listen(${port}, () => console.log('Shielded on port ${port}'));`;
+    }
+
+    // Default Nginx (Ubuntu / Debian)
+    return `# /etc/nginx/sites-available/sparrowx.conf\nlimit_req_zone $binary_remote_addr zone=spx_rate:10m rate=20r/s;\n\nserver {\n    server_name ${cleanHost};\n    listen 80;\n    listen 443 ssl http2;\n\n    # Hardened Security & Anti-Sniff Headers\n    add_header X-Content-Type-Options "nosniff" always;\n    add_header X-Frame-Options "SAMEORIGIN" always;\n    add_header X-SparrowX-Shield "Active-v2" always;\n\n    location / {\n        limit_req zone=spx_rate burst=40 nodelay;\n        proxy_pass http://127.0.0.1:${port};\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-SparrowX-Key "${key}";\n    }\n}`;
+  }, [serverStack, serverHost, serverPort, tenants]);
 
   const handleDownloadFirewall = () => {
     const blob = new Blob([exportedFw.content], { type: exportedFw.mimeType });
@@ -379,29 +431,72 @@ export function ShieldSocDashboardView({
             )}
 
             {liveAudit && (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 pt-1">
-                {liveAudit.findings.map((finding, i) => (
-                  <div
-                    key={`${finding.title}-${i}`}
-                    className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-3.5 space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium text-[#F4F6FA]">{finding.title}</span>
-                      <span
-                        className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase ${
-                          finding.status === "passed"
-                            ? "bg-[#10B981]/15 text-[#10B981]"
-                            : finding.status === "warning"
-                              ? "bg-[#FFEBB9]/15 text-[#FFEBB9]"
-                              : "bg-[#F9103A]/15 text-[#F9103A]"
-                        }`}
-                      >
-                        {finding.status}
+              <div className="space-y-3 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-mono">
+                  <span className="rounded border border-[#F4F6FA]/12 bg-[#07090E] px-2 py-0.5 text-[#F4F6FA]/90 font-bold">
+                    Grade {liveAudit.scoreGrade} · {liveAudit.riskLevel}
+                  </span>
+                  <span className="rounded border border-[#F4F6FA]/10 bg-[#07090E] px-2 py-0.5 text-[#F4F6FA]/80">
+                    TLS: {liveAudit.deepTelemetry?.tlsProtocol ?? (liveAudit.httpsReachable ? "TLSv1.3" : "Failed")}
+                  </span>
+                  {liveAudit.deepTelemetry?.certIssuer && (
+                    <span className="rounded border border-[#F4F6FA]/10 bg-[#07090E] px-2 py-0.5 text-[#F4F6FA]/80">
+                      CA: {liveAudit.deepTelemetry.certIssuer}
+                    </span>
+                  )}
+                  <span className="rounded border border-[#F4F6FA]/10 bg-[#07090E] px-2 py-0.5 text-[#F4F6FA]/80">
+                    WAF: {liveAudit.deepTelemetry?.wafProvider ?? "Direct Origin"}
+                  </span>
+                  <span className="rounded border border-[#F4F6FA]/10 bg-[#07090E] px-2 py-0.5 text-[#10B981]">
+                    Tools: {liveAudit.deepTelemetry?.toolsExecuted.length ?? 8} Executed
+                  </span>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {liveAudit.findings.map((finding, i) => (
+                    <div
+                      key={`${finding.title}-${i}`}
+                      className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-3.5 space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-[#F4F6FA]">{finding.title}</span>
+                        <span
+                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] uppercase ${
+                            finding.status === "passed"
+                              ? "bg-[#10B981]/15 text-[#10B981]"
+                              : finding.status === "warning"
+                                ? "bg-[#FFEBB9]/15 text-[#FFEBB9]"
+                                : "bg-[#F9103A]/15 text-[#F9103A]"
+                          }`}
+                        >
+                          {finding.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#F4F6FA]/55">{finding.detail}</p>
+                      <p className="text-[10px] font-mono text-[#F96246]/90 truncate">{finding.evidence}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {liveAudit.advisory && (
+                  <div className="rounded-xl border border-[#F96246]/35 bg-[#F96246]/[0.07] p-4 space-y-2 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-[#F96246]">
+                        ✦ SparrowX AI Neural Threat Advisory ({liveAudit.advisory.modelUsed})
+                      </span>
+                      <span className="font-mono text-[10px] text-[#F4F6FA]/60">
+                        Target Profile: {liveAudit.advisory.targetCategory}
                       </span>
                     </div>
-                    <p className="text-[11px] text-[#F4F6FA]/55">{finding.detail}</p>
+                    <p className="text-[#F4F6FA]/90 leading-relaxed">{liveAudit.advisory.executiveSummary}</p>
+                    <p className="text-[#FFEBB9]/90 text-[11px]">
+                      <strong>Exploit Vector:</strong> {liveAudit.advisory.exploitScenario}
+                    </p>
+                    <p className="text-[#10B981] text-[11px] font-medium">
+                      <strong>60-Second Defense:</strong> {liveAudit.advisory.recommendedAction}
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             )}
           </div>
@@ -419,20 +514,20 @@ export function ShieldSocDashboardView({
 
         {/* Functional Security Defense Tools Grid */}
         <section id="shield-defense-tools" className="grid gap-6 lg:grid-cols-2">
-          {/* AI Prompt Injection & PII Firewall */}
+          {/* AI Prompt Injection & PII Firewall + SparrowX AI Neural Copilot */}
           <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-6 space-y-4">
             <div className="flex items-center justify-between gap-2">
               <div>
                 <h3 className="text-base font-semibold text-[#F4F6FA] flex items-center gap-2">
                   <Sparkles className="size-4 text-[#F96246]" />
-                  <span>AI Prompt &amp; Tool-Call Firewall Sandbox</span>
+                  <span>AI Prompt Firewall &amp; SparrowX AI Neural Copilot</span>
                 </h3>
                 <p className="text-xs text-[#F4F6FA]/55 mt-0.5">
-                  Test live jailbreak detection, MCP shell-call blocking, and PII/API secret redaction.
+                  Test live jailbreak detection, redact PII/secrets, or ask SparrowX AI to synthesize custom WAF/eBPF rules.
                 </p>
               </div>
               <span className="rounded-full border border-[#10B981]/35 bg-[#10B981]/10 px-2.5 py-0.5 font-mono text-[10px] text-[#10B981]">
-                Inline Engine
+                Neural Engine Active
               </span>
             </div>
 
@@ -461,17 +556,28 @@ export function ShieldSocDashboardView({
               rows={3}
               value={promptInput}
               onChange={(e) => setPromptInput(e.target.value)}
-              placeholder="Paste any LLM prompt or MCP tool payload to inspect..."
+              placeholder="Paste any LLM prompt, CVE, or ask SparrowX AI to generate NGINX / Cloudflare WAF rules..."
               className="w-full rounded-xl border border-[#F4F6FA]/12 bg-[#07090E] p-3 font-mono text-xs text-[#F4F6FA] placeholder-[#F4F6FA]/35 outline-none focus:border-[#F9103A]"
             />
 
-            <button
-              type="button"
-              onClick={() => promptInput.trim() && setPromptVerdict(analyzePromptInSandbox(promptInput))}
-              className="w-full h-10 rounded-xl bg-[#F9103A] hover:bg-[#F9103A]/90 text-xs font-semibold text-white cursor-pointer"
-            >
-              Inspect Payload Against Guardrails
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => promptInput.trim() && setPromptVerdict(analyzePromptInSandbox(promptInput))}
+                className="h-10 rounded-xl bg-[#F9103A] hover:bg-[#F9103A]/90 text-xs font-semibold text-white cursor-pointer"
+              >
+                Inspect Payload Against Guardrails
+              </button>
+              <button
+                type="button"
+                disabled={aiCopilotLoading}
+                onClick={() => void handleAskSparrowxAi()}
+                className="h-10 rounded-xl border border-[#F96246]/45 bg-[#F96246]/15 hover:bg-[#F96246]/25 text-xs font-semibold text-[#FFEBB9] cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                <Sparkles className={`size-3.5 text-[#F96246] ${aiCopilotLoading ? "animate-spin" : ""}`} />
+                <span>{aiCopilotLoading ? "Synthesizing..." : "Analyze with SparrowX AI"}</span>
+              </button>
+            </div>
 
             {promptVerdict && (
               <div
@@ -498,6 +604,18 @@ export function ShieldSocDashboardView({
                 <code className="block rounded bg-[#07090E] p-2.5 font-mono text-[11px] text-[#F4F6FA]/85 break-all">
                   {promptVerdict.redactedText}
                 </code>
+              </div>
+            )}
+
+            {aiCopilotResult && (
+              <div className="rounded-xl border border-[#F96246]/35 bg-[#07090E] p-4 space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[10px] font-mono text-[#F96246]">
+                  <span className="font-bold uppercase">✦ {aiCopilotResult.modelUsed}</span>
+                  <span>{aiCopilotResult.liveAiGenerated ? "Live Neural Synthesis" : "Autonomous Core"}</span>
+                </div>
+                <div className="whitespace-pre-wrap text-[#F4F6FA]/90 leading-relaxed font-sans">
+                  {aiCopilotResult.text}
+                </div>
               </div>
             )}
           </div>
@@ -665,6 +783,105 @@ export function ShieldSocDashboardView({
                 </ul>
               )}
             </div>
+          </div>
+        </section>
+
+        {/* Single Server Armor & Edge Connector */}
+        <section id="single-server-armor" className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-6 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex size-7 items-center justify-center rounded-lg bg-[#F9103A]/15 border border-[#F9103A]/30 text-[#F9103A]">
+                  <Server className="size-4" />
+                </span>
+                <h3 className="text-base font-semibold text-[#F4F6FA]">Single-Server Production Armor &amp; Reverse Proxy</h3>
+                <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-[#10B981]">
+                  Self-Hosted / Single VPS
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-[#F4F6FA]/55">
+                Drop this into your Ubuntu server (Nginx / Caddy / Cloudflare Tunnel) to protect your website and APIs with SparrowX Edge WAF and DDoS mitigation.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#F4F6FA]/60">Stack:</span>
+              <select
+                aria-label="Server reverse proxy configuration stack"
+                value={serverStack}
+                onChange={(e) => setServerStack(e.target.value as "nginx" | "caddy" | "cloudflare" | "express")}
+                className="h-9 rounded-lg border border-[#F4F6FA]/14 bg-[#07090E] px-3 text-xs font-medium text-[#F4F6FA] outline-none"
+              >
+                <option value="nginx">Nginx (Ubuntu / Debian)</option>
+                <option value="caddy">Caddy v2</option>
+                <option value="cloudflare">Cloudflare Tunnel (cloudflared)</option>
+                <option value="express">Node.js Express Middleware</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="text-[11px] font-medium text-[#F4F6FA]/70 block mb-1">Target Host / Domain</label>
+              <input
+                type="text"
+                value={serverHost}
+                onChange={(e) => setServerHost(e.target.value)}
+                placeholder="yourdomain.com"
+                className="h-9 w-full rounded-lg border border-[#F4F6FA]/12 bg-[#07090E] px-3 font-mono text-xs text-[#F4F6FA] outline-none focus:border-[#F9103A]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#F4F6FA]/70 block mb-1">App Internal Port</label>
+              <input
+                type="text"
+                value={serverPort}
+                onChange={(e) => setServerPort(e.target.value)}
+                placeholder="3000"
+                className="h-9 w-full rounded-lg border border-[#F4F6FA]/12 bg-[#07090E] px-3 font-mono text-xs text-[#F4F6FA] outline-none focus:border-[#F9103A]"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-medium text-[#F4F6FA]/70 block mb-1">Tenant Secret Key</label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type={revealSecret ? "text" : "password"}
+                  readOnly
+                  value={tenants[0]?.apiKey || "spx_live_single_server_shield_key"}
+                  className="h-9 flex-1 rounded-lg border border-[#F4F6FA]/12 bg-[#07090E] px-3 font-mono text-xs text-[#F4F6FA]/80 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setRevealSecret((v) => !v)}
+                  title={revealSecret ? "Hide Key" : "Reveal Key"}
+                  className="size-9 rounded-lg border border-[#F4F6FA]/12 bg-[#121622] grid place-items-center text-[#F4F6FA]/70 hover:text-white cursor-pointer"
+                >
+                  {revealSecret ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative rounded-xl border border-[#F4F6FA]/[0.08] bg-[#07090E] p-4 font-mono text-xs text-[#F4F6FA]/85">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#F4F6FA]/[0.07] text-[11px] text-[#F4F6FA]/50">
+              <span>{serverStack === "nginx" ? "/etc/nginx/sites-available/sparrowx.conf" : serverStack === "caddy" ? "Caddyfile" : serverStack === "cloudflare" ? "config.yml" : "server.js"}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(generatedServerSnippet);
+                  setCopiedServerSnippet(true);
+                  emitEngineToast("Reverse proxy configuration copied to clipboard.", "success", "Config Copied");
+                  setTimeout(() => setCopiedServerSnippet(false), 1600);
+                }}
+                className="inline-flex items-center gap-1 rounded bg-[#F9103A]/15 border border-[#F9103A]/30 px-2.5 py-1 text-xs text-[#FFEBB9] hover:bg-[#F9103A]/25 cursor-pointer"
+              >
+                {copiedServerSnippet ? <Check className="size-3 text-[#10B981]" /> : <Copy className="size-3" />}
+                <span>{copiedServerSnippet ? "Copied" : "Copy Config"}</span>
+              </button>
+            </div>
+            <pre className="overflow-x-auto text-[11px] leading-relaxed max-h-48 text-[#F4F6FA]/90">
+              {generatedServerSnippet}
+            </pre>
           </div>
         </section>
 
