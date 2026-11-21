@@ -311,20 +311,27 @@ export function SparrowxKeysEngine() {
 
       {/* SECTION 2: THE LIVE INSTRUMENT (PRECISION CONSOLE) */}
       <main className="relative flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
-        {/* Subtle floating 3D side accent */}
-        <div
-          aria-hidden="true"
-          className="hidden xl:block pointer-events-none absolute -right-28 top-8 w-40 opacity-90"
-        >
-          <Floating3DVisual
-            src="/3d/keys-crypto-module.jpg"
-            alt=""
-            accent="amber"
-            size="sm"
-            priority="lazy"
-            width={220}
-            height={220}
-          />
+        {/* Compact Borderless Floating 3D Hardware Key Accent */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
+          <div className="space-y-1 text-center sm:text-left">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
+              Offline Cryptographic Key Generator
+            </h1>
+            <p className="text-xs sm:text-sm text-[#9CA3AF]">
+              100% browser-local Web Crypto CSPRNG entropy. Zero network calls.
+            </p>
+          </div>
+          <div className="w-36 sm:w-44 shrink-0">
+            <Floating3DVisual
+              src="/3d/keys-crypto-module.jpg"
+              alt="3D floating obsidian and brushed gold hardware security key"
+              accent="amber"
+              size="sm"
+              priority="lcp"
+              width={260}
+              height={260}
+            />
+          </div>
         </div>
 
         {/* TOP SEGMENTED INDUSTRIAL SWITCH (MODE MATRIX) */}

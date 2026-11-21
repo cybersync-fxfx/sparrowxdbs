@@ -354,22 +354,7 @@ print(response.json())`;
           </div>
         </header>
 
-        <main className="relative flex-1 flex items-center justify-center px-4 py-12 overflow-hidden">
-          <div
-            aria-hidden="true"
-            className="hidden lg:block pointer-events-none absolute right-12 top-1/2 -translate-y-1/2 w-52 opacity-85"
-          >
-            <Floating3DVisual
-              src="/3d/api-gateway-nexus.svg"
-              alt=""
-              accent="emerald"
-              size="md"
-              priority="lazy"
-              width={260}
-              height={260}
-            />
-          </div>
-
+        <main className="relative flex-1 flex flex-col md:flex-row items-center justify-center gap-6 md:gap-10 px-4 py-10 overflow-hidden">
           <div className="relative z-10 w-full max-w-md border border-white/[0.1] bg-[#0E1015] rounded-lg p-6 sm:p-8 space-y-6 shadow-2xl">
             <div className="space-y-2 text-center">
               <div className="mx-auto size-11 rounded-lg bg-emerald-500/10 border border-emerald-500/30 grid place-items-center text-emerald-400">
@@ -502,6 +487,19 @@ print(response.json())`;
                 Manage in DB Studio →
               </a>
             </div>
+          </div>
+
+          {/* Borderless Floating 3D API Gateway Side Object */}
+          <div className="w-48 sm:w-56 md:w-64 shrink-0">
+            <Floating3DVisual
+              src="/3d/api-gateway-nexus.svg"
+              alt="3D floating emerald API gateway router prism"
+              accent="emerald"
+              size="md"
+              priority="lcp"
+              width={320}
+              height={320}
+            />
           </div>
         </main>
       </div>

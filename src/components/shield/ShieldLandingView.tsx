@@ -247,21 +247,23 @@ export function ShieldLandingView({
               </div>
             </div>
 
-            {/* Interactive Live Perimeter Audit Card + subtle floating 3D side accent */}
+            {/* Interactive Live Perimeter Audit Card + borderless floating 3D side shield */}
             <div className="relative space-y-4 min-w-0 w-full">
               <div
                 aria-hidden="true"
-                className="hidden xl:block pointer-events-none absolute -top-24 -right-12 w-40 opacity-85"
+                className="flex justify-center lg:justify-end -mb-2 pointer-events-none"
               >
-                <Floating3DVisual
-                  src="/3d/shield-waf-fortress.svg"
-                  alt=""
-                  accent="crimson"
-                  size="sm"
-                  priority="lazy"
-                  width={200}
-                  height={200}
-                />
+                <div className="w-36 sm:w-44">
+                  <Floating3DVisual
+                    src="/3d/shield-waf-fortress.svg"
+                    alt=""
+                    accent="crimson"
+                    size="sm"
+                    priority="lcp"
+                    width={240}
+                    height={240}
+                  />
+                </div>
               </div>
 
             <div

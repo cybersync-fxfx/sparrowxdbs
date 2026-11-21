@@ -1692,21 +1692,8 @@ export function SparrowxDropEngine() {
                   </button>
                 </div>
             {/* Header intro */}
-            <div className="relative text-center space-y-3 max-w-2xl mx-auto">
-              <div
-                aria-hidden="true"
-                className="hidden lg:block pointer-events-none absolute -right-44 -top-6 w-36 opacity-90"
-              >
-                <Floating3DVisual
-                  src="/3d/drop-encrypted-vault.svg"
-                  alt=""
-                  accent="violet"
-                  size="sm"
-                  priority="lazy"
-                  width={200}
-                  height={200}
-                />
-              </div>
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-4xl mx-auto">
+              <div className="text-center md:text-left space-y-3 max-w-xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-400">
                 <HardDrive className="size-3.5" />
                 <span>Sovereign NVMe Disk Storage • Permanent Unique URLs</span>
@@ -1718,6 +1705,18 @@ export function SparrowxDropEngine() {
                 Upload any file to your private sovereign server. Each upload gets a permanent download URL
                 that stays active until you choose to delete it.
               </p>
+              </div>
+              <div className="w-40 sm:w-48 shrink-0">
+                <Floating3DVisual
+                  src="/3d/drop-encrypted-vault.svg"
+                  alt="3D floating encrypted file storage vault cube"
+                  accent="violet"
+                  size="sm"
+                  priority="lcp"
+                  width={260}
+                  height={260}
+                />
+              </div>
             </div>
 
             {/* Storage Hardware Telemetry HUD */}
@@ -1942,21 +1941,8 @@ export function SparrowxDropEngine() {
         {/* ================================================================= */}
         {activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
-            <div className="relative text-center space-y-3.5 max-w-2xl mx-auto">
-              <div
-                aria-hidden="true"
-                className="hidden lg:block pointer-events-none absolute -right-44 -top-6 w-36 opacity-90"
-              >
-                <Floating3DVisual
-                  src="/3d/drop-encrypted-vault.svg"
-                  alt=""
-                  accent="violet"
-                  size="sm"
-                  priority="lazy"
-                  width={200}
-                  height={200}
-                />
-              </div>
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-4xl mx-auto">
+              <div className="text-center md:text-left space-y-3.5 max-w-xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-300">
                 <Flame className="size-3.5 text-purple-400" />
                 <span>Zero-Disk RAM • We Don't Save Anything</span>
@@ -1964,11 +1950,11 @@ export function SparrowxDropEngine() {
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
                 Ephemeral Drop: We Don&apos;t Save Anything.
               </h1>
-              <p className="text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed">
+              <p className="text-sm text-zinc-300 leading-relaxed">
                 In Ephemeral mode, we don&apos;t save anything. Files are encrypted with AES-GCM in your browser RAM before transfer, and the moment you close this tab, memory is zeroed out and destroyed without a trace.
               </p>
               <div className="pt-1">
-                <div className="inline-flex flex-wrap items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-purple-950/20 px-4 py-2 text-xs text-zinc-300">
+                <div className="inline-flex flex-wrap items-center justify-center md:justify-start gap-2 rounded-xl border border-purple-500/30 bg-purple-950/20 px-4 py-2 text-xs text-zinc-300">
                   <span className="text-zinc-400">Want to keep your files permanently?</span>
                   <button
                     type="button"
@@ -1984,6 +1970,18 @@ export function SparrowxDropEngine() {
                     <ArrowRight className="size-3" />
                   </button>
                 </div>
+              </div>
+              </div>
+              <div className="w-40 sm:w-48 shrink-0">
+                <Floating3DVisual
+                  src="/3d/drop-encrypted-vault.svg"
+                  alt="3D floating encrypted memory vault cube"
+                  accent="violet"
+                  size="sm"
+                  priority="lcp"
+                  width={260}
+                  height={260}
+                />
               </div>
             </div>
 

@@ -70,19 +70,19 @@ export function Hero({ service, onService }: { service: Service; onService: (s: 
           </div>
         </div>
 
-        <div className="relative flex justify-center lg:justify-end" style={{ perspective: 1200 }}>
+        <div className="relative flex flex-col items-center lg:items-end gap-3" style={{ perspective: 1200 }}>
           <div
             aria-hidden="true"
-            className="hidden xl:block pointer-events-none absolute -top-24 -right-8 w-44 opacity-90"
+            className="w-36 sm:w-44 pointer-events-none"
           >
             <Floating3DVisual
               src="/3d/game-server-node.svg"
               alt=""
               accent="orange"
               size="sm"
-              priority="lazy"
-              width={220}
-              height={220}
+              priority="lcp"
+              width={240}
+              height={240}
             />
           </div>
           <TelemetryCard service={service} />
