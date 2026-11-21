@@ -41,12 +41,14 @@ interface UpiAutoPayModalProps {
   planName: string;
   amountInr: number;
   customerEmail: string;
-  metadata?: {
-    category?: "bare-metal" | "dedicated" | "vps";
-    hostname?: string;
-    region?: string;
-    os?: string;
-  };
+  metadata?:
+    | {
+        category?: "bare-metal" | "dedicated" | "vps";
+        hostname?: string;
+        region?: string;
+        os?: string;
+      }
+    | undefined;
   onPaymentConfirmed?: (order: UpiCheckoutOrder) => void;
 }
 

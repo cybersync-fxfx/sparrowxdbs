@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import {
   AlertTriangle,
   ArrowRight,
@@ -411,6 +412,11 @@ export function SparrowxShieldEngine({
                     email: emailClean,
                     fullName: newUser.fullName,
                     tenantId: newUser.tenantId,
+                  });
+                  requestGlobalEmailVerification({
+                    email: newUser.email,
+                    fullName: newUser.fullName,
+                    serviceName: "SparrowX Shield SOC & WAF",
                   });
                   completeAuthTransition({ ...newUser, password: "" });
                 }

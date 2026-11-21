@@ -394,3 +394,22 @@ CREATE TABLE IF NOT EXISTS public.threat_radar (
 );
 CREATE INDEX IF NOT EXISTS idx_threat_radar_ip ON public.threat_radar (ip);
 CREATE INDEX IF NOT EXISTS idx_threat_radar_detected_at ON public.threat_radar (detected_at DESC);
+
+-- 18. Unified Email Verification (Self-Hosted Postfix/OpenDKIM SMTP across all SparrowX services)
+ALTER TABLE public.app_users
+  ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS public.email_verification_codes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT DEFAULT NULL,
+  email TEXT NOT NULL,
+  code_hash TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ DEFAULT NULL,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_email_verif_email_created ON public.email_verification_codes (LOWER(email), created_at DESC);
+REVOKE ALL ON public.email_verification_codes FROM web_anon;

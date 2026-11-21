@@ -195,5 +195,8 @@ describe("App routing", () => {
       .map((el) => el.getAttribute("href"))
       .filter(Boolean);
     expect(allHrefs).not.toContain("/errors");
+    expect(allHrefs).not.toContain("/game/dashboard");
+    expect(allHrefs).not.toContain("https://game.panel.sparrowx.net");
+    expect(allHrefs).not.toContain("https://netsec.sparrowx.net");
   });
 });

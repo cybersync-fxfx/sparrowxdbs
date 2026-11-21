@@ -58,6 +58,13 @@
       "url": "https://sparrowx.net/verification.sh",
       "repoPath": "verification.sh",
       "cliCommand": "curl -sSL https://sparrowx.net/verification.sh | sudo bash"
+    },
+    {
+      "id": "smtp-setup",
+      "name": "Self-Hosted Open-Source SMTP (Postfix + OpenDKIM) Setup",
+      "url": "https://sparrowx.net/smtp-setup.sh",
+      "repoPath": "deploy/smtp-setup.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/smtp-setup.sh | sudo bash"
     }
   ]
 }

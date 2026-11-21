@@ -106,6 +106,14 @@ services:
       RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
       RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      # Self-Hosted Open-Source SMTP (Postfix + OpenDKIM) & Email Verification
+      SMTP_HOST: ${SMTP_HOST:-smtp}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-SparrowX Security <noreply@${SPARROWX_DOMAIN:-sparrowx.net}>}
+      SMTP_HELO_DOMAIN: ${SPARROWX_DOMAIN:-sparrowx.net}
     volumes:
       - sparrowx_appdata:/app/data
     ports:
@@ -116,6 +124,29 @@ services:
           - sparrowx
           - sparrowx-app
           - sparrowx-studio
+
+  smtp:
+    image: boky/postfix:latest
+    container_name: sparrowx-smtp
+    restart: unless-stopped
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${SPARROWX_DOMAIN:-sparrowx.net}
+      HOSTNAME: mail.${SPARROWX_DOMAIN:-sparrowx.net}
+      DKIM_AUTOGENERATE: "1"
+      DKIM_SELECTOR: ${SMTP_DKIM_SELECTOR:-mail}
+      RELAYHOST: ${SMTP_RELAYHOST:-}
+      RELAYHOST_USERNAME: ${SMTP_RELAYHOST_USER:-}
+      RELAYHOST_PASSWORD: ${SMTP_RELAYHOST_PASS:-}
+      POSTFIX_myhostname: mail.${SPARROWX_DOMAIN:-sparrowx.net}
+      POSTFIX_smtputf8_enable: "no"
+    volumes:
+      - ./ovh/dkim:/etc/opendkim/keys
+    networks:
+      sparrowx_net:
+        aliases:
+          - smtp
+          - sparrowx-smtp
+          - mail
 
   nginx:
     image: nginx:1.27-alpine

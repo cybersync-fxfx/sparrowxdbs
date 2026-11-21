@@ -316,7 +316,7 @@ export async function executeServerAction(input: {
       ok: true,
       message: `Executed Proxmox '${input.action}' on ${server.name} (VMID ${server.vmid}).`,
       server,
-      proxmoxTask,
+      ...(proxmoxTask ? { proxmoxTask } : {}),
     };
   }
 
@@ -448,7 +448,7 @@ export async function createServerConsoleSession(serverId: string): Promise<{
       return {
         ok: true,
         sshCommand,
-        proxmoxTicket: payload.ticket,
+        ...(payload.ticket ? { proxmoxTicket: payload.ticket } : {}),
         consolePort: Number(payload.port || 5900),
         mode: "live",
       };

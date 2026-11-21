@@ -20,20 +20,22 @@ export interface UpiPaymentOrder {
   createdAt: string;
   expiresAt: string;
   paidAt?: string;
-  metadata?: {
-    category?: "bare-metal" | "dedicated" | "vps";
-    hostname?: string;
-    region?: string;
-    os?: string;
-  };
-  provisionedServer?: ManagedInfraServer;
+  metadata?:
+    | {
+        category?: "bare-metal" | "dedicated" | "vps";
+        hostname?: string;
+        region?: string;
+        os?: string;
+      }
+    | undefined;
+  provisionedServer?: ManagedInfraServer | undefined;
 }
 
 interface IncomingBridgeReceipt {
   utr: string;
   amountInr: number;
-  orderId?: string;
-  senderText?: string;
+  orderId?: string | undefined;
+  senderText?: string | undefined;
   receivedAt: string;
 }
 

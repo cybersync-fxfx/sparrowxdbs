@@ -83,6 +83,7 @@ Run any SparrowX installer or DDoS defense script directly over HTTPS (`https://
 | Updater, Rebuild & DDoS Sync | `curl -sSL https://sparrowx.net/update.sh \| sudo bash` | [update.sh](update.sh) |
 | Autonomous 12-Stage Auto-Heal Doctor | `curl -sSL https://sparrowx.net/fix.sh \| sudo bash -s -- --auto` | [fix.sh](fix.sh) |
 | Total Infrastructure Audit (11 Layers) | `curl -sSL https://sparrowx.net/verification.sh \| sudo bash` | [verification.sh](verification.sh) / [public/verification.sh](public/verification.sh) |
+| Self-Hosted Open-Source SMTP (Postfix + DKIM) | `curl -sSL https://sparrowx.net/smtp-setup.sh \| sudo bash` | [deploy/smtp-setup.sh](deploy/smtp-setup.sh) / [public/smtp-setup.sh](public/smtp-setup.sh) |
 | VPS Telemetry Connector (+optional XDP) | `curl -sSL https://sparrowx.net/install-connector.sh \| SPX_KEY=... SPX_TENANT=... SPX_ENABLE_DDOS=1 bash` | [public/install-connector.sh](public/install-connector.sh) |
 
 Global CLI symlinks installed on Ubuntu/Debian hosts: `sparrowx-setup`, `sparrowx-ddos`, `sparrowx-xdp`, `sparrowx-update`, `sparrowx-fix`, `sparrowx-doctor`, `sparrowx-verify`, `sparrowx-db`, `sparrowx-heal`.
