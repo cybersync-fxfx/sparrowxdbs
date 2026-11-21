@@ -542,12 +542,33 @@ ensure_netsec_dashboard_running() {
   fi
 
   local local_sbs_src="${INSTALL_DIR:-/opt/sparrowxdbs}/sbs"
+  local sbs_assets_changed="no"
   if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
-    mkdir -p "${netsec_dir}" 2>/dev/null || true
+    mkdir -p "${netsec_dir}" "${netsec_dir}/frontend/public" "${netsec_dir}/frontend/src/components" "${netsec_dir}/frontend/src/pages" 2>/dev/null || true
     cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
     cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
+    if [ -d "${local_sbs_src}/frontend" ]; then
+      if [ -f "${local_sbs_src}/frontend/public/logo.png" ] && ! cmp -s "${local_sbs_src}/frontend/public/logo.png" "${netsec_dir}/frontend/public/logo.png" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/index.html" ] && ! cmp -s "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/src/pages/Landing.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Landing.jsx" "${netsec_dir}/frontend/src/pages/Landing.jsx" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" "${netsec_dir}/frontend/src/pages/Dashboard.jsx" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/public/" 2>/dev/null || true
+      [ -f "${local_sbs_src}/frontend/index.html" ] && cp -f "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null || true
+      [ -d "${local_sbs_src}/frontend/src" ] && cp -rf "${local_sbs_src}/frontend/src/." "${netsec_dir}/frontend/src/" 2>/dev/null || true
+      if [ -d "${netsec_dir}/frontend/dist" ]; then
+        cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/dist/" 2>/dev/null || true
+      fi
+    fi
   fi
 
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then
@@ -559,7 +580,7 @@ ensure_netsec_dashboard_running() {
   local cur_rev="" built_rev="" need_build="no"
   cur_rev="$(git -C "${netsec_dir}" rev-parse HEAD 2>/dev/null || echo 'local')"
   [ -f "${netsec_dir}/.sparrowx-built-rev" ] && built_rev="$(cat "${netsec_dir}/.sparrowx-built-rev" 2>/dev/null | tr -d '[:space:]' || true)"
-  if [ ! -s "${netsec_dir}/frontend/dist/index.html" ] || [ ! -f "${netsec_dir}/pg-compat.js" ] || [ ! -d "${netsec_dir}/node_modules/express" ] || [ ! -d "${netsec_dir}/node_modules/bcrypt" ] || [ ! -d "${netsec_dir}/node_modules/pg" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${NETSEC_REBUILD:-0}" = "1" ]; then
+  if [ ! -s "${netsec_dir}/frontend/dist/index.html" ] || [ ! -f "${netsec_dir}/pg-compat.js" ] || [ ! -d "${netsec_dir}/node_modules/express" ] || [ ! -d "${netsec_dir}/node_modules/bcrypt" ] || [ ! -d "${netsec_dir}/node_modules/pg" ] || [ "${cur_rev}" != "${built_rev}" ] || [ "${sbs_assets_changed}" = "yes" ] || [ "${NETSEC_REBUILD:-0}" = "1" ]; then
     need_build="yes"
   fi
 

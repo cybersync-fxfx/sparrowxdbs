@@ -1,158 +1,509 @@
-/* Landing.css - Ultra-dark black + red/green brand */
-.landing-body {
+/* Landing.css — SparrowX NetSec High-Conversion Cyber DDoS Showcase */
+.ns-landing {
   min-height: 100vh;
-  background-color: #030305;
-  color: #f3fff0;
+  background: radial-gradient(circle at 18% 0%, rgba(255, 34, 58, 0.14), transparent 48%),
+              radial-gradient(circle at 82% 12%, rgba(34, 211, 238, 0.09), transparent 45%),
+              #04060b;
+  color: #f8fafc;
+  position: relative;
   overflow-x: hidden;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.ns-ambient {
+  position: fixed;
+  width: 560px;
+  height: 560px;
+  border-radius: 50%;
+  filter: blur(130px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.16;
+}
+
+.ns-ambient-crimson {
+  top: -180px;
+  left: -140px;
+  background: #ff223a;
+}
+
+.ns-ambient-cyan {
+  bottom: -200px;
+  right: -140px;
+  background: #06b6d4;
+}
+
+.ns-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(16px);
+  background: rgba(4, 6, 11, 0.82);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ns-nav-inner {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ns-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.ns-brand-logo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 12px rgba(255, 34, 58, 0.45));
+}
+
+.ns-brand-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.ns-brand-name span {
+  color: #ff223a;
+}
+
+.ns-brand-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: #94a3b8;
+}
+
+.ns-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 0.86rem;
+  color: #cbd5e1;
+}
+
+.ns-nav-links a,
+.ns-link-btn {
+  color: #cbd5e1;
+  text-decoration: none;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.ns-nav-links a:hover,
+.ns-link-btn:hover {
+  color: #ffffff;
+}
+
+.ns-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ns-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.ns-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+}
+
+.ns-btn-ghost {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ns-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #ff223a 0%, #d9142b 100%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -6px rgba(255, 34, 58, 0.55);
+}
+
+.ns-container {
   position: relative;
   z-index: 1;
-}
-
-.bg-glow {
-  position: absolute;
-  width: 600px;
-  height: 600px;
-  filter: blur(100px);
-  z-index: -1;
-  opacity: 0.12;
-  pointer-events: none;
-}
-
-.bg-glow-blue {
-  top: -200px;
-  left: -200px;
-  background: #e11d2e;
-}
-
-.bg-glow-cyan {
-  bottom: -200px;
-  right: -200px;
-  background: #289912;
-}
-
-.content-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  max-width: 1000px;
+  max-width: 1240px;
   margin: 0 auto;
-  width: 100%;
-  min-height: 100vh;
+  padding: 48px 24px 80px;
 }
 
-.brand-header {
+.ns-hero {
   text-align: center;
-  margin-bottom: 60px;
+  max-width: 920px;
+  margin: 0 auto 64px;
 }
 
-.brand-icon {
-  color: #289912;
-  margin-bottom: 20px;
-  filter: drop-shadow(0 0 20px rgba(40, 153, 18, 0.42));
-  cursor: pointer;
-  transition: transform 0.3s ease;
-}
-
-.brand-icon:hover {
-  transform: scale(1.1);
-}
-
-.brand-title {
-  font-size: clamp(2.5rem, 5vw, 4rem);
-  font-weight: 700;
-  letter-spacing: -1px;
-  margin-bottom: 15px;
-  color: #ffffff;
-  text-shadow: 0 0 20px rgba(40, 153, 18, 0.34);
-}
-
-.brand-subtitle {
-  font-size: 1.2rem;
-  color: #73806f;
-  font-weight: 400;
-}
-
-.redirect-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: 100%;
-  max-width: 600px;
-}
-
-.redirect-card {
-  display: flex;
+.ns-hero-badge {
+  display: inline-flex;
   align-items: center;
-  padding: 24px 30px;
-  background: rgba(7, 11, 7, 0.74);
-  border: 1px solid rgba(40, 153, 18, 0.24);
-  text-decoration: none;
-  color: #f3fff0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(255, 34, 58, 0.12);
+  border: 1px solid rgba(255, 34, 58, 0.35);
+  color: #ff6b7b;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-bottom: 22px;
+}
+
+.ns-hero-title {
+  font-size: clamp(2.2rem, 4.6vw, 3.8rem);
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 20px;
+}
+
+.ns-gradient-text {
+  background: linear-gradient(90deg, #ff334b 0%, #ff8a65 55%, #22d3ee 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ns-hero-sub {
+  font-size: 1.05rem;
+  line-height: 1.65;
+  color: #94a3b8;
+  max-width: 760px;
+  margin: 0 auto 28px;
+}
+
+.ns-hero-sub strong {
+  color: #f1f5f9;
+}
+
+.ns-hero-ctas {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 26px;
+}
+
+.ns-btn-hero-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 26px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff223a 0%, #c8102e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 32px -10px rgba(255, 34, 58, 0.65);
+  transition: transform 0.15s ease;
+}
+
+.ns-btn-hero-primary:hover {
+  transform: translateY(-2px);
+}
+
+.ns-btn-hero-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 22px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-size: 0.92rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.redirect-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; bottom: 0; width: 3px;
-  background: #73806f;
-  transition: all 0.3s ease;
+.ns-cmd-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 8px 12px 8px 16px;
+  border-radius: 12px;
+  background: rgba(11, 15, 25, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  margin-bottom: 42px;
 }
 
-.redirect-card:hover {
-  background: rgba(10, 17, 10, 0.92);
-  border-color: rgba(40, 153, 18, 0.56);
-  transform: translateY(-4px);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.62), 0 0 20px rgba(40, 153, 18, 0.13);
+.ns-cmd-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #ff4d63;
+  letter-spacing: 0.08em;
 }
 
-.redirect-card:hover::before {
-  background: #289912;
-  width: 6px;
+.ns-cmd-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: #38bdf8;
 }
 
-.primary-card {
-  border-color: rgba(40, 153, 18, 0.42);
-}
-.primary-card::before {
-  background: #289912;
+.ns-cmd-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.card-icon-wrapper {
-  background: rgba(40, 153, 18, 0.08);
-  padding: 16px;
-  margin-right: 20px;
-  color: #289912;
-}
-
-.card-content {
-  flex: 1;
+.ns-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
   text-align: left;
 }
 
-.card-content h2 {
-  font-size: 1.25rem;
-  font-weight: 600;
+.ns-kpi-card {
+  padding: 20px;
+  border-radius: 14px;
+  background: rgba(14, 18, 28, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 14px 32px -16px rgba(0, 0, 0, 0.8);
+}
+
+.ns-kpi-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+  margin-bottom: 8px;
+}
+
+.ns-kpi-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin-bottom: 4px;
+}
+
+.ns-text-emerald { color: #34d399; }
+.ns-text-cyan { color: #38bdf8; }
+.ns-text-crimson { color: #ff4d63; }
+
+.ns-kpi-meta {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.ns-section {
+  margin-top: 64px;
+}
+
+.ns-section-head {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.ns-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.15em;
+  color: #ff4d63;
+  font-weight: 700;
+}
+
+.ns-section-head h2 {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  margin: 8px 0 10px;
+}
+
+.ns-section-head p {
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.ns-pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 16px;
+}
+
+.ns-stage-card {
+  padding: 20px;
+  border-radius: 14px;
+  background: rgba(14, 18, 28, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 3px solid #ff223a;
+}
+
+.ns-stage-card.tone-cyan { border-top-color: #22d3ee; }
+.ns-stage-card.tone-amber { border-top-color: #f59e0b; }
+.ns-stage-card.tone-emerald { border-top-color: #10b981; }
+
+.ns-stage-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+}
+
+.ns-stage-num {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+.ns-stage-tag {
+  color: #94a3b8;
+}
+
+.ns-stage-card h3 {
+  font-size: 1.02rem;
+  margin-bottom: 8px;
+  color: #ffffff;
+}
+
+.ns-stage-card p {
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: #94a3b8;
+}
+
+.ns-proto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.ns-proto-card {
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: rgba(14, 18, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.ns-proto-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
-.card-content p {
-  font-size: 0.95rem;
-  color: #73806f;
+.ns-proto-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #f8fafc;
 }
 
-.link-icon {
-  color: #73806f;
-  transition: color 0.3s, transform 0.3s;
+.ns-proto-status {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
 }
 
-.redirect-card:hover .link-icon {
-  color: #289912;
-  transform: translateX(4px) translateY(-4px);
+.ns-proto-ports {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.ns-launch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.ns-launch-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px;
+  border-radius: 14px;
+  background: rgba(14, 18, 28, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.ns-launch-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 34, 58, 0.5);
+}
+
+.ns-launch-card.primary {
+  border-color: rgba(255, 34, 58, 0.4);
+  background: linear-gradient(135deg, rgba(255, 34, 58, 0.12), rgba(14, 18, 28, 0.9));
+}
+
+.ns-launch-icon {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 34, 58, 0.14);
+  color: #ff4d63;
+}
+
+.ns-launch-body {
+  flex: 1;
+}
+
+.ns-launch-body h3 {
+  font-size: 1rem;
+  margin-bottom: 4px;
+}
+
+.ns-launch-body p {
+  font-size: 0.82rem;
+  color: #94a3b8;
+  line-height: 1.45;
 }

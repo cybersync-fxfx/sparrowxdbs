@@ -76,18 +76,19 @@ function App() {
       <div style={{
         display: 'flex', flexDirection: 'column',
         height: '100vh', justifyContent: 'center', alignItems: 'center',
-        background: '#030305', color: '#289912',
+        background: '#030407', color: '#f8fafc',
         fontFamily: "'JetBrains Mono', monospace", gap: '16px'
       }}>
+        <img src="/logo.png?v=3d" alt="SparrowX NetSec" style={{ width: '56px', height: '56px', objectFit: 'contain', filter: 'drop-shadow(0 0 16px rgba(255,34,58,0.55))' }} />
         <div style={{
-          width: '40px', height: '40px',
-          border: '2px solid rgba(40,153,18,0.22)',
-          borderTop: '2px solid #289912',
+          width: '36px', height: '36px',
+          border: '2px solid rgba(255,34,58,0.22)',
+          borderTop: '2px solid #ff223a',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite'
         }} />
-        <span style={{ fontSize: '0.8rem', letterSpacing: '3px', textTransform: 'uppercase' }}>
-          Authenticating...
+        <span style={{ fontSize: '0.76rem', letterSpacing: '3px', textTransform: 'uppercase', color: '#94a3b8' }}>
+          Initializing SparrowX NetSec...
         </span>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>

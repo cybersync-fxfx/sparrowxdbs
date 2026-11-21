@@ -49,8 +49,16 @@ export default function Layout({ user, setToken }) {
   return (
     <div className="app-layout">
       <header className="topbar">
-        <div className="brand-lockup">
+        <div className="brand-lockup" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
           <img src="/logo.png?v=3d" alt="SparrowX NetSec" className="brand-logo" />
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
+            <div style={{ fontWeight: 800, fontSize: '0.98rem', letterSpacing: '-0.02em', color: '#fff' }}>
+              SPARROWX <span style={{ color: '#ff223a' }}>NETSEC</span>
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.58rem', letterSpacing: '0.14em', color: '#94a3b8' }}>
+              XDP · L3/L4/L7 SHIELD
+            </div>
+          </div>
         </div>
 
         <div className="topbar-meta">

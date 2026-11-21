@@ -62,17 +62,19 @@ export default function Dashboard({ token, user }) {
     return () => clearInterval(id);
   }, [token, tunnelStatus]);
 
+  const [tunnelNotice, setTunnelNotice] = useState(null);
+
   // ── Build chart data objects from context history ─────────────────────────
   const cpuChartData = useMemo(() => ({
     labels: Array(CHART_POINTS).fill(''),
     datasets: [
       {
-        label: 'CPU %', borderColor: '#289912', backgroundColor: 'rgba(40,153,18,0.1)',
-        borderWidth: 1.5, tension: 0.4, fill: true, data: cpuHistory.cpu, pointRadius: 0,
+        label: 'CPU %', borderColor: '#ff223a', backgroundColor: 'rgba(255,34,58,0.14)',
+        borderWidth: 1.8, tension: 0.4, fill: true, data: cpuHistory.cpu, pointRadius: 0,
       },
       {
-        label: 'MEM %', borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)',
-        borderWidth: 1.5, tension: 0.4, fill: true, data: cpuHistory.mem, pointRadius: 0,
+        label: 'MEM %', borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)',
+        borderWidth: 1.8, tension: 0.4, fill: true, data: cpuHistory.mem, pointRadius: 0,
       },
     ],
   }), [cpuHistory]);
@@ -81,12 +83,12 @@ export default function Dashboard({ token, user }) {
     labels: Array(CHART_POINTS).fill(''),
     datasets: [
       {
-        label: 'In (Mbps)', borderColor: '#289912', backgroundColor: 'rgba(40,153,18,0.1)',
-        borderWidth: 1.5, tension: 0.4, fill: true, data: netHistory.inb, pointRadius: 0,
+        label: 'In (Mbps)', borderColor: '#ff223a', backgroundColor: 'rgba(255,34,58,0.14)',
+        borderWidth: 1.8, tension: 0.4, fill: true, data: netHistory.inb, pointRadius: 0,
       },
       {
-        label: 'Out (Mbps)', borderColor: '#55c934', backgroundColor: 'rgba(85,201,52,0.09)',
-        borderWidth: 1.5, tension: 0.4, fill: true, data: netHistory.out, pointRadius: 0,
+        label: 'Out (Mbps)', borderColor: '#22d3ee', backgroundColor: 'rgba(34,211,238,0.1)',
+        borderWidth: 1.8, tension: 0.4, fill: true, data: netHistory.out, pointRadius: 0,
       },
     ],
   }), [netHistory]);
@@ -187,14 +189,23 @@ export default function Dashboard({ token, user }) {
       console.log('[Tunnel] Creation response:', res.status, data);
 
       if (res.ok) {
-        alert('Tunnel setup queued. This only confirms the job was accepted. The tunnel will show active after both the guard and client interfaces are up.');
+        setTunnelNotice({
+          type: 'ok',
+          text: 'Tunnel setup queued. The WireGuard scrub link will transition to Active once both guard and client interfaces complete handshake.',
+        });
         fetchTunnelStatus();
       } else {
-        alert('Failed: ' + (data.error || 'Unknown error'));
+        setTunnelNotice({
+          type: 'err',
+          text: 'Tunnel provisioning failed: ' + (data.error || 'Unknown error'),
+        });
       }
     } catch (e) {
       console.error('[Tunnel] Creation error:', e);
-      alert('Error connecting to server.');
+      setTunnelNotice({
+        type: 'err',
+        text: 'Network error while connecting to the scrubbing controller.',
+      });
     }
   };
 
@@ -324,8 +335,8 @@ export default function Dashboard({ token, user }) {
     scales: {
       y: {
         min: 0, ...(maxY ? { max: maxY } : {}),
-        grid: { color: 'rgba(40,153,18,0.1)' },
-        ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 }, callback: v => `${v}${yLabel}` }
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        ticks: { color: '#94a3b8', font: { family: 'JetBrains Mono', size: 10 }, callback: v => `${v}${yLabel}` }
       },
       x: { grid: { display: false }, ticks: { display: false } }
     }
@@ -361,6 +372,33 @@ export default function Dashboard({ token, user }) {
         </div>
       </section>
 
+      {tunnelNotice && (
+        <section
+          className={`callout-banner ${tunnelNotice.type === 'err' ? 'warning' : ''}`}
+          style={{
+            borderColor: tunnelNotice.type === 'ok' ? 'rgba(34,211,238,0.4)' : undefined,
+            background: tunnelNotice.type === 'ok' ? 'rgba(34,211,238,0.08)' : undefined,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div>
+            <strong>{tunnelNotice.type === 'ok' ? '[TUNNEL]' : '[!]'}</strong>{' '}
+            <span>{tunnelNotice.text}</span>
+          </div>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setTunnelNotice(null)}
+            style={{ padding: '4px 10px', fontSize: '0.72rem' }}
+          >
+            Dismiss
+          </button>
+        </section>
+      )}
+
       {!isConnected && (
         <section className="callout-banner warning">
           <strong>[!]</strong>
@@ -374,6 +412,88 @@ export default function Dashboard({ token, user }) {
           <span>The panel is receiving agent stats, but this client has not reported the new packet-counter build yet.</span>
         </section>
       )}
+
+      <section
+        className="surface-card"
+        style={{
+          padding: '18px 20px',
+          border: '1px solid rgba(255, 34, 58, 0.24)',
+          background: 'linear-gradient(135deg, rgba(16, 19, 28, 0.94) 0%, rgba(9, 11, 16, 0.96) 100%)',
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span
+              style={{
+                display: 'inline-block',
+                width: '9px',
+                height: '9px',
+                borderRadius: '50%',
+                background: isConnected ? '#22d3ee' : '#ff223a',
+                boxShadow: isConnected ? '0 0 12px #22d3ee' : '0 0 12px #ff223a',
+              }}
+            />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.74rem', letterSpacing: '0.14em', textTransform: 'uppercase', color: '#f8fafc', fontWeight: 700 }}>
+              5-Stage XDP / eBPF Autonomous Scrubbing Pipeline
+            </span>
+          </div>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.72rem', color: isConnected ? '#22d3ee' : '#94a3b8' }}>
+            {isConnected ? 'KERNEL FAST-PATH ARMED · < 0.38ms LATENCY' : 'STANDBY · AWAITING AGENT TELEMETRY'}
+          </span>
+        </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(185px, 1fr))',
+            gap: '10px',
+          }}
+        >
+          {[
+            { step: 'STAGE 01', title: 'XDP Driver Hook', detail: 'Pre-skb NIC ring-buffer drop', badge: isConnected ? 'XDP_DROP READY' : 'ARMED' },
+            { step: 'STAGE 02', title: 'eBPF Hash & LPM Maps', detail: '2.0M+ dynamic ban prefixes', badge: `${totalSbsBans} ACTIVE BANS` },
+            { step: 'STAGE 03', title: 'UDP Game Signatures', detail: 'A2S, RakNet, ENet, FiveM inspect', badge: `${Number(stats.pps || 0).toLocaleString()} PPS` },
+            { step: 'STAGE 04', title: 'XDP_TX SYN Cookies', detail: 'Zero-state TCP flood challenge', badge: `${Number(stats.synRate || 0)} SYN/s` },
+            { step: 'STAGE 05', title: 'WireGuard Clean Pipe', detail: 'Verified traffic to origin VIP', badge: postureTunnelLabel },
+          ].map((item) => (
+            <div
+              key={item.step}
+              style={{
+                padding: '12px 14px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.025)',
+                border: '1px solid rgba(255, 255, 255, 0.07)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                gap: '8px',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', marginBottom: '4px' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.66rem', color: '#ff223a', fontWeight: 700, letterSpacing: '0.08em' }}>
+                    {item.step}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '0.64rem',
+                      padding: '2px 7px',
+                      borderRadius: '999px',
+                      background: 'rgba(34, 211, 238, 0.1)',
+                      color: '#22d3ee',
+                      border: '1px solid rgba(34, 211, 238, 0.25)',
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#f8fafc' }}>{item.title}</div>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8' }}>{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="metric-grid">
         {statCards.map(card => (

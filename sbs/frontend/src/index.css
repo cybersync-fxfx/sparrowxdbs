@@ -1,40 +1,41 @@
  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg-dark: #000000;
-  --bg-alt: #050505;
-  --panel-bg: rgba(20, 20, 20, 0.6);
-  --panel-strong: rgba(30, 30, 30, 0.8);
-  --panel-border: rgba(180, 180, 180, 0.25); /* Ash/White outlines */
-  --panel-border-strong: rgba(220, 220, 220, 0.6);
-  --panel-border-glow: rgba(255, 26, 26, 0.6); /* Red glow interaction */
-  
-  --accent-cyan: #ff1a1a; /* Main tech red */
-  --accent-glow: rgba(255, 26, 26, 0.4);
-  --accent-blue: #cc0000;
-  
-  --danger-red: #ff0000;
-  --danger-glow: rgba(255, 0, 0, 0.6);
-  
-  --success-green: #2ecc71;
-  --success-glow: rgba(46, 204, 113, 0.36);
-  
-  --warn-amber: #f39c12;
-  
-  --text-main: #ffffff;
-  --text-soft: #d4d4d4; /* Ash */
-  --text-muted: #888888;
-  --text-dim: #444444;
-  
-  --shadow-lg: 0 0px 30px rgba(0, 0, 0, 0.9);
-  --shadow-sm: 0 0px 15px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px var(--accent-glow);
-  
-  --font-body: 'JetBrains Mono', monospace;
-  --font-display: 'JetBrains Mono', monospace;
-  --font-mono: 'JetBrains Mono', monospace;
-  
-  --glass-blur: blur(0px);
+  color-scheme: dark;
+  --bg-dark: #030407;
+  --bg-alt: #080a10;
+  --panel-bg: rgba(14, 17, 24, 0.78);
+  --panel-strong: rgba(20, 24, 34, 0.9);
+  --panel-border: rgba(255, 255, 255, 0.11);
+  --panel-border-strong: rgba(255, 255, 255, 0.24);
+  --panel-border-glow: rgba(255, 34, 58, 0.55);
+
+  --accent-cyan: #ff223a;
+  --accent-glow: rgba(255, 34, 58, 0.36);
+  --accent-blue: #d9142b;
+
+  --danger-red: #ff2a42;
+  --danger-glow: rgba(255, 42, 66, 0.5);
+
+  --success-green: #22c55e;
+  --success-glow: rgba(34, 197, 94, 0.35);
+
+  --warn-amber: #f59e0b;
+
+  --text-main: #f8fafc;
+  --text-soft: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  --shadow-lg: 0 20px 50px -16px rgba(0, 0, 0, 0.92), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-sm: 0 8px 24px -12px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-glow: 0 0 24px var(--accent-glow);
+
+  --font-body: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --glass-blur: blur(14px);
 }
 
 
@@ -42,36 +43,64 @@
 
 html, body, #root {
   min-height: 100%;
+  --scrollbar-thumb: rgba(148, 163, 184, 0.45);
+  --scrollbar-track: #05070c;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+@supports not (scrollbar-color: auto) {
+  html, body, #root {
+    scrollbar-width: auto;
+  }
+  html::-webkit-scrollbar, body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  html::-webkit-scrollbar-thumb, body::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
+  html::-webkit-scrollbar-track, body::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
 }
 
 body {
   background-color: var(--bg-dark);
-  background-image: 
-    radial-gradient(circle at 15% 50%, rgba(255, 26, 26, 0.08), transparent 25%),
-    radial-gradient(circle at 85% 30%, rgba(180, 180, 180, 0.05), transparent 25%),
-    linear-gradient(180deg, #000000 0%, #030303 100%);
+  background-image:
+    radial-gradient(ellipse 65% 40% at 18% 0%, rgba(255, 34, 58, 0.11), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 85% 20%, rgba(148, 163, 184, 0.06), transparent 55%),
+    linear-gradient(180deg, #030407 0%, #070910 100%);
   color: var(--text-main);
   font-family: var(--font-body);
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 a {
   color: inherit;
 }
 
-/* Background Animated Grid */
+/* Background Subtle Grid */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background-image: 
-    linear-gradient(to right, rgba(180, 180, 180, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(180, 180, 180, 0.05) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
   background-size: 40px 40px;
-  mask-image: radial-gradient(circle at center, black 50%, transparent 90%);
+  mask-image: radial-gradient(circle at center, black 45%, transparent 90%);
+  -webkit-mask-image: radial-gradient(circle at center, black 45%, transparent 90%);
   z-index: -2;
-  animation: bg-pan 60s linear infinite;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  body::before {
+    animation: bg-pan 60s linear infinite;
+  }
 }
 
 @keyframes bg-pan {
@@ -81,7 +110,7 @@ body::before {
 
 h1, h2, h3 {
   font-family: var(--font-display);
-  letter-spacing: -0.04em;
+  letter-spacing: -0.03em;
   font-weight: 700;
 }
 
@@ -89,39 +118,52 @@ p, li, span, label, td, th {
   font-family: var(--font-body);
 }
 
+code, pre, .mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Inputs */
 input, select {
-  background: rgba(14, 20, 36, 0.5);
+  background: rgba(255, 255, 255, 0.035);
   border: 1px solid var(--panel-border);
   color: var(--text-main);
-  padding: 8px 12px;
-  border-radius: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
   outline: none;
   font-family: var(--font-body);
-  font-size: 0.8rem;
-  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  transition: border-color 150ms ease-out, background-color 150ms ease-out, box-shadow 150ms ease-out;
   width: 100%;
+}
+
+input:hover, select:hover {
+  border-color: var(--panel-border-strong);
 }
 
 input:focus, select:focus {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px rgba(255, 26, 26, 0.22), inset 0 0 10px rgba(255, 26, 26, 0.08);
-  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 0 0 3px rgba(255, 34, 58, 0.2);
 }
 
 /* Buttons */
 button {
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--text-main);
-  padding: 6px 14px;
-  border-radius: 0;
+  padding: 8px 16px;
+  border-radius: 8px;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.8rem;
-  letter-spacing: 0.5px;
+  font-size: 0.84rem;
+  letter-spacing: -0.01em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition:
+    transform 150ms ease-out,
+    background-color 150ms ease-out,
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
   position: relative;
   overflow: hidden;
 }
