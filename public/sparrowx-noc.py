@@ -955,7 +955,20 @@ class TelemetryCollector:
                             )
                         )
 
-        # 4. Registered Client VPS Protection Bundles (/opt/sparrowx/clients/registry.json & web registry)
+        # 4. Registered Client VPS & Game Edge Proxies (/opt/sparrowx/clients/registry.json)
+        #    Enrich with live packet/byte counters from `nft list chain ip sparrowx_edge_nat prerouting`
+        edge_counters: Dict[str, Tuple[int, int]] = {}
+        if shutil.which("nft"):
+            rc_n, out_n, _ = run_cmd(["nft", "list", "chain", "ip", "sparrowx_edge_nat", "prerouting"], timeout=1.0)
+            if rc_n == 0:
+                for line in out_n.splitlines():
+                    m_tag = re.search(r'comment\s+"spx_([^"]+)"', line)
+                    m_cnt = re.search(r"packets\s+(\d+)\s+bytes\s+(\d+)", line)
+                    if m_tag and m_cnt:
+                        aid_key = m_tag.group(1)
+                        prev_p, prev_b = edge_counters.get(aid_key, (0, 0))
+                        edge_counters[aid_key] = (prev_p + int(m_cnt.group(1)), prev_b + int(m_cnt.group(2)))
+
         seen_agents: Set[str] = set()
         for reg_candidate in (
             Path("/opt/sparrowx/clients/registry.json"),
@@ -972,18 +985,22 @@ class TelemetryCollector:
                             continue
                         seen_agents.add(aid)
                         uname = str(item.get("username") or aid)[:14]
-                        pub_ip = str(item.get("publicIp") or item.get("tunnel_ip") or "direct-edge")
-                        email = str(item.get("email") or "")[:20]
+                        kind_lbl = str(item.get("kind") or "CLIENT-VPS")[:9]
+                        backend_ip = str(item.get("client_ip") or item.get("publicIp") or item.get("tunnel_ip") or "direct-edge")
+                        edge_ports = str(item.get("edge_ports") or item.get("ports") or "")[:16]
+                        pkts, nbytes = edge_counters.get(aid, (0, 0))
                         st_raw = str(item.get("status") or "PROVISIONED").upper()
-                        st = "PROTECTED" if st_raw == "PROTECTED" else "WAITING"
+                        st = "PROTECTED" if (st_raw == "PROTECTED" or pkts > 0) else "WAITING"
+                        age_info = f"{fmt_count(pkts)}pkts/{fmt_bytes(nbytes)}" if pkts > 0 else (edge_ports or "ready")
                         backends.append(
                             ProtectedBackend(
                                 name=uname,
-                                kind="CLIENT-VPS",
-                                tunnel_ip=pub_ip,
-                                endpoint=email,
+                                kind=kind_lbl,
+                                tunnel_ip=backend_ip,
+                                endpoint=edge_ports or str(item.get("email") or "")[:18],
                                 status=st,
-                                handshake_age=str(item.get("lastSeen") or item.get("created_at") or item.get("createdAt") or "")[-9:-1],
+                                rx_bytes=nbytes,
+                                handshake_age=age_info,
                             )
                         )
             except (OSError, json.JSONDecodeError):
