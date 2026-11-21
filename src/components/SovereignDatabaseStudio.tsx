@@ -21,6 +21,7 @@ import {
 } from "@/lib/developer-connection";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
+import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   SiAstro,
@@ -2322,6 +2323,19 @@ export function SovereignDatabaseStudio({
                   <Check className="size-3.5 text-[#A3E635]" /> PgBouncer Port 6543 Pooler
                 </span>
               </div>
+
+              <Floating3DVisual
+                src="/3d/cloud-db-cluster.svg"
+                alt="3D floating PostgreSQL 16 sovereign database platters with orbiting pgvector glass cubes"
+                accent="lime"
+                size="md"
+                priority="lcp"
+                showMotionControl={true}
+                caption="PostgreSQL 16 + pgvector Sovereign Cluster"
+                className="border border-[#A3E635]/20 bg-[#06090F]"
+                width={480}
+                height={480}
+              />
             </div>
 
             {/* Right: Studio Strict Auth Card */}

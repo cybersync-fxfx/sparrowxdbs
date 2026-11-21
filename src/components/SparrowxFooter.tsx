@@ -1,6 +1,6 @@
 import React from "react";
 
-export type SparrowxServiceKey = "db" | "sec" | "file" | "password" | "api";
+export type SparrowxServiceKey = "db" | "sec" | "file" | "password" | "api" | "infra";
 
 export interface SparrowxFooterProps {
   onLaunchService?: ((
@@ -23,6 +23,12 @@ interface ProductLinkItem {
 }
 
 const PRODUCT_LINKS: ProductLinkItem[] = [
+  {
+    label: "Cloud Infra",
+    sublabel: "infra.sparrowx.net",
+    href: "https://infra.sparrowx.net",
+    serviceKey: "infra",
+  },
   {
     label: "Cloud Database",
     sublabel: "db.sparrowx.net",
@@ -55,28 +61,13 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
   },
   {
     label: "Game Hosting",
-    sublabel: "sparrowx.net/game",
+    sublabel: "game.sparrowx.net",
     href: "/game",
-  },
-  {
-    label: "Game Client Dashboard",
-    sublabel: "sparrowx.net/game/dashboard",
-    href: "/game/dashboard",
-  },
-  {
-    label: "Game Server Panel",
-    sublabel: "game.panel.sparrowx.net",
-    href: "https://game.panel.sparrowx.net",
   },
   {
     label: "Game DDoS Defense",
     sublabel: "gamesec.sparrowx.net",
     href: "https://gamesec.sparrowx.net",
-  },
-  {
-    label: "NetSec DDoS Panel",
-    sublabel: "netsec.sparrowx.net",
-    href: "https://netsec.sparrowx.net",
   },
 ];
 
@@ -170,7 +161,7 @@ export function SparrowxFooter({
                       onClick={(e) => handleProductClick(e, item)}
                       className={`${LINK_CLASSES} max-w-full`}
                     >
-                      <span className="truncate">{item.label}</span>
+                      <span className="shrink-0">{item.label}</span>
                       <span className="text-xs text-[#F4F6FA]/40 truncate">
                         {item.sublabel}
                       </span>

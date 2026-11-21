@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <radialGradient id="apiBg" cx="50%" cy="50%" r="48%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.32"/>
+      <stop offset="56%" stop-color="#065F46" stop-opacity="0.09"/>
+      <stop offset="100%" stop-color="#05060A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="prismTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22343D"/>
+      <stop offset="100%" stop-color="#0C141A"/>
+    </linearGradient>
+    <linearGradient id="prismLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#142029"/>
+      <stop offset="100%" stop-color="#080D12"/>
+    </linearGradient>
+    <linearGradient id="prismRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E382D"/>
+      <stop offset="100%" stop-color="#081214"/>
+    </linearGradient>
+    <filter id="emeraldGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<circle cx="320" cy="318" r="265" fill="url(#apiBg)"/>
+
+  <!-- Optical Fiber Conduits -->
+  <path d="M132 206 L320 304 L508 206" stroke="#10B981" stroke-width="3.5" stroke-linecap="round" filter="url(#emeraldGlow)"/>
+  <path d="M320 304 L320 510" stroke="#34D399" stroke-width="3.5" stroke-linecap="round" filter="url(#emeraldGlow)"/>
+  <path d="M132 426 L320 330 L508 426" stroke="#10B981" stroke-opacity="0.55" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <!-- Central 3D Metallic Router Prism -->
+  <g transform="translate(0, -10)">
+    <polygon points="320,170 448,244 320,318 192,244" fill="url(#prismTop)" stroke="#34D399" stroke-width="2"/>
+    <polygon points="192,244 320,318 320,428 192,354" fill="url(#prismLeft)" stroke="#1E293B" stroke-width="1.5"/>
+    <polygon points="448,244 320,318 320,428 448,354" fill="url(#prismRight)" stroke="#10B981" stroke-opacity="0.7" stroke-width="1.5"/>
+    <!-- Glowing top ring -->
+    <polygon points="320,206 386,244 320,282 254,244" fill="#10B981" fill-opacity="0.22" stroke="#6EE7B7" stroke-width="2" filter="url(#emeraldGlow)"/>
+    <circle cx="320" cy="244" r="10" fill="#A7F3D0" filter="url(#emeraldGlow)"/>
+  </g>
+
+  <!-- Relay Node 1 (Top Left) -->
+  <g transform="translate(88, 152)">
+    <polygon points="44,0 88,24 44,48 0,24" fill="#0F2922" stroke="#34D399" stroke-width="1.8"/>
+    <polygon points="0,24 44,48 44,82 0,58" fill="#0C131C" stroke="#1E293B" stroke-width="1.2"/>
+    <polygon points="88,24 44,48 44,82 88,58" fill="#0D2520" stroke="#10B981" stroke-width="1.2"/>
+  </g>
+
+  <!-- Relay Node 2 (Top Right) -->
+  <g transform="translate(464, 152)">
+    <polygon points="44,0 88,24 44,48 0,24" fill="#0F2922" stroke="#34D399" stroke-width="1.8"/>
+    <polygon points="0,24 44,48 44,82 0,58" fill="#0C131C" stroke="#1E293B" stroke-width="1.2"/>
+    <polygon points="88,24 44,48 44,82 88,58" fill="#0D2520" stroke="#10B981" stroke-width="1.2"/>
+  </g>
+
+  <!-- Relay Node 3 (Bottom Center) -->
+  <g transform="translate(276, 466)">
+    <polygon points="44,0 88,24 44,48 0,24" fill="#0F2922" stroke="#6EE7B7" stroke-width="1.8"/>
+    <polygon points="0,24 44,48 44,78 0,54" fill="#0C131C" stroke="#1E293B" stroke-width="1.2"/>
+    <polygon points="88,24 44,48 44,78 88,54" fill="#0D2520" stroke="#10B981" stroke-width="1.2"/>
+  </g>
+</svg>

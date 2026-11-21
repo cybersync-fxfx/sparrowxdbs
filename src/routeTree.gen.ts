@@ -14,6 +14,7 @@ import { Route as DbRouteImport } from './routes/db'
 import { Route as DropRouteImport } from './routes/drop'
 import { Route as ErrorsRouteImport } from './routes/errors'
 import { Route as GatewayRouteImport } from './routes/gateway'
+import { Route as InfraRouteImport } from './routes/infra'
 import { Route as KeysRouteImport } from './routes/keys'
 import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as StoryRouteImport } from './routes/story'
@@ -57,6 +58,11 @@ const ErrorsRoute = ErrorsRouteImport.update({
 const GatewayRoute = GatewayRouteImport.update({
   id: '/gateway',
   path: '/gateway',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfraRoute = InfraRouteImport.update({
+  id: '/infra',
+  path: '/infra',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KeysRoute = KeysRouteImport.update({
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
+  '/infra': typeof InfraRoute
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
+  '/infra': typeof InfraRoute
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
@@ -217,6 +225,7 @@ export interface FileRoutesById {
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
+  '/infra': typeof InfraRoute
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/drop'
     | '/errors'
     | '/gateway'
+    | '/infra'
     | '/keys'
     | '/shield'
     | '/story'
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/drop'
     | '/errors'
     | '/gateway'
+    | '/infra'
     | '/keys'
     | '/shield'
     | '/story'
@@ -297,6 +308,7 @@ export interface FileRouteTypes {
     | '/drop'
     | '/errors'
     | '/gateway'
+    | '/infra'
     | '/keys'
     | '/shield'
     | '/story'
@@ -324,6 +336,7 @@ export interface RootRouteChildren {
   DropRoute: typeof DropRoute
   ErrorsRoute: typeof ErrorsRoute
   GatewayRoute: typeof GatewayRoute
+  InfraRoute: typeof InfraRoute
   KeysRoute: typeof KeysRoute
   ShieldRoute: typeof ShieldRoute
   StoryRoute: typeof StoryRoute
@@ -380,6 +393,13 @@ declare module '@tanstack/react-router' {
       path: '/gateway'
       fullPath: '/gateway'
       preLoaderRoute: typeof GatewayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/infra': {
+      id: '/infra'
+      path: '/infra'
+      fullPath: '/infra'
+      preLoaderRoute: typeof InfraRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/keys': {
@@ -524,6 +544,7 @@ const rootRouteChildren: RootRouteChildren = {
   DropRoute: DropRoute,
   ErrorsRoute: ErrorsRoute,
   GatewayRoute: GatewayRoute,
+  InfraRoute: InfraRoute,
   KeysRoute: KeysRoute,
   ShieldRoute: ShieldRoute,
   StoryRoute: StoryRoute,

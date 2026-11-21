@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import {
   UploadCloud,
   Shield,
@@ -1686,6 +1687,20 @@ export function SparrowxDropEngine() {
                 </div>
             {/* Header intro */}
             <div className="text-center space-y-3 max-w-2xl mx-auto">
+              <div className="max-w-md mx-auto pb-2">
+                <Floating3DVisual
+                  src="/3d/drop-encrypted-vault.svg"
+                  alt="3D floating encrypted NVMe file vault cube with luminous violet core"
+                  accent="violet"
+                  size="md"
+                  priority="lcp"
+                  showMotionControl={true}
+                  caption="Sovereign NVMe Encrypted Vault"
+                  className="border border-purple-500/20 bg-[#080912]"
+                  width={440}
+                  height={440}
+                />
+              </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-400">
                 <HardDrive className="size-3.5" />
                 <span>Sovereign NVMe Disk Storage • Permanent Unique URLs</span>
@@ -1922,6 +1937,20 @@ export function SparrowxDropEngine() {
         {activeMode === "ephemeral" && !incomingDrop && !incomingPersistentId && (
           <div className="space-y-8">
             <div className="text-center space-y-3.5 max-w-2xl mx-auto">
+              <div className="max-w-md mx-auto pb-2">
+                <Floating3DVisual
+                  src="/3d/drop-encrypted-vault.svg"
+                  alt="3D floating encrypted AES-256-GCM memory vault cube with glowing violet data shards"
+                  accent="violet"
+                  size="md"
+                  priority="lcp"
+                  showMotionControl={true}
+                  caption="Zero-Disk AES-256-GCM RAM Vault"
+                  className="border border-purple-500/20 bg-[#080912]"
+                  width={440}
+                  height={440}
+                />
+              </div>
               <div className="inline-flex items-center gap-2 rounded-full border border-purple-500/30 bg-purple-500/10 px-3 py-1 text-xs font-mono text-purple-300">
                 <Flame className="size-3.5 text-purple-400" />
                 <span>Zero-Disk RAM • We Don't Save Anything</span>

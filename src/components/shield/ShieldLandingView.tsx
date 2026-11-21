@@ -27,6 +27,7 @@ import {
   type LiveDomainAuditResult,
 } from "@/components/GrowthAndMonetizationHub";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 
 export const GAMESEC_URL = "https://gamesec.sparrowx.net";
 
@@ -246,7 +247,21 @@ export function ShieldLandingView({
               </div>
             </div>
 
-            {/* Interactive Live Perimeter Audit Card */}
+            {/* Interactive Live Perimeter Audit Card + 3D Floating Shield */}
+            <div className="space-y-4 min-w-0 w-full">
+              <Floating3DVisual
+                src="/3d/shield-waf-fortress.svg"
+                alt="3D floating obsidian cyber defense shield deflecting crimson DDoS attack packets"
+                accent="crimson"
+                size="md"
+                priority="lcp"
+                showMotionControl={true}
+                caption="Autonomous Edge WAF & XDP Deflection"
+                className="border border-[#F9103A]/20 bg-[#090C14]"
+                width={480}
+                height={480}
+              />
+
             <div
               id="shield-scanner"
               className="min-w-0 w-full max-w-full overflow-hidden rounded-2xl border border-[#F4F6FA]/[0.09] bg-[#0D1017]/95 p-5 sm:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.75)] space-y-4"
@@ -367,6 +382,7 @@ export function ShieldLandingView({
                   </p>
                 </div>
               )}
+            </div>
             </div>
           </div>
         </section>

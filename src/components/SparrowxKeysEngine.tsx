@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 
 // EFF Long Wordlist excerpt for Diceware
 const EFF_WORDLIST = [
@@ -310,6 +311,31 @@ export function SparrowxKeysEngine() {
 
       {/* SECTION 2: THE LIVE INSTRUMENT (PRECISION CONSOLE) */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        {/* 3D Cryptographic Hardware Showcase Banner */}
+        <section className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center border border-white/[0.08] bg-[#0E1015] rounded-xl p-5 shadow-md">
+          <div className="md:col-span-7 space-y-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              Hardware-grade offline entropy in your browser
+            </h1>
+            <p className="text-sm text-[#9CA3AF] leading-relaxed max-w-xl">
+              Generate high-entropy passwords, Diceware passphrases, and 512-bit JWT or PostgreSQL secrets locally via Web Crypto CSPRNG with zero network requests.
+            </p>
+          </div>
+          <div className="md:col-span-5">
+            <Floating3DVisual
+              src="/3d/keys-crypto-module.jpg"
+              alt="3D floating obsidian and brushed gold hardware cryptographic security key and entropy prism"
+              accent="amber"
+              size="sm"
+              priority="lcp"
+              showMotionControl={true}
+              className="border border-amber-500/20 bg-[#05060A]"
+              width={420}
+              height={420}
+            />
+          </div>
+        </section>
+
         {/* TOP SEGMENTED INDUSTRIAL SWITCH (MODE MATRIX) */}
         <div className="border border-white/[0.08] bg-[#0E1015] p-1.5 rounded-md flex flex-wrap items-center justify-between gap-2 shadow-2xs">
           <div className="flex items-center gap-1 w-full sm:w-auto overflow-x-auto no-scrollbar touch-pan-x py-0.5">

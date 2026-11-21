@@ -6,7 +6,8 @@ export type RootRedirectTarget = {
     | "/keys"
     | "/gateway"
     | "/game"
-    | "/game/dashboard";
+    | "/game/dashboard"
+    | "/infra";
   search: Record<string, unknown>;
   hash?: string;
 };
@@ -19,7 +20,8 @@ export type SubdomainProduct =
   | "api"
   | "game"
   | "game-dash"
-  | "game-panel";
+  | "game-panel"
+  | "infra";
 
 /**
  * Prefix rules ordered from most-specific multi-label hosts (e.g. `game.dash.`)
@@ -33,6 +35,7 @@ const SUBDOMAIN_RULES: ReadonlyArray<{
   { prefixes: ["game.panel."], product: "game-panel", route: null },
   { prefixes: ["game.dash.", "game-dash."], product: "game-dash", route: "/game/dashboard" },
   { prefixes: ["game.", "game-"], product: "game", route: "/game" },
+  { prefixes: ["infra.", "metal.", "vps.", "cloud."], product: "infra", route: "/infra" },
   { prefixes: ["db.", "studio.", "supabase.", "sparrowbase."], product: "db", route: "/db" },
   { prefixes: ["sec.", "shield."], product: "shield", route: "/shield" },
   { prefixes: ["file.", "drop.", "share."], product: "drop", route: "/drop" },
@@ -54,6 +57,9 @@ const ROUTING_FLAG_KEYS = new Set([
   "api",
   "gateway",
   "game",
+  "infra",
+  "metal",
+  "vps",
 ]);
 
 /**
@@ -183,6 +189,8 @@ export function resolveRootRedirectTarget(input: {
     destination = "/gateway";
   } else if (search.game === "1") {
     destination = "/game";
+  } else if (search.infra === "1" || search.metal === "1" || search.vps === "1") {
+    destination = "/infra";
   }
 
   if (!destination) return null;

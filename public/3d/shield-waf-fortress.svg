@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <radialGradient id="shieldGlow" cx="50%" cy="48%" r="48%">
+      <stop offset="0%" stop-color="#F9103A" stop-opacity="0.34"/>
+      <stop offset="52%" stop-color="#991B1B" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#05060A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shieldLeftFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#293244"/>
+      <stop offset="55%" stop-color="#111622"/>
+      <stop offset="100%" stop-color="#080B12"/>
+    </linearGradient>
+    <linearGradient id="shieldRightFace" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#171E2C"/>
+      <stop offset="65%" stop-color="#0B0E17"/>
+      <stop offset="100%" stop-color="#05070C"/>
+    </linearGradient>
+    <linearGradient id="crimsonEdge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FB7185"/>
+      <stop offset="48%" stop-color="#F9103A"/>
+      <stop offset="100%" stop-color="#F97316"/>
+    </linearGradient>
+    <filter id="redBloom" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<circle cx="320" cy="312" r="265" fill="url(#shieldGlow)"/>
+
+  <!-- Orbital Perimeter Defense Rings -->
+  <ellipse cx="320" cy="336" rx="236" ry="92" transform="rotate(-14 320 336)" stroke="#F9103A" stroke-opacity="0.4" stroke-width="2" stroke-dasharray="10 8"/>
+  <ellipse cx="320" cy="336" rx="196" ry="74" transform="rotate(-14 320 336)" stroke="#F97316" stroke-opacity="0.32" stroke-width="1.5"/>
+
+  <!-- Deflected Packet Attack Streaks -->
+  <path d="M58 178 L188 242" stroke="#F97316" stroke-width="3" stroke-linecap="round" filter="url(#redBloom)"/>
+  <path d="M76 236 L176 270" stroke="#F9103A" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+  <circle cx="192" cy="244" r="7" fill="#FCA5A5" filter="url(#redBloom)"/>
+  <path d="M192 244 L144 134" stroke="#FB7185" stroke-width="1.8" stroke-dasharray="4 4" opacity="0.75"/>
+  <path d="M192 244 L126 308" stroke="#F97316" stroke-width="1.8" stroke-dasharray="4 4" opacity="0.7"/>
+
+  <!-- 3D Extruded Depth Shadow Behind Shield -->
+  <path d="M338 112 L506 176 L484 378 C472 456 410 516 338 548 C266 516 204 456 192 378 L170 176 Z" fill="#0A0D16" stroke="#F9103A" stroke-opacity="0.45" stroke-width="2"/>
+
+  <!-- Main 3D Faceted Obsidian Shield -->
+  <!-- Left Bevel Half -->
+  <path d="M320 96 L156 160 L178 364 C190 442 250 502 320 534 Z" fill="url(#shieldLeftFace)" stroke="#475569" stroke-width="1.5"/>
+  <!-- Right Bevel Half -->
+  <path d="M320 96 L484 160 L462 364 C450 442 390 502 320 534 Z" fill="url(#shieldRightFace)" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- Glowing Outer Rim -->
+  <path d="M320 96 L484 160 L462 364 C450 442 390 502 320 534 C250 502 190 442 178 364 L156 160 Z" stroke="url(#crimsonEdge)" stroke-width="4" filter="url(#redBloom)"/>
+
+  <!-- Inner Raised Hexagonal Titanium Core -->
+  <polygon points="320,184 414,238 414,346 320,400 226,346 226,238" fill="#0D111C" stroke="#F9103A" stroke-opacity="0.75" stroke-width="2.5"/>
+  <polygon points="320,214 388,253 388,331 320,370 252,331 252,253" fill="#151C2B" stroke="#FB7185" stroke-opacity="0.55" stroke-width="1.5"/>
+
+  <!-- Central Active Sentinel Core -->
+  <polygon points="320,248 358,270 358,314 320,336 282,314 282,270" fill="#F9103A" fill-opacity="0.24" stroke="#FCA5A5" stroke-width="2" filter="url(#redBloom)"/>
+  <circle cx="320" cy="292" r="14" fill="#F9103A" filter="url(#redBloom)"/>
+  <circle cx="320" cy="292" r="6" fill="#FFF1F2"/>
+
+  <!-- Reflection under shield -->
+  <ellipse cx="320" cy="574" rx="118" ry="18" fill="#F9103A" fill-opacity="0.2" filter="url(#redBloom)"/>
+</svg>

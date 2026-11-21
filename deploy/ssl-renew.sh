@@ -28,6 +28,7 @@ DOMAIN_SEC="${DOMAIN_SEC:-sec.${DOMAIN_ROOT}}"
 DOMAIN_FILE="${DOMAIN_FILE:-file.${DOMAIN_ROOT}}"
 DOMAIN_PASSWORD="${DOMAIN_PASSWORD:-password.${DOMAIN_ROOT}}"
 DOMAIN_API="${DOMAIN_API:-api.${DOMAIN_ROOT}}"
+DOMAIN_INFRA="${DOMAIN_INFRA:-infra.${DOMAIN_ROOT}}"
 DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${DOMAIN_ROOT}}"
 DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${DOMAIN_ROOT}}"
 DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${DOMAIN_ROOT}}"
@@ -68,6 +69,7 @@ CANDIDATE_DOMAINS=(
   "passwd.${DOMAIN_ROOT}"
   "keys.${DOMAIN_ROOT}"
   "${DOMAIN_API}"
+  "${DOMAIN_INFRA}"
   "${DOMAIN_GAME_WEB}"
   "${DOMAIN_GAME_DASH}"
   "${DOMAIN_GAME}"
@@ -219,4 +221,7 @@ if [ -n "${DOMAIN_GAMESEC:-}" ] && [[ "${DOMAIN_GAMESEC}" != *.local ]] && [[ " 
 fi
 if [ -n "${DOMAIN_NETSEC:-}" ] && [[ "${DOMAIN_NETSEC}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_NETSEC} " ]]; then
   renew_dedicated_game_cert "${DOMAIN_NETSEC}" "netsec" "# 8\\. Network DDoS Dashboard"
+fi
+if [ -n "${DOMAIN_INFRA:-}" ] && [[ "${DOMAIN_INFRA}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_INFRA} " ]]; then
+  renew_dedicated_game_cert "${DOMAIN_INFRA}" "infra" "# 9\\. Cloud Infrastructure Storefront"
 fi

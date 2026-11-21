@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { Service, ServiceId } from "@/lib/services";
 import { ServiceSwitcher } from "./ServiceSwitcher";
 import { TelemetryCard } from "./TelemetryCard";
+import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 
 export function Hero({ service, onService }: { service: Service; onService: (s: ServiceId) => void }) {
   return (
@@ -69,7 +70,19 @@ export function Hero({ service, onService }: { service: Service; onService: (s: 
           </div>
         </div>
 
-        <div className="flex justify-center lg:justify-end" style={{ perspective: 1200 }}>
+        <div className="flex flex-col items-center lg:items-end gap-5" style={{ perspective: 1200 }}>
+          <Floating3DVisual
+            src="/3d/game-server-node.svg"
+            alt={`3D floating high-frequency ${service.name} Ryzen NVMe game server blade`}
+            accent="orange"
+            size="md"
+            priority="lcp"
+            showMotionControl={true}
+            caption={`${service.name} · High-Frequency NVMe Node`}
+            className="w-full max-w-[380px] border border-white/12 bg-[#07090F]/80 backdrop-blur-md"
+            width={480}
+            height={480}
+          />
           <TelemetryCard service={service} />
         </div>
       </div>

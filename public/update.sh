@@ -1162,6 +1162,7 @@ ensure_game_letsencrypt_ssl() {
   local game_dash_domain="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
   local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN}}"
+  local infra_domain="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
 
@@ -1189,6 +1190,7 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
   issue_le_cert_to_ovh_ssl "${gamesec_domain}" "gamesec"
   issue_le_cert_to_ovh_ssl "${netsec_domain}" "netsec"
+  issue_le_cert_to_ovh_ssl "${infra_domain}" "infra"
 }
 
 ensure_core_letsencrypt_ssl() {
@@ -1219,6 +1221,7 @@ ensure_core_letsencrypt_ssl() {
     "file.${root_domain}"
     "password.${root_domain}"
     "api.${root_domain}"
+    "infra.${root_domain}"
   )
   if getent ahosts "www.${root_domain}" >/dev/null 2>&1; then
     candidate_domains+=("www.${root_domain}")
@@ -1278,7 +1281,7 @@ ensure_core_letsencrypt_ssl() {
   else
     certbot certonly \
       --webroot -w "${webroot}" \
-      --non-interactive --agree-tos --keep-until-expiring \
+      --non-interactive --agree-tos --expand --keep-until-expiring \
       -m "${ssl_email}" \
       --cert-name "${root_domain}" \
       "${domain_args[@]}" >/dev/null 2>&1 || true
@@ -1407,6 +1410,7 @@ PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
 DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+DOMAIN_INFRA="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
 DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
 GAMESEC_REPO_URL="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
 GAMESEC_DIR="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
@@ -1478,6 +1482,7 @@ ensure_env_key "DOMAIN_STUDIO" "${SPARROWX_STUDIO_DOMAIN}"
 ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
 ensure_env_key "DOMAIN_GAME_WEB" "${DOMAIN_GAME_WEB}"
 ensure_env_key "DOMAIN_GAME_DASH" "${DOMAIN_GAME_DASH}"
+ensure_env_key "DOMAIN_INFRA" "${DOMAIN_INFRA}"
 ensure_env_key "DOMAIN_GAMESEC" "${DOMAIN_GAMESEC}"
 ensure_env_key "GAMESEC_PORT" "${GAMESEC_PORT}"
 ensure_env_key "GAMESEC_REPO_URL" "${GAMESEC_REPO_URL}"
@@ -1509,7 +1514,7 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${PTERO_DB_NAME}" ] && ensure_env_key "PTERO_DB_NAME" "${PTERO_DB_NAME}"
 [ -n "${PTERO_DB_USER}" ] && ensure_env_key "PTERO_DB_USER" "${PTERO_DB_USER}"
 [ -n "${PTERO_DB_PASSWORD}" ] && ensure_env_key "PTERO_DB_PASSWORD" "${PTERO_DB_PASSWORD}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_INFRA DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -1759,6 +1764,13 @@ render_sparrowx_nginx_conf() {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
     }"
+  fi
+  local infra_domain="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local infra_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local infra_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/infra-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/infra-privkey.pem" ]; then
+    infra_ssl_cert="/etc/nginx/ssl/infra-fullchain.pem"
+    infra_ssl_key="/etc/nginx/ssl/infra-privkey.pem"
   fi
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN:-sparrowx.local}}"
   local netsec_p="${NETSEC_PORT:-3006}"
@@ -2245,11 +2257,68 @@ server {
 
 ${netsec_backend}
 }
+
+# 9. Cloud Infrastructure Storefront (${infra_domain})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${infra_domain} metal.${SPARROWX_DOMAIN};
+    ssl_certificate ${infra_ssl_cert};
+    ssl_certificate_key ${infra_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    client_max_body_size 50M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    limit_conn spx_conn_limit 40;
+    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_req_status 429;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-SparrowX-WAF "ACTIVE" always;
+    add_header X-SparrowX-Shield "PROTECTED" always;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-SparrowX-Infra "1";
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
 EOF
 }
 
 render_sparrowx_nginx_conf
-log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_NETSEC} & ${DOMAIN_GAME}"
+log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_INFRA}, ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_NETSEC} & ${DOMAIN_GAME}"
 
 # ==============================================================================
 # STEP 5/7: Auto-Upgrade Systemd Daemon & CLI Symlinks
@@ -2610,6 +2679,7 @@ printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Drop Vault       : ${C_
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Password Vault   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://password.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://sec.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Cloud Infra      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_INFRA}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game DDoS Portal : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAMESEC}"

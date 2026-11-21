@@ -724,11 +724,11 @@ server {
     }
 }
 
-# 3. Standalone Product Subdomains (Drop, Keys, Shield, API)
+# 3. Standalone Product Subdomains (Drop, Keys, Shield, API, Cloud Infra)
 server {
     listen 80;
     listen 443 ssl;
-    server_name ${DOMAIN_FILE} drop.${DOMAIN_ROOT} ${DOMAIN_PASSWORD} passwd.${DOMAIN_ROOT} keys.${DOMAIN_ROOT} ${DOMAIN_SEC} shield.${DOMAIN_ROOT} ${DOMAIN_API} rest.${DOMAIN_ROOT};
+    server_name ${DOMAIN_FILE} drop.${DOMAIN_ROOT} ${DOMAIN_PASSWORD} passwd.${DOMAIN_ROOT} keys.${DOMAIN_ROOT} ${DOMAIN_SEC} shield.${DOMAIN_ROOT} ${DOMAIN_API} rest.${DOMAIN_ROOT} infra.${DOMAIN_ROOT} metal.${DOMAIN_ROOT};
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -2205,7 +2205,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${DOMAIN_ROOT}" \
-    -addext "subjectAltName=DNS:${DOMAIN_ROOT},DNS:www.${DOMAIN_ROOT},DNS:${DOMAIN_STUDIO},DNS:${DOMAIN_SEC},DNS:shield.${DOMAIN_ROOT},DNS:${DOMAIN_FILE},DNS:drop.${DOMAIN_ROOT},DNS:${DOMAIN_PASSWORD},DNS:passwd.${DOMAIN_ROOT},DNS:keys.${DOMAIN_ROOT},DNS:${DOMAIN_API},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:${DOMAIN_GAME},DNS:panel.${DOMAIN_ROOT},IP:${SPARROWX_PUBLIC_IP}" >/dev/null 2>&1 || \
+    -addext "subjectAltName=DNS:${DOMAIN_ROOT},DNS:www.${DOMAIN_ROOT},DNS:${DOMAIN_STUDIO},DNS:${DOMAIN_SEC},DNS:shield.${DOMAIN_ROOT},DNS:${DOMAIN_FILE},DNS:drop.${DOMAIN_ROOT},DNS:${DOMAIN_PASSWORD},DNS:passwd.${DOMAIN_ROOT},DNS:keys.${DOMAIN_ROOT},DNS:${DOMAIN_API},DNS:infra.${DOMAIN_ROOT},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:${DOMAIN_GAME},DNS:panel.${DOMAIN_ROOT},IP:${SPARROWX_PUBLIC_IP}" >/dev/null 2>&1 || \
   openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \

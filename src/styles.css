@@ -628,3 +628,182 @@ html { scroll-behavior: smooth; }
   50% { opacity: 0.45; transform: scale(0.8); }
 }
 @utility animate-pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+
+/* ============================================================================
+   SPARROWX 3D FLOATING VISUAL STAGE (Compositor-Only + Reduced Motion Safe)
+   ============================================================================ */
+@keyframes spx-3d-levitate {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotateZ(0deg);
+  }
+  50% {
+    transform: translate3d(0, -10px, 14px) rotateZ(0.8deg);
+  }
+}
+
+@keyframes spx-3d-ring-pulse {
+  0%, 100% {
+    transform: translateX(-50%) scaleX(1) scaleY(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateX(-50%) scaleX(0.9) scaleY(0.88);
+    opacity: 0.32;
+  }
+}
+
+.spx-3d-stage {
+  --spx-tilt-x: 0deg;
+  --spx-tilt-y: 0deg;
+  --spx-glare-x: 50%;
+  --spx-glare-y: 50%;
+  perspective: 1100px;
+}
+
+.spx-3d-tilt {
+  transform-style: preserve-3d;
+  transform: rotateX(var(--spx-tilt-x)) rotateY(var(--spx-tilt-y));
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.spx-3d-img {
+  mix-blend-mode: lighten;
+  mask-image: radial-gradient(circle at 50% 50%, #000 54%, transparent 86%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 54%, transparent 86%);
+  filter: drop-shadow(0 18px 26px rgba(0, 0, 0, 0.7));
+}
+
+.spx-3d-glare {
+  opacity: 0;
+  background: radial-gradient(
+    280px circle at var(--spx-glare-x) var(--spx-glare-y),
+    rgba(255, 255, 255, 0.14),
+    transparent 65%
+  );
+  transition: opacity 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spx-3d-stage[data-tilted="true"] .spx-3d-glare {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spx-3d-stage[data-paused="false"] .spx-3d-float {
+    animation: spx-3d-levitate 5.8s ease-in-out infinite;
+  }
+
+  .spx-3d-stage[data-paused="false"] .spx-3d-orbit {
+    animation: spx-3d-ring-pulse 5.8s ease-in-out infinite;
+  }
+}
+
+.spx-3d-stage[data-paused="true"] .spx-3d-tilt {
+  transform: none;
+}
+
+/* ============================================================================
+   SPARROWX NATIVE <dialog> MODAL SCROLL CONTAINMENT (Modern Web Guidance)
+   ============================================================================ */
+dialog.spx-native-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.spx-native-dialog::backdrop {
+  background: rgba(2, 4, 8, 0.8);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+dialog.spx-native-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================================================
+   SPARROWX CLOUD INFRA RESPONSIVE CONTAINER-QUERY TABLE
+   ============================================================================ */
+.spx-infra-table-wrap {
+  overflow: auto;
+  max-inline-size: 100%;
+  container-type: inline-size;
+}
+
+.spx-infra-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  --label-2: "Processor";
+  --label-3: "Memory";
+  --label-4: "Storage";
+  --label-5: "Network";
+  --label-6: "Price";
+  --label-7: "Deploy";
+}
+
+.spx-infra-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+
+.spx-infra-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: #0b0e15;
+}
+
+@container (width < 760px) {
+  .spx-infra-table,
+  .spx-infra-table thead,
+  .spx-infra-table tbody,
+  .spx-infra-table tr,
+  .spx-infra-table th,
+  .spx-infra-table td {
+    display: block;
+  }
+
+  .spx-infra-table thead {
+    display: none;
+  }
+
+  .spx-infra-table tr {
+    margin-block-end: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 0.75rem;
+    background: #0b0e15;
+    overflow: hidden;
+  }
+
+  .spx-infra-table tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: #101520;
+    padding: 0.875rem 1rem;
+  }
+
+  .spx-infra-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .spx-infra-table td:last-child {
+    border-bottom: none;
+    padding-block: 0.875rem;
+  }
+
+  .spx-infra-table td:nth-child(2)::before { content: var(--label-2) ": "; color: #94a3b8; font-size: 0.8125rem; }
+  .spx-infra-table td:nth-child(3)::before { content: var(--label-3) ": "; color: #94a3b8; font-size: 0.8125rem; }
+  .spx-infra-table td:nth-child(4)::before { content: var(--label-4) ": "; color: #94a3b8; font-size: 0.8125rem; }
+  .spx-infra-table td:nth-child(5)::before { content: var(--label-5) ": "; color: #94a3b8; font-size: 0.8125rem; }
+  .spx-infra-table td:nth-child(6)::before { content: var(--label-6) ": "; color: #94a3b8; font-size: 0.8125rem; }
+  .spx-infra-table td:nth-child(7)::before { content: var(--label-7) ": "; color: #94a3b8; font-size: 0.8125rem; }
+}

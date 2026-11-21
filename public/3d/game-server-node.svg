@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <radialGradient id="gameBg" cx="50%" cy="50%" r="48%">
+      <stop offset="0%" stop-color="#F97316" stop-opacity="0.32"/>
+      <stop offset="50%" stop-color="#0EA5E9" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#05060A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bladeTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2D3748"/>
+      <stop offset="100%" stop-color="#0F141D"/>
+    </linearGradient>
+    <linearGradient id="bladeFront" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0A0E16"/>
+    </linearGradient>
+    <linearGradient id="moltenBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F97316"/>
+      <stop offset="60%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#38BDF8"/>
+    </linearGradient>
+    <filter id="orangeGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="9" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<circle cx="320" cy="320" r="260" fill="url(#gameBg)"/>
+
+  <!-- Telemetry orbital ring -->
+  <ellipse cx="320" cy="356" rx="236" ry="82" stroke="#38BDF8" stroke-opacity="0.32" stroke-width="1.8" stroke-dasharray="10 6"/>
+  <ellipse cx="320" cy="534" rx="176" ry="30" fill="#F97316" fill-opacity="0.18" filter="url(#orangeGlow)"/>
+
+  <!-- Stacked 3D High-Frequency Ryzen Game Blades -->
+  <!-- Blade 3 (Bottom) -->
+  <g transform="translate(0, 96)">
+    <polygon points="320,230 516,324 320,418 124,324" fill="url(#bladeTop)" stroke="#475569" stroke-width="1.5"/>
+    <polygon points="124,324 320,418 320,456 124,362" fill="url(#bladeFront)" stroke="#334155" stroke-width="1.5"/>
+    <polygon points="516,324 320,418 320,456 516,362" fill="#0B1019" stroke="#38BDF8" stroke-opacity="0.5" stroke-width="1.5"/>
+    <line x1="156" y1="358" x2="294" y2="424" stroke="#38BDF8" stroke-width="4" stroke-linecap="round" filter="url(#orangeGlow)"/>
+  </g>
+
+  <!-- Blade 2 (Middle) -->
+  <g transform="translate(0, 8)">
+    <polygon points="320,230 516,324 320,418 124,324" fill="url(#bladeTop)" stroke="#64748B" stroke-width="1.5"/>
+    <polygon points="124,324 320,418 320,456 124,362" fill="url(#bladeFront)" stroke="#334155" stroke-width="1.5"/>
+    <polygon points="516,324 320,418 320,456 516,362" fill="#0B1019" stroke="#F97316" stroke-opacity="0.65" stroke-width="1.5"/>
+    <line x1="156" y1="358" x2="294" y2="424" stroke="url(#moltenBar)" stroke-width="4.5" stroke-linecap="round" filter="url(#orangeGlow)"/>
+  </g>
+
+  <!-- Blade 1 (Top Cooling Heatsink Blade) -->
+  <g transform="translate(0, -82)">
+    <polygon points="320,230 516,324 320,418 124,324" fill="url(#bladeTop)" stroke="#F97316" stroke-opacity="0.8" stroke-width="2"/>
+    <polygon points="124,324 320,418 320,456 124,362" fill="url(#bladeFront)" stroke="#475569" stroke-width="1.5"/>
+    <polygon points="516,324 320,418 320,456 516,362" fill="#0B1019" stroke="#F97316" stroke-opacity="0.85" stroke-width="1.5"/>
+    <!-- Molten CPU Heatsink Core -->
+    <polygon points="320,276 412,320 320,364 228,320" fill="#1C1917" stroke="#F97316" stroke-width="2"/>
+    <polygon points="320,294 374,320 320,346 266,320" fill="#F97316" fill-opacity="0.35" stroke="#FDBA74" stroke-width="2" filter="url(#orangeGlow)"/>
+    <line x1="156" y1="358" x2="294" y2="424" stroke="url(#moltenBar)" stroke-width="5" stroke-linecap="round" filter="url(#orangeGlow)"/>
+  </g>
+</svg>

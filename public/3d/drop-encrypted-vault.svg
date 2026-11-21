@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <radialGradient id="vaultBg" cx="50%" cy="50%" r="48%">
+      <stop offset="0%" stop-color="#A855F7" stop-opacity="0.34"/>
+      <stop offset="56%" stop-color="#581C87" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#05060A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="vTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2E2647"/>
+      <stop offset="100%" stop-color="#11101C"/>
+    </linearGradient>
+    <linearGradient id="vLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1B192E"/>
+      <stop offset="100%" stop-color="#090912"/>
+    </linearGradient>
+    <linearGradient id="vRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#241D3D"/>
+      <stop offset="100%" stop-color="#0C0A17"/>
+    </linearGradient>
+    <linearGradient id="crystalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5D0FE"/>
+      <stop offset="50%" stop-color="#C084FC"/>
+      <stop offset="100%" stop-color="#7E22CE"/>
+    </linearGradient>
+    <filter id="violetGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<circle cx="320" cy="316" r="260" fill="url(#vaultBg)"/>
+
+  <!-- Floor shadow halo -->
+  <ellipse cx="320" cy="540" rx="164" ry="34" fill="#A855F7" fill-opacity="0.2" filter="url(#violetGlow)"/>
+
+  <!-- Lower Vault Cube Base -->
+  <polygon points="320,278 492,366 320,454 148,366" fill="#18142C" stroke="#C084FC" stroke-opacity="0.65" stroke-width="2"/>
+  <polygon points="148,366 320,454 320,524 148,436" fill="url(#vLeft)" stroke="#4C1D95" stroke-width="1.5"/>
+  <polygon points="492,366 320,454 320,524 492,436" fill="url(#vRight)" stroke="#7E22CE" stroke-width="1.5"/>
+
+  <!-- Glowing Encrypted Interior Core -->
+  <polygon points="320,214 396,294 320,378 244,294" fill="url(#crystalGrad)" fill-opacity="0.88" stroke="#FAE8FF" stroke-width="2" filter="url(#violetGlow)"/>
+  <polygon points="320,214 396,294 320,318" fill="#FAF5FF" fill-opacity="0.45"/>
+  <polygon points="320,318 396,294 320,378" fill="#581C87" fill-opacity="0.5"/>
+
+  <!-- Levitating Upper Lid of Vault Cube -->
+  <g transform="translate(0, -74)">
+    <polygon points="320,164 492,252 320,340 148,252" fill="url(#vTop)" stroke="#E9D5FF" stroke-opacity="0.8" stroke-width="2"/>
+    <polygon points="148,252 320,340 320,368 148,280" fill="url(#vLeft)" stroke="#A855F7" stroke-opacity="0.6" stroke-width="1.5"/>
+    <polygon points="492,252 320,340 320,368 492,280" fill="url(#vRight)" stroke="#C084FC" stroke-opacity="0.7" stroke-width="1.5"/>
+    <!-- Etched top diamond -->
+    <polygon points="320,206 410,252 320,298 230,252" fill="none" stroke="#C084FC" stroke-opacity="0.65" stroke-width="2"/>
+  </g>
+
+  <!-- Orbiting Data Shards -->
+  <polygon points="122,222 146,248 122,276 98,248" fill="#C084FC" fill-opacity="0.85" filter="url(#violetGlow)"/>
+  <polygon points="524,256 544,278 524,300 504,278" fill="#E879F9" fill-opacity="0.85" filter="url(#violetGlow)"/>
+  <line x1="146" y1="256" x2="244" y2="294" stroke="#C084FC" stroke-opacity="0.55" stroke-width="1.8" stroke-dasharray="4 5"/>
+  <line x1="504" y1="278" x2="396" y2="294" stroke="#E879F9" stroke-opacity="0.55" stroke-width="1.8" stroke-dasharray="4 5"/>
+</svg>

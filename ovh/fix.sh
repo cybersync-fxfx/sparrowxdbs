@@ -1122,6 +1122,7 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${game_dash_domain}" "game-dash"
   issue_le_cert_to_ovh_ssl "${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}" "gamesec"
   issue_le_cert_to_ovh_ssl "${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN}}" "netsec"
+  issue_le_cert_to_ovh_ssl "${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}" "infra"
 }
 
 ensure_gamesec_landing_running() {
@@ -1629,6 +1630,7 @@ ensure_core_letsencrypt_ssl() {
     "file.${root_domain}"
     "password.${root_domain}"
     "api.${root_domain}"
+    "infra.${root_domain}"
   )
   if getent ahosts "www.${root_domain}" >/dev/null 2>&1; then
     candidate_domains+=("www.${root_domain}")
@@ -2354,6 +2356,13 @@ render_sparrowx_nginx_conf() {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }"
   fi
+  local infra_domain="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local infra_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local infra_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/infra-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/infra-privkey.pem" ]; then
+    infra_ssl_cert="/etc/nginx/ssl/infra-fullchain.pem"
+    infra_ssl_key="/etc/nginx/ssl/infra-privkey.pem"
+  fi
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN:-sparrowx.local}}"
   local netsec_p="${NETSEC_PORT:-3006}"
   local netsec_ssl_cert="/etc/nginx/ssl/fullchain.pem"
@@ -2851,6 +2860,54 @@ server {
     }
 
 ${netsec_backend_block}
+}
+
+# 9. Cloud Infrastructure Storefront (${infra_domain})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${infra_domain} metal.${SPARROWX_DOMAIN};
+    ssl_certificate ${infra_ssl_cert};
+    ssl_certificate_key ${infra_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    client_max_body_size 50M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-SparrowX-Infra "1";
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
 }
 EOF
 }

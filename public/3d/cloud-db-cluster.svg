@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" fill="none">
+  <defs>
+    <radialGradient id="dbBgGlow" cx="50%" cy="54%" r="48%">
+      <stop offset="0%" stop-color="#A3E635" stop-opacity="0.28"/>
+      <stop offset="55%" stop-color="#4D7C0F" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#05060A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="dbTopMetal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#27313F"/>
+      <stop offset="50%" stop-color="#11161F"/>
+      <stop offset="100%" stop-color="#090D14"/>
+    </linearGradient>
+    <linearGradient id="dbSideCyl" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0D1219"/>
+      <stop offset="32%" stop-color="#202A36"/>
+      <stop offset="68%" stop-color="#141A24"/>
+      <stop offset="100%" stop-color="#07090E"/>
+    </linearGradient>
+    <linearGradient id="limeRing" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#65A30D"/>
+      <stop offset="45%" stop-color="#BEF264"/>
+      <stop offset="100%" stop-color="#A3E635"/>
+    </linearGradient>
+    <linearGradient id="cubeTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D9F99D" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#4D7C0F" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="cubeLeft" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1F2937"/>
+      <stop offset="100%" stop-color="#0B0F17"/>
+    </linearGradient>
+    <linearGradient id="cubeRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#365314" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <filter id="limeBlur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<ellipse cx="320" cy="340" rx="260" ry="240" fill="url(#dbBgGlow)"/>
+
+  <!-- Floor reflection ellipse -->
+  <ellipse cx="320" cy="518" rx="172" ry="44" fill="#A3E635" fill-opacity="0.14" filter="url(#limeBlur)"/>
+  <ellipse cx="320" cy="518" rx="195" ry="52" stroke="#A3E635" stroke-opacity="0.28" stroke-width="1.5" stroke-dasharray="8 8"/>
+
+  <!-- Bottom Platter -->
+  <g transform="translate(0, 62)">
+    <path d="M168 350 V406 C168 437 236 462 320 462 C404 462 472 437 472 406 V350 Z" fill="url(#dbSideCyl)" stroke="#334155" stroke-width="1.5"/>
+    <ellipse cx="320" cy="350" rx="152" ry="54" fill="url(#dbTopMetal)" stroke="#475569" stroke-width="1.5"/>
+    <path d="M174 378 C174 407 239 430 320 430 C401 430 466 407 466 378" stroke="url(#limeRing)" stroke-width="4" stroke-linecap="round" filter="url(#limeBlur)"/>
+    <ellipse cx="320" cy="350" rx="116" ry="38" stroke="#A3E635" stroke-opacity="0.35" stroke-width="1.5"/>
+  </g>
+
+  <!-- Middle Platter -->
+  <g transform="translate(0, -18)">
+    <path d="M168 320 V376 C168 407 236 432 320 432 C404 432 472 407 472 376 V320 Z" fill="url(#dbSideCyl)" stroke="#334155" stroke-width="1.5"/>
+    <ellipse cx="320" cy="320" rx="152" ry="54" fill="url(#dbTopMetal)" stroke="#475569" stroke-width="1.5"/>
+    <path d="M174 348 C174 377 239 400 320 400 C401 400 466 377 466 348" stroke="url(#limeRing)" stroke-width="4.5" stroke-linecap="round" filter="url(#limeBlur)"/>
+    <ellipse cx="320" cy="320" rx="114" ry="38" stroke="#BEF264" stroke-opacity="0.45" stroke-width="1.5"/>
+    <!-- Status LEDs -->
+    <circle cx="242" cy="378" r="3.5" fill="#A3E635"/>
+    <circle cx="258" cy="382" r="3.5" fill="#A3E635" fill-opacity="0.65"/>
+    <circle cx="274" cy="385" r="3.5" fill="#38BDF8"/>
+  </g>
+
+  <!-- Top Sovereign Platter -->
+  <g transform="translate(0, -98)">
+    <path d="M168 290 V346 C168 377 236 402 320 402 C404 402 472 377 472 346 V290 Z" fill="url(#dbSideCyl)" stroke="#475569" stroke-width="1.5"/>
+    <ellipse cx="320" cy="290" rx="152" ry="54" fill="url(#dbTopMetal)" stroke="#A3E635" stroke-opacity="0.65" stroke-width="2"/>
+    <ellipse cx="320" cy="290" rx="108" ry="36" fill="#0B111A" stroke="#A3E635" stroke-opacity="0.5" stroke-width="1.5"/>
+    <ellipse cx="320" cy="290" rx="54" ry="18" fill="#A3E635" fill-opacity="0.22" stroke="#D9F99D" stroke-width="2" filter="url(#limeBlur)"/>
+    <path d="M174 318 C174 347 239 370 320 370 C401 370 466 347 466 318" stroke="url(#limeRing)" stroke-width="5" stroke-linecap="round" filter="url(#limeBlur)"/>
+  </g>
+
+  <!-- Central vertical laser beam through platters -->
+  <line x1="320" y1="112" x2="320" y2="210" stroke="#BEF264" stroke-width="3" stroke-opacity="0.85" filter="url(#limeBlur)"/>
+
+  <!-- Orbiting 3D Vector Embedding Glass Cubes -->
+  <!-- Left Cube -->
+  <g transform="translate(96, 178)">
+    <polygon points="44,0 88,24 44,48 0,24" fill="url(#cubeTop)" stroke="#BEF264" stroke-width="1.5"/>
+    <polygon points="0,24 44,48 44,94 0,70" fill="url(#cubeLeft)" stroke="#475569" stroke-width="1.2"/>
+    <polygon points="88,24 44,48 44,94 88,70" fill="url(#cubeRight)" stroke="#A3E635" stroke-opacity="0.7" stroke-width="1.2"/>
+  </g>
+
+  <!-- Top Right Cube -->
+  <g transform="translate(466, 134)">
+    <polygon points="38,0 76,20 38,40 0,20" fill="url(#cubeTop)" stroke="#D9F99D" stroke-width="1.5"/>
+    <polygon points="0,20 38,40 38,80 0,60" fill="url(#cubeLeft)" stroke="#475569" stroke-width="1.2"/>
+    <polygon points="76,20 38,40 38,80 76,60" fill="url(#cubeRight)" stroke="#A3E635" stroke-opacity="0.75" stroke-width="1.2"/>
+  </g>
+
+  <!-- Lower Right Cube -->
+  <g transform="translate(486, 342)">
+    <polygon points="28,0 56,15 28,30 0,15" fill="url(#cubeTop)" stroke="#BEF264" stroke-width="1.4"/>
+    <polygon points="0,15 28,30 28,60 0,45" fill="url(#cubeLeft)" stroke="#475569" stroke-width="1"/>
+    <polygon points="56,15 28,30 28,60 56,45" fill="url(#cubeRight)" stroke="#A3E635" stroke-opacity="0.65" stroke-width="1"/>
+  </g>
+
+  <!-- Fiber arcs linking vector cubes to DB core -->
+  <path d="M184 224 Q250 185 320 192" stroke="#A3E635" stroke-opacity="0.55" stroke-width="2" stroke-dasharray="5 5"/>
+  <path d="M466 174 Q405 190 320 192" stroke="#BEF264" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="5 5"/>
+</svg>
