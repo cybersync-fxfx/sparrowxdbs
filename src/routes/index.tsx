@@ -141,6 +141,7 @@ import {
 import {
   clearMasterSsoSession,
   ensureDeveloperConnection,
+  fetchMasterSsoUser,
   syncMasterSsoSession,
 } from "@/lib/developer-connection";
 import {
@@ -531,6 +532,44 @@ function Dashboard() {
           });
           if (dbUser.tenantId) {
             setSelectedTenantId(dbUser.tenantId);
+          }
+          setPortalMode("client");
+          setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));
+        }
+      });
+    } else {
+      void fetchMasterSsoUser().then((ssoUser) => {
+        if (!active || !ssoUser) return;
+        issueSignedSessionToken({
+          id: ssoUser.id,
+          email: ssoUser.email,
+          fullName: ssoUser.fullName,
+          role: ssoUser.role,
+          tenantId: ssoUser.tenantId,
+        });
+        setCurrentUser({
+          id: ssoUser.id,
+          email: ssoUser.email,
+          password: "",
+          fullName: ssoUser.fullName,
+          admin: ssoUser.role === "admin" ? "yes" : "no",
+          tenantId: ssoUser.tenantId,
+        });
+        if (ssoUser.role === "admin") {
+          setAuthSession({
+            role: "admin",
+            operatorName: ssoUser.fullName || "SparrowX Admin",
+            operatorEmail: ssoUser.email,
+          });
+          setPortalMode("soc");
+        } else {
+          setAuthSession({
+            role: "client",
+            tenantId: ssoUser.tenantId,
+            userEmail: ssoUser.email,
+          });
+          if (ssoUser.tenantId) {
+            setSelectedTenantId(ssoUser.tenantId);
           }
           setPortalMode("client");
           setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));

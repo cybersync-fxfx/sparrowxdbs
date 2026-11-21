@@ -1,10 +1,12 @@
-import { getCookie } from "@tanstack/react-start/server";
+import { getCookie, getRequestHeader } from "@tanstack/react-start/server";
 import { integrations, panelUrl } from "./config.server";
 import { decryptText, encryptText, generatePassword, sanitizeUsername } from "./crypto.server";
 import * as db from "./db.server";
 import * as ptero from "./ptero.server";
 import {
   MASTER_SSO_COOKIE_NAME,
+  UNIFIED_CLIENT_SESSION_COOKIE_NAME,
+  extractCookieValue,
   verifyMasterSsoToken,
   type MasterSsoClaims,
 } from "./master-sso.server";
@@ -27,9 +29,48 @@ const daysFromNow = (d: number) => new Date(Date.now() + d * 86400000).toISOStri
 
 async function readAuthenticatedGoogleUser(): Promise<MasterSsoClaims | null> {
   try {
-    const rawCookie = getCookie(MASTER_SSO_COOKIE_NAME);
-    if (!rawCookie) return null;
-    return await verifyMasterSsoToken(rawCookie);
+    const cookieHeader = getRequestHeader("cookie") ?? null;
+    const rawCookie =
+      getCookie(MASTER_SSO_COOKIE_NAME) ||
+      extractCookieValue(cookieHeader, MASTER_SSO_COOKIE_NAME);
+    if (rawCookie) {
+      const verified = await verifyMasterSsoToken(rawCookie);
+      if (verified) return verified;
+    }
+
+    const unifiedRaw =
+      getCookie(UNIFIED_CLIENT_SESSION_COOKIE_NAME) ||
+      extractCookieValue(cookieHeader, UNIFIED_CLIENT_SESSION_COOKIE_NAME);
+    if (unifiedRaw) {
+      const parts = unifiedRaw.split(".");
+      if (parts.length === 3 && parts[1]) {
+        const decoded = JSON.parse(Buffer.from(parts[1], "base64").toString("utf8")) as {
+          sub?: string;
+          email?: string;
+          fullName?: string;
+          role?: "admin" | "client";
+          tenantId?: string | null;
+          expiresAt?: number;
+        };
+        if (
+          decoded.sub &&
+          decoded.email &&
+          typeof decoded.expiresAt === "number" &&
+          decoded.expiresAt > Date.now()
+        ) {
+          return {
+            sub: decoded.sub,
+            email: decoded.email.trim().toLowerCase(),
+            fullName: decoded.fullName || decoded.email.split("@")[0] || "Player",
+            role: decoded.role === "admin" ? "admin" : "client",
+            tenantId: decoded.tenantId ?? null,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(decoded.expiresAt / 1000),
+          };
+        }
+      }
+    }
+    return null;
   } catch {
     return null;
   }

@@ -34,6 +34,7 @@ export const Route = createFileRoute("/api/auth/master-sso")({
         const {
           authenticateMasterCredentialsInDb,
           buildMasterSsoCookieHeader,
+          buildUnifiedClientSessionCookieHeader,
           createMasterSsoToken,
         } = await import("@/lib/server/master-sso.server");
         const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
@@ -92,6 +93,10 @@ export const Route = createFileRoute("/api/auth/master-sso")({
         }
 
         const ssoToken = await createMasterSsoToken(authResult.user);
+        const postHeaders = new Headers();
+        postHeaders.set("Cache-Control", "no-store");
+        postHeaders.append("Set-Cookie", buildMasterSsoCookieHeader(request, ssoToken));
+        postHeaders.append("Set-Cookie", buildUnifiedClientSessionCookieHeader(request, authResult.user));
         return Response.json(
           {
             ok: true,
@@ -99,25 +104,22 @@ export const Route = createFileRoute("/api/auth/master-sso")({
             source: authResult.source,
             user: authResult.user,
           },
-          {
-            headers: {
-              "Set-Cookie": buildMasterSsoCookieHeader(request, ssoToken),
-              "Cache-Control": "no-store",
-            },
-          },
+          { headers: postHeaders },
         );
       },
 
       DELETE: async ({ request }) => {
-        const { buildMasterSsoCookieHeader } = await import("@/lib/server/master-sso.server");
+        const {
+          buildMasterSsoCookieHeader,
+          buildUnifiedClientSessionCookieHeader,
+        } = await import("@/lib/server/master-sso.server");
+        const delHeaders = new Headers();
+        delHeaders.set("Cache-Control", "no-store");
+        delHeaders.append("Set-Cookie", buildMasterSsoCookieHeader(request, "", 0));
+        delHeaders.append("Set-Cookie", buildUnifiedClientSessionCookieHeader(request, null, 0));
         return Response.json(
           { ok: true, authenticated: false },
-          {
-            headers: {
-              "Set-Cookie": buildMasterSsoCookieHeader(request, "", 0),
-              "Cache-Control": "no-store",
-            },
-          },
+          { headers: delHeaders },
         );
       },
     },

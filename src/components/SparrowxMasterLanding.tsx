@@ -475,21 +475,28 @@ export function SparrowxMasterLanding({
   const [connectingDb, setConnectingDb] = useState(false);
   const [copiedUri, setCopiedUri] = useState(false);
 
+  const onUserAuthenticatedRef = React.useRef(onUserAuthenticated);
+  onUserAuthenticatedRef.current = onUserAuthenticated;
+
   // Hydrate authenticated session on client mount (local JWT or Google/Master SSO cookie).
   useEffect(() => {
     const verified = verifySessionToken();
     if (verified) {
-      setSessionUser({
+      const hydrated: AppUser = {
         id: verified.sub,
         email: verified.email,
         fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
         password: "",
         admin: verified.role === "admin" ? "yes" : "no",
         tenantId: verified.tenantId,
-      });
+      };
+      setSessionUser(hydrated);
       const cached = getCachedDeveloperConnection(verified.tenantId, verified.email);
       if (cached) setDevConnection(cached);
-      return;
+      if (onUserAuthenticatedRef.current) {
+        onUserAuthenticatedRef.current(hydrated);
+      }
+      return undefined;
     }
     let active = true;
     void fetchMasterSsoUser().then((ssoUser) => {
@@ -510,12 +517,14 @@ export function SparrowxMasterLanding({
         tenantId: ssoUser.tenantId,
       };
       setSessionUser(hydrated);
-      if (onUserAuthenticated) onUserAuthenticated(hydrated);
+      if (onUserAuthenticatedRef.current) {
+        onUserAuthenticatedRef.current(hydrated);
+      }
     });
     return () => {
       active = false;
     };
-  }, [onUserAuthenticated]);
+  }, []);
 
   useEffect(() => {
     if (!sessionUser) {

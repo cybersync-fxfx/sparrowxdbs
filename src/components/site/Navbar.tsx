@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSessionSummary } from "@/lib/portal.functions";
+import { verifySessionToken } from "@/lib/advanced-features";
+import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import type { ServiceId } from "@/lib/services";
 import { ServiceSwitcher } from "./ServiceSwitcher";
 
@@ -34,7 +36,33 @@ export function Brand() {
 }
 
 export function useSessionSummary() {
-  return useQuery({ queryKey: ["session-summary"], queryFn: () => getSessionSummary(), staleTime: 60_000 });
+  return useQuery({
+    queryKey: ["session-summary"],
+    queryFn: async () => {
+      const serverSummary = await getSessionSummary().catch(() => null);
+      if (serverSummary) return serverSummary;
+      const localToken = verifySessionToken();
+      if (localToken?.email) {
+        return {
+          id: localToken.sub,
+          email: localToken.email,
+          username: localToken.fullName || localToken.email.split("@")[0] || "Player",
+          avatarUrl: null as string | null,
+        };
+      }
+      const sso = await fetchMasterSsoUser().catch(() => null);
+      if (sso?.email) {
+        return {
+          id: sso.id,
+          email: sso.email,
+          username: sso.fullName || sso.email.split("@")[0] || "Player",
+          avatarUrl: null as string | null,
+        };
+      }
+      return null;
+    },
+    staleTime: 60_000,
+  });
 }
 
 export function Navbar({ service, onService }: { service: ServiceId; onService: (s: ServiceId) => void }) {

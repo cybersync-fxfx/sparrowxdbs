@@ -55,6 +55,7 @@ import {
   verifySessionToken,
 } from "@/lib/advanced-features";
 import { matchProductSubdomain } from "@/lib/routing";
+import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { querySparrowxCrossSystemAi, type CrossSystemAiResponse } from "@/lib/sparrowx-ai-brain";
 
 /** Returns the clean Vault base path for the current host and removes /f/:id from history. */
@@ -125,11 +126,46 @@ export function SparrowxDropEngine() {
   const [isVaultAuthenticated, setIsVaultAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
+    const isGoogleReturn =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("google_auth") === "1";
     const initial = readInitialVaultUser();
     if (initial) {
       setVaultUser(initial);
       setIsVaultAuthenticated(true);
+      if (isGoogleReturn) setActiveMode("storage");
+      return undefined;
     }
+    let active = true;
+    void fetchMasterSsoUser().then((ssoUser) => {
+      if (!active || !ssoUser) return;
+      issueSignedSessionToken({
+        id: ssoUser.id,
+        email: ssoUser.email,
+        fullName: ssoUser.fullName,
+        role: ssoUser.role,
+        tenantId: ssoUser.tenantId,
+      });
+      const hydrated: AppUser = {
+        id: ssoUser.id,
+        email: ssoUser.email,
+        fullName: ssoUser.fullName,
+        password: "",
+        admin: ssoUser.role === "admin" ? "yes" : "no",
+        tenantId: ssoUser.tenantId,
+      };
+      try {
+        localStorage.setItem("sparrowx_auth_user", JSON.stringify(hydrated));
+      } catch {
+        // ignore
+      }
+      setVaultUser(hydrated);
+      setIsVaultAuthenticated(true);
+      if (isGoogleReturn) setActiveMode("storage");
+    });
+    return () => {
+      active = false;
+    };
   }, []);
   const [vaultAuthMode, setVaultAuthMode] = useState<"signin" | "register">("signin");
   const [authFullName, setAuthFullName] = useState("");

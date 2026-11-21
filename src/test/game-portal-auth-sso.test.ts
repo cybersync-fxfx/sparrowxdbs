@@ -93,4 +93,21 @@ describe("game portal auth redirect & Pterodactyl SSO helpers", () => {
     );
     expect(verifyPteroSsoToken(unsafeNextToken, secret)?.next).toBe("/");
   });
+
+  it("buildUnifiedClientSessionCookieHeader issues a valid client-readable spx_unified_session cookie across .sparrowx.net", async () => {
+    const { buildUnifiedClientSessionCookieHeader } = await import("@/lib/server/master-sso.server");
+    const req = new Request("https://sparrowx.net/api/auth/google/login?next=%2Fgame%2Fdashboard", {
+      headers: { "x-forwarded-proto": "https", "x-forwarded-host": "sparrowx.net" },
+    });
+    const cookie = buildUnifiedClientSessionCookieHeader(req, {
+      id: "USR-GOOGLE-1",
+      email: "operator@gmail.com",
+      fullName: "Sparrow Operator",
+      role: "client",
+      tenantId: "TNT-GOOGLE-1",
+    });
+    expect(cookie).toContain("spx_unified_session=");
+    expect(cookie).toContain("Domain=.sparrowx.net");
+    expect(cookie).not.toContain("HttpOnly");
+  });
 });

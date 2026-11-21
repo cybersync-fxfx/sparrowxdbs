@@ -40,6 +40,7 @@ import {
 import {
   clearMasterSsoSession,
   ensureDeveloperConnection,
+  fetchMasterSsoUser,
   syncMasterSsoSession,
 } from "@/lib/developer-connection";
 import { ShieldLandingView } from "./shield/ShieldLandingView";
@@ -126,15 +127,48 @@ export function SparrowxShieldEngine({
     if (currentUser) {
       setSessionUser(currentUser);
       setViewStage((prev) => (prev === "landing" ? "client-area" : prev));
-    } else {
-      const next = readInitialShieldUser(null);
+      return undefined;
+    }
+    const next = readInitialShieldUser(null);
+    if (next) {
       setSessionUser(next);
-      if (next) {
+      setViewStage((prev) => (prev === "landing" ? "client-area" : prev));
+      return undefined;
+    }
+    let active = true;
+    void fetchMasterSsoUser().then((ssoUser) => {
+      if (!active) return;
+      if (ssoUser) {
+        issueSignedSessionToken({
+          id: ssoUser.id,
+          email: ssoUser.email,
+          fullName: ssoUser.fullName,
+          role: ssoUser.role,
+          tenantId: ssoUser.tenantId,
+        });
+        const hydrated: AppUser = {
+          id: ssoUser.id,
+          email: ssoUser.email,
+          fullName: ssoUser.fullName,
+          password: "",
+          admin: ssoUser.role === "admin" ? "yes" : "no",
+          tenantId: ssoUser.tenantId,
+        };
+        try {
+          localStorage.setItem("sparrowx_auth_user", JSON.stringify(hydrated));
+        } catch {
+          // ignore
+        }
+        setSessionUser(hydrated);
         setViewStage((prev) => (prev === "landing" ? "client-area" : prev));
+        if (onUserAuthenticated) onUserAuthenticated(hydrated);
       } else {
         setViewStage("landing");
       }
-    }
+    });
+    return () => {
+      active = false;
+    };
   }, [currentUser]);
 
   useEffect(() => {

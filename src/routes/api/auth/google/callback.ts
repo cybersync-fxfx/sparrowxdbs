@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           GOOGLE_OAUTH_STATE_COOKIE,
           buildGoogleStateCookieHeader,
           buildMasterSsoCookieHeader,
+          buildUnifiedClientSessionCookieHeader,
           createMasterSsoToken,
           extractCookieValue,
           sanitizeGoogleNextUrl,
@@ -39,8 +40,10 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         const fallbackNext = sanitizeGoogleNextUrl(verifiedState?.next, origin);
 
         const failRedirect = (message: string) => {
-          const dest = new URL(fallbackNext);
-          dest.searchParams.set("auth_error", message);
+          const dest = new URL(`${origin}/api/auth/google/login`);
+          dest.searchParams.set("next", fallbackNext);
+          dest.searchParams.set("oauth_fallback", "1");
+          dest.searchParams.set("error_msg", message);
           const headers = new Headers();
           headers.set("Location", dest.toString());
           headers.set("Cache-Control", "no-store");
@@ -134,6 +137,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           headers.set("Cache-Control", "no-store");
           headers.append("Set-Cookie", buildGoogleStateCookieHeader(request, "", 0));
           headers.append("Set-Cookie", buildMasterSsoCookieHeader(request, masterToken));
+          headers.append("Set-Cookie", buildUnifiedClientSessionCookieHeader(request, user));
           return new Response(null, { status: 302, headers });
         } catch (err) {
           console.error("[SparrowX Google OAuth] Callback error:", err);

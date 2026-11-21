@@ -180,6 +180,70 @@ export function buildMasterSsoCookieHeader(
   return attrs.join("; ");
 }
 
+export const UNIFIED_CLIENT_SESSION_COOKIE_NAME = "spx_unified_session";
+
+/**
+ * Builds the client-readable `spx_unified_session` cookie so `verifySessionToken()`
+ * across `/`, `/db`, `/drop`, `/shield`, `/gateway`, and `/infra` hydrates synchronously
+ * on the first frame immediately after Google OAuth redirect.
+ */
+export function buildUnifiedClientSessionCookieHeader(
+  request: Request,
+  user: MasterSsoUser | null,
+  maxAgeSeconds = MASTER_SSO_TTL_SECONDS,
+): string {
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const isHttps = forwardedProto === "https" || new URL(request.url).protocol === "https:";
+  const domain = resolveMasterCookieDomain(request);
+
+  if (!user || maxAgeSeconds <= 0) {
+    const clearAttrs = [
+      `${UNIFIED_CLIENT_SESSION_COOKIE_NAME}=`,
+      "Path=/",
+      "SameSite=Lax",
+      "Max-Age=0",
+    ];
+    if (domain) clearAttrs.push(`Domain=${domain}`);
+    if (isHttps) clearAttrs.push("Secure");
+    return clearAttrs.join("; ");
+  }
+
+  const issuedAt = Date.now();
+  const expiresAt = issuedAt + maxAgeSeconds * 1000;
+  const permissions =
+    user.role === "admin"
+      ? ["incidents:write", "services:manage", "tenants:killswitch", "audit:export", "keys:rotate"]
+      : ["services:view", "incidents:read", "telemetry:stream", "profile:edit"];
+
+  const payload = {
+    sub: user.id,
+    email: user.email.trim().toLowerCase(),
+    fullName: user.fullName || user.email.split("@")[0] || "Operator",
+    role: user.role === "admin" ? "admin" : "client",
+    tenantId: user.tenantId ?? null,
+    issuedAt,
+    expiresAt,
+    permissions,
+  };
+
+  const b64 = (str: string) =>
+    typeof Buffer !== "undefined"
+      ? Buffer.from(str, "utf8").toString("base64")
+      : btoa(str);
+
+  const jwt = `${b64(JSON.stringify({ alg: "HS256", typ: "JWT" }))}.${b64(JSON.stringify(payload))}.${b64(`sparrowx_sig_${payload.sub}_${payload.issuedAt}`)}`;
+
+  const attrs = [
+    `${UNIFIED_CLIENT_SESSION_COOKIE_NAME}=${encodeURIComponent(jwt)}`,
+    "Path=/",
+    "SameSite=Lax",
+    `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`,
+  ];
+  if (domain) attrs.push(`Domain=${domain}`);
+  if (isHttps) attrs.push("Secure");
+  return attrs.join("; ");
+}
+
 async function openMasterAuthPool(): Promise<pg.Pool> {
   const host =
     env("POSTGRES_HOST") ||

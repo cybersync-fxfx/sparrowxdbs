@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
 import { getSessionSummary, logout, redeemPromo } from "@/lib/portal.functions";
+import { verifySessionToken } from "@/lib/advanced-features";
+import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { PanelCredentials } from "@/components/dashboard/PanelCredentials";
 import { TopUpDialog } from "@/components/dashboard/TopUpDialog";
 import { DeployPlans } from "@/components/dashboard/DeployPlans";
@@ -21,7 +23,28 @@ export const Route = createFileRoute("/game/dashboard")({
     deploy: typeof s.deploy === "string" && /^[a-z0-9-]{1,40}$/.test(s.deploy) ? s.deploy : undefined,
   }),
   beforeLoad: async () => {
-    const me = await getSessionSummary();
+    let me = await getSessionSummary().catch(() => null);
+    if (!me) {
+      const localToken = verifySessionToken();
+      if (localToken?.email) {
+        me = {
+          id: localToken.sub,
+          email: localToken.email,
+          username: localToken.fullName || localToken.email.split("@")[0] || "Player",
+          avatarUrl: null,
+        };
+      } else {
+        const sso = await fetchMasterSsoUser().catch(() => null);
+        if (sso?.email) {
+          me = {
+            id: sso.id,
+            email: sso.email,
+            username: sso.fullName || sso.email.split("@")[0] || "Player",
+            avatarUrl: null,
+          };
+        }
+      }
+    }
     if (!me) throw redirect({ to: "/game", search: { auth_error: "Please sign in with Google first" } });
   },
   head: () => ({
