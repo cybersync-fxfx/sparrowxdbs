@@ -44,7 +44,7 @@ export const Route = createFileRoute("/game/")({
       {
         name: "twitter:description",
         content:
-          "Low-ping NVMe Gen4 game hosting in Asia-IN with instant Discord login and automated Pterodactyl setup.",
+          "Low-ping NVMe Gen4 game hosting in Asia-IN with instant Google Sign-In and automated Pterodactyl setup.",
       },
       { name: "twitter:image", content: "https://sparrowx.net/assets/logo-game-A5Nnak65.png" },
       { name: "twitter:image:alt", content: "SparrowX Game Hosting — High Performance Game Servers" },

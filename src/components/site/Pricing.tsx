@@ -4,8 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
-import { DiscordIcon } from "./DiscordIcon";
-import { LOGIN_HREF, useSessionSummary } from "./Navbar";
+import { GoogleGIcon, useSessionSummary } from "./Navbar";
 
 export function Pricing({ service }: { service: Service }) {
   const { data: me } = useSessionSummary();
@@ -64,8 +63,8 @@ export function Pricing({ service }: { service: Service }) {
                 </Button>
               ) : (
                 <Button asChild variant={p.popular ? "svc" : "ivory"} size="xl" className="w-full">
-                  <a href={`${LOGIN_HREF}?plan=${p.id}`}>
-                    <DiscordIcon className="size-4" /> Continue with Discord
+                  <a href={`/api/auth/google/login?next=${encodeURIComponent(`/game/dashboard?deploy=${p.id}`)}`}>
+                    <GoogleGIcon className="size-4" /> Continue with Google
                   </a>
                 </Button>
               )}

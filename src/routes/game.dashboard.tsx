@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Coins, ExternalLink, FlaskConical, Gift, Loader2, LogOut, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import { Coins, ExternalLink, Gift, Loader2, LogOut, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,7 @@ export const Route = createFileRoute("/game/dashboard")({
   }),
   beforeLoad: async () => {
     const me = await getSessionSummary();
-    if (!me) throw redirect({ to: "/game", search: { auth_error: "Please log in with Discord first" } });
+    if (!me) throw redirect({ to: "/game", search: { auth_error: "Please sign in with Google first" } });
   },
   head: () => ({
     meta: [
@@ -71,6 +71,7 @@ function GameDashboard() {
   const signOut = async () => {
     setLeaving(true);
     await qc.cancelQueries();
+    await fetch("/api/auth/master-sso", { method: "DELETE", credentials: "include" }).catch(() => {});
     await logout();
     qc.clear();
     navigate({ to: "/game", search: {}, replace: true });
@@ -112,16 +113,6 @@ function GameDashboard() {
       <main className="relative mx-auto max-w-7xl space-y-6 px-5 py-8">
         {error && <p className="rounded-2xl border border-destructive/40 p-4 text-sm text-destructive">{errorText(error)}</p>}
 
-        {data?.mode === "demo" && (
-          <div className="flex items-start gap-3 rounded-2xl border border-sheen/30 bg-primary/10 p-4 text-sm">
-            <FlaskConical className="mt-0.5 size-4 shrink-0 text-sheen" />
-            <p className="text-secondary-foreground">
-              <span className="font-semibold text-foreground">Preview mode.</span> You're exploring with demo data — coins,
-              servers and payments are simulated until Discord, the database and the game panel are connected.
-            </p>
-          </div>
-        )}
-
         <div className="grid gap-6 lg:grid-cols-[1.45fr_1fr]">
           <section className="surface-3d rim-sheen relative flex flex-col justify-between overflow-hidden rounded-3xl p-6">
             <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-primary/30 blur-3xl" />
@@ -131,14 +122,20 @@ function GameDashboard() {
               <div className="relative space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <img src={data.user.avatarUrl} alt={`${data.user.username} player avatar`} width={64} height={64} className="size-16 rounded-2xl ring-2 ring-sheen/60" />
+                    {data.user.avatarUrl ? (
+                      <img src={data.user.avatarUrl} alt={`${data.user.username} avatar`} width={64} height={64} className="size-16 rounded-2xl ring-2 ring-sheen/60" />
+                    ) : (
+                      <div className="grid size-16 place-items-center rounded-2xl bg-primary/25 ring-2 ring-sheen/60 font-display text-2xl font-bold text-white">
+                        {(data.user.globalName ?? data.user.username).slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
                     <div className="min-w-0">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Discord Client Area</p>
+                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">SparrowX Google Client Area</p>
                       <h1 className="truncate text-2xl font-bold">{data.user.globalName ?? data.user.username}</h1>
-                      <p className="font-mono text-sm text-sheen">@{data.user.username}</p>
+                      <p className="font-mono text-sm text-sheen">{data.user.email}</p>
                     </div>
                   </div>
-                  <Button type="button" variant="discord" className="rounded-xl" onClick={() => setTopUp(true)}>
+                  <Button type="button" variant="ivory" className="rounded-xl" onClick={() => setTopUp(true)}>
                     <Sparkles className="size-4" /> Add SparrowCoins
                   </Button>
                 </div>
@@ -164,7 +161,7 @@ function GameDashboard() {
                         <Gift className="size-3.5 text-sheen" /> Redeem SparrowCoins Promo
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        Instant credit · 1 Coin = ₹1 {data.mode === "demo" ? "(Try SPARROW100 or LAUNCH250)" : ""}
+                        Instant credit · 1 Coin = ₹1
                       </p>
                     </div>
                     <form
@@ -239,7 +236,7 @@ function GameDashboard() {
         </section>
       </main>
 
-      {data && <TopUpDialog open={topUp} onOpenChange={setTopUp} demo={data.mode === "demo"} razorpay={data.integrations.razorpay} />}
+      {data && <TopUpDialog open={topUp} onOpenChange={setTopUp} demo={false} razorpay={data.integrations.razorpay} />}
       <Toaster theme="dark" position="bottom-right" />
     </div>
   );

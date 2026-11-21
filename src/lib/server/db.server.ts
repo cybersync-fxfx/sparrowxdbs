@@ -37,7 +37,7 @@ export class DbError extends Error {
 }
 
 async function pg<T>(path: string, init: RequestInit & { prefer?: string } = {}): Promise<T> {
-  const base = env("POSTGREST_URL");
+  const base = env("POSTGREST_URL") || env("POSTGREST_INTERNAL_URL") || env("SPARROWX_DB_REST_URL");
   if (!base) throw new Error("POSTGREST_URL is not configured");
   const key = env("POSTGREST_API_KEY");
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
@@ -56,6 +56,13 @@ const q = encodeURIComponent;
 
 export async function findClientByDiscordId(discordId: string): Promise<ClientRow | null> {
   const rows = await pg<ClientRow[]>(`/clients?discord_id=eq.${q(discordId)}&limit=1`);
+  return rows[0] ?? null;
+}
+
+export async function findClientByEmail(email: string): Promise<ClientRow | null> {
+  const clean = email.trim().toLowerCase();
+  if (!clean) return null;
+  const rows = await pg<ClientRow[]>(`/clients?email=ilike.${q(clean)}&limit=1`);
   return rows[0] ?? null;
 }
 

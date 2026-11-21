@@ -6,20 +6,19 @@ const env = (k: string) => {
 
 export function integrations() {
   return {
-    database: !!env("POSTGREST_URL"),
-    discord: !!(env("DISCORD_CLIENT_ID") && env("DISCORD_CLIENT_SECRET")),
+    database: !!(env("POSTGREST_URL") || env("POSTGREST_INTERNAL_URL") || env("SPARROWX_DB_REST_URL")),
+    google: !!(env("GOOGLE_CLIENT_ID") && env("GOOGLE_CLIENT_SECRET")),
     pterodactyl: !!(env("PTERO_URL") && env("PTERO_APPLICATION_API_KEY")),
     pteroLiveUsage: !!env("PTERO_CLIENT_API_KEY"),
     razorpay: !!(env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET")),
   };
 }
 
-export type Mode = "live" | "demo";
+export type Mode = "live";
 
-/** Live only when database, Discord and Pterodactyl are all connected; otherwise a self-contained demo. */
+/** Production-only mode: zero mock or simulated demo data. */
 export function getMode(): Mode {
-  const i = integrations();
-  return i.database && i.discord && i.pterodactyl ? "live" : "demo";
+  return "live";
 }
 
 export function panelUrl(): string {
@@ -28,7 +27,7 @@ export function panelUrl(): string {
 
 export function sessionSecret(): string {
   const s = env("SESSION_SECRET");
-  return s && s.length >= 32 ? s : "sparrowx-game-portal-preview-session-secret-key-2026";
+  return s && s.length >= 32 ? s : "sparrowx-game-portal-session-secret-key-2026";
 }
 
 export { env };

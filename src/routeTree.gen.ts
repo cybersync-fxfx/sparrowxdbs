@@ -38,8 +38,6 @@ import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
-import { Route as ApiPublicAuthDiscordCallbackRouteImport } from './routes/api/public/auth/discord/callback'
-import { Route as ApiPublicAuthDiscordLoginRouteImport } from './routes/api/public/auth/discord/login'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -189,18 +187,6 @@ const ApiPublicRazorpayWebhookRoute =
     path: '/api/public/razorpay/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicAuthDiscordCallbackRoute =
-  ApiPublicAuthDiscordCallbackRouteImport.update({
-    id: '/api/public/auth/discord/callback',
-    path: '/api/public/auth/discord/callback',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicAuthDiscordLoginRoute =
-  ApiPublicAuthDiscordLoginRouteImport.update({
-    id: '/api/public/auth/discord/login',
-    path: '/api/public/auth/discord/login',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -232,8 +218,6 @@ export interface FileRoutesByFullPath {
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
-  '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
-  '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -265,8 +249,6 @@ export interface FileRoutesByTo {
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
-  '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
-  '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -299,8 +281,6 @@ export interface FileRoutesById {
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
-  '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
-  '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -334,8 +314,6 @@ export interface FileRouteTypes {
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/public/razorpay/webhook'
-    | '/api/public/auth/discord/callback'
-    | '/api/public/auth/discord/login'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -367,8 +345,6 @@ export interface FileRouteTypes {
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/public/razorpay/webhook'
-    | '/api/public/auth/discord/callback'
-    | '/api/public/auth/discord/login'
   id:
     | '__root__'
     | '/'
@@ -400,8 +376,6 @@ export interface FileRouteTypes {
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/public/razorpay/webhook'
-    | '/api/public/auth/discord/callback'
-    | '/api/public/auth/discord/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -434,8 +408,6 @@ export interface RootRouteChildren {
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
-  ApiPublicAuthDiscordCallbackRoute: typeof ApiPublicAuthDiscordCallbackRoute
-  ApiPublicAuthDiscordLoginRoute: typeof ApiPublicAuthDiscordLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -643,20 +615,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRazorpayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/auth/discord/callback': {
-      id: '/api/public/auth/discord/callback'
-      path: '/api/public/auth/discord/callback'
-      fullPath: '/api/public/auth/discord/callback'
-      preLoaderRoute: typeof ApiPublicAuthDiscordCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/auth/discord/login': {
-      id: '/api/public/auth/discord/login'
-      path: '/api/public/auth/discord/login'
-      fullPath: '/api/public/auth/discord/login'
-      preLoaderRoute: typeof ApiPublicAuthDiscordLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -690,8 +648,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
-  ApiPublicAuthDiscordCallbackRoute: ApiPublicAuthDiscordCallbackRoute,
-  ApiPublicAuthDiscordLoginRoute: ApiPublicAuthDiscordLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

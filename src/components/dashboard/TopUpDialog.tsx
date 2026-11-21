@@ -34,7 +34,6 @@ export function TopUpDialog({ open, onOpenChange, demo, razorpay }: { open: bool
   const pay = useMutation({
     mutationFn: async () => {
       const r = await startTopup({ data: { amount } });
-      if (r.kind === "credited") return r.coins;
       const Razorpay = await loadRazorpay();
       return new Promise<number>((resolve, reject) => {
         const rz = new Razorpay({
@@ -112,15 +111,14 @@ export function TopUpDialog({ open, onOpenChange, demo, razorpay }: { open: bool
               {pay.isPending ? <Loader2 className="animate-spin" /> : <Plus />} Pay ₹{amount.toLocaleString("en-IN")}
             </Button>
             <p className="text-center text-[11px] text-muted-foreground">
-              {demo ? "Demo mode: payments are simulated and credited instantly." : payDisabled ? "Online payments are coming soon — redeem a promo code meanwhile." : "Secured by Razorpay · UPI, cards, netbanking"}
+              {payDisabled ? "Configure Razorpay keys on server to enable online payments — or redeem a promo code." : "Secured by Razorpay · UPI, cards, netbanking"}
             </p>
           </TabsContent>
           <TabsContent value="promo" className="mt-4 space-y-4">
-            <Input placeholder="e.g. SPARROW100" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="bg-background/50 font-mono uppercase" />
-            <Button variant="discord" size="xl" className="w-full" disabled={promo.isPending || code.trim().length < 3} onClick={() => promo.mutate()}>
+            <Input placeholder="Enter promo code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="bg-background/50 font-mono uppercase" />
+            <Button variant="ivory" size="xl" className="w-full" disabled={promo.isPending || code.trim().length < 3} onClick={() => promo.mutate()}>
               {promo.isPending ? <Loader2 className="animate-spin" /> : <Gift />} Redeem code
             </Button>
-            {demo && <p className="text-center text-[11px] text-muted-foreground">Demo codes: SPARROW100, LAUNCH250</p>}
           </TabsContent>
         </Tabs>
       </DialogContent>

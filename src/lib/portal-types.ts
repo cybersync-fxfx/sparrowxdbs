@@ -19,8 +19,6 @@ export type Subscription = {
   status: "active" | "expired" | "cancelled";
   expiresAt: string;
   createdAt: string;
-  /** Demo mode only: mock server details kept with the subscription. */
-  demo?: { identifier: string; port: number; name: string; ramMb: number; vcpu: number; diskGb: number };
 };
 
 export type ServerStatus = "ONLINE" | "OFFLINE" | "INSTALLING" | "SUSPENDED";
@@ -43,13 +41,24 @@ export type ServerView = {
 };
 
 export type DashboardData = {
-  mode: "live" | "demo";
-  user: { discordId: string; username: string; globalName: string | null; avatarUrl: string };
+  mode: "live";
+  user: {
+    id: string;
+    email: string;
+    username: string;
+    globalName: string | null;
+    avatarUrl: string | null;
+  };
   coins: number;
-  panel: { url: string; username: string | null; hasPassword: boolean; email: string | null };
+  panel: {
+    url: string;
+    username: string | null;
+    hasPassword: boolean;
+    email: string | null;
+  };
   integrations: {
     database: boolean;
-    discord: boolean;
+    google: boolean;
     pterodactyl: boolean;
     pteroLiveUsage: boolean;
     razorpay: boolean;

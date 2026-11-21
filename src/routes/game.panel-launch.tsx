@@ -109,11 +109,9 @@ function PanelLaunchPage() {
             <div>
               <h1 className="font-display text-2xl font-bold tracking-tight">Game Control Panel Bridge</h1>
               <p className="mt-1 text-sm text-white/65">
-                {info?.mode === "demo"
-                  ? "Preview Mode is active: auto-login SSO activates automatically once connected to your live Pterodactyl host."
-                  : info?.ssoReady
-                    ? "Signed auto-login SSO bridge is online. Redirecting you directly into your panel session."
-                    : "Direct Credential Assist is ready while the host SSO bridge initializes."}
+                {info?.ssoReady
+                  ? "Signed auto-login SSO bridge is online. Redirecting you directly into your panel session."
+                  : "Direct Credential Assist is ready while the host SSO bridge initializes."}
               </p>
             </div>
           </div>

@@ -14,19 +14,19 @@ export const Route = createFileRoute("/api/game/panel-sso")({
         const nextPath = sanitizeRelativePath(url.searchParams.get("next"), "/");
 
         try {
-          const identity = await getPanelSsoIdentity();
+          const identity = await getPanelSsoIdentity(request);
           if (!identity) {
-            return redirect302(`${origin}/api/public/auth/discord/login`);
+            return redirect302(`${origin}/api/auth/google/login?next=${encodeURIComponent("/game/dashboard")}`);
           }
 
-          if (identity.mode === "demo" || !identity.pteroUserId) {
-            return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=demo`);
+          if (!identity.pteroUserId) {
+            return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}`);
           }
 
           const base = panelUrl();
           const ssoReady = await isPteroSsoReady(base);
           if (!ssoReady) {
-            return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=live`);
+            return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}`);
           }
 
           const token = createPteroSsoToken({
@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/game/panel-sso")({
           });
           return redirect302(`${base}/sparrowx-sso.php?token=${encodeURIComponent(token)}`);
         } catch {
-          return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=live`);
+          return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}`);
         }
       },
     },

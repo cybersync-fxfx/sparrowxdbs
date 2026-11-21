@@ -16,7 +16,7 @@ describe("game portal auth redirect & Pterodactyl SSO helpers", () => {
   });
 
   it("resolveRequestOrigin honors reverse-proxy headers and blocks malformed hosts", () => {
-    const proxied = new Request("http://127.0.0.1:3000/api/public/auth/discord/login", {
+    const proxied = new Request("http://127.0.0.1:3000/api/auth/google/login", {
       headers: {
         "x-forwarded-proto": "https",
         "x-forwarded-host": "game.sparrowx.net",
@@ -24,7 +24,7 @@ describe("game portal auth redirect & Pterodactyl SSO helpers", () => {
     });
     expect(resolveRequestOrigin(proxied)).toBe("https://game.sparrowx.net");
 
-    const invalidHost = new Request("https://sparrowx.net/api/public/auth/discord/login", {
+    const invalidHost = new Request("https://sparrowx.net/api/auth/google/login", {
       headers: {
         "x-forwarded-host": "evil.com/phish",
       },

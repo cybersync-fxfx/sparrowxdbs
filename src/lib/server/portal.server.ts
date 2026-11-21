@@ -1,14 +1,21 @@
-import { getMode, integrations, panelUrl } from "./config.server";
-import { avatarUrl, getAppSession, type DemoState, type SessionData } from "./session.server";
+import { getCookie } from "@tanstack/react-start/server";
+import { integrations, panelUrl } from "./config.server";
 import { decryptText, encryptText, generatePassword, sanitizeUsername } from "./crypto.server";
 import * as db from "./db.server";
 import * as ptero from "./ptero.server";
-import { findPlan, planCostCoins, RENEWAL_DAYS, SERVICES, type ServiceId } from "../services";
-import type { DashboardData, ServerView, Subscription, Transaction, TxType } from "../portal-types";
-import { DEMO_PROMOS } from "../promos";
+import {
+  MASTER_SSO_COOKIE_NAME,
+  verifyMasterSsoToken,
+  type MasterSsoClaims,
+} from "./master-sso.server";
+import { findPlan, planCostCoins, RENEWAL_DAYS, type ServiceId } from "../services";
+import type { DashboardData, ServerView, Transaction, TxType } from "../portal-types";
 
 export class PortalError extends Error {
-  constructor(public code: "UNAUTHENTICATED" | "INSUFFICIENT_COINS" | "NOT_FOUND" | "BAD_REQUEST" | "UNAVAILABLE", message: string) {
+  constructor(
+    public code: "UNAUTHENTICATED" | "INSUFFICIENT_COINS" | "NOT_FOUND" | "BAD_REQUEST" | "UNAVAILABLE",
+    message: string,
+  ) {
     super(message);
   }
 }
@@ -16,183 +23,181 @@ export class PortalError extends Error {
 const uid = () => crypto.randomUUID();
 const daysFromNow = (d: number) => new Date(Date.now() + d * 86400000).toISOString();
 
-// ---------------- Demo identity + seed ----------------
+// ---------------- Authenticated Google / Master SSO Context ----------------
 
-export async function buildDemoSession(): Promise<SessionData> {
-  const discordId = "1093847562019384756";
-  const pw = generatePassword();
-  const now = Date.now();
-  const iso = (msAgo: number) => new Date(now - msAgo).toISOString();
-  const mc = SERVICES.minecraft.plans[1] ?? SERVICES.minecraft.plans[0]!;
-  const bot = SERVICES.discord.plans[0]!;
-  const demo: DemoState = {
-    coins: 1000 + 500 - planCostCoins(mc) - planCostCoins(bot),
-    pteroUserId: 4821,
-    pteroUsername: sanitizeUsername("sparrowpilot", discordId),
-    pteroPasswordEnc: await encryptText(pw),
-    email: "pilot@example.com",
-    subs: [
-      {
-        id: uid(), pteroServerId: 912, serviceType: "minecraft", planName: mc.name, priceCoins: planCostCoins(mc),
-        status: "active", expiresAt: daysFromNow(21), createdAt: iso(9 * 86400000),
-        demo: { identifier: "a1f9c2e7", port: 25565, name: "Skyforge SMP", ramMb: mc.ramMb, vcpu: mc.vcpu, diskGb: mc.diskGb },
-      },
-      {
-        id: uid(), pteroServerId: 913, serviceType: "discord", planName: bot.name, priceCoins: planCostCoins(bot),
-        status: "active", expiresAt: daysFromNow(4), createdAt: iso(26 * 86400000),
-        demo: { identifier: "7b3d0e44", port: 3012, name: "Moderation Bot", ramMb: bot.ramMb, vcpu: bot.vcpu, diskGb: bot.diskGb },
-      },
-    ],
-    txs: [
-      { id: uid(), amount: -planCostCoins(mc), type: "purchase", description: `Deployed ${mc.name} (Minecraft)`, createdAt: iso(9 * 86400000) },
-      { id: uid(), amount: 500, type: "topup", description: "UPI top-up via Razorpay", createdAt: iso(10 * 86400000) },
-      { id: uid(), amount: -planCostCoins(bot), type: "purchase", description: `Deployed ${bot.name} (Discord Bots)`, createdAt: iso(26 * 86400000) },
-      { id: uid(), amount: 1000, type: "bonus", description: "Welcome credit (demo)", createdAt: iso(27 * 86400000) },
-    ],
-    usedPromos: [],
-  };
-  return { mode: "demo", discordId, username: "sparrowpilot", globalName: "Sparrow Pilot", avatar: null, demo };
-}
-
-// ---------------- Live provisioning (Discord login -> Pterodactyl) ----------------
-
-export async function provisionLiveClient(discord: { id: string; username: string; global_name: string | null; avatar: string | null; email: string | null }) {
-  let client = await db.findClientByDiscordId(discord.id);
-  if (!client) {
-    client = await db.insertClient({
-      discord_id: discord.id,
-      discord_username: discord.username,
-      discord_avatar: discord.avatar,
-      email: discord.email,
-      ptero_user_id: null,
-      ptero_username: null,
-      ptero_password_enc: null,
-    });
-  } else {
-    client = await db.updateClient(client.id, { discord_username: discord.username, discord_avatar: discord.avatar, email: discord.email ?? client.email });
+async function readAuthenticatedGoogleUser(): Promise<MasterSsoClaims | null> {
+  try {
+    const rawCookie = getCookie(MASTER_SSO_COOKIE_NAME);
+    if (!rawCookie) return null;
+    return await verifyMasterSsoToken(rawCookie);
+  } catch {
+    return null;
   }
-  if (!client.ptero_user_id) {
-    const email = discord.email ?? `discord-${discord.id}@users.sparrowx.net`;
-    const password = generatePassword();
-    const existing = await ptero.findUserByEmail(email);
-    const user = existing
-      ? await ptero.setUserPassword(existing.id, password).then(() => existing)
-      : await ptero.createUser({ email, username: sanitizeUsername(discord.username, discord.id), firstName: discord.global_name ?? discord.username, password });
-    client = await db.updateClient(client.id, {
-      ptero_user_id: user.id,
-      ptero_username: user.username,
-      ptero_password_enc: await encryptText(password),
-    });
+}
+
+async function requireGoogleUser(): Promise<MasterSsoClaims> {
+  const claims = await readAuthenticatedGoogleUser();
+  if (!claims) {
+    throw new PortalError("UNAUTHENTICATED", "Please sign in with Google");
   }
-  return client;
+  return claims;
 }
 
-// ---------------- Context ----------------
+/**
+ * Ensures the signed-in Google user has a real `public.clients` record (and Pterodactyl
+ * panel user when Pterodactyl API is configured). Never fabricates mock records.
+ */
+export async function resolveLiveClient(claims: MasterSsoClaims): Promise<db.ClientRow | null> {
+  const ints = integrations();
+  if (!ints.database) return null;
 
-async function ctx() {
-  const session = await getAppSession();
-  const d = session.data;
-  if (!d.discordId) throw new PortalError("UNAUTHENTICATED", "Please log in with Discord");
-  const mode = getMode();
-  if (d.mode === "demo" && d.demo) return { session, d, mode: "demo" as const, demo: d.demo };
-  if (d.mode === "live" && d.clientId && mode === "live") return { session, d, mode: "live" as const, clientId: d.clientId };
-  throw new PortalError("UNAUTHENTICATED", "Session expired, please log in again");
-}
+  const email = claims.email.trim().toLowerCase();
+  const externalKey = `google:${claims.sub}`;
+  const displayName = claims.fullName || email.split("@")[0] || "player";
 
-type Ctx = Awaited<ReturnType<typeof ctx>>;
+  try {
+    let client =
+      (await db.findClientByEmail(email)) ??
+      (await db.findClientByDiscordId(externalKey));
 
-async function saveDemo(c: Ctx & { mode: "demo" }, demo: DemoState) {
-  demo.txs = demo.txs.slice(0, 10);
-  demo.subs = demo.subs.slice(0, 6);
-  await c.session.update({ ...c.d, demo });
+    if (!client) {
+      client = await db.insertClient({
+        discord_id: externalKey,
+        discord_username: displayName,
+        discord_avatar: null,
+        email,
+        ptero_user_id: null,
+        ptero_username: null,
+        ptero_password_enc: null,
+      });
+    } else if (client.email !== email || client.discord_username !== displayName) {
+      client = await db.updateClient(client.id, {
+        discord_username: displayName,
+        email,
+      });
+    }
+
+    if (!client.ptero_user_id && ints.pterodactyl) {
+      try {
+        const password = generatePassword();
+        const existing = await ptero.findUserByEmail(email);
+        const pteroUser = existing
+          ? await ptero.setUserPassword(existing.id, password).then(() => existing)
+          : await ptero.createUser({
+              email,
+              username: sanitizeUsername(displayName, claims.sub),
+              firstName: displayName,
+              password,
+            });
+        client = await db.updateClient(client.id, {
+          ptero_user_id: pteroUser.id,
+          ptero_username: pteroUser.username,
+          ptero_password_enc: await encryptText(password),
+        });
+      } catch (err) {
+        console.warn("[SparrowX Game Portal] Pterodactyl user auto-sync deferred:", err);
+      }
+    }
+
+    return client;
+  } catch (err) {
+    console.warn("[SparrowX Game Portal] Live PostgREST client lookup unavailable:", err);
+    return null;
+  }
 }
 
 export async function sessionSummary() {
-  const s = await getAppSession();
-  if (!s.data.discordId) return null;
-  return { username: s.data.globalName ?? s.data.username ?? "Player", avatarUrl: avatarUrl(s.data.discordId, s.data.avatar) };
+  const claims = await readAuthenticatedGoogleUser();
+  if (!claims) return null;
+  return {
+    id: claims.sub,
+    email: claims.email,
+    username: claims.fullName || claims.email.split("@")[0] || "Player",
+    avatarUrl: null as string | null,
+  };
 }
 
 export async function dashboard(): Promise<DashboardData> {
-  const c = await ctx();
-  const user = { discordId: c.d.discordId!, username: c.d.username!, globalName: c.d.globalName ?? null, avatarUrl: avatarUrl(c.d.discordId!, c.d.avatar) };
-  if (c.mode === "demo") {
-    return { mode: "demo", user, coins: c.demo.coins, panel: { url: panelUrl(), username: c.demo.pteroUsername, hasPassword: true, email: c.demo.email }, integrations: integrations() };
-  }
-  const client = await db.getClient(c.clientId);
-  if (!client) throw new PortalError("UNAUTHENTICATED", "Account not found");
+  const claims = await requireGoogleUser();
+  const ints = integrations();
+  const client = await resolveLiveClient(claims);
+  const username = claims.email.split("@")[0] || "player";
+
   return {
     mode: "live",
-    user,
-    coins: client.coins,
-    panel: { url: panelUrl(), username: client.ptero_username, hasPassword: !!client.ptero_password_enc, email: client.email },
-    integrations: integrations(),
+    user: {
+      id: claims.sub,
+      email: claims.email,
+      username,
+      globalName: claims.fullName || username,
+      avatarUrl: null,
+    },
+    coins: client?.coins ?? 0,
+    panel: {
+      url: panelUrl(),
+      username: client?.ptero_username ?? null,
+      hasPassword: Boolean(client?.ptero_password_enc),
+      email: client?.email ?? claims.email,
+    },
+    integrations: ints,
   };
 }
 
 export async function revealPassword(): Promise<string> {
-  const c = await ctx();
-  if (c.mode === "demo") return decryptText(c.demo.pteroPasswordEnc);
-  const client = await db.getClient(c.clientId);
-  if (!client?.ptero_password_enc) throw new PortalError("NOT_FOUND", "No panel password stored yet — use Sync / Reset");
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client?.ptero_password_enc) {
+    throw new PortalError("NOT_FOUND", "No panel password stored yet — connect Pterodactyl and click Sync / Reset");
+  }
   return decryptText(client.ptero_password_enc);
 }
 
 export async function resetPassword(): Promise<string> {
-  const c = await ctx();
-  const pw = generatePassword();
-  if (c.mode === "demo") {
-    await saveDemo(c, { ...c.demo, pteroPasswordEnc: await encryptText(pw) });
-    return pw;
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client?.ptero_user_id) {
+    throw new PortalError("NOT_FOUND", "Pterodactyl panel account is not linked yet");
   }
-  const client = await db.getClient(c.clientId);
-  if (!client?.ptero_user_id) throw new PortalError("NOT_FOUND", "Panel account not linked yet");
+  const pw = generatePassword();
   await ptero.setUserPassword(client.ptero_user_id, pw);
   await db.updateClient(client.id, { ptero_password_enc: await encryptText(pw) });
   return pw;
 }
 
 export async function transactions(): Promise<Transaction[]> {
-  const c = await ctx();
-  if (c.mode === "demo") return c.demo.txs;
-  return db.listTransactions(c.clientId);
-}
-
-function hash(s: string) {
-  let h = 0;
-  for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0;
-  return Math.abs(h);
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client) return [];
+  return db.listTransactions(client.id);
 }
 
 export async function servers(): Promise<ServerView[]> {
-  const c = await ctx();
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client?.ptero_user_id || !integrations().pterodactyl) return [];
+
   const base = panelUrl();
-  if (c.mode === "demo") {
-    const tick = Math.floor(Date.now() / 5000);
-    return c.demo.subs.map((s) => {
-      const m = s.demo!;
-      const age = Date.now() - new Date(s.createdAt).getTime();
-      const installing = age < 45_000;
-      const wobble = (hash(m.identifier + tick) % 100) / 100;
-      return {
-        id: String(s.pteroServerId), identifier: m.identifier, name: m.name, service: s.serviceType, planName: s.planName,
-        status: installing ? "INSTALLING" : "ONLINE",
-        address: `103.174.${(hash(m.identifier) % 200) + 20}.${(hash(m.name) % 200) + 20}:${m.port}`,
-        ramLimitMb: m.ramMb, ramUsedMb: installing ? 0 : Math.round(m.ramMb * (0.38 + wobble * 0.3)),
-        cpuLimit: Math.round(m.vcpu * 100), cpuUsed: installing ? 0 : Math.round(m.vcpu * 100 * (0.12 + wobble * 0.35)),
-        diskLimitGb: m.diskGb, expiresAt: s.expiresAt, manageUrl: `${base}/server/${m.identifier}`,
-      };
-    });
-  }
-  const client = await db.getClient(c.clientId);
-  if (!client?.ptero_user_id) return [];
-  const [live, subs] = await Promise.all([ptero.listUserServers(client.ptero_user_id), db.listSubscriptions(client.id)]);
+  const [live, subs] = await Promise.all([
+    ptero.listUserServers(client.ptero_user_id),
+    db.listSubscriptions(client.id),
+  ]);
   return live.map((s) => {
     const sub = subs.find((x) => x.pteroServerId === s.id);
     return {
-      id: String(s.id), identifier: s.identifier, name: s.name, service: sub?.serviceType ?? null, planName: sub?.planName ?? null,
-      status: s.status, address: s.address, ramLimitMb: s.ramLimitMb, ramUsedMb: s.ramUsedMb, cpuLimit: s.cpuLimit, cpuUsed: s.cpuUsed,
-      diskLimitGb: s.diskLimitGb, expiresAt: sub?.expiresAt ?? null, manageUrl: `${base}/server/${s.identifier}`,
+      id: String(s.id),
+      identifier: s.identifier,
+      name: s.name,
+      service: sub?.serviceType ?? null,
+      planName: sub?.planName ?? null,
+      status: s.status,
+      address: s.address,
+      ramLimitMb: s.ramLimitMb,
+      ramUsedMb: s.ramUsedMb,
+      cpuLimit: s.cpuLimit,
+      cpuUsed: s.cpuUsed,
+      diskLimitGb: s.diskLimitGb,
+      expiresAt: sub?.expiresAt ?? null,
+      manageUrl: `${base}/server/${s.identifier}`,
     };
   });
 }
@@ -203,24 +208,16 @@ export async function deploy(planId: string, serverName: string) {
   const { service, plan } = found;
   const cost = planCostCoins(plan);
   const name = serverName.trim() || `${plan.name} Server`;
-  const c = await ctx();
 
-  if (c.mode === "demo") {
-    if (c.demo.coins < cost) throw new PortalError("INSUFFICIENT_COINS", `You need ${cost - c.demo.coins} more SparrowCoins`);
-    const id = 900 + c.demo.subs.length + Math.floor(Math.random() * 90);
-    const sub: Subscription = {
-      id: uid(), pteroServerId: id, serviceType: service.id, planName: plan.name, priceCoins: cost, status: "active",
-      expiresAt: daysFromNow(RENEWAL_DAYS), createdAt: new Date().toISOString(),
-      demo: { identifier: uid().slice(0, 8), port: { fivem: 30120, samp: 7777, minecraft: 25565, discord: 3000 }[service.id] + c.demo.subs.length, name, ramMb: plan.ramMb, vcpu: plan.vcpu, diskGb: plan.diskGb },
-    };
-    const tx: Transaction = { id: uid(), amount: -cost, type: "purchase", description: `Deployed ${plan.name} (${service.name})`, createdAt: sub.createdAt };
-    const demo = { ...c.demo, coins: c.demo.coins - cost, subs: [sub, ...c.demo.subs], txs: [tx, ...c.demo.txs] };
-    await saveDemo(c, demo);
-    return { coins: demo.coins, serverName: name };
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client?.ptero_user_id) {
+    throw new PortalError(
+      "UNAVAILABLE",
+      "Pterodactyl game panel & sovereign database must be connected before deploying a server.",
+    );
   }
 
-  const client = await db.getClient(c.clientId);
-  if (!client?.ptero_user_id) throw new PortalError("NOT_FOUND", "Panel account not linked yet");
   let balance: number;
   try {
     balance = await db.spendCoins(client.id, cost, `Deployed ${plan.name} (${service.name})`);
@@ -230,122 +227,116 @@ export async function deploy(planId: string, serverName: string) {
     }
     throw e;
   }
+
   try {
     const srv = await ptero.createServer({ userId: client.ptero_user_id, name, service: service.id, plan });
     await db.insertSubscription({
-      client_id: client.id, ptero_server_id: srv.id, service_type: service.id, plan_name: plan.name,
-      price_coins: cost, status: "active", expires_at: daysFromNow(RENEWAL_DAYS),
+      client_id: client.id,
+      ptero_server_id: srv.id,
+      service_type: service.id,
+      plan_name: plan.name,
+      price_coins: cost,
+      status: "active",
+      expires_at: daysFromNow(RENEWAL_DAYS),
     });
     return { coins: balance, serverName: name };
   } catch (e) {
-    const refund = await db.creditCoins(client.id, cost, "refund", `Refund: ${plan.name} deploy failed`, `refund:${uid()}`);
+    const refund = await db.creditCoins(
+      client.id,
+      cost,
+      "refund",
+      `Refund: ${plan.name} deploy failed`,
+      `refund:${uid()}`,
+    );
     console.error("Deploy failed, refunded", e);
-    throw new PortalError("UNAVAILABLE", `Deployment failed and ${cost} coins were refunded (balance ${refund.balance}). ${e instanceof Error ? e.message : ""}`);
+    throw new PortalError(
+      "UNAVAILABLE",
+      `Deployment failed and ${cost} coins were refunded (balance ${refund.balance}). ${e instanceof Error ? e.message : ""}`,
+    );
   }
 }
 
 export async function redeemPromo(rawCode: string) {
   const code = rawCode.trim().toUpperCase();
-  const c = await ctx();
-  if (c.mode === "demo") {
-    const coins = DEMO_PROMOS[code];
-    if (!coins) throw new PortalError("NOT_FOUND", "That promo code isn't valid");
-    if (c.demo.usedPromos.includes(code)) throw new PortalError("BAD_REQUEST", "You've already redeemed this code");
-    const tx: Transaction = { id: uid(), amount: coins, type: "promo", description: `Promo code ${code}`, createdAt: new Date().toISOString() };
-    const demo = { ...c.demo, coins: c.demo.coins + coins, txs: [tx, ...c.demo.txs], usedPromos: [...c.demo.usedPromos, code] };
-    await saveDemo(c, demo);
-    return { coins: demo.coins, added: coins };
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required to redeem promo codes.");
   }
   const promo = await db.findPromo(code);
   if (!promo) throw new PortalError("NOT_FOUND", "That promo code isn't valid");
-  const r = await db.creditCoins(c.clientId, promo.coins, "promo", `Promo code ${code}`, `promo:${code}:${c.clientId}`);
+  const r = await db.creditCoins(
+    client.id,
+    promo.coins,
+    "promo",
+    `Promo code ${code}`,
+    `promo:${code}:${client.id}`,
+  );
   if (!r.applied) throw new PortalError("BAD_REQUEST", "You've already redeemed this code");
   return { coins: r.balance, added: promo.coins };
 }
 
-/** Demo-only instant top-up (simulated UPI). */
-export async function demoTopup(amount: number) {
-  const c = await ctx();
-  if (c.mode !== "demo") throw new PortalError("BAD_REQUEST", "Use the payment checkout");
-  const tx: Transaction = { id: uid(), amount, type: "topup", description: "UPI top-up (demo payment)", createdAt: new Date().toISOString() };
-  const demo = { ...c.demo, coins: c.demo.coins + amount, txs: [tx, ...c.demo.txs] };
-  await saveDemo(c, demo);
-  return { coins: demo.coins };
-}
-
 export async function liveClientId(): Promise<string> {
-  const c = await ctx();
-  if (c.mode !== "live") throw new PortalError("BAD_REQUEST", "Not available in demo mode");
-  return c.clientId;
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client) {
+    throw new PortalError("UNAVAILABLE", "Database connection is not active on this server.");
+  }
+  return client.id;
 }
 
 export async function creditTopup(clientId: string, coins: number, paymentId: string) {
-  return db.creditCoins(clientId, coins, "topup" as TxType, "UPI / card top-up via Razorpay", `razorpay:${paymentId}`);
+  return db.creditCoins(
+    clientId,
+    coins,
+    "topup" as TxType,
+    "UPI / card top-up via Razorpay",
+    `razorpay:${paymentId}`,
+  );
 }
 
-export async function getPanelSsoIdentity(): Promise<
-  | null
-  | { mode: "demo"; pteroUserId: number; username: string; email: string }
-  | { mode: "live"; pteroUserId: number | null; username: string; email: string }
-> {
-  const session = await getAppSession();
-  const d = session.data;
-  if (!d.discordId) return null;
-  if (d.mode === "demo" && d.demo) {
-    return {
-      mode: "demo",
-      pteroUserId: d.demo.pteroUserId,
-      username: d.demo.pteroUsername,
-      email: d.demo.email,
-    };
+export async function getPanelSsoIdentity(
+  request?: Request,
+): Promise<null | { mode: "live"; pteroUserId: number | null; username: string; email: string }> {
+  let claims: MasterSsoClaims | null = null;
+  if (request) {
+    const { readMasterSsoFromRequest } = await import("./master-sso.server");
+    claims = await readMasterSsoFromRequest(request);
+  } else {
+    claims = await readAuthenticatedGoogleUser();
   }
-  const mode = getMode();
-  if (d.mode === "live" && d.clientId && mode === "live") {
-    const client = await db.getClient(d.clientId);
-    if (!client) return null;
-    const email = client.email ?? `discord-${client.discord_id}@users.sparrowx.net`;
-    return {
-      mode: "live",
-      pteroUserId: client.ptero_user_id ?? null,
-      username: client.ptero_username ?? d.username ?? "player",
-      email,
-    };
-  }
-  return null;
+  if (!claims) return null;
+
+  const client = await resolveLiveClient(claims);
+  return {
+    mode: "live",
+    pteroUserId: client?.ptero_user_id ?? null,
+    username: client?.ptero_username ?? claims.email.split("@")[0] ?? "player",
+    email: client?.email ?? claims.email,
+  };
 }
 
 export async function getPanelLaunchInfo() {
-  const c = await ctx();
+  const claims = await requireGoogleUser();
   const { isPteroSsoReady } = await import("./ptero-sso.server");
   const base = panelUrl();
-  if (c.mode === "demo") {
-    return {
-      mode: "demo" as const,
-      panelUrl: base,
-      username: c.demo.pteroUsername,
-      email: c.demo.email,
-      ssoReady: false,
-    };
-  }
-  const client = await db.getClient(c.clientId);
-  if (!client) throw new PortalError("UNAUTHENTICATED", "Account not found");
-  const ssoReady = await isPteroSsoReady(base);
+  const client = await resolveLiveClient(claims);
+  const ssoReady = client?.ptero_user_id ? await isPteroSsoReady(base) : false;
   return {
     mode: "live" as const,
     panelUrl: base,
-    username: client.ptero_username,
-    email: client.email ?? `discord-${client.discord_id}@users.sparrowx.net`,
+    username: client?.ptero_username ?? null,
+    email: client?.email ?? claims.email,
     ssoReady,
   };
 }
 
 export async function powerAction(identifier: string, signal: "start" | "stop" | "restart") {
-  const c = await ctx();
-  if (c.mode === "demo") {
-    return { ok: true, signal, identifier, message: `Demo server "${identifier}" received ${signal.toUpperCase()} signal` };
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client?.ptero_user_id) {
+    throw new PortalError("NOT_FOUND", "Pterodactyl panel account is not linked yet");
   }
-  const client = await db.getClient(c.clientId);
-  if (!client?.ptero_user_id) throw new PortalError("NOT_FOUND", "Panel account not linked yet");
   const owned = await ptero.listUserServers(client.ptero_user_id);
   if (!owned.some((s) => s.identifier === identifier)) {
     throw new PortalError("BAD_REQUEST", "Server does not belong to your account");

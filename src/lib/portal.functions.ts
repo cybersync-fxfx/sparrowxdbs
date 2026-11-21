@@ -49,18 +49,14 @@ export const redeemPromo = createServerFn({ method: "POST" })
 
 const amountSchema = z.object({ amount: z.number().int().min(10).max(50000) });
 
-/** Starts a top-up: Razorpay order in live mode, instant simulated credit in demo mode. */
+/** Starts a live Razorpay top-up order (zero simulated demo credits). */
 export const startTopup = createServerFn({ method: "POST" })
   .validator((d) => amountSchema.parse(d))
   .handler(async ({ data }) =>
     run(async () => {
-      const { getMode, integrations } = await import("./server/config.server");
+      const { integrations } = await import("./server/config.server");
       const portal = await import("./server/portal.server");
-      if (getMode() === "demo") {
-        const r = await portal.demoTopup(data.amount);
-        return { kind: "credited" as const, coins: r.coins };
-      }
-      if (!integrations().razorpay) throw new Error("UNAVAILABLE: Online payments aren't enabled yet — use a promo code");
+      if (!integrations().razorpay) throw new Error("UNAVAILABLE: Online payments aren't enabled yet — configure Razorpay keys or redeem a promo code");
       const clientId = await portal.liveClientId();
       const { createOrder } = await import("./server/razorpay.server");
       const o = await createOrder(clientId, data.amount);
@@ -103,8 +99,11 @@ export const getPanelLaunchContext = createServerFn({ method: "GET" }).handler(a
 );
 
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
+  const { deleteCookie } = await import("@tanstack/react-start/server");
   const { getAppSession } = await import("./server/session.server");
+  const { MASTER_SSO_COOKIE_NAME } = await import("./server/master-sso.server");
   const s = await getAppSession();
   await s.clear();
+  deleteCookie(MASTER_SSO_COOKIE_NAME, { path: "/" });
   return { ok: true };
 });
