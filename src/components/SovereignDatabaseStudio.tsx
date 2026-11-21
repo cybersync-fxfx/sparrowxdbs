@@ -1438,6 +1438,11 @@ export function SovereignDatabaseStudio({
   // Fetch rows for a specific table
   const fetchTableRows = useCallback(
     async (tableName: string) => {
+      if (!tableName || !tableName.trim()) {
+        setRows([]);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         const res = await fetch(`/rest/v1/${tableName}?select=*`, {

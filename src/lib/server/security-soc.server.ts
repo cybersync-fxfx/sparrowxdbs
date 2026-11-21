@@ -181,7 +181,7 @@ export function verifyAuditChain(): { valid: boolean; totalEntries: number; brok
  */
 export function getTenantAuditLogs(tenantId?: string): ImmutableAuditLogEntry[] {
   if (!tenantId || tenantId === "all" || tenantId === "tnt-system") {
-    return GLOBAL_AUDIT_CHAIN.toReversed().slice(0, 100);
+    return [...GLOBAL_AUDIT_CHAIN].reverse().slice(0, 100);
   }
   return GLOBAL_AUDIT_CHAIN.filter((e) => e.tenantId === tenantId)
     .reverse()
