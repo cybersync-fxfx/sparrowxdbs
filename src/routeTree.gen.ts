@@ -17,6 +17,8 @@ import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as KeysRouteImport } from './routes/keys'
 import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as StoryRouteImport } from './routes/story'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as DocsServiceRouteImport } from './routes/docs/$service'
 import { Route as DocsErrorsRouteImport } from './routes/docs/errors'
 import { Route as FIndexRouteImport } from './routes/f.index'
 import { Route as FIdRouteImport } from './routes/f.$id'
@@ -77,6 +79,16 @@ const ShieldRoute = ShieldRouteImport.update({
 const StoryRoute = StoryRouteImport.update({
   id: '/story',
   path: '/story',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsServiceRoute = DocsServiceRouteImport.update({
+  id: '/docs/$service',
+  path: '/docs/$service',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsErrorsRoute = DocsErrorsRouteImport.update({
@@ -197,11 +209,13 @@ export interface FileRoutesByFullPath {
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
+  '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/infra/dashboard': typeof InfraDashboardRoute
+  '/docs/': typeof DocsIndexRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
   '/infra/': typeof InfraIndexRoute
@@ -228,11 +242,13 @@ export interface FileRoutesByTo {
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
+  '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/infra/dashboard': typeof InfraDashboardRoute
+  '/docs': typeof DocsIndexRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
   '/infra': typeof InfraIndexRoute
@@ -260,11 +276,13 @@ export interface FileRoutesById {
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
+  '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/infra/dashboard': typeof InfraDashboardRoute
+  '/docs/': typeof DocsIndexRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
   '/infra/': typeof InfraIndexRoute
@@ -293,11 +311,13 @@ export interface FileRouteTypes {
     | '/keys'
     | '/shield'
     | '/story'
+    | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
     | '/infra/dashboard'
+    | '/docs/'
     | '/f/'
     | '/game/'
     | '/infra/'
@@ -324,11 +344,13 @@ export interface FileRouteTypes {
     | '/keys'
     | '/shield'
     | '/story'
+    | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
     | '/infra/dashboard'
+    | '/docs'
     | '/f'
     | '/game'
     | '/infra'
@@ -355,11 +377,13 @@ export interface FileRouteTypes {
     | '/keys'
     | '/shield'
     | '/story'
+    | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
     | '/infra/dashboard'
+    | '/docs/'
     | '/f/'
     | '/game/'
     | '/infra/'
@@ -387,11 +411,13 @@ export interface RootRouteChildren {
   KeysRoute: typeof KeysRoute
   ShieldRoute: typeof ShieldRoute
   StoryRoute: typeof StoryRoute
+  DocsServiceRoute: typeof DocsServiceRoute
   DocsErrorsRoute: typeof DocsErrorsRoute
   FIdRoute: typeof FIdRoute
   GameDashboardRoute: typeof GameDashboardRoute
   GamePanelLaunchRoute: typeof GamePanelLaunchRoute
   InfraDashboardRoute: typeof InfraDashboardRoute
+  DocsIndexRoute: typeof DocsIndexRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
   InfraIndexRoute: typeof InfraIndexRoute
@@ -466,6 +492,20 @@ declare module '@tanstack/react-router' {
       path: '/story'
       fullPath: '/story'
       preLoaderRoute: typeof StoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$service': {
+      id: '/docs/$service'
+      path: '/docs/$service'
+      fullPath: '/docs/$service'
+      preLoaderRoute: typeof DocsServiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/errors': {
@@ -627,11 +667,13 @@ const rootRouteChildren: RootRouteChildren = {
   KeysRoute: KeysRoute,
   ShieldRoute: ShieldRoute,
   StoryRoute: StoryRoute,
+  DocsServiceRoute: DocsServiceRoute,
   DocsErrorsRoute: DocsErrorsRoute,
   FIdRoute: FIdRoute,
   GameDashboardRoute: GameDashboardRoute,
   GamePanelLaunchRoute: GamePanelLaunchRoute,
   InfraDashboardRoute: InfraDashboardRoute,
+  DocsIndexRoute: DocsIndexRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
   InfraIndexRoute: InfraIndexRoute,

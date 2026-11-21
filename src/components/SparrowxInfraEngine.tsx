@@ -367,6 +367,12 @@ export function SparrowxInfraEngine() {
               Network &amp; DDoS
             </a>
             <a
+              href="/docs/infra"
+              className="hover:text-white transition-colors duration-150"
+            >
+              Docs
+            </a>
+            <a
               href={buildMasterHref("/")}
               className="hover:text-white transition-colors duration-150"
             >

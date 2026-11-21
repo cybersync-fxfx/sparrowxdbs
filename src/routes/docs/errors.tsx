@@ -80,16 +80,24 @@ function DocsErrorsPage() {
           </a>
           <span className="text-muted-foreground/60">/</span>
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-mono">
-            Documentation
+            Error Reference
           </span>
         </div>
 
-        <a
-          href="/"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
-        >
-          <span>← Back to Dashboard</span>
-        </a>
+        <div className="flex items-center gap-2">
+          <a
+            href="/docs"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+          >
+            <span>Service Docs</span>
+          </a>
+          <a
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
+          >
+            <span>← Back to SparrowX</span>
+          </a>
+        </div>
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8">

@@ -50,6 +50,12 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
         </div>
         <div className="flex items-center gap-2">
           <a
+            href="/docs/game"
+            className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Docs
+          </a>
+          <a
             href="https://gamesec.sparrowx.net"
             className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >

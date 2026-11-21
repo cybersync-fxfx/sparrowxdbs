@@ -196,6 +196,11 @@ export function SparrowxFooter({
                   </a>
                 </li>
                 <li className="min-w-0">
+                  <a href="/docs" className={LINK_CLASSES}>
+                    Documentation
+                  </a>
+                </li>
+                <li className="min-w-0">
                   <a href="/docs/errors" className={LINK_CLASSES}>
                     Error Reference
                   </a>
