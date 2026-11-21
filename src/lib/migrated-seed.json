@@ -1,9 +1,18 @@
 {
   "app_users": [
     {
+      "id": "USR-SPX-MASTER",
+      "email": "master-db@sparrowx.net",
+      "password": "spx_digest",
+      "full_name": "SparrowX Master DB Owner",
+      "admin": "yes",
+      "tenant_id": "TNT-SPARROWX-CORE",
+      "created_at": "2026-11-21T09:06:29.601Z"
+    },
+    {
       "id": "USR-7163",
       "email": "cybersync790@gmail.com",
-      "password": "12345678",
+      "password": "spx_digest",
       "full_name": "sam",
       "admin": "yes",
       "tenant_id": "TNT-5638",
@@ -20,6 +29,30 @@
     }
   ],
   "client_tenants": [
+    {
+      "id": "TNT-SPARROWX-CORE",
+      "name": "SparrowX Core Platform DB",
+      "contact_email": "master-db@sparrowx.net",
+      "primary_domain": "https://sparrowx.net",
+      "plan_tier": "Enterprise",
+      "status": "Active",
+      "enabled_modules": [
+        "web_security",
+        "ai_shield",
+        "cloud_security",
+        "compliance",
+        "sovereign_db",
+        "netsec_ddos"
+      ],
+      "api_key": "spx_tenant_master_core_sovereign",
+      "sdk_verified": true,
+      "guardrails_active": true,
+      "requests_per_min": 0,
+      "blocked_threats": 0,
+      "avg_latency_ms": 1,
+      "quota_used_pct": 0,
+      "created_at": "2026-11-21T09:06:29.606Z"
+    },
     {
       "id": "TNT-6032",
       "name": "ij",
