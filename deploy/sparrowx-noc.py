@@ -955,7 +955,41 @@ class TelemetryCollector:
                             )
                         )
 
-        # 4. Exposed listening ports (`ss -tuln`)
+        # 4. Registered Client VPS Protection Bundles (/opt/sparrowx/clients/registry.json & web registry)
+        seen_agents: Set[str] = set()
+        for reg_candidate in (
+            Path("/opt/sparrowx/clients/registry.json"),
+            Path("/opt/sparrowxdbs/data/client-vps-registry.json"),
+        ):
+            if not reg_candidate.exists():
+                continue
+            try:
+                entries = json.loads(reg_candidate.read_text(encoding="utf-8"))
+                if isinstance(entries, list):
+                    for item in entries[:25]:
+                        aid = str(item.get("agent_id") or item.get("agentId") or "")
+                        if not aid or aid in seen_agents:
+                            continue
+                        seen_agents.add(aid)
+                        uname = str(item.get("username") or aid)[:14]
+                        pub_ip = str(item.get("publicIp") or item.get("tunnel_ip") or "direct-edge")
+                        email = str(item.get("email") or "")[:20]
+                        st_raw = str(item.get("status") or "PROVISIONED").upper()
+                        st = "PROTECTED" if st_raw == "PROTECTED" else "WAITING"
+                        backends.append(
+                            ProtectedBackend(
+                                name=uname,
+                                kind="CLIENT-VPS",
+                                tunnel_ip=pub_ip,
+                                endpoint=email,
+                                status=st,
+                                handshake_age=str(item.get("lastSeen") or item.get("created_at") or item.get("createdAt") or "")[-9:-1],
+                            )
+                        )
+            except (OSError, json.JSONDecodeError):
+                pass
+
+        # 5. Exposed listening ports (`ss -tuln`)
         rc, out, _ = run_cmd(["ss", "-tuln"], timeout=1.0)
         if rc == 0:
             ports_set: Set[str] = set()

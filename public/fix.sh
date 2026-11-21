@@ -1797,7 +1797,12 @@ if [ -d "/usr/local/bin" ]; then
     ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-noc 2>/dev/null || true
     ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-master 2>/dev/null || true
   fi
-  log_ok "CLI symlinks verified: sparrowx-setup, sparrowx-fix, sparrowx-doctor, sparrowx-update, sparrowx-db, sparrowx-ddos, sparrowx-xdp, sparrowx-noc"
+  if [ -f "${INSTALL_DIR}/deploy/sparrowx-client-gen.py" ]; then
+    chmod +x "${INSTALL_DIR}/deploy/sparrowx-client-gen.py" 2>/dev/null || true
+    ln -sf "${INSTALL_DIR}/deploy/sparrowx-client-gen.py" /usr/local/bin/sparrowx-gen-client 2>/dev/null || true
+    ln -sf "${INSTALL_DIR}/deploy/sparrowx-client-gen.py" /usr/local/bin/sparrowx-protect-gen 2>/dev/null || true
+  fi
+  log_ok "CLI symlinks verified: sparrowx-setup, sparrowx-fix, sparrowx-doctor, sparrowx-update, sparrowx-db, sparrowx-ddos, sparrowx-xdp, sparrowx-noc, sparrowx-gen-client"
 fi
 
 # ==============================================================================

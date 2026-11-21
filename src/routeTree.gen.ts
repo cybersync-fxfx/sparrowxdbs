@@ -27,6 +27,8 @@ import { Route as InfraIndexRouteImport } from './routes/infra.index'
 import { Route as InfraDashboardRouteImport } from './routes/infra.dashboard'
 import { Route as ApiAuthMasterSsoRouteImport } from './routes/api/auth/master-sso'
 import { Route as ApiAuthVerifyEmailRouteImport } from './routes/api/auth/verify-email'
+import { Route as ApiClientProtectGenerateRouteImport } from './routes/api/client-protect/generate'
+import { Route as ApiClientProtectHeartbeatRouteImport } from './routes/api/client-protect/heartbeat'
 import { Route as ApiDbHealthRouteImport } from './routes/api/db/health'
 import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
@@ -129,6 +131,18 @@ const ApiAuthVerifyEmailRoute = ApiAuthVerifyEmailRouteImport.update({
   path: '/api/auth/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiClientProtectGenerateRoute =
+  ApiClientProtectGenerateRouteImport.update({
+    id: '/api/client-protect/generate',
+    path: '/api/client-protect/generate',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiClientProtectHeartbeatRoute =
+  ApiClientProtectHeartbeatRouteImport.update({
+    id: '/api/client-protect/heartbeat',
+    path: '/api/client-protect/heartbeat',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiDbHealthRoute = ApiDbHealthRouteImport.update({
   id: '/api/db/health',
   path: '/api/db/health',
@@ -207,6 +221,8 @@ export interface FileRoutesByFullPath {
   '/infra/': typeof InfraIndexRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
+  '/api/client-protect/generate': typeof ApiClientProtectGenerateRoute
+  '/api/client-protect/heartbeat': typeof ApiClientProtectHeartbeatRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -238,6 +254,8 @@ export interface FileRoutesByTo {
   '/infra': typeof InfraIndexRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
+  '/api/client-protect/generate': typeof ApiClientProtectGenerateRoute
+  '/api/client-protect/heartbeat': typeof ApiClientProtectHeartbeatRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -270,6 +288,8 @@ export interface FileRoutesById {
   '/infra/': typeof InfraIndexRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
+  '/api/client-protect/generate': typeof ApiClientProtectGenerateRoute
+  '/api/client-protect/heartbeat': typeof ApiClientProtectHeartbeatRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -303,6 +323,8 @@ export interface FileRouteTypes {
     | '/infra/'
     | '/api/auth/master-sso'
     | '/api/auth/verify-email'
+    | '/api/client-protect/generate'
+    | '/api/client-protect/heartbeat'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -334,6 +356,8 @@ export interface FileRouteTypes {
     | '/infra'
     | '/api/auth/master-sso'
     | '/api/auth/verify-email'
+    | '/api/client-protect/generate'
+    | '/api/client-protect/heartbeat'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -365,6 +389,8 @@ export interface FileRouteTypes {
     | '/infra/'
     | '/api/auth/master-sso'
     | '/api/auth/verify-email'
+    | '/api/client-protect/generate'
+    | '/api/client-protect/heartbeat'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -397,6 +423,8 @@ export interface RootRouteChildren {
   InfraIndexRoute: typeof InfraIndexRoute
   ApiAuthMasterSsoRoute: typeof ApiAuthMasterSsoRoute
   ApiAuthVerifyEmailRoute: typeof ApiAuthVerifyEmailRoute
+  ApiClientProtectGenerateRoute: typeof ApiClientProtectGenerateRoute
+  ApiClientProtectHeartbeatRoute: typeof ApiClientProtectHeartbeatRoute
   ApiDbHealthRoute: typeof ApiDbHealthRoute
   ApiDbLifecycleRoute: typeof ApiDbLifecycleRoute
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
@@ -538,6 +566,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthVerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/client-protect/generate': {
+      id: '/api/client-protect/generate'
+      path: '/api/client-protect/generate'
+      fullPath: '/api/client-protect/generate'
+      preLoaderRoute: typeof ApiClientProtectGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/client-protect/heartbeat': {
+      id: '/api/client-protect/heartbeat'
+      path: '/api/client-protect/heartbeat'
+      fullPath: '/api/client-protect/heartbeat'
+      preLoaderRoute: typeof ApiClientProtectHeartbeatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/db/health': {
       id: '/api/db/health'
       path: '/api/db/health'
@@ -637,6 +679,8 @@ const rootRouteChildren: RootRouteChildren = {
   InfraIndexRoute: InfraIndexRoute,
   ApiAuthMasterSsoRoute: ApiAuthMasterSsoRoute,
   ApiAuthVerifyEmailRoute: ApiAuthVerifyEmailRoute,
+  ApiClientProtectGenerateRoute: ApiClientProtectGenerateRoute,
+  ApiClientProtectHeartbeatRoute: ApiClientProtectHeartbeatRoute,
   ApiDbHealthRoute: ApiDbHealthRoute,
   ApiDbLifecycleRoute: ApiDbLifecycleRoute,
   ApiDbProvisionRoute: ApiDbProvisionRoute,
