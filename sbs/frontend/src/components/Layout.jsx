@@ -50,7 +50,7 @@ export default function Layout({ user, setToken }) {
     <div className="app-layout">
       <header className="topbar">
         <div className="brand-lockup">
-          <img src="/logo.png" alt="SBS Logo" className="brand-logo" />
+          <img src="/logo.png?v=3d" alt="SparrowX NetSec" className="brand-logo" />
         </div>
 
         <div className="topbar-meta">
