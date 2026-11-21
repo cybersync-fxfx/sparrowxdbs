@@ -545,23 +545,29 @@ ensure_netsec_dashboard_running() {
   local sbs_assets_changed="no"
   if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
     mkdir -p "${netsec_dir}" "${netsec_dir}/frontend/public" "${netsec_dir}/frontend/src/components" "${netsec_dir}/frontend/src/pages" 2>/dev/null || true
+    for _sbs_check in \
+      "server.js" \
+      "pg-compat.js" \
+      "radar-scanner.js" \
+      "frontend/public/logo.png" \
+      "frontend/index.html" \
+      "frontend/src/App.jsx" \
+      "frontend/src/index.css" \
+      "frontend/src/pages/Landing.jsx" \
+      "frontend/src/pages/Auth.jsx" \
+      "frontend/src/pages/Dashboard.jsx" \
+      "frontend/src/pages/Docs.jsx"; do
+      if [ -f "${local_sbs_src}/${_sbs_check}" ] && ! cmp -s "${local_sbs_src}/${_sbs_check}" "${netsec_dir}/${_sbs_check}" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+    done
     cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
+    [ -f "${local_sbs_src}/pg-compat.js" ] && cp -f "${local_sbs_src}/pg-compat.js" "${netsec_dir}/pg-compat.js" 2>/dev/null || true
+    [ -f "${local_sbs_src}/radar-scanner.js" ] && cp -f "${local_sbs_src}/radar-scanner.js" "${netsec_dir}/radar-scanner.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
     cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
     if [ -d "${local_sbs_src}/frontend" ]; then
-      if [ -f "${local_sbs_src}/frontend/public/logo.png" ] && ! cmp -s "${local_sbs_src}/frontend/public/logo.png" "${netsec_dir}/frontend/public/logo.png" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-      if [ -f "${local_sbs_src}/frontend/index.html" ] && ! cmp -s "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-      if [ -f "${local_sbs_src}/frontend/src/pages/Landing.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Landing.jsx" "${netsec_dir}/frontend/src/pages/Landing.jsx" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-      if [ -f "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" "${netsec_dir}/frontend/src/pages/Dashboard.jsx" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
       cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/public/" 2>/dev/null || true
       [ -f "${local_sbs_src}/frontend/index.html" ] && cp -f "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null || true
       [ -d "${local_sbs_src}/frontend/src" ] && cp -rf "${local_sbs_src}/frontend/src/." "${netsec_dir}/frontend/src/" 2>/dev/null || true
@@ -569,6 +575,11 @@ ensure_netsec_dashboard_running() {
         cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/dist/" 2>/dev/null || true
       fi
     fi
+  fi
+
+  # Clear any false-positive visitor auto-bans created by legacy TIME-WAIT radar scoring
+  if command -v nft >/dev/null 2>&1; then
+    nft flush set inet detroit_guard blacklist >/dev/null 2>&1 || true
   fi
 
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then

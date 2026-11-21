@@ -537,7 +537,7 @@ function createSparrowxDb({ pool: customPool, jwtSecret: customJwtSecret } = {})
           `SELECT u.id, u.email, u.password_hash, u.raw_user_meta_data, p.role, p.status
            FROM sbs_users u
            LEFT JOIN user_profiles p ON p.id = u.id
-           WHERE LOWER(u.email) = LOWER($1)
+           WHERE LOWER(u.email) = LOWER($1) OR LOWER(p.username) = LOWER($1)
            LIMIT 1`,
           [normalizedEmail]
         );

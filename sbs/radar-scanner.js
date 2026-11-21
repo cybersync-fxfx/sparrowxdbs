@@ -34,7 +34,7 @@ const DEFAULT_CONFIG = {
   scanIntervalMs: DEFAULT_SCAN_INTERVAL_MS,
   banCooldownMs: Number(envCompat('SPARROWX_RADAR_BAN_COOLDOWN_MS', 'SBS_RADAR_BAN_COOLDOWN_MS', 30 * 60 * 1000)),
   logCooldownMs: Number(envCompat('SPARROWX_RADAR_LOG_COOLDOWN_MS', 'SBS_RADAR_LOG_COOLDOWN_MS', 5 * 60 * 1000)),
-  ignoredLocalPorts: parseIntegerList(envCompat('SPARROWX_RADAR_IGNORE_PORTS', 'SBS_RADAR_IGNORE_PORTS', '22,80,443,3001')),
+  ignoredLocalPorts: parseIntegerList(envCompat('SPARROWX_RADAR_IGNORE_PORTS', 'SBS_RADAR_IGNORE_PORTS', '22,80,443,3000,3001,3005,3006,8080,8090,8443')),
   whitelistCidrs: normalizeCidrs(envCompat('SPARROWX_RADAR_WHITELIST_CIDRS', 'SBS_RADAR_WHITELIST_CIDRS', '')),
   trustedProxyCidrs: normalizeCidrs(envCompat('SPARROWX_RADAR_TRUSTED_PROXY_CIDRS', 'SBS_RADAR_TRUSTED_PROXY_CIDRS', '')),
 };
@@ -228,33 +228,48 @@ class RadarScanner {
 
   getEffectiveConfig() {
     const base = { ...this.config };
-    if (base.mode === 'strict') {
-      base.threshold = Math.floor(base.threshold * 0.66);
-      base.watchThreshold = Math.floor(base.watchThreshold * 0.5);
-      base.connWarn = Math.floor(base.connWarn * 0.5);
-      base.connBan = Math.floor(base.connBan * 0.5);
-      base.synWarn = Math.floor(base.synWarn * 0.5);
-      base.synBan = Math.floor(base.synBan * 0.5);
-      base.udpWarn = Math.floor(base.udpWarn * 0.5);
-      base.udpBan = Math.floor(base.udpBan * 0.5);
-    } else if (base.mode === 'shield') {
-      base.threshold = Math.max(35, Math.floor(base.threshold * 0.45));
-      base.watchThreshold = Math.max(15, Math.floor(base.watchThreshold * 0.3));
-      base.connWarn = Math.max(15, Math.floor(base.connWarn * 0.3));
-      base.connBan = Math.max(40, Math.floor(base.connBan * 0.3));
-      base.synWarn = Math.max(10, Math.floor(base.synWarn * 0.3));
-      base.synBan = Math.max(25, Math.floor(base.synBan * 0.3));
-      base.udpWarn = Math.max(30, Math.floor(base.udpWarn * 0.3));
-      base.udpBan = Math.max(80, Math.floor(base.udpBan * 0.3));
+    // Avoid double-multiplying when getRadarModePatch already persisted mode-specific thresholds
+    if (base.mode === 'strict' && base.threshold >= 85) {
+      base.threshold = 80;
+      base.watchThreshold = 45;
+      base.connWarn = 60;
+      base.connBan = 160;
+      base.synWarn = 20;
+      base.synBan = 60;
+      base.udpWarn = 100;
+      base.udpBan = 260;
+    } else if (base.mode === 'shield' && base.threshold >= 75) {
+      base.threshold = 65;
+      base.watchThreshold = 35;
+      base.connWarn = 40;
+      base.connBan = 100;
+      base.synWarn = 12;
+      base.synBan = 35;
+      base.udpWarn = 70;
+      base.udpBan = 160;
     }
+    base.threshold = Math.max(60, Number(base.threshold || 65));
+    base.watchThreshold = Math.max(30, Number(base.watchThreshold || 35));
+    base.connWarn = Math.max(40, Number(base.connWarn || 40));
+    base.connBan = Math.max(100, Number(base.connBan || 100));
+    base.synWarn = Math.max(12, Number(base.synWarn || 12));
+    base.synBan = Math.max(35, Number(base.synBan || 35));
     return base;
+  }
+
+  whitelistOperatorIp(ip) {
+    const clean = String(ip || '').trim();
+    if (!clean || clean === '127.0.0.1' || clean === '::1') return;
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(clean)) {
+      this.systemWhitelist.add(`${clean}/32`);
+    }
   }
 
   updateConfig(patch = {}) {
     // If an operator IP is provided, add it to system whitelist permanently for this session
     if (patch.operatorIp) {
       console.log(`[Radar] Whitelisting operator IP: ${patch.operatorIp}`);
-      this.systemWhitelist.add(`${patch.operatorIp}/32`);
+      this.whitelistOperatorIp(patch.operatorIp);
       delete patch.operatorIp;
     }
 
@@ -315,6 +330,11 @@ class RadarScanner {
     for (const line of lines) {
       const parts = line.split(/\s+/);
       if (parts.length < 2) continue;
+      const state = String(parts[0] || '').toUpperCase();
+      // Ignore closed/passive socket states so completed HTTP browser connections do not trigger false flood scores
+      if (metric === 'tcp' && (state === 'TIME-WAIT' || state === 'TIME_WAIT' || state === 'CLOSE' || state === 'LISTEN')) {
+        continue;
+      }
       const remote = extractEndpoint(parts[parts.length - 1]);
       const local = extractEndpoint(parts[parts.length - 2]);
       if (!remote || !remote.ip || remote.ip === '0.0.0.0') continue;
@@ -330,7 +350,8 @@ class RadarScanner {
       };
 
       current[metric] += 1;
-      if (local?.port) current.localPorts.add(local.port);
+      // Only count service destination ports (< 32768), never outbound ephemeral source ports
+      if (local?.port && local.port < 32768) current.localPorts.add(local.port);
       if (local?.ip) current.localIps.add(local.ip);
       snapshot.set(remote.ip, current);
     }
@@ -375,6 +396,10 @@ class RadarScanner {
         } catch (_) {
           // ignore invalid CIDRs in config
         }
+      }
+      // Protect normal web/SSH visitors on ignoredLocalPorts unless they exceed flood thresholds
+      if ((metrics.syn || 0) < 25 && (metrics.tcp || 0) < 120 && (metrics.udp || 0) < 140) {
+        return true;
       }
     }
 

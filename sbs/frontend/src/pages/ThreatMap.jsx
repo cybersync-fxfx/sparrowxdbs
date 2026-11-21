@@ -56,32 +56,33 @@ export default function ThreatMap({ token }) {
       .finally(() => setLookupLoading(false));
   };
 
-  // Build a real-time operations terminal feed
+  // Build a real-time operations terminal feed from live radar telemetry
   useEffect(() => {
-    if (data.liveScores.length === 0) return;
-    
-    const protocols = ['TCP', 'UDP', 'ICMP', 'SYN-FLOOD'];
-    const actions = ['[INTERCEPTED]', '[BLOCKED]', '[ROUTING]', '[ANALYZING]'];
-    
-    const timer = setInterval(() => {
-      const target = data.liveScores[Math.floor(Math.random() * data.liveScores.length)];
-      if (!target) return;
+    if (data.liveScores.length === 0) {
+      setTerminalLogs([]);
+      return;
+    }
 
-      const proto = protocols[Math.floor(Math.random() * protocols.length)];
-      const act = actions[Math.floor(Math.random() * actions.length)];
-      const port = Math.floor(Math.random() * 65535);
-      const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
-
-      const newLog = {
-        id: Math.random(),
-        text: `[${timestamp}] ${act} ${proto} request from ${target.ip} to Port ${port} (Threat Level: ${target.score})`,
-        type: target.action === 'banned' ? 'danger' : (target.action === 'watched' ? 'warning' : 'info')
+    const nextLogs = data.liveScores.slice(0, 25).map((target, idx) => {
+      const ts = target.detected_at
+        ? new Date(target.detected_at).toLocaleTimeString()
+        : new Date().toLocaleTimeString();
+      const act =
+        target.action === 'banned'
+          ? '[BANNED]'
+          : target.action === 'watched'
+            ? '[WATCHED]'
+            : '[OBSERVED]';
+      const protoSummary = `TCP:${target.tcp || 0} SYN:${target.syn || 0} UDP:${target.udp || 0}`;
+      const geoTag = target.country ? ` (${target.country})` : '';
+      return {
+        id: target.id || `${target.ip}-${idx}`,
+        text: `[${ts}] ${act} ${target.ip}${geoTag} · ${protoSummary} · Score ${target.score} (${target.reason || 'normal flow'})`,
+        type: target.action === 'banned' ? 'danger' : target.action === 'watched' ? 'warning' : 'info',
       };
+    });
 
-      setTerminalLogs(prev => [...prev.slice(-25), newLog]);
-    }, 1200);
-
-    return () => clearInterval(timer);
+    setTerminalLogs(nextLogs);
   }, [data.liveScores]);
 
   // Scroll terminal to bottom WITHOUT scrolling page

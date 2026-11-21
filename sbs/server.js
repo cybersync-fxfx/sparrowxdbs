@@ -17,17 +17,31 @@ if (!fs.existsSync(path.join(__dirname, 'node_modules'))) {
   }
 }
 
-// Check for .env file (optional: environment variables may be provided directly)
-if (!fs.existsSync(path.join(__dirname, '.env'))) {
-  console.log('\x1b[33m[!] .env file not found — using process environment and SparrowX PostgreSQL defaults.\x1b[0m');
+if (fs.existsSync(path.join(__dirname, '.env'))) {
+  require('dotenv').config();
 }
 
-require('dotenv').config();
+const pgCompat = require('./pg-compat');
+
+if (!fs.existsSync(path.join(__dirname, '.env')) && !pgCompat.isPgConfigured(process.env) && !process.env.SUPABASE_URL) {
+  console.log('\x1b[33m[!] .env file not found and PostgreSQL env vars missing. Creating a template...\x1b[0m');
+  const envTemplate = `PORT=3001
+POSTGRES_HOST=sparrowx-postgres
+POSTGRES_PORT=5432
+POSTGRES_USER=sparrowx
+POSTGRES_PASSWORD=sparrowx_ovh_secret_2026
+POSTGRES_DB=sparrowx_db
+SPARROWX_MASTER_URL=https://sparrowx.net
+`;
+  fs.writeFileSync(path.join(__dirname, '.env'), envTemplate);
+  console.log('\x1b[31m[x] .env template created. Fill in your database credentials and restart the server.\x1b[0m');
+  process.exit(1);
+}
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const crypto = require('crypto');
-const { createSparrowxDb, DEFAULT_ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD } = require('./sparrowx-db-adapter');
+const { createClient } = require('@supabase/supabase-js');
 const {
   DEFAULT_POOL_CIDR,
   getTunnelConfig,
@@ -189,6 +203,12 @@ function buildInterfaceTrafficEvents(netNow, rxDiff, txDiff, rxPacketDiff, txPac
 }
 
 const PORT = process.env.PORT || 3001;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY; // Needed for admin operations
+const PG_ENABLED = pgCompat.isPgConfigured(process.env);
+const ADMIN_FEATURES_ENABLED = Boolean(PG_ENABLED || SUPABASE_SERVICE_KEY);
+const MASTER_PORTAL_URL = (process.env.SPARROWX_MASTER_URL || 'https://sparrowx.net').replace(/\/+$/, '');
 const PRODUCT_NAME = 'Sparrowx';
 
 function envCompat(primaryName, legacyName, fallback = '') {
@@ -199,11 +219,36 @@ function envCompat(primaryName, legacyName, fallback = '') {
   return fallback;
 }
 
-// Primary SparrowX PostgreSQL Database & Auth Adapter
-const sparrowxDb = createSparrowxDb();
-const supabase = sparrowxDb;
-const supabaseAdmin = sparrowxDb;
-const ADMIN_FEATURES_ENABLED = true;
+if (!PG_ENABLED && (!SUPABASE_URL || !SUPABASE_ANON_KEY)) {
+  console.error("\x1b[31m[x] Error: Configure PostgreSQL (DATABASE_URL / POSTGRES_*) or SUPABASE_URL + SUPABASE_ANON_KEY\x1b[0m");
+  process.exit(1);
+}
+
+const pgCompatClient = PG_ENABLED ? pgCompat.createPgCompatClient() : null;
+
+// Global Data Client (Sovereign PostgreSQL primary, Supabase fallback)
+const supabase = PG_ENABLED
+  ? pgCompatClient
+  : createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Admin Client (Bypasses RLS, keep server-side only.)
+const supabaseAdmin = PG_ENABLED
+  ? pgCompatClient
+  : (ADMIN_FEATURES_ENABLED
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        },
+      })
+    : supabase);
+
+function getUserScopedClient(token) {
+  if (PG_ENABLED) return pgCompatClient;
+  return createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } }
+  });
+}
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '200kb' }));
@@ -1026,7 +1071,10 @@ async function getApprovedProfileFromToken(token, select = '*') {
   const user = data?.user;
   if (error || !user) throw httpError('Invalid token', 401);
 
-  const { data: profile, error: profileError } = await supabaseAdmin
+  // Create an authenticated client to fetch user_profiles (respects RLS)
+  const userClient = getUserScopedClient(token);
+
+  const { data: profile, error: profileError } = await userClient
     .from('user_profiles')
     .select(select)
     .eq('id', user.id)
@@ -1053,6 +1101,10 @@ const authMiddleware = async (req, res, next) => {
     
     // Cache the role for WebSocket broadcasts and performance
     userRoles[user.id] = profile.role;
+    const operatorIp = normalizeIp(req.headers['x-forwarded-for'] || req.socket?.remoteAddress);
+    if (operatorIp && radar && typeof radar.whitelistOperatorIp === 'function') {
+      radar.whitelistOperatorIp(operatorIp);
+    }
     
     next();
   } catch (err) {
@@ -1125,16 +1177,150 @@ const agentAuthMiddleware = async (req, res, next) => {
   }
 };
 
-// Routes
+// Auth & Master SSO Routes
+app.get('/api/auth/providers', (req, res) => {
+  res.json({
+    pgEnabled: PG_ENABLED,
+    supabaseEnabled: Boolean(SUPABASE_URL && SUPABASE_ANON_KEY),
+    masterSsoEnabled: true,
+    autoApprove: PG_ENABLED
+      ? String(process.env.NETSEC_REQUIRE_APPROVAL || '').toLowerCase() !== 'true' &&
+        String(process.env.NETSEC_AUTO_APPROVE || '').toLowerCase() !== 'false'
+      : false,
+    masterUrl: MASTER_PORTAL_URL,
+  });
+});
+
+app.get('/api/auth/master-sso', async (req, res) => {
+  const peek = req.query.peek === '1' || req.query.peek === 'true';
+  const cookies = pgCompat.parseCookies(req.headers.cookie || '');
+  const rawToken = String(req.query.token || cookies[pgCompat.MASTER_SSO_COOKIE_NAME] || '').trim();
+  const claims = pgCompat.verifyMasterSsoCookieValue(rawToken);
+
+  if (!claims) {
+    if (peek) {
+      return res.json({
+        authenticated: false,
+        pgEnabled: PG_ENABLED,
+        masterUrl: MASTER_PORTAL_URL,
+        user: null,
+        database: null,
+      });
+    }
+    return res.status(401).json({ error: 'No active SparrowX Master session detected.' });
+  }
+
+  const database = PG_ENABLED
+    ? await pgCompat.getDeveloperDbSummary(claims.email, claims.tenantId)
+    : null;
+
+  if (peek) {
+    return res.json({
+      authenticated: true,
+      pgEnabled: PG_ENABLED,
+      masterUrl: MASTER_PORTAL_URL,
+      user: {
+        id: claims.sub,
+        email: claims.email,
+        fullName: claims.fullName,
+        role: claims.role,
+        tenantId: claims.tenantId,
+      },
+      database,
+    });
+  }
+
+  if (!PG_ENABLED) {
+    return res.status(503).json({ error: 'Master SSO requires PostgreSQL backend connection.' });
+  }
+
+  try {
+    const resolved = await pgCompat.resolveOrCreateMasterProfile(claims);
+    const resolvedDb = await pgCompat.getDeveloperDbSummary(
+      resolved.profile.email || claims.email,
+      resolved.profile.tenant_id || claims.tenantId
+    );
+    return res.json({
+      success: true,
+      token: resolved.token,
+      masterConnected: true,
+      user: {
+        id: resolved.profile.id,
+        username: resolved.profile.username,
+        email: resolved.profile.email || claims.email,
+        apiKey: resolved.profile.api_key,
+        agentId: resolved.profile.agent_id,
+        role: resolved.profile.role,
+        tenantId: resolved.profile.tenant_id || claims.tenantId || null,
+      },
+      database: resolvedDb,
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Master SSO login failed.' });
+  }
+});
+
+app.post('/api/auth/master-sso', async (req, res) => {
+  const clientIp = normalizeIp(req.headers['x-forwarded-for'] || req.socket.remoteAddress);
+  if (!checkRateLimit(clientIp, 20, 60000)) {
+    return res.status(429).json({ error: 'Too many SSO exchange attempts. Please try again shortly.' });
+  }
+  const cookies = pgCompat.parseCookies(req.headers.cookie || '');
+  const rawToken = String(
+    req.body?.ssoToken || req.query?.token || cookies[pgCompat.MASTER_SSO_COOKIE_NAME] || ''
+  ).trim();
+  const claims = pgCompat.verifyMasterSsoCookieValue(rawToken);
+  if (!claims) {
+    return res.status(401).json({ error: 'Invalid or expired SparrowX Master session.' });
+  }
+  if (!PG_ENABLED) {
+    return res.status(503).json({ error: 'Master SSO requires PostgreSQL backend connection.' });
+  }
+  try {
+    const resolved = await pgCompat.resolveOrCreateMasterProfile(claims);
+    const database = await pgCompat.getDeveloperDbSummary(
+      resolved.profile.email || claims.email,
+      resolved.profile.tenant_id || claims.tenantId
+    );
+    return res.json({
+      success: true,
+      token: resolved.token,
+      masterConnected: true,
+      user: {
+        id: resolved.profile.id,
+        username: resolved.profile.username,
+        email: resolved.profile.email || claims.email,
+        apiKey: resolved.profile.api_key,
+        agentId: resolved.profile.agent_id,
+        role: resolved.profile.role,
+        tenantId: resolved.profile.tenant_id || claims.tenantId || null,
+      },
+      database,
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message || 'Master SSO exchange failed.' });
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.json({ success: true });
+});
+
 app.post('/api/auth/register', async (req, res) => {
   const clientIp = normalizeIp(req.headers['x-forwarded-for'] || req.socket.remoteAddress);
   if (!checkRateLimit(clientIp, 10, 60000)) {
     return res.status(429).json({ error: 'Too many registration attempts. Please try again later.' });
   }
-  const { username, email, password } = req.body;
+  const username = String(req.body?.username || '').trim();
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const password = String(req.body?.password || '');
   if (!email || !password || !username) {
     return res.status(400).json({ error: 'username, email, and password are required.' });
   }
+  if (password.length < 8) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters long.' });
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -1142,9 +1328,46 @@ app.post('/api/auth/register', async (req, res) => {
       data: { username }
     }
   });
-  
+
   if (error) return res.status(400).json({ error: error.message });
-  res.json({ success: true });
+
+  const accessToken = data?.session?.access_token || null;
+  if (accessToken && data?.user?.id) {
+    const userClient = getUserScopedClient(accessToken);
+    const { data: profile } = await userClient
+      .from('user_profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profile && profile.status !== 'pending' && profile.status !== 'rejected') {
+      const database = PG_ENABLED
+        ? await pgCompat.getDeveloperDbSummary(profile.email || email, profile.tenant_id)
+        : null;
+      return res.json({
+        success: true,
+        isPending: false,
+        token: accessToken,
+        masterConnected: Boolean(profile.master_user_id),
+        user: {
+          id: profile.id,
+          username: profile.username || username,
+          email: profile.email || email,
+          apiKey: profile.api_key,
+          agentId: profile.agent_id,
+          role: profile.role,
+          tenantId: profile.tenant_id || null,
+        },
+        database,
+      });
+    }
+  }
+
+  res.json({
+    success: true,
+    isPending: true,
+    message: 'Account created and awaiting administrator approval.',
+  });
 });
 
 app.post('/api/auth/login', async (req, res) => {
@@ -1152,36 +1375,54 @@ app.post('/api/auth/login', async (req, res) => {
   if (!checkRateLimit(clientIp, 15, 60000)) {
     return res.status(429).json({ error: 'Too many login attempts. Please try again in a minute.' });
   }
-  const { username, password } = req.body;
-  const email = username; 
+  const { username, email: bodyEmail, password } = req.body || {};
+  const email = String(bodyEmail || username || '').trim();
   if (!email || !password) return res.status(400).json({ error: 'email and password are required.' });
-  
+
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return res.status(401).json({ error: error.message });
-  
+  if (error || !data?.session?.access_token) {
+    return res.status(401).json({ error: error?.message || 'Invalid login credentials' });
+  }
+
   const token = data.session.access_token;
-  const { data: profile } = await supabaseAdmin.from('user_profiles').select('*').eq('id', data.user.id).single();
-  
+  const userClient = getUserScopedClient(token);
+  const { data: profile } = await userClient.from('user_profiles').select('*').eq('id', data.user.id).single();
+
   if (profile?.status === 'pending') {
-    return res.status(403).json({ error: 'Account pending approval from administrator.' });
+    return res.status(403).json({
+      error: 'Account pending approval from administrator.',
+      isPending: true,
+    });
   }
   if (profile?.status === 'rejected') {
     return res.status(403).json({ error: 'Account rejected.' });
   }
-  
-  res.json({ 
-    token, 
-    user: { 
-      username: profile?.username || data.user.email, 
-      apiKey: profile?.api_key, 
+
+  const database = PG_ENABLED
+    ? await pgCompat.getDeveloperDbSummary(profile?.email || data.user.email, profile?.tenant_id)
+    : null;
+
+  res.json({
+    token,
+    masterConnected: Boolean(profile?.master_user_id),
+    user: {
+      id: profile?.id || data.user.id,
+      username: profile?.username || data.user.email,
+      email: profile?.email || data.user.email,
+      apiKey: profile?.api_key,
       agentId: profile?.agent_id,
-      role: profile?.role
-    } 
+      role: profile?.role,
+      tenantId: profile?.tenant_id || null,
+    },
+    database,
   });
 });
 
-app.get('/api/me', authMiddleware, (req, res) => {
+app.get('/api/me', authMiddleware, async (req, res) => {
   const agentStatus = db.agents[req.user.agent_id] ? 'CONNECTED' : 'NO AGENT';
+  const database = PG_ENABLED
+    ? await pgCompat.getDeveloperDbSummary(req.user.email, req.user.tenant_id || req.user.tenantId)
+    : null;
   res.json({
     id: req.user.id,
     username: req.user.username,
@@ -1189,6 +1430,9 @@ app.get('/api/me', authMiddleware, (req, res) => {
     apiKey: req.user.api_key,
     agentId: req.user.agent_id,
     role: req.user.role,
+    tenantId: req.user.tenant_id || req.user.tenantId || null,
+    masterConnected: Boolean(req.user.master_user_id),
+    database,
     agentStatus
   });
 });
@@ -2900,15 +3144,7 @@ async function fetchGlobalBannedTotal() {
     // Silent fallback
   }
 
-  // User-specified 'hope' baseline (Ensure minimum benchmark representation)
-  const historicalBaseline = 642;
-  
-  if (uniqueIps.size === 0) {
-    db.sbsBanTotal = historicalBaseline;
-  } else {
-    db.sbsBanTotal = Math.max(uniqueIps.size, historicalBaseline);
-  }
-  
+  db.sbsBanTotal = uniqueIps.size;
   db.sbsBanTotalUpdatedAt = new Date().toISOString();
 }
 fetchGlobalBannedTotal();
@@ -3127,9 +3363,25 @@ app.get('/api/internal/agents', (req, res) => {
   res.json(db.agents);
 });
 
+async function isLocalOrAdminRequest(req) {
+  const clientIp = req.socket?.remoteAddress;
+  const isLoopback =
+    !req.headers['x-forwarded-for'] &&
+    (clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1');
+  if (isLoopback) return true;
+
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return false;
+  try {
+    const { profile } = await getApprovedProfileFromToken(token);
+    return profile?.role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
 app.get('/api/internal/users', async (req, res) => {
-  const clientIp = req.socket.remoteAddress;
-  if (clientIp !== '127.0.0.1' && clientIp !== '::1' && clientIp !== '::ffff:127.0.0.1') {
+  if (!(await isLocalOrAdminRequest(req))) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   
@@ -3138,7 +3390,7 @@ app.get('/api/internal/users', async (req, res) => {
   }
 
   try {
-    const { data, error } = await supabaseAdmin.from('user_profiles').select('id, username, role, status, agent_id');
+    const { data, error } = await supabaseAdmin.from('user_profiles').select('id, username, email, role, status, agent_id, created_at');
     if (error) return res.status(500).json({ error: error.message });
     res.json(data || []);
   } catch (err) {
@@ -3147,8 +3399,7 @@ app.get('/api/internal/users', async (req, res) => {
 });
 
 app.post('/api/internal/users/status', async (req, res) => {
-  const clientIp = req.socket.remoteAddress;
-  if (clientIp !== '127.0.0.1' && clientIp !== '::1' && clientIp !== '::ffff:127.0.0.1') {
+  if (!(await isLocalOrAdminRequest(req))) {
     return res.status(403).json({ error: 'Forbidden' });
   }
 
@@ -3156,15 +3407,28 @@ app.post('/api/internal/users/status', async (req, res) => {
     return res.status(503).json({ error: 'Admin features not enabled' });
   }
 
-  const { username, status } = req.body;
-  if (!username || !status) {
-    return res.status(400).json({ error: 'Missing username or status' });
+  const { username, status, role } = req.body || {};
+  if (!username || (!status && !role)) {
+    return res.status(400).json({ error: 'Missing username or target status/role' });
+  }
+
+  const patch = {};
+  if (role === 'admin' || role === 'user') {
+    patch.role = role;
+  }
+  if (status === 'admin') {
+    patch.role = 'admin';
+    patch.status = 'approved';
+  } else if (status === 'active' || status === 'approved') {
+    patch.status = 'approved';
+  } else if (status) {
+    patch.status = status;
   }
 
   try {
     const { data, error } = await supabaseAdmin
       .from('user_profiles')
-      .update({ status })
+      .update(patch)
       .eq('username', username)
       .select();
 
@@ -3208,18 +3472,8 @@ app.get('/api/internal/storage-status', (req, res) => {
   });
 });
 
-app.get('/api/health', async (req, res) => {
-  try {
-    const db = await sparrowxDb.healthCheck();
-    res.json({ ok: true, uptime: process.uptime(), ts: new Date().toISOString(), db });
-  } catch (err) {
-    res.status(503).json({
-      ok: false,
-      uptime: process.uptime(),
-      ts: new Date().toISOString(),
-      db: { ok: false, engine: 'sparrowx-postgresql', error: err.message },
-    });
-  }
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, uptime: process.uptime(), ts: new Date().toISOString() });
 });
 
 // -- Security Status & Fix ------------------------------------
@@ -3759,6 +4013,17 @@ app.get('/api/internal/brain-insight', authMiddleware, async (req, res) => {
   }
 });
 
+// Public 1-click DDoS Shield installer script endpoint
+app.get(['/ddos-setup.sh', '/sparrow-setup.sh'], (req, res) => {
+  const setupScriptPath = path.join(__dirname, 'sparrow-setup.sh');
+  if (fs.existsSync(setupScriptPath)) {
+    res.setHeader('Content-Type', 'text/x-shellscript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    return res.sendFile(setupScriptPath);
+  }
+  return res.status(404).type('text/plain').send('#!/usr/bin/env bash\necho "[x] sparrow-setup.sh not found on server"\nexit 1\n');
+});
+
 // Catch all for SPA
 app.use((req, res) => {
   if (!fs.existsSync(FRONTEND_INDEX_PATH)) {
@@ -3767,28 +4032,18 @@ app.use((req, res) => {
   res.sendFile(FRONTEND_INDEX_PATH);
 });
 
-async function startServer() {
-  try {
-    await sparrowxDb.ensureSchema();
-    const seeded = await sparrowxDb.seedAdminAccount();
-    if (seeded.created) {
-      console.log(`\x1b[32m[ok] Seeded SparrowX SBS Admin: ${DEFAULT_ADMIN_EMAIL} (password: ${DEFAULT_ADMIN_PASSWORD})\x1b[0m`);
-    } else {
-      console.log(`\x1b[32m[ok] SparrowX PostgreSQL schema verified (admin: ${seeded.user?.email || DEFAULT_ADMIN_EMAIL})\x1b[0m`);
-    }
-  } catch (err) {
-    console.error('\x1b[31m[!] Failed to initialize SparrowX PostgreSQL schema/seed:\x1b[0m', err.message);
-  }
-
-  server.listen(PORT, () => {
-    console.log(`\x1b[32m[ok] ${PRODUCT_NAME} server listening on port ${PORT}\x1b[0m`);
-    /* Discord webhook disabled to prevent spam on restart loops
-    sendDiscordWebhook('info', { ... });
-    */
-  });
+if (PG_ENABLED) {
+  pgCompat.ensureSchema()
+    .then(() => console.log('\x1b[32m[ok] PostgreSQL auth & threat_radar schema synchronized.\x1b[0m'))
+    .catch((err) => console.error('\x1b[31m[!] PostgreSQL schema sync warning:\x1b[0m', err.message));
 }
 
-startServer();
+server.listen(PORT, () => {
+  console.log(`\x1b[32m[ok] ${PRODUCT_NAME} server listening on port ${PORT} (auth=${PG_ENABLED ? 'PostgreSQL' : 'Supabase'})\x1b[0m`);
+  /* Discord webhook disabled to prevent spam on restart loops
+  sendDiscordWebhook('info', { ... });
+  */
+});
 
 // -- Graceful Shutdown ----------------------------------------
 // Ensures runtime state is persisted before PM2/systemd kills the process.

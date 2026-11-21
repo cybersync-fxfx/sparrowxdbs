@@ -133,9 +133,10 @@ export default function ThreatRadar({ token }) {
       if (payload?.radar?.config) {
         setConfig((prev) => ({ ...prev, ...payload.radar.config }));
       }
+      setError('');
       fetchStats();
     } catch (e) {
-      alert(e.message || 'Failed to change defense mode.');
+      setError(e.message || 'Failed to change defense mode.');
     } finally {
       setModeBusy('');
     }
@@ -165,10 +166,10 @@ export default function ThreatRadar({ token }) {
 
       {error ? (
         <section className={`callout-banner ${setupRequired ? 'warning' : 'danger'}`}>
-          <strong>{setupRequired ? 'Threat Radar setup required.' : 'Threat Radar unavailable.'}</strong>
+          <strong>{setupRequired ? 'Threat Radar schema initializing.' : 'Threat Radar notice.'}</strong>
           <span>
             {setupRequired
-              ? 'Threat Radar database tables are missing. Run supabase_threat_radar.sql in your Supabase SQL editor, then reload this page.'
+              ? 'Threat Radar tables are synchronizing on Sovereign PostgreSQL. Refresh this page in a few seconds.'
               : error}
           </span>
         </section>

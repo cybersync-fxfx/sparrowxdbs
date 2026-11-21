@@ -6,7 +6,7 @@
               #04060b;
   color: #f8fafc;
   position: relative;
-  overflow-x: hidden;
+  overflow-x: clip;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 

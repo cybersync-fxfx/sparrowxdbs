@@ -1,14 +1,8 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Activity, Terminal, Shield, ListX, Download, Key, Settings, LogOut, RadioTower, ServerCog, Globe, Sparkles, ShoppingCart } from 'lucide-react';
+import { Activity, Terminal, Shield, ListX, Download, Key, Settings, LogOut, RadioTower, ServerCog, Globe, Sparkles, ShoppingCart, Database, BookOpen } from 'lucide-react';
 import { useTelemetry } from '../context/TelemetryContext';
 import NotificationCenter from './NotificationCenter';
-
-const DiscordIcon = ({ size = 18 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-    <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.8528 2.0944 5.5947 3.37 8.2913 4.2031a.0766.0766 0 00.0839-.0279c.6437-.8786 1.2064-1.8155 1.6787-2.793a.0772.0772 0 00-.0422-.107c-.918-.348-1.789-.783-2.6103-1.2825a.077.077 0 01-.0075-.1278c.1741-.1312.3482-.2676.5134-.4077a.0762.0762 0 01.0795-.0108c5.4085 2.4758 11.2646 2.4758 16.6021 0a.0765.0765 0 01.0805.0104c.1652.1405.3393.2766.5144.4077a.077.077 0 01-.0063.1278c-.8136.495-1.6853.93-2.6033 1.2753a.0773.0773 0 00-.0415.1077c.4735.9729 1.0375 1.9052 1.6811 2.784a.077.077 0 00.0837.0284c2.704-.8284 5.4463-2.1087 8.3033-4.2081a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.095 2.1568 2.419 0 1.3332-.9555 2.419-2.1569 2.419zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.095 2.1568 2.419 0 1.3332-.946 2.419-2.1568 2.419z" />
-  </svg>
-);
 
 export default function Layout({ user, setToken }) {
   const navigate = useNavigate();
@@ -20,7 +14,17 @@ export default function Layout({ user, setToken }) {
     return () => clearInterval(timer);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      sessionStorage.setItem('sparrowx_netsec_logged_out', '1');
+    } catch {
+      // ignore storage errors
+    }
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+    } catch {
+      // best effort session cleanup
+    }
     setToken(null);
     localStorage.removeItem('sparrowx_token');
     localStorage.removeItem('sbs_token');
@@ -42,6 +46,11 @@ export default function Layout({ user, setToken }) {
     { path: '/install', name: 'Install Agent', icon: <Download size={18} />, caption: 'Generate the installer and deploy to a server' },
     { path: '/apikeys', name: 'API & Keys', icon: <Key size={18} />, caption: 'Manage agent credentials and API access' },
     { path: '/settings', name: 'Settings', icon: <Settings size={18} />, caption: 'Account details and network controls' },
+    { path: '/docs', name: 'Documentation', icon: <BookOpen size={18} />, caption: 'XDP/eBPF setup guides and API runbooks' },
+    { section: 'Ecosystem' },
+    { path: 'https://sparrowx.net', name: 'SparrowX Master Cloud', icon: <Database size={18} />, caption: 'Managed PostgreSQL, Vault & Cloud Console', isExternal: true },
+    { path: 'https://gamesec.sparrowx.net', name: 'GameSec L4 DDoS', icon: <Shield size={18} />, caption: 'Anycast L3/L4 Game DDoS Protection', isExternal: true },
+    { path: 'https://game.sparrowx.net', name: 'Game Server Hosting', icon: <Sparkles size={18} />, caption: 'FiveM, Minecraft, SA-MP & Discord Bots', isExternal: true },
   ];
 
   const { isConnected, agentStatus, wsState, viewMode, setViewMode } = useTelemetry();
@@ -50,14 +59,14 @@ export default function Layout({ user, setToken }) {
     <div className="app-layout">
       <header className="topbar">
         <div className="brand-lockup" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
-          <img src="/logo.png?v=3d" alt="SparrowX NetSec" className="brand-logo" />
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1 }}>
-            <div style={{ fontWeight: 800, fontSize: '0.98rem', letterSpacing: '-0.02em', color: '#fff' }}>
-              SPARROWX <span style={{ color: '#ff223a' }}>NETSEC</span>
-            </div>
-            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.58rem', letterSpacing: '0.14em', color: '#94a3b8' }}>
+          <img src="/logo.png?v=3d" alt="SparrowX NetSec Logo" className="brand-logo" />
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}>
+            <span className="brand-title" style={{ fontSize: '0.96rem', letterSpacing: '0.04em' }}>
+              SPARROWX <span style={{ color: 'var(--accent-cyan)' }}>NETSEC</span>
+            </span>
+            <span className="brand-subtitle" style={{ fontSize: '0.58rem', letterSpacing: '0.18em' }}>
               XDP · L3/L4/L7 SHIELD
-            </div>
+            </span>
           </div>
         </div>
 
@@ -89,6 +98,15 @@ export default function Layout({ user, setToken }) {
           </div>
           <div className="meta-chip">WS {wsState}</div>
           <div className="topbar-time">{time}</div>
+          {user?.database?.connected && user.database.primary && (
+            <div
+              className="master-db-chip"
+              title={`SparrowX Developer Database linked: ${user.database.primary.dbName} (${user.database.primary.planId})`}
+            >
+              <Database size={13} />
+              <span>DB: {user.database.primary.dbName}</span>
+            </div>
+          )}
           <div className="user-chip">@{user?.username} {user?.role === 'admin' && '(ADMIN)'}</div>
           
           <button className="icon-button danger-outline" onClick={handleLogout} aria-label="Log out">

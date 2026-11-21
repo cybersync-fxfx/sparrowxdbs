@@ -70,11 +70,6 @@ export default function Blocklist({ token, user }) {
 
     setFeedback({ msg: '', type: '' });
     setLoading(true);
-    const approved = window.confirm(`Ban ${ip} on the guard firewall and sync to connected agents?`);
-    if (!approved) {
-      setLoading(false);
-      return;
-    }
 
     try {
       const res = await fetch('/api/guard/blocklist', {
@@ -103,9 +98,6 @@ export default function Blocklist({ token, user }) {
   };
 
   const unbanIp = async (ip) => {
-    const approved = window.confirm(`Remove ${ip} from the guard firewall blocklist?`);
-    if (!approved) return;
-
     setUnbanning(ip);
     setFeedback({ msg: '', type: '' });
 
@@ -132,6 +124,10 @@ export default function Blocklist({ token, user }) {
 
   const onKeyDown = (e) => {
     if (e.key === 'Enter' && !loading && token) {
+      e.preventDefault();
+      if (e.nativeEvent?.isComposing || e.isComposing || e.keyCode === 229) {
+        return;
+      }
       banIp();
     }
   };

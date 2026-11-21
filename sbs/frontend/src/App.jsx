@@ -17,10 +17,24 @@ import ThreatMap   from './pages/ThreatMap';
 import Security    from './pages/Security';
 import Plans       from './pages/Plans';
 
+function hasPendingMasterSsoAttempt() {
+  const params = new URLSearchParams(window.location.search);
+  const wantsMasterSso = params.get('sso') === 'master' || Boolean(params.get('ssoToken'));
+  let optedOut = false;
+  try {
+    optedOut = sessionStorage.getItem('sparrowx_netsec_logged_out') === '1';
+  } catch {
+    optedOut = false;
+  }
+  return wantsMasterSso && !optedOut;
+}
+
 function App() {
-  const [token,   setToken]   = useState(localStorage.getItem('sparrowx_token') || localStorage.getItem('sbs_token'));
+  const [token,   setToken]   = useState(() => localStorage.getItem('sparrowx_token') || localStorage.getItem('sbs_token'));
   const [user,    setUser]    = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() =>
+    Boolean(localStorage.getItem('sparrowx_token') || localStorage.getItem('sbs_token')) || hasPendingMasterSsoAttempt()
+  );
 
   // -- Fetch /api/me ---------------------------------------------------------
   const fetchMe = useCallback((tk) => {
@@ -38,7 +52,7 @@ function App() {
       });
   }, []);
 
-  // Initial load
+  // Initial load & optional Master SSO exchange (?sso=master or ?ssoToken=...)
   useEffect(() => {
     if (token) {
       fetch('/api/me', { headers: { Authorization: `Bearer ${token}` } })
@@ -53,9 +67,31 @@ function App() {
           setToken(null);
           setLoading(false);
         });
-    } else {
-      setLoading(false);
+      return;
     }
+
+    const params = new URLSearchParams(window.location.search);
+    if (!hasPendingMasterSsoAttempt()) {
+      return;
+    }
+
+    fetch('/api/auth/master-sso', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(params.get('ssoToken') ? { ssoToken: params.get('ssoToken') } : {}),
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (data?.token) {
+          localStorage.setItem('sparrowx_token', data.token);
+          localStorage.removeItem('sbs_token');
+          setToken(data.token);
+          return;
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [token]);
 
   // Poll /api/me every 10s to keep user fresh
@@ -66,9 +102,18 @@ function App() {
   }, [token, user?.id, fetchMe]);
 
   const handleSetToken = (t) => {
-    setToken(t);
-    localStorage.setItem('sparrowx_token', t);
+    if (t) {
+      try {
+        sessionStorage.removeItem('sparrowx_netsec_logged_out');
+      } catch {
+        // ignore storage errors
+      }
+      localStorage.setItem('sparrowx_token', t);
+    } else {
+      localStorage.removeItem('sparrowx_token');
+    }
     localStorage.removeItem('sbs_token');
+    setToken(t);
   };
 
   if (loading) {
@@ -102,19 +147,21 @@ function App() {
         {!token ? (
           <>
             <Route path="/"          element={<Landing />} />
-            <Route path="/login"     element={<Auth setToken={handleSetToken} />} />
+            <Route path="/login"     element={<Auth setToken={handleSetToken} initialTab="login" />} />
+            <Route path="/register"  element={<Auth setToken={handleSetToken} initialTab="register" />} />
             <Route path="/dashboard" element={<Navigate to="/login" replace />} />
             <Route path="*"          element={<Navigate to="/login" replace />} />
           </>
         ) : (
           <Route element={
             <TelemetryProvider token={token} user={user}>
-              <Layout user={user} setToken={setToken} />
+              <Layout user={user} setToken={handleSetToken} />
             </TelemetryProvider>
           }>
             <Route path="/"          element={<Dashboard token={token} user={user} />} />
             <Route path="/dashboard" element={<Dashboard token={token} user={user} />} />
             <Route path="/login"     element={<Navigate to="/" replace />} />
+            <Route path="/register"  element={<Navigate to="/" replace />} />
             <Route path="/terminal"  element={<Terminal  token={token} user={user} />} />
             <Route path="/firewall"  element={<Firewall  token={token} user={user} />} />
             <Route path="/blocklist" element={<Blocklist token={token} user={user} />} />

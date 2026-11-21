@@ -1,185 +1,172 @@
-import { useEffect, useState } from 'react';
-import { Cpu, HardDrive, Package, Check, ArrowRight, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Cpu, HardDrive, Package, Check, ArrowRight, Shield, ExternalLink } from 'lucide-react';
 
-export default function Plans({ token, user }) {
-  const [plans, setPlans] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [currency, setCurrency] = useState('USD');
-  const [currencies, setCurrencies] = useState([]);
+const PLANS = [
+  {
+    id: 'sparrow-basic',
+    name: 'NetSec Edge Starter',
+    category: { name: 'Starter Shield' },
+    price: 5.0,
+    billing_period: 'mo',
+    specs: { ram_gb: 2, cpu_cores: 1, disk_gb: 20, scrub_tbps: '1.2 Tbps' },
+    features: { backups: 1, databases: 1, protocols: 'L3/L4 XDP + WireGuard Clean Pipe' },
+    targetUrl: '/install',
+    ctaLabel: 'ATTACH SERVER AGENT',
+  },
+  {
+    id: 'sparrow-pro',
+    name: 'NetSec Game & Pro Shield',
+    category: { name: 'Game & Pro' },
+    price: 15.0,
+    billing_period: 'mo',
+    specs: { ram_gb: 4, cpu_cores: 2, disk_gb: 50, scrub_tbps: '3.2 Tbps' },
+    features: { backups: 3, databases: 3, protocols: 'FiveM, Minecraft, CS2, Rust, SA-MP Filters' },
+    targetUrl: 'https://gamesec.sparrowx.net',
+    ctaLabel: 'LAUNCH GAMESEC L4',
+  },
+  {
+    id: 'sparrow-elite',
+    name: 'NetSec Sovereign Metal',
+    category: { name: 'Enterprise' },
+    price: 35.0,
+    billing_period: 'mo',
+    specs: { ram_gb: 8, cpu_cores: 4, disk_gb: 100, scrub_tbps: '4.8+ Tbps' },
+    features: { backups: 5, databases: 5, protocols: 'Dedicated Anycast VIP + Custom eBPF Maps' },
+    targetUrl: 'https://sparrowx.net/infra',
+    ctaLabel: 'DEPLOY CLOUD INFRA',
+  },
+];
 
-  useEffect(() => {
-    // Hardcoded local plans to ensure zero external dependencies
-    const localData = {
-      currencies: [{ code: 'USD', symbol: '$' }],
-      plans: [
-        {
-          id: 'sparrow-basic',
-          name: 'Sparrow Basic',
-          category: { name: 'Starter' },
-          price: 5.00,
-          billing_period: 'mo',
-          prices: [{ code: 'USD', amount: 5.00 }],
-          specs: { ram_gb: 2, cpu_cores: 1, disk_gb: 20 },
-          features: { backups: 1, databases: 1 },
-          is_out_of_stock: false
-        },
-        {
-          id: 'sparrow-pro',
-          name: 'Sparrow Pro',
-          category: { name: 'Professional' },
-          price: 15.00,
-          billing_period: 'mo',
-          prices: [{ code: 'USD', amount: 15.00 }],
-          specs: { ram_gb: 4, cpu_cores: 2, disk_gb: 50 },
-          features: { backups: 3, databases: 3 },
-          is_out_of_stock: false
-        },
-        {
-          id: 'sparrow-elite',
-          name: 'Sparrow Elite',
-          category: { name: 'Enterprise' },
-          price: 35.00,
-          billing_period: 'mo',
-          prices: [{ code: 'USD', amount: 35.00 }],
-          specs: { ram_gb: 8, cpu_cores: 4, disk_gb: 100 },
-          features: { backups: 5, databases: 5 },
-          is_out_of_stock: false
-        }
-      ]
-    };
-    
-    setPlans(localData.plans);
-    setCurrencies(localData.currencies);
-    setLoading(false);
-  }, []);
+export default function Plans() {
+  const navigate = useNavigate();
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
-  if (loading) {
-    return (
-      <div className="page-shell" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
-          <Loader2 className="animate-spin text-cyan" size={32} />
-          <span className="eyebrow">Fetching server configurations...</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="page-shell">
-        <section className="hero-panel">
-          <div>
-            <p className="eyebrow text-red">Fatal Error</p>
-            <h1 className="page-title">Marketplace Offline</h1>
-            <p className="page-copy">{error}</p>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
-  const [redirectingPlanId, setRedirectingPlanId] = useState(null);
-
-  const handleDeploy = (planId) => {
-    setRedirectingPlanId(planId);
-    setTimeout(() => {
-      // Localized notification instead of external redirect
-      alert(`Local deployment of plan ${planId} initialized on this VPS.`);
-      setRedirectingPlanId(null);
-    }, 1500);
+  const handleDeploy = (plan) => {
+    setSelectedPlan(plan);
+    if (plan.targetUrl.startsWith('/')) {
+      navigate(plan.targetUrl);
+    }
   };
-
-  const selectedCurrency = currencies.find(c => c.code === currency) || { symbol: '$' };
 
   return (
     <div className="page-shell">
       <section className="hero-panel">
         <div>
-          <p className="eyebrow">Marketplace</p>
-          <h1 className="page-title">Deploy Infrastructure</h1>
+          <p className="eyebrow">Marketplace &amp; Tiers</p>
+          <h1 className="page-title">Deploy Protected Infrastructure</h1>
           <p className="page-copy">
-            High-performance virtual servers with enterprise DDoS protection. 
-            Select a plan to scale your operations.
+            Attach our XDP/eBPF protection agent to your existing Linux VPS or provision dedicated DDoS-protected Game &amp; Cloud nodes across the SparrowX ecosystem.
           </p>
         </div>
         <div className="hero-status-stack">
-          <div className="view-switcher" style={{ background: 'rgba(0,0,0,0.4)', padding: '4px' }}>
-            {currencies.map(c => (
-              <button
-                key={c.code}
-                className={`view-button ${currency === c.code ? 'active' : ''}`}
-                onClick={() => setCurrency(c.code)}
-                style={{ padding: '4px 12px', fontSize: '0.7rem' }}
-              >
-                {c.code}
-              </button>
-            ))}
-          </div>
+          <div className="status-pill connected">4.8+ TBPS SCRUBBING CAPACITY</div>
         </div>
       </section>
 
+      {selectedPlan && !selectedPlan.targetUrl.startsWith('/') && (
+        <section
+          className="callout-banner"
+          style={{
+            borderColor: 'rgba(34,211,238,0.45)',
+            background: 'rgba(34,211,238,0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <strong>[PROVISIONING]</strong>{' '}
+            <span>
+              Selected <strong>{selectedPlan.name}</strong> (${selectedPlan.price}/mo). Continue to the SparrowX provisioning portal or attach an existing server immediately via Install Agent.
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" className="secondary-button" onClick={() => navigate('/install')}>
+              Install Local Agent
+            </button>
+            <a
+              href={selectedPlan.targetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 14px',
+                borderRadius: '8px',
+                background: '#ff223a',
+                color: '#fff',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                textDecoration: 'none',
+              }}
+            >
+              <span>Open Provisioning Portal</span>
+              <ExternalLink size={14} />
+            </a>
+          </div>
+        </section>
+      )}
+
       <div className="plans-grid">
-        {plans.map(plan => {
-          const priceObj = plan.prices.find(p => p.code === currency) || { amount: plan.price };
-          const isRedirecting = redirectingPlanId === plan.id;
-          
-          return (
-            <article key={plan.id} className="glass-panel elevated-panel plan-card">
-              <div className="plan-badge">{plan.category.name}</div>
-              <h2 className="plan-name">{plan.name}</h2>
-              
-              <div className="plan-price">
-                <span className="price-symbol">{selectedCurrency.symbol}</span>
-                <span className="price-amount">{priceObj.amount}</span>
-                <span className="price-period">/{plan.billing_period}</span>
-              </div>
+        {PLANS.map((plan) => (
+          <article key={plan.id} className="glass-panel elevated-panel plan-card">
+            <div className="plan-badge">{plan.category.name}</div>
+            <h2 className="plan-name">{plan.name}</h2>
 
-              <div className="plan-specs">
-                <div className="spec-item">
-                  <Package size={14} className="text-cyan" />
-                  <span>{plan.specs.ram_gb} GB RAM</span>
-                </div>
-                <div className="spec-item">
-                  <Cpu size={14} className="text-cyan" />
-                  <span>{plan.specs.cpu_cores} vCores</span>
-                </div>
-                <div className="spec-item">
-                  <HardDrive size={14} className="text-cyan" />
-                  <span>{plan.specs.disk_gb} GB NVMe</span>
-                </div>
-              </div>
+            <div className="plan-price">
+              <span className="price-symbol">$</span>
+              <span className="price-amount">{plan.price}</span>
+              <span className="price-period">/{plan.billing_period}</span>
+            </div>
 
-              <div className="plan-features">
-                <div className="feature-item">
-                  <Check size={14} className="text-green" />
-                  <span>{plan.features.backups} Backup Slots</span>
-                </div>
-                <div className="feature-item">
-                  <Check size={14} className="text-green" />
-                  <span>{plan.features.databases} Database Slots</span>
-                </div>
-                <div className="feature-item">
-                  <Check size={14} className="text-green" />
-                  <span>DDoS Protection</span>
-                </div>
+            <div className="plan-specs">
+              <div className="spec-item">
+                <Shield size={14} className="text-cyan" />
+                <span>{plan.specs.scrub_tbps} XDP Scrubbing</span>
               </div>
+              <div className="spec-item">
+                <Package size={14} className="text-cyan" />
+                <span>{plan.specs.ram_gb} GB Dedicated RAM</span>
+              </div>
+              <div className="spec-item">
+                <Cpu size={14} className="text-cyan" />
+                <span>{plan.specs.cpu_cores} High-Frequency vCores</span>
+              </div>
+              <div className="spec-item">
+                <HardDrive size={14} className="text-cyan" />
+                <span>{plan.specs.disk_gb} GB Enterprise NVMe</span>
+              </div>
+            </div>
 
-              <button 
-                onClick={() => handleDeploy(plan.id)}
-                disabled={plan.is_out_of_stock || isRedirecting}
-                className={`plan-button ${(plan.is_out_of_stock || isRedirecting) ? 'disabled' : ''}`}
-              >
-                {plan.is_out_of_stock ? 'OUT OF STOCK' : (isRedirecting ? 'INITIALIZING...' : 'DEPLOY NOW')}
-                {isRedirecting ? (
-                  <Loader2 className="animate-spin" size={14} />
-                ) : (
-                  !plan.is_out_of_stock && <ArrowRight size={14} />
-                )}
-              </button>
-            </article>
-          )
-        })}
+            <div className="plan-features">
+              <div className="feature-item">
+                <Check size={14} className="text-green" />
+                <span>{plan.features.protocols}</span>
+              </div>
+              <div className="feature-item">
+                <Check size={14} className="text-green" />
+                <span>{plan.features.backups} Automated Snapshot Slots</span>
+              </div>
+              <div className="feature-item">
+                <Check size={14} className="text-green" />
+                <span>{plan.features.databases} Sovereign PostgreSQL DBs</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleDeploy(plan)}
+              className="plan-button"
+            >
+              <span>{plan.ctaLabel}</span>
+              <ArrowRight size={14} />
+            </button>
+          </article>
+        ))}
       </div>
 
       <style>{`
@@ -187,7 +174,7 @@ export default function Plans({ token, user }) {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 16px;
-          margin-top: 20px;
+          margin-top: 12px;
         }
         .plan-card {
           display: flex;
@@ -196,32 +183,34 @@ export default function Plans({ token, user }) {
           padding: 24px;
           position: relative;
           overflow: hidden;
-          transition: all 0.3s ease;
+          transition: all 0.25s ease;
           border: 1px solid var(--panel-border);
           background: var(--panel-bg);
+          border-radius: 14px;
         }
         .plan-card:hover {
           border-color: var(--accent-cyan);
           transform: translateY(-4px);
-          box-shadow: 0 0 30px rgba(255, 26, 26, 0.15);
+          box-shadow: 0 0 30px rgba(255, 34, 58, 0.16);
         }
         .plan-badge {
           position: absolute;
           top: 0;
           right: 0;
           background: var(--accent-cyan);
-          color: #000;
-          font-size: 0.6rem;
+          color: #fff;
+          font-size: 0.62rem;
           font-weight: 800;
-          padding: 4px 12px;
+          padding: 5px 12px;
           letter-spacing: 1px;
           text-transform: uppercase;
+          border-bottom-left-radius: 10px;
         }
         .plan-name {
-          font-size: 1.25rem;
+          font-size: 1.2rem;
           font-weight: 800;
           color: var(--text-main);
-          letter-spacing: -0.5px;
+          letter-spacing: -0.3px;
         }
         .plan-price {
           display: flex;
@@ -230,11 +219,11 @@ export default function Plans({ token, user }) {
         }
         .price-symbol {
           font-size: 1.2rem;
-          font-weight: 600;
+          font-weight: 700;
           color: var(--accent-cyan);
         }
         .price-amount {
-          font-size: 2.6rem;
+          font-size: 2.5rem;
           font-weight: 800;
           color: var(--text-main);
           font-family: var(--font-display);
@@ -257,7 +246,7 @@ export default function Plans({ token, user }) {
           display: flex;
           align-items: center;
           gap: 12px;
-          font-size: 0.9rem;
+          font-size: 0.88rem;
           font-weight: 500;
           color: var(--text-soft);
         }
@@ -270,7 +259,7 @@ export default function Plans({ token, user }) {
         .feature-item {
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
           font-size: 0.8rem;
           color: var(--text-muted);
         }
@@ -279,34 +268,15 @@ export default function Plans({ token, user }) {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding: 14px;
-          background: var(--accent-cyan);
-          color: #000;
-          text-decoration: none;
+          padding: 13px !important;
+          border-radius: 10px !important;
+          background: linear-gradient(135deg, #ff223a 0%, #c90f24 100%) !important;
+          color: #fff !important;
           font-weight: 800;
           font-size: 0.8rem;
           letter-spacing: 1px;
-          transition: all 0.2s ease;
-          border: none;
+          border: 1px solid rgba(255, 92, 112, 0.45) !important;
           cursor: pointer;
-        }
-        .plan-button:hover:not(.disabled) {
-          background: #fff;
-          transform: scale(1.02);
-        }
-        .plan-button.disabled {
-          background: rgba(255,255,255,0.05);
-          color: var(--text-dim);
-          border: 1px solid var(--panel-border);
-          pointer-events: none;
-          cursor: not-allowed;
-        }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>
