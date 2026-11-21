@@ -7,6 +7,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { env } from "./config.server";
+import { timingSafeEqual } from "./crypto.server";
 
 export interface RegisteredClientVps {
   agentId: string;
@@ -18,15 +19,23 @@ export interface RegisteredClientVps {
   ports: string;
   guardIp: string;
   status: "PROVISIONED" | "PROTECTED" | "OFFLINE";
-  hostname?: string;
-  publicIp?: string;
-  load1m?: string;
-  synRecv?: number;
+  hostname?: string | undefined;
+  publicIp?: string | undefined;
+  load1m?: string | undefined;
+  synRecv?: number | undefined;
   createdAt: string;
-  lastSeen?: string;
+  lastSeen?: string | undefined;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Strict allowlist prevents shell metacharacters (", $, `, \) inside generated bash scripts
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,190}\.[a-zA-Z]{2,24}$/;
+
+let registryLock: Promise<unknown> = Promise.resolve();
+function withRegistryLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = registryLock.then(fn, fn);
+  registryLock = next.catch(() => {});
+  return next;
+}
 
 function getRegistryPath(): string {
   const dataDir = env("SPARROWX_DATA_DIR") || resolve(process.cwd(), "data");
@@ -238,9 +247,9 @@ export function renderClientProtectionScript(input: {
 export async function createBoundClientVpsBundle(input: {
   username: string;
   email: string;
-  ports?: string;
-  guardIp?: string;
-  enableXdp?: boolean;
+  ports?: string | undefined;
+  guardIp?: string | undefined;
+  enableXdp?: boolean | undefined;
 }): Promise<{
   record: RegisteredClientVps;
   filename: string;
@@ -276,9 +285,11 @@ export async function createBoundClientVpsBundle(input: {
     createdAt,
   };
 
-  const existing = await readClientVpsRegistry();
-  existing.unshift(record);
-  await writeClientVpsRegistry(existing.slice(0, 500));
+  await withRegistryLock(async () => {
+    const existing = await readClientVpsRegistry();
+    existing.unshift(record);
+    await writeClientVpsRegistry(existing.slice(0, 500));
+  });
 
   const filename = `sparrowx-protect-${username}-${shortRand}.sh`;
   const script = renderClientProtectionScript({
@@ -301,29 +312,31 @@ export async function createBoundClientVpsBundle(input: {
 export async function recordClientVpsHeartbeat(input: {
   token: string;
   agentId: string;
-  hostname?: string;
-  publicIp?: string;
-  load1m?: string;
-  synRecv?: number;
+  hostname?: string | undefined;
+  publicIp?: string | undefined;
+  load1m?: string | undefined;
+  synRecv?: number | undefined;
 }): Promise<RegisteredClientVps | null> {
   if (!input.token || !input.agentId) return null;
   const incomingHash = sha256Hex(input.token.trim());
-  const entries = await readClientVpsRegistry();
-  const idx = entries.findIndex(
-    (e) => e.agentId === input.agentId && e.tokenHash === incomingHash,
-  );
-  if (idx === -1) return null;
+  return withRegistryLock(async () => {
+    const entries = await readClientVpsRegistry();
+    const idx = entries.findIndex(
+      (e) => e.agentId === input.agentId && timingSafeEqual(e.tokenHash, incomingHash),
+    );
+    if (idx === -1) return null;
 
-  const updated: RegisteredClientVps = {
-    ...entries[idx]!,
-    status: "PROTECTED",
-    hostname: input.hostname ? String(input.hostname).slice(0, 120) : entries[idx]!.hostname,
-    publicIp: input.publicIp ? String(input.publicIp).slice(0, 64) : entries[idx]!.publicIp,
-    load1m: input.load1m ? String(input.load1m).slice(0, 16) : entries[idx]!.load1m,
-    synRecv: typeof input.synRecv === "number" ? input.synRecv : entries[idx]!.synRecv,
-    lastSeen: new Date().toISOString(),
-  };
-  entries[idx] = updated;
-  await writeClientVpsRegistry(entries);
-  return updated;
+    const updated: RegisteredClientVps = {
+      ...entries[idx]!,
+      status: "PROTECTED",
+      hostname: input.hostname ? String(input.hostname).slice(0, 120) : entries[idx]!.hostname,
+      publicIp: input.publicIp ? String(input.publicIp).slice(0, 64) : entries[idx]!.publicIp,
+      load1m: input.load1m ? String(input.load1m).slice(0, 16) : entries[idx]!.load1m,
+      synRecv: typeof input.synRecv === "number" ? input.synRecv : entries[idx]!.synRecv,
+      lastSeen: new Date().toISOString(),
+    };
+    entries[idx] = updated;
+    await writeClientVpsRegistry(entries);
+    return updated;
+  });
 }

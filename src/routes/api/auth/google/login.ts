@@ -7,6 +7,7 @@ export const Route = createFileRoute("/api/auth/google/login")({
         const { env } = await import("@/lib/server/config.server");
         const { randomToken } = await import("@/lib/server/crypto.server");
         const { resolveRequestOrigin } = await import("@/lib/server/http.server");
+        const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
         const {
           buildGoogleStateCookieHeader,
           createGoogleOAuthState,
@@ -16,6 +17,17 @@ export const Route = createFileRoute("/api/auth/google/login")({
         const reqUrl = new URL(request.url);
         const origin = resolveRequestOrigin(request);
         const nextUrl = sanitizeGoogleNextUrl(reqUrl.searchParams.get("next"), origin);
+
+        const ip = extractClientIp(request);
+        const rate = checkDbRateLimit(`google-oauth-login:${ip}`, 30, 60_000);
+        if (!rate.allowed) {
+          return Response.json(
+            { ok: false, error: `Too many sign-in attempts. Retry in ${rate.retryAfterSec}s.` },
+            { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+          );
+        }
+
+        try {
 
         const clientId = env("GOOGLE_CLIENT_ID");
         if (!clientId) {
@@ -52,6 +64,14 @@ export const Route = createFileRoute("/api/auth/google/login")({
         headers.set("Cache-Control", "no-store");
         headers.append("Set-Cookie", buildGoogleStateCookieHeader(request, signedState, 600));
         return new Response(null, { status: 302, headers });
+        } catch {
+          const errDest = new URL(nextUrl);
+          errDest.searchParams.set("auth_error", "Google sign-in initialization failed. Please try again.");
+          return new Response(null, {
+            status: 302,
+            headers: { Location: errDest.toString(), "Cache-Control": "no-store" },
+          });
+        }
       },
     },
   },

@@ -577,7 +577,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     icon: SiReact,
     accent: "text-sky-400 border-sky-500/30 bg-sky-500/10",
     snippet: (restBase, anonKey) =>
-      `// src/lib/sparrowx-db.ts\nimport { createClient } from '@supabase/supabase-js'\n\nexport const db = createClient(\n  '${restBase.replace("/rest/v1", "")}',\n  '${anonKey}'\n)\n\n// Usage inside a React component:\nconst { data: users } = await db.from('app_users').select('id, email, full_name')`,
+      `// src/lib/sparrowx-db.ts\nimport { createClient } from '@sparrowx/client'\n\nexport const db = createClient(\n  '${restBase.replace("/rest/v1", "")}',\n  '${anonKey}'\n)\n\n// Usage inside a React component:\nconst { data: users } = await db.from('app_users').select('id, email, full_name')`,
   },
   {
     id: "nextjs",
@@ -586,7 +586,7 @@ const FRAMEWORK_GUIDES: [FrameworkGuide, ...FrameworkGuide[]] = [
     icon: SiNextdotjs,
     accent: "text-white border-white/25 bg-white/10",
     snippet: (restBase, anonKey) =>
-      `// app/api/health/route.ts (Server Route)\nimport { createClient } from '@supabase/supabase-js'\n\nconst client = createClient(\n  process.env.SPARROWX_URL ?? '${restBase.replace("/rest/v1", "")}',\n  process.env.SPARROWX_ANON_KEY ?? '${anonKey}'\n)\n\nexport async function GET() {\n  const { data } = await client.from('client_tenants').select('*').limit(10)\n  return Response.json({ data })\n}`,
+      `// app/api/health/route.ts (Server Route)\nimport { createClient } from '@sparrowx/client'\n\nconst client = createClient(\n  process.env.SPARROWX_URL ?? '${restBase.replace("/rest/v1", "")}',\n  process.env.SPARROWX_ANON_KEY ?? '${anonKey}'\n)\n\nexport async function GET() {\n  const { data } = await client.from('client_tenants').select('*').limit(10)\n  return Response.json({ data })\n}`,
   },
   {
     id: "tanstack",
@@ -1072,6 +1072,7 @@ export function SovereignDatabaseStudio({
         };
       }
     }
+    return undefined;
   }, [currentUser]);
 
   // Auth Mode on Landing
@@ -2268,9 +2269,9 @@ export function SovereignDatabaseStudio({
     const apiBase = activeProject.restBaseUrl;
     const apiKey = activeProject.anonKey;
     return {
-      js: `// 1. Initialize the SparrowX Database Client\nimport { createClient } from '@supabase/supabase-js';\n\nconst sparrowx = createClient(\n  '${apiBase.replace("/rest/v1", "")}',\n  '${apiKey}'\n);\n\n// 2. Query sovereign data with Row Level Security\nconst { data, error } = await sparrowx\n  .from('${tbl}')\n  .select('*')\n  .limit(10);`,
+      js: `// 1. Initialize the SparrowX Database Client\nimport { createClient } from '@sparrowx/client';\n\nconst sparrowx = createClient(\n  '${apiBase.replace("/rest/v1", "")}',\n  '${apiKey}'\n);\n\n// 2. Query sovereign data with Row Level Security\nconst { data, error } = await sparrowx\n  .from('${tbl}')\n  .select('*')\n  .limit(10);`,
       curl: `# Query PostgREST REST API Gateway directly\ncurl -X GET "${apiBase}/${tbl}?select=*&limit=10" \\\n  -H "apikey: ${apiKey}" \\\n  -H "Authorization: Bearer ${apiKey}" \\\n  -H "Accept: application/json"`,
-      python: `# Python SDK (sparrowx-py)\nfrom supabase import create_client\n\nsparrowx = create_client("${apiBase.replace("/rest/v1", "")}", "${apiKey}")\nresponse = sparrowx.table("${tbl}").select("*").limit(10).execute()\nprint("Data:", response.data)`,
+      python: `# Python SDK (sparrowx-py)\nfrom sparrowx import create_client\n\nsparrowx = create_client("${apiBase.replace("/rest/v1", "")}", "${apiKey}")\nresponse = sparrowx.table("${tbl}").select("*").limit(10).execute()\nprint("Data:", response.data)`,
       prisma: `// Prisma Schema Definition for ${tbl}\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL") // postgresql://${activeProject.dbUser}:[YOUR-PASSWORD]@db.sparrowx.net:6543/${activeProject.dbName}?pgbouncer=true\n}\n\nmodel ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) => l.toUpperCase())} {\n  id        String   @id @default(uuid())\n  createdAt DateTime @default(now()) @map("created_at")\n}`,
     };
   }, [sandboxSelectedTable, activeProject]);
@@ -3043,7 +3044,7 @@ export function SovereignDatabaseStudio({
                       copyText(
                         "doc-setup",
                         docSetupTab === "agent"
-                          ? `Help me set up SparrowX Cloud DB:\n1. npm install @supabase/supabase-js --save-dev\n2. Set SPARROWX_URL=https://db.sparrowx.net`
+                          ? `Help me set up SparrowX Cloud DB:\n1. npm install @sparrowx/client --save-dev\n2. Set SPARROWX_URL=https://db.sparrowx.net`
                           : `npx sparrowx-db init && sparrowx-db status --host https://db.sparrowx.net`
                       )
                     }
@@ -3061,7 +3062,7 @@ export function SovereignDatabaseStudio({
                     <p>
                       1. Install the client SDK as a project dependency with{" "}
                       <code className="px-1.5 py-0.5 rounded bg-[#07090E] border border-[#2A2A2E] text-[#A3E635] font-mono text-[11px]">
-                        npm install @supabase/supabase-js
+                        npm install @sparrowx/client
                       </code>
                     </p>
                     <p>

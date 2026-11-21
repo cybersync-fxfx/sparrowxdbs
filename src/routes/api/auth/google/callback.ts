@@ -7,6 +7,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         const { env } = await import("@/lib/server/config.server");
         const { timingSafeEqual } = await import("@/lib/server/crypto.server");
         const { resolveRequestOrigin } = await import("@/lib/server/http.server");
+        const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
         const {
           GOOGLE_OAUTH_STATE_COOKIE,
           buildGoogleStateCookieHeader,
@@ -17,6 +18,15 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           upsertGoogleSsoUserInDb,
           verifyGoogleOAuthState,
         } = await import("@/lib/server/master-sso.server");
+
+        const ip = extractClientIp(request);
+        const rate = checkDbRateLimit(`google-oauth-cb:${ip}`, 30, 60_000);
+        if (!rate.allowed) {
+          return Response.json(
+            { ok: false, error: `Too many requests. Retry in ${rate.retryAfterSec}s.` },
+            { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+          );
+        }
 
         const reqUrl = new URL(request.url);
         const origin = resolveRequestOrigin(request);
@@ -110,7 +120,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
 
           const user = await upsertGoogleSsoUserInDb({
             email: profile.email,
-            fullName: profile.name || profile.email.split("@")[0],
+            fullName: profile.name || profile.email.split("@")[0] || "Operator",
             googleSub: profile.sub || null,
           });
 

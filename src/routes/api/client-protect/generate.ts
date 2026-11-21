@@ -6,6 +6,7 @@ export const Route = createFileRoute("/api/client-protect/generate")({
       POST: async ({ request }) => {
         const { readMasterSsoFromRequest } = await import("@/lib/server/master-sso.server");
         const { env } = await import("@/lib/server/config.server");
+        const { timingSafeEqual } = await import("@/lib/server/crypto.server");
         const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
         const { createBoundClientVpsBundle } = await import("@/lib/server/client-protect.server");
 
@@ -14,13 +15,15 @@ export const Route = createFileRoute("/api/client-protect/generate")({
         if (!rate.allowed) {
           return Response.json(
             { ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
-            { status: 429 },
+            { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
           );
         }
 
         const adminKey = env("SPARROWX_ADMIN_API_KEY");
         const suppliedAdminKey = request.headers.get("x-sparrowx-admin-key")?.trim() || "";
-        const isAdminKeyValid = Boolean(adminKey && suppliedAdminKey && suppliedAdminKey === adminKey);
+        const isAdminKeyValid = Boolean(
+          adminKey && suppliedAdminKey && timingSafeEqual(suppliedAdminKey, adminKey),
+        );
         const ssoClaims = await readMasterSsoFromRequest(request);
 
         if (!isAdminKeyValid && !ssoClaims) {

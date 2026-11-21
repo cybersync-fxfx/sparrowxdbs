@@ -33,3 +33,5 @@ dist-ssr
 
 # Local persistent data directory
 data/
+__pycache__/
+*.pyc

@@ -5,6 +5,8 @@ import {
   ArrowRight,
   Check,
   Copy,
+  Eye,
+  EyeOff,
   Gamepad2,
   Globe,
   KeyRound,

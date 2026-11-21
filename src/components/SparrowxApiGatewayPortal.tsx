@@ -326,7 +326,7 @@ export function SparrowxApiGatewayPortal() {
     }
 
     if (activeCodeTab === "typescript") {
-      return `import { createClient } from '@supabase/supabase-js';
+      return `import { createClient } from '@sparrowx/client';
 
 const sparrowx = createClient('${apiBaseUrl}', '${activeKey}');
 

@@ -13,28 +13,32 @@ export const Route = createFileRoute("/api/game/panel-sso")({
         const origin = resolveRequestOrigin(request);
         const nextPath = sanitizeRelativePath(url.searchParams.get("next"), "/");
 
-        const identity = await getPanelSsoIdentity();
-        if (!identity) {
-          return redirect302(`${origin}/api/public/auth/discord/login`);
-        }
+        try {
+          const identity = await getPanelSsoIdentity();
+          if (!identity) {
+            return redirect302(`${origin}/api/public/auth/discord/login`);
+          }
 
-        if (identity.mode === "demo" || !identity.pteroUserId) {
-          return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=demo`);
-        }
+          if (identity.mode === "demo" || !identity.pteroUserId) {
+            return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=demo`);
+          }
 
-        const base = panelUrl();
-        const ssoReady = await isPteroSsoReady(base);
-        if (!ssoReady) {
+          const base = panelUrl();
+          const ssoReady = await isPteroSsoReady(base);
+          if (!ssoReady) {
+            return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=live`);
+          }
+
+          const token = createPteroSsoToken({
+            userId: identity.pteroUserId,
+            email: identity.email,
+            username: identity.username,
+            nextPath,
+          });
+          return redirect302(`${base}/sparrowx-sso.php?token=${encodeURIComponent(token)}`);
+        } catch {
           return redirect302(`${origin}/game/panel-launch?next=${encodeURIComponent(nextPath)}&mode=live`);
         }
-
-        const token = createPteroSsoToken({
-          userId: identity.pteroUserId,
-          email: identity.email,
-          username: identity.username,
-          nextPath,
-        });
-        return redirect302(`${base}/sparrowx-sso.php?token=${encodeURIComponent(token)}`);
       },
     },
   },

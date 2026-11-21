@@ -325,7 +325,7 @@ export function ServiceOnboardingWizard({
                 {
                   id: "database" as AssetType,
                   title: "Sovereign PostgreSQL Database",
-                  desc: "Direct PostgreSQL instances, Supabase clusters, and SQL storage layers. Shielded on Port 5432.",
+                  desc: "Direct PostgreSQL instances, sovereign database clusters, and SQL storage layers. Shielded on Port 5432.",
                   badge: "DB Injection Shield",
                   icon: Database,
                   color: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",

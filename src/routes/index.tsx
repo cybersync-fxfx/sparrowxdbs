@@ -2238,9 +2238,8 @@ function Dashboard() {
   }
 
   if (
-    activeNav === "Supabase Studio" ||
-    activeNav === "SparrowX DB" ||
-    activeNav === "Database Studio"
+    activeNav === "Database Studio" ||
+    activeNav === "SparrowX DB"
   ) {
     return (
       <>
@@ -2391,7 +2390,7 @@ function Dashboard() {
                   type="button"
                   onClick={() => handleNavigate("Client Subscriptions")}
                   className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    portalMode === "admin" && activeNav !== "Supabase Studio"
+                    portalMode === "admin" && activeNav !== "Database Studio"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
@@ -2405,7 +2404,7 @@ function Dashboard() {
                   type="button"
                   onClick={() => setActiveNav("SparrowX DB")}
                   className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    activeNav === "SparrowX DB" || activeNav === "Supabase Studio"
+                    activeNav === "SparrowX DB" || activeNav === "Database Studio"
                       ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
                       : "text-[#3ECF8E] hover:bg-[#3ECF8E]/15"
                   }`}
@@ -2431,7 +2430,7 @@ function Dashboard() {
                   type="button"
                   onClick={() => setActiveNav("SparrowX DB")}
                   className={`hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                    activeNav === "SparrowX DB" || activeNav === "Supabase Studio"
+                    activeNav === "SparrowX DB" || activeNav === "Database Studio"
                       ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
                       : "text-[#3ECF8E] border border-[#3ECF8E]/30 hover:bg-[#3ECF8E]/15"
                   }`}

@@ -28,7 +28,18 @@ export const Route = createFileRoute("/api/client-protect/heartbeat")({
       },
 
       POST: async ({ request }) => {
+        const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
         const { recordClientVpsHeartbeat } = await import("@/lib/server/client-protect.server");
+
+        const ip = extractClientIp(request);
+        const rate = checkDbRateLimit(`client-protect-hb:${ip}`, 60, 60_000);
+        if (!rate.allowed) {
+          return Response.json(
+            { ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
+            { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+          );
+        }
+
         const token = request.headers.get("x-sparrowx-client-token")?.trim() || "";
         if (!token) {
           return Response.json({ ok: false, error: "Missing X-SparrowX-Client-Token" }, { status: 401 });
