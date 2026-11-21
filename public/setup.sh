@@ -2521,6 +2521,11 @@ ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || tru
 ln -sf "${INSTALL_DIR}/deploy/watchdog.sh" /usr/local/bin/sparrowx-heal 2>/dev/null || true
 [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
 [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
+if [ -f "${INSTALL_DIR}/deploy/sparrowx-noc.py" ]; then
+  chmod +x "${INSTALL_DIR}/deploy/sparrowx-noc.py" 2>/dev/null || true
+  ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-noc 2>/dev/null || true
+  ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-master 2>/dev/null || true
+fi
 
 # Seed DB only if app_users table has no rows yet
 if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -x "${INSTALL_DIR}/manage-db.sh" ]; then
@@ -2648,5 +2653,6 @@ echo -e "  ${C_BOLD}CLI TOOLS:${C_RESET}"
 echo -e "    • Watchdog (2m)  : ${C_DIM}${INSTALL_DIR}/deploy/watchdog.sh${C_RESET} (or ${C_BOLD}sparrowx-heal${C_RESET})"
 echo -e "    • Auto-Heal (fix): ${C_BOLD}sparrowx-fix${C_RESET}   |  DB Studio TUI: ${C_BOLD}sparrowx-db${C_RESET}"
 echo -e "    • DDoS / XDP CLI : ${C_BOLD}sparrowx-ddos${C_RESET}  |  XDP NIC Probe: ${C_BOLD}sparrowx-xdp --status${C_RESET}"
+echo -e "    • Master NOC TUI : ${C_BOLD}sudo sparrowx-noc${C_RESET} (or ${C_BOLD}sparrowx-master${C_RESET})"
 echo -e "    • 1-Click Update : ${C_BOLD}sparrowx-update${C_RESET} |  Full Setup  : ${C_BOLD}sparrowx-setup${C_RESET}"
 echo -e "${C_ORANGE}========================================================================${C_RESET}"

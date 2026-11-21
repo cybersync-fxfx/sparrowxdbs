@@ -1374,6 +1374,11 @@ if [ -d "/usr/local/bin" ]; then
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
+  if [ -f "${INSTALL_DIR}/deploy/sparrowx-noc.py" ]; then
+    chmod +x "${INSTALL_DIR}/deploy/sparrowx-noc.py" 2>/dev/null || true
+    ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-noc 2>/dev/null || true
+    ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-master 2>/dev/null || true
+  fi
 fi
 
 if [ -f "${INSTALL_DIR}/.env" ]; then
@@ -2707,6 +2712,7 @@ echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}Quick Operations CLI & Setup Links:${
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Full Update      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./update.sh  (or: sparrowx-update)"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Auto-Heal Doctor : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./fix.sh     (or: sparrowx-fix / sparrowx-doctor)"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} DDoS / XDP Setup : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "sparrowx-ddos (or: sparrowx-xdp --status)"
+printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Linux Master NOC : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "sudo sparrowx-noc (or: sparrowx-master)"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Database TUI     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./manage-db.sh (or: sparrowx-db)"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Single-File DDoS : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${SPARROWX_DOMAIN}/ddos-setup.sh"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} XDP C / Setup    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${SPARROWX_DOMAIN}/setup.sh"

@@ -1792,7 +1792,12 @@ if [ -d "/usr/local/bin" ]; then
   ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
-  log_ok "CLI symlinks verified: sparrowx-setup, sparrowx-fix, sparrowx-doctor, sparrowx-update, sparrowx-db, sparrowx-ddos, sparrowx-xdp"
+  if [ -f "${INSTALL_DIR}/deploy/sparrowx-noc.py" ]; then
+    chmod +x "${INSTALL_DIR}/deploy/sparrowx-noc.py" 2>/dev/null || true
+    ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-noc 2>/dev/null || true
+    ln -sf "${INSTALL_DIR}/deploy/sparrowx-noc.py" /usr/local/bin/sparrowx-master 2>/dev/null || true
+  fi
+  log_ok "CLI symlinks verified: sparrowx-setup, sparrowx-fix, sparrowx-doctor, sparrowx-update, sparrowx-db, sparrowx-ddos, sparrowx-xdp, sparrowx-noc"
 fi
 
 # ==============================================================================
