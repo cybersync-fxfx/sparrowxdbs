@@ -18,6 +18,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { UpiAutoPayModal } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   computePlanPrice,
@@ -137,6 +138,7 @@ export function SparrowxInfraEngine() {
     totalLabel: string;
     regionName: string;
   } | null>(null);
+  const [upiPayOpen, setUpiPayOpen] = useState(false);
 
   useEffect(() => {
     const verified = verifySessionToken();
@@ -358,6 +360,12 @@ export function SparrowxInfraEngine() {
 
           <div className="flex items-center gap-3">
             <a
+              href="/infra/dashboard"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-[#0B0E15] hover:border-white/35 px-3.5 py-2 text-sm font-medium text-white transition-colors duration-150"
+            >
+              <span>Cloud Panel</span>
+            </a>
+            <a
               href="#catalog"
               className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 px-4 py-2 text-sm font-semibold text-black transition-colors duration-150"
             >
@@ -403,6 +411,13 @@ export function SparrowxInfraEngine() {
               className="block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10"
             >
               Network &amp; DDoS
+            </a>
+            <a
+              href="/infra/dashboard"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block rounded-lg px-3 py-2.5 text-sky-300 font-semibold hover:bg-white/10"
+            >
+              Cloud Management Panel (hPanel)
             </a>
             <a
               href={buildMasterHref("/")}
@@ -1160,6 +1175,16 @@ export function SparrowxInfraEngine() {
                         Cancel
                       </button>
                       <button
+                        type="button"
+                        onClick={() => {
+                          closeConfigurator();
+                          setUpiPayOpen(true);
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-black transition-colors duration-150 cursor-pointer"
+                      >
+                        <span>Pay via UPI</span>
+                      </button>
+                      <button
                         type="submit"
                         disabled={submittingOrder}
                         className="inline-flex items-center gap-2 rounded-lg bg-sky-400 hover:bg-sky-300 disabled:opacity-60 px-5 py-2.5 text-sm font-semibold text-black transition-colors duration-150 cursor-pointer"
@@ -1177,6 +1202,33 @@ export function SparrowxInfraEngine() {
           </>
         )}
       </dialog>
+
+      <UpiAutoPayModal
+        open={upiPayOpen && Boolean(selectedPlan)}
+        onClose={() => setUpiPayOpen(false)}
+        service="infra"
+        planId={selectedPlan?.id ?? "vps-starter"}
+        planName={selectedPlan?.name ?? "SparrowX Server"}
+        amountInr={
+          selectedPlan
+            ? computePlanPrice(selectedPlan, "INR", billingCycle, addonMonthlyUsd).unitMonthly *
+              (billingCycle === "annual" ? 12 : billingCycle === "quarterly" ? 3 : 1)
+            : 849
+        }
+        customerEmail={customerEmail || sessionEmail || "ops@sparrowx.net"}
+        metadata={
+          selectedPlan
+            ? {
+                category: selectedPlan.category,
+                hostname: hostnameInput || `${selectedPlan.id}.sparrowx.net`,
+                region:
+                  INFRA_REGIONS.find((r) => r.id === configRegion)?.name ||
+                  "Mumbai IN-1",
+                os: selectedOsMeta.label,
+              }
+            : undefined
+        }
+      />
 
       <SparrowxFooter inPageAnchors={false} />
     </div>

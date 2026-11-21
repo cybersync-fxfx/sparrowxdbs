@@ -14,7 +14,6 @@ import { Route as DbRouteImport } from './routes/db'
 import { Route as DropRouteImport } from './routes/drop'
 import { Route as ErrorsRouteImport } from './routes/errors'
 import { Route as GatewayRouteImport } from './routes/gateway'
-import { Route as InfraRouteImport } from './routes/infra'
 import { Route as KeysRouteImport } from './routes/keys'
 import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as StoryRouteImport } from './routes/story'
@@ -24,7 +23,10 @@ import { Route as FIdRouteImport } from './routes/f.$id'
 import { Route as GameIndexRouteImport } from './routes/game.index'
 import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
 import { Route as GamePanelLaunchRouteImport } from './routes/game.panel-launch'
+import { Route as InfraIndexRouteImport } from './routes/infra.index'
+import { Route as InfraDashboardRouteImport } from './routes/infra.dashboard'
 import { Route as ApiAuthMasterSsoRouteImport } from './routes/api/auth/master-sso'
+import { Route as ApiAuthVerifyEmailRouteImport } from './routes/api/auth/verify-email'
 import { Route as ApiDbHealthRouteImport } from './routes/api/db/health'
 import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
@@ -58,11 +60,6 @@ const ErrorsRoute = ErrorsRouteImport.update({
 const GatewayRoute = GatewayRouteImport.update({
   id: '/gateway',
   path: '/gateway',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InfraRoute = InfraRouteImport.update({
-  id: '/infra',
-  path: '/infra',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KeysRoute = KeysRouteImport.update({
@@ -110,9 +107,24 @@ const GamePanelLaunchRoute = GamePanelLaunchRouteImport.update({
   path: '/game/panel-launch',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InfraIndexRoute = InfraIndexRouteImport.update({
+  id: '/infra/',
+  path: '/infra/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfraDashboardRoute = InfraDashboardRouteImport.update({
+  id: '/infra/dashboard',
+  path: '/infra/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthMasterSsoRoute = ApiAuthMasterSsoRouteImport.update({
   id: '/api/auth/master-sso',
   path: '/api/auth/master-sso',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthVerifyEmailRoute = ApiAuthVerifyEmailRouteImport.update({
+  id: '/api/auth/verify-email',
+  path: '/api/auth/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDbHealthRoute = ApiDbHealthRouteImport.update({
@@ -170,7 +182,6 @@ export interface FileRoutesByFullPath {
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
-  '/infra': typeof InfraRoute
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
@@ -178,9 +189,12 @@ export interface FileRoutesByFullPath {
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
+  '/infra/dashboard': typeof InfraDashboardRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/infra/': typeof InfraIndexRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
+  '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -197,7 +211,6 @@ export interface FileRoutesByTo {
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
-  '/infra': typeof InfraRoute
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
@@ -205,9 +218,12 @@ export interface FileRoutesByTo {
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
+  '/infra/dashboard': typeof InfraDashboardRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
+  '/infra': typeof InfraIndexRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
+  '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -225,7 +241,6 @@ export interface FileRoutesById {
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
-  '/infra': typeof InfraRoute
   '/keys': typeof KeysRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
@@ -233,9 +248,12 @@ export interface FileRoutesById {
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
+  '/infra/dashboard': typeof InfraDashboardRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
+  '/infra/': typeof InfraIndexRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
+  '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/db/health': typeof ApiDbHealthRoute
   '/api/db/lifecycle': typeof ApiDbLifecycleRoute
   '/api/db/provision': typeof ApiDbProvisionRoute
@@ -254,7 +272,6 @@ export interface FileRouteTypes {
     | '/drop'
     | '/errors'
     | '/gateway'
-    | '/infra'
     | '/keys'
     | '/shield'
     | '/story'
@@ -262,9 +279,12 @@ export interface FileRouteTypes {
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
+    | '/infra/dashboard'
     | '/f/'
     | '/game/'
+    | '/infra/'
     | '/api/auth/master-sso'
+    | '/api/auth/verify-email'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -281,7 +301,6 @@ export interface FileRouteTypes {
     | '/drop'
     | '/errors'
     | '/gateway'
-    | '/infra'
     | '/keys'
     | '/shield'
     | '/story'
@@ -289,9 +308,12 @@ export interface FileRouteTypes {
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
+    | '/infra/dashboard'
     | '/f'
     | '/game'
+    | '/infra'
     | '/api/auth/master-sso'
+    | '/api/auth/verify-email'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -308,7 +330,6 @@ export interface FileRouteTypes {
     | '/drop'
     | '/errors'
     | '/gateway'
-    | '/infra'
     | '/keys'
     | '/shield'
     | '/story'
@@ -316,9 +337,12 @@ export interface FileRouteTypes {
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
+    | '/infra/dashboard'
     | '/f/'
     | '/game/'
+    | '/infra/'
     | '/api/auth/master-sso'
+    | '/api/auth/verify-email'
     | '/api/db/health'
     | '/api/db/lifecycle'
     | '/api/db/provision'
@@ -336,7 +360,6 @@ export interface RootRouteChildren {
   DropRoute: typeof DropRoute
   ErrorsRoute: typeof ErrorsRoute
   GatewayRoute: typeof GatewayRoute
-  InfraRoute: typeof InfraRoute
   KeysRoute: typeof KeysRoute
   ShieldRoute: typeof ShieldRoute
   StoryRoute: typeof StoryRoute
@@ -344,9 +367,12 @@ export interface RootRouteChildren {
   FIdRoute: typeof FIdRoute
   GameDashboardRoute: typeof GameDashboardRoute
   GamePanelLaunchRoute: typeof GamePanelLaunchRoute
+  InfraDashboardRoute: typeof InfraDashboardRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
+  InfraIndexRoute: typeof InfraIndexRoute
   ApiAuthMasterSsoRoute: typeof ApiAuthMasterSsoRoute
+  ApiAuthVerifyEmailRoute: typeof ApiAuthVerifyEmailRoute
   ApiDbHealthRoute: typeof ApiDbHealthRoute
   ApiDbLifecycleRoute: typeof ApiDbLifecycleRoute
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
@@ -393,13 +419,6 @@ declare module '@tanstack/react-router' {
       path: '/gateway'
       fullPath: '/gateway'
       preLoaderRoute: typeof GatewayRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/infra': {
-      id: '/infra'
-      path: '/infra'
-      fullPath: '/infra'
-      preLoaderRoute: typeof InfraRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/keys': {
@@ -465,11 +484,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamePanelLaunchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/infra/': {
+      id: '/infra/'
+      path: '/infra'
+      fullPath: '/infra/'
+      preLoaderRoute: typeof InfraIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/infra/dashboard': {
+      id: '/infra/dashboard'
+      path: '/infra/dashboard'
+      fullPath: '/infra/dashboard'
+      preLoaderRoute: typeof InfraDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/master-sso': {
       id: '/api/auth/master-sso'
       path: '/api/auth/master-sso'
       fullPath: '/api/auth/master-sso'
       preLoaderRoute: typeof ApiAuthMasterSsoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/verify-email': {
+      id: '/api/auth/verify-email'
+      path: '/api/auth/verify-email'
+      fullPath: '/api/auth/verify-email'
+      preLoaderRoute: typeof ApiAuthVerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/db/health': {
@@ -544,7 +584,6 @@ const rootRouteChildren: RootRouteChildren = {
   DropRoute: DropRoute,
   ErrorsRoute: ErrorsRoute,
   GatewayRoute: GatewayRoute,
-  InfraRoute: InfraRoute,
   KeysRoute: KeysRoute,
   ShieldRoute: ShieldRoute,
   StoryRoute: StoryRoute,
@@ -552,9 +591,12 @@ const rootRouteChildren: RootRouteChildren = {
   FIdRoute: FIdRoute,
   GameDashboardRoute: GameDashboardRoute,
   GamePanelLaunchRoute: GamePanelLaunchRoute,
+  InfraDashboardRoute: InfraDashboardRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
+  InfraIndexRoute: InfraIndexRoute,
   ApiAuthMasterSsoRoute: ApiAuthMasterSsoRoute,
+  ApiAuthVerifyEmailRoute: ApiAuthVerifyEmailRoute,
   ApiDbHealthRoute: ApiDbHealthRoute,
   ApiDbLifecycleRoute: ApiDbLifecycleRoute,
   ApiDbProvisionRoute: ApiDbProvisionRoute,

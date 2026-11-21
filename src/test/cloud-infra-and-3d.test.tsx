@@ -4,6 +4,15 @@ import { matchProductSubdomain, resolveRootRedirectTarget } from "@/lib/routing"
 import { computePlanPrice, INFRA_PLANS } from "@/lib/infra-plans";
 import { SparrowxInfraEngine } from "@/components/SparrowxInfraEngine";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import {
+  executeServerAction,
+  listManagedInfraServers,
+} from "@/lib/server/proxmox.server";
+import {
+  createUpiOrder,
+  getUpiOrder,
+  processUpiAutoWebhook,
+} from "@/lib/server/upi-payments.server";
 
 describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () => {
   it("routes infra.sparrowx.net and metal.sparrowx.net to /infra", () => {
@@ -55,5 +64,52 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     fireEvent.click(screen.getByRole("tab", { name: "Cloud KVM VPS" }));
     expect(screen.getByText("VPS-Nano NVMe")).toBeTruthy();
     expect(screen.queryByText("BM-Edge 7950X")).toBeNull();
+  });
+
+  it("creates a UPI order, auto-confirms via webhook, and provisions a Proxmox server", async () => {
+    const order = createUpiOrder({
+      service: "infra",
+      planId: "vps-starter",
+      planName: "VPS-Builder NVMe",
+      amountInr: 849,
+      customerEmail: "ops@sparrowx.net",
+      metadata: {
+        category: "vps",
+        hostname: "auto-vps-01.sparrowx.net",
+        region: "Mumbai IN-1",
+        os: "Ubuntu 24.04 LTS (Hardened)",
+      },
+    });
+    expect(order.status).toBe("PENDING");
+    expect(order.upiUri).toContain("upi://pay?");
+
+    const rawBody = JSON.stringify({
+      orderId: order.orderId,
+      amountInr: 849,
+      utr: "432199887766",
+    });
+    const hookRes = processUpiAutoWebhook({
+      rawBody,
+      headers: {},
+      payload: JSON.parse(rawBody),
+    });
+    expect(hookRes.ok).toBe(true);
+    expect(hookRes.order?.status).toBe("PAID");
+    expect(hookRes.order?.provisionedServer?.hostname).toBe("auto-vps-01.sparrowx.net");
+
+    const verifiedOrder = getUpiOrder(order.orderId);
+    expect(verifiedOrder?.status).toBe("PAID");
+
+    const fleet = await listManagedInfraServers();
+    const created = fleet.servers.find((s) => s.hostname === "auto-vps-01.sparrowx.net");
+    expect(created).toBeTruthy();
+
+    const snapRes = await executeServerAction({
+      serverId: created!.id,
+      action: "snapshot",
+      snapshotName: "post-deploy",
+    });
+    expect(snapRes.ok).toBe(true);
+    expect(snapRes.server?.snapshots[0]?.name).toBe("post-deploy");
   });
 });

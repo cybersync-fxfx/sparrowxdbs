@@ -8,6 +8,19 @@ import {
   handleContactRequest,
   type ContactInquiryRecord,
 } from "./lib/contact-inquiry";
+import {
+  createServerConsoleSession,
+  executeServerAction,
+  listManagedInfraServers,
+} from "./lib/server/proxmox.server";
+import {
+  createUpiOrder,
+  getUpiGatewayConfig,
+  getUpiOrder,
+  listRecentUpiOrders,
+  processUpiAutoWebhook,
+  verifyUpiUtr,
+} from "./lib/server/upi-payments.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -605,6 +618,168 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         JSON.stringify({ error: "Invalid JSON diagnostics payload" }),
         { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
       );
+    }
+  }
+
+  // =========================================================================
+  // SPARROWX CLOUD INFRA — PROXMOX VE CONTROL PLANE API
+  // =========================================================================
+  if (url.pathname === "/api/infra/servers" && request.method === "GET") {
+    const payload = await listManagedInfraServers();
+    return new Response(JSON.stringify({ ok: true, ...payload }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
+  }
+
+  if (url.pathname === "/api/infra/servers/action" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as Parameters<typeof executeServerAction>[0];
+      const result = await executeServerAction(body);
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch {
+      return new Response(JSON.stringify({ ok: false, message: "Invalid JSON payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+  }
+
+  if (url.pathname === "/api/infra/servers/console" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as { serverId?: string };
+      const result = await createServerConsoleSession(String(body.serverId || ""));
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 404,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch {
+      return new Response(JSON.stringify({ ok: false, error: "Invalid JSON payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+  }
+
+  // =========================================================================
+  // SPARROWX UNIFIED UPI AUTO-CONFIRMATION PAYMENT API (ALL SERVICES)
+  // =========================================================================
+  if (url.pathname === "/api/payments/upi/create" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as {
+        service?: "infra" | "game" | "db" | "shield" | "netsec" | "wallet";
+        planId?: string;
+        planName?: string;
+        amountInr?: number;
+        customerEmail?: string;
+        metadata?: {
+          category?: "bare-metal" | "dedicated" | "vps";
+          hostname?: string;
+          region?: string;
+          os?: string;
+        };
+      };
+      const amount = Number(body.amountInr || 0);
+      if (!Number.isFinite(amount) || amount < 1) {
+        return new Response(JSON.stringify({ ok: false, error: "Amount must be at least ₹1." }), {
+          status: 400,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+      const order = createUpiOrder({
+        service: body.service || "infra",
+        planId: String(body.planId || "custom"),
+        planName: String(body.planName || "SparrowX Cloud Service"),
+        amountInr: amount,
+        customerEmail: String(body.customerEmail || "client@sparrowx.net"),
+        metadata: body.metadata,
+      });
+      const cfg = getUpiGatewayConfig();
+      return new Response(JSON.stringify({ ok: true, mode: cfg.mode, order }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch {
+      return new Response(JSON.stringify({ ok: false, error: "Invalid UPI create payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+  }
+
+  if (url.pathname === "/api/payments/upi/status" && request.method === "GET") {
+    const orderId = url.searchParams.get("orderId") || "";
+    const order = getUpiOrder(orderId);
+    if (!order) {
+      return new Response(JSON.stringify({ ok: false, error: "UPI order not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+    return new Response(JSON.stringify({ ok: true, order }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
+  }
+
+  if (url.pathname === "/api/payments/upi/orders" && request.method === "GET") {
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        config: getUpiGatewayConfig(),
+        orders: listRecentUpiOrders(25),
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      },
+    );
+  }
+
+  if (url.pathname === "/api/payments/upi/webhook" && request.method === "POST") {
+    const rawBody = await request.text();
+    let payload: Record<string, unknown> = {};
+    try {
+      payload = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      return new Response(JSON.stringify({ ok: false, message: "Invalid webhook JSON" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+    const result = processUpiAutoWebhook({
+      rawBody,
+      headers: {
+        "x-razorpay-signature": request.headers.get("x-razorpay-signature") ?? undefined,
+        "x-sparrowx-upi-secret": request.headers.get("x-sparrowx-upi-secret") ?? undefined,
+      },
+      payload,
+    });
+    return new Response(JSON.stringify(result), {
+      status: result.status,
+      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    });
+  }
+
+  if (url.pathname === "/api/payments/upi/verify-utr" && request.method === "POST") {
+    try {
+      const body = (await request.json()) as { orderId?: string; utr?: string };
+      const result = verifyUpiUtr({
+        orderId: String(body.orderId || ""),
+        utr: String(body.utr || ""),
+      });
+      return new Response(JSON.stringify(result), {
+        status: result.ok ? 200 : 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch {
+      return new Response(JSON.stringify({ ok: false, message: "Invalid UTR payload" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
     }
   }
 

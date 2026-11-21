@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { SparrowxInfraEngine } from "@/components/SparrowxInfraEngine";
 import { BackgroundEngineToaster } from "@/components/BackgroundEngineToaster";
 
-export const Route = createFileRoute("/infra")({
+export const Route = createFileRoute("/infra/")({
   head: () => ({
     meta: [
       {

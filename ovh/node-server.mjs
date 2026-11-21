@@ -702,6 +702,7 @@ const server = createServer(async (req, res) => {
       pathname === "/keys" ||
       pathname === "/shield" ||
       pathname === "/infra" ||
+      pathname.startsWith("/infra/") ||
       pathname === "/game" ||
       pathname.startsWith("/game/") ||
       pathname.startsWith("/f/");
