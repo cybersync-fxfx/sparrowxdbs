@@ -3,23 +3,30 @@
 ================================================================================
  SPARROWX MASTER CYBERSECURITY & NETWORK DDoS FILTRATION TERMINAL DASHBOARD
 ================================================================================
- Native Linux terminal NOC (Network Operations Center) & real-time packet
- filtration console. Zero third-party Python dependencies (pure Python 3 stdlib).
+ Native Linux terminal NOC (Network Operations Center), real-time packet
+ filtration monitor, and interactive Whitelist / Blocklist manager.
+ Zero third-party Python dependencies (pure Python 3 stdlib).
 
- Partitioned 5-Pane Layout:
-   [TOP BAR] Telemetry Banner: Host, NIC, CPU/RAM, Live RX/TX Mbps+PPS, Threat
-   [PANE 1]  Live Incoming/Outgoing Traffic Sparklines & Kernel/XDP Filtration
-   [PANE 2]  Protected Downstream Servers & WireGuard Tunnels (spx_* / wg*)
-   [PANE 3]  Live Active IP Connections, SYN Flood Detector & Top Talkers
-   [PANE 4]  Active Mitigation Rules & Blocked IPs (XDP / nft / UFW / Fail2Ban)
+ Partitioned 5-Pane Aesthetic SOC Layout (Rounded Unicode + 256-Color Themes):
+   [TOP BAR] Telemetry Header: Host, NIC Speed/IP, CPU/RAM Bars, Load, Threat
+   [PANE 1]  Live RX/TX Sparklines, Peak Rates, Kernel SNMP & XDP Filtration
+   [PANE 2]  Protected Downstream Servers, WireGuard Tunnels & Open Ports
+   [PANE 3]  Live Active IP Connections, SYN/TW Flood Detector & Top Talkers
+   [PANE 4]  Whitelist & Blocklist Manager (Live Split View: XDP/nft/UFW/F2B)
    [PANE 5]  Real-Time Security & Packet Filtration Event Log Stream
+
+ Interactive Controls:
+   [1-5/0] Zoom / Reset Pane    [↑/↓] Select Remote IP   [c] Cycle Theme
+   [b] Ban IP (XDP+nft+UFW)     [u] Unban IP             [t] Pane 4 View
+   [w] Whitelist IP (XDP+UFW)   [W] Remove Whitelist     [x] Strict SYN Mode
+   [i] Cycle NIC  [p] Pause     [/] Filter   [r] Refresh [q] Quit
 
  Usage:
    sudo sparrowx-noc                      # Launch live interactive Linux TUI
+   sudo sparrowx-noc --theme cyber        # Themes: cyber | emerald | crimson
    sudo sparrowx-noc --iface enp1s0f0     # Pin specific network interface
-   sudo sparrowx-noc --interval 1.0       # Refresh rate in seconds
    sparrowx-noc --once                    # Print single ANSI terminal snapshot
-   sparrowx-noc --demo                    # Simulated telemetry preview (opt-in)
+   sparrowx-noc --demo                    # Opt-in simulated telemetry preview
 ================================================================================
 """
 
@@ -41,7 +48,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Deque, Dict, List, Optional, Tuple
+from typing import Deque, Dict, List, Optional, Set, Tuple
 
 try:
     import curses
@@ -49,9 +56,12 @@ except ImportError:
     curses = None  # Handled gracefully for --once mode on non-curses systems
 
 
-VERSION = "2.1.0"
+VERSION = "2.5.0"
 SPARK_CHARS = " ▁▂▃▄▅▆▇█"
 IS_LINUX = sys.platform.startswith("linux")
+THEMES = ("cyber", "emerald", "crimson")
+WHITELIST_FILE = Path("/opt/sparrowx/xdp/whitelist_ipv4.txt")
+BLOCKLIST_FILE = Path("/opt/sparrowx/xdp/blocked_ipv4.txt")
 
 
 # ------------------------------------------------------------------------------
@@ -117,7 +127,7 @@ def make_sparkline(values: List[float], width: int) -> str:
     if width <= 0:
         return ""
     if not values:
-        return " " * width
+        return "▁" * width
     slice_vals = list(values[-width:])
     if len(slice_vals) < width:
         slice_vals = [0.0] * (width - len(slice_vals)) + slice_vals
@@ -134,6 +144,13 @@ def make_sparkline(values: List[float], width: int) -> str:
 
 
 def make_bar(ratio: float, width: int) -> str:
+    width = max(4, width)
+    clamped = max(0.0, min(1.0, ratio))
+    filled = int(round(clamped * width))
+    return "━" * filled + "╌" * (width - filled)
+
+
+def make_block_bar(ratio: float, width: int) -> str:
     width = max(4, width)
     clamped = max(0.0, min(1.0, ratio))
     filled = int(round(clamped * width))
@@ -208,19 +225,26 @@ class HostStats:
     kernel: str = "linux"
     is_root: bool = False
     cpu_pct: float = 0.0
+    cpu_cores: int = 1
     mem_used_gb: float = 0.0
     mem_total_gb: float = 0.0
     mem_pct: float = 0.0
     load_1m: float = 0.0
+    load_5m: float = 0.0
+    load_15m: float = 0.0
     uptime_str: str = "0m"
 
 
 @dataclass
 class NicStats:
     iface: str = "eth0"
+    ipv4: str = "-"
+    link_speed: str = "-"
     available_ifaces: List[str] = field(default_factory=list)
     rx_bps: float = 0.0
     tx_bps: float = 0.0
+    peak_rx_bps: float = 0.0
+    peak_tx_bps: float = 0.0
     rx_pps: float = 0.0
     tx_pps: float = 0.0
     rx_drop_ps: float = 0.0
@@ -248,8 +272,13 @@ class FiltrationStats:
     conntrack_count: int = 0
     conntrack_max: int = 0
     syn_recv_count: int = 0
+    time_wait_count: int = 0
     established_count: int = 0
     total_sockets: int = 0
+    tcp_retrans_ps: float = 0.0
+    udp_in_ps: float = 0.0
+    udp_err_ps: float = 0.0
+    icmp_in_ps: float = 0.0
     fail2ban_jails: int = 0
     fail2ban_banned: int = 0
     ufw_active: bool = False
@@ -263,7 +292,7 @@ class ProtectedBackend:
     kind: str  # WG-TUNNEL | NAT-MASQ | DOCKER | SERVICE
     tunnel_ip: str
     endpoint: str
-    status: str  # PROTECTED | IDLE | DOWN
+    status: str  # PROTECTED | IDLE | WAITING | DOWN
     rx_bytes: int = 0
     tx_bytes: int = 0
     rx_bps: float = 0.0
@@ -277,23 +306,24 @@ class RemoteTalker:
     total_conns: int
     established: int
     syn_recv: int
+    time_wait: int
     udp_conns: int
     ports: str
     process: str
-    risk: str  # OK | WARN | FLOOD
+    risk: str  # WHITELIST | BLOCKED | FLOOD | WARN | OK
 
 
 @dataclass
-class BlockedIpEntry:
+class PolicyIpEntry:
     ip: str
-    source: str  # XDP | NFT | UFW | F2B
-    hits_or_note: str
+    source: str  # XDP | NFT | UFW | F2B | FILE
+    note: str
 
 
 @dataclass
 class LogEvent:
     ts: str
-    tag: str  # XDP | DROP | BAN | WAF | WG | SYS | AUTH
+    tag: str  # XDP | DROP | BAN | WHT | WAF | WG | SYS | AUTH
     message: str
 
 
@@ -304,8 +334,10 @@ class DashboardSnapshot:
     nic: NicStats
     filtration: FiltrationStats
     backends: List[ProtectedBackend]
+    listening_ports: List[str]
     talkers: List[RemoteTalker]
-    blocked_ips: List[BlockedIpEntry]
+    blocked_ips: List[PolicyIpEntry]
+    whitelisted_ips: List[PolicyIpEntry]
     logs: List[LogEvent]
     demo_mode: bool = False
 
@@ -323,22 +355,33 @@ class TelemetryCollector:
         self._prev_cpu: Optional[Tuple[int, int]] = None
         self._prev_net: Dict[str, Tuple[float, int, int, int, int, int, int]] = {}
         self._prev_xdp_drop: Optional[Tuple[float, int]] = None
+        self._prev_snmp: Optional[Tuple[float, int, int, int, int]] = None
         self._prev_wg_bytes: Dict[str, Tuple[float, int, int]] = {}
+        self._peak_rx_bps: float = 0.0
+        self._peak_tx_bps: float = 0.0
 
-        self.rx_history: Deque[float] = collections.deque(maxlen=60)
-        self.tx_history: Deque[float] = collections.deque(maxlen=60)
+        self.rx_history: Deque[float] = collections.deque(maxlen=72)
+        self.tx_history: Deque[float] = collections.deque(maxlen=72)
 
-        self.log_buffer: Deque[LogEvent] = collections.deque(maxlen=300)
+        self.log_buffer: Deque[LogEvent] = collections.deque(maxlen=350)
         self._log_offsets: Dict[str, int] = {}
         self._demo_tick = 0
-        self._demo_banned: List[BlockedIpEntry] = [
-            BlockedIpEntry("185.220.101.42", "XDP", "482.1K pkts"),
-            BlockedIpEntry("45.155.205.91", "XDP", "194.6K pkts"),
-            BlockedIpEntry("91.240.118.17", "NFT", "sparrowx_shield"),
-            BlockedIpEntry("194.26.135.88", "F2B", "sshd / syn-flood"),
-            BlockedIpEntry("103.149.28.14", "UFW", "DENY IN"),
-        ]
         self._demo_strict = False
+
+        # Demo lists (ONLY used when --demo is explicitly enabled)
+        self._demo_banned: List[PolicyIpEntry] = [
+            PolicyIpEntry("185.220.101.42", "XDP", "482.1K pkts"),
+            PolicyIpEntry("45.155.205.91", "XDP", "194.6K pkts"),
+            PolicyIpEntry("91.240.118.17", "NFT", "sparrowx_shield"),
+            PolicyIpEntry("194.26.135.88", "F2B", "sshd / syn-flood"),
+            PolicyIpEntry("103.149.28.14", "UFW", "DENY IN"),
+        ]
+        self._demo_whitelisted: List[PolicyIpEntry] = [
+            PolicyIpEntry("51.79.142.18", "XDP", "Edge Peer #1 (trusted)"),
+            PolicyIpEntry("139.99.84.201", "XDP", "Origin Node SG-01"),
+            PolicyIpEntry("145.239.61.99", "NFT", "sparrowx_shield WL"),
+            PolicyIpEntry("172.69.34.102", "UFW", "ALLOW IN (Admin NOC)"),
+        ]
 
         if not self.demo:
             self._prime_log_sources()
@@ -394,6 +437,8 @@ class TelemetryCollector:
             self.active_iface = ifaces[0]
         self.rx_history.clear()
         self.tx_history.clear()
+        self._peak_rx_bps = 0.0
+        self._peak_tx_bps = 0.0
         self.push_event("SYS", f"Switched primary telemetry interface to {self.active_iface}")
         return self.active_iface
 
@@ -404,11 +449,11 @@ class TelemetryCollector:
             hostname=socket.gethostname(),
             kernel=platform.release(),
             is_root=(os.geteuid() == 0) if hasattr(os, "geteuid") else False,
+            cpu_cores=os.cpu_count() or 1,
         )
         if not IS_LINUX:
             return hs
 
-        # CPU % from /proc/stat
         try:
             with open("/proc/stat", "r", encoding="utf-8") as f:
                 parts = f.readline().split()
@@ -425,7 +470,6 @@ class TelemetryCollector:
         except OSError:
             pass
 
-        # Memory from /proc/meminfo
         try:
             meminfo: Dict[str, int] = {}
             with open("/proc/meminfo", "r", encoding="utf-8") as f:
@@ -443,13 +487,12 @@ class TelemetryCollector:
         except (OSError, ValueError):
             pass
 
-        # Load average
         try:
-            hs.load_1m = os.getloadavg()[0]
+            l1, l5, l15 = os.getloadavg()
+            hs.load_1m, hs.load_5m, hs.load_15m = l1, l5, l15
         except OSError:
             pass
 
-        # Uptime
         try:
             with open("/proc/uptime", "r", encoding="utf-8") as f:
                 up_sec = int(float(f.read().split()[0]))
@@ -462,7 +505,7 @@ class TelemetryCollector:
 
         return hs
 
-    # -- Network RX/TX Rates (/proc/net/dev) -----------------------------------
+    # -- Network RX/TX Rates & NIC Metadata (/proc/net/dev + sysfs) ------------
 
     def _collect_nic(self) -> NicStats:
         ifaces = self._list_net_ifaces()
@@ -472,6 +515,25 @@ class TelemetryCollector:
         ns = NicStats(iface=self.active_iface, available_ifaces=ifaces)
         if not IS_LINUX or not Path("/proc/net/dev").exists():
             return ns
+
+        # NIC IPv4 address
+        rc, out, _ = run_cmd(["ip", "-4", "-o", "addr", "show", "dev", self.active_iface], timeout=0.8)
+        if rc == 0:
+            m = re.search(r"inet\s+(\d+\.\d+\.\d+\.\d+)", out)
+            if m:
+                ns.ipv4 = m.group(1)
+
+        # NIC link speed from sysfs
+        speed_p = Path(f"/sys/class/net/{self.active_iface}/speed")
+        if speed_p.exists():
+            try:
+                sp = int(speed_p.read_text().strip())
+                if sp >= 1000:
+                    ns.link_speed = f"{sp // 1000}GbE"
+                elif sp > 0:
+                    ns.link_speed = f"{sp}MbE"
+            except (OSError, ValueError):
+                pass
 
         now = time.monotonic()
         try:
@@ -515,29 +577,84 @@ class TelemetryCollector:
         except (OSError, ValueError):
             pass
 
+        self._peak_rx_bps = max(self._peak_rx_bps, ns.rx_bps)
+        self._peak_tx_bps = max(self._peak_tx_bps, ns.tx_bps)
+        ns.peak_rx_bps = self._peak_rx_bps
+        ns.peak_tx_bps = self._peak_tx_bps
+
         self.rx_history.append(ns.rx_bps)
         self.tx_history.append(ns.tx_bps)
         ns.rx_history = list(self.rx_history)
         ns.tx_history = list(self.tx_history)
         return ns
 
-    # -- XDP, nftables, iptables, conntrack, Fail2Ban, UFW ---------------------
+    # -- Kernel Protocol Counters (/proc/net/snmp) -----------------------------
 
-    def _collect_filtration_and_blocks(
-        self, syn_recv: int, established: int, total_sockets: int
-    ) -> Tuple[FiltrationStats, List[BlockedIpEntry]]:
+    def _collect_snmp_rates(self) -> Tuple[float, float, float, float]:
+        """Returns (tcp_retrans_ps, udp_in_ps, udp_err_ps, icmp_in_ps)."""
+        if not IS_LINUX or not Path("/proc/net/snmp").exists():
+            return 0.0, 0.0, 0.0, 0.0
+        try:
+            lines = Path("/proc/net/snmp").read_text(encoding="utf-8", errors="ignore").splitlines()
+            parsed: Dict[str, Dict[str, int]] = {}
+            i = 0
+            while i + 1 < len(lines):
+                if ":" in lines[i] and ":" in lines[i + 1]:
+                    proto_h, keys_s = lines[i].split(":", 1)
+                    proto_v, vals_s = lines[i + 1].split(":", 1)
+                    if proto_h == proto_v:
+                        keys = keys_s.split()
+                        vals = vals_s.split()
+                        if len(keys) == len(vals):
+                            parsed[proto_h] = {k: int(v) for k, v in zip(keys, vals) if v.lstrip("-").isdigit()}
+                        i += 2
+                        continue
+                i += 1
+            tcp_retrans = parsed.get("Tcp", {}).get("RetransSegs", 0)
+            udp_in = parsed.get("Udp", {}).get("InDatagrams", 0)
+            udp_err = parsed.get("Udp", {}).get("InErrors", 0)
+            icmp_in = parsed.get("Icmp", {}).get("InMsgs", 0)
+            now = time.monotonic()
+            if self._prev_snmp is not None:
+                dt = max(0.1, now - self._prev_snmp[0])
+                rates = (
+                    max(0.0, (tcp_retrans - self._prev_snmp[1]) / dt),
+                    max(0.0, (udp_in - self._prev_snmp[2]) / dt),
+                    max(0.0, (udp_err - self._prev_snmp[3]) / dt),
+                    max(0.0, (icmp_in - self._prev_snmp[4]) / dt),
+                )
+            else:
+                rates = (0.0, 0.0, 0.0, 0.0)
+            self._prev_snmp = (now, tcp_retrans, udp_in, udp_err, icmp_in)
+            return rates
+        except (OSError, ValueError):
+            return 0.0, 0.0, 0.0, 0.0
+
+    # -- XDP, nftables, iptables, conntrack, Fail2Ban, UFW + Whitelist ---------
+
+    def _collect_filtration_and_policies(
+        self, syn_recv: int, time_wait: int, established: int, total_sockets: int
+    ) -> Tuple[FiltrationStats, List[PolicyIpEntry], List[PolicyIpEntry]]:
+        tcp_ret, udp_in, udp_err, icmp_in = self._collect_snmp_rates()
         fs = FiltrationStats(
             syn_recv_count=syn_recv,
+            time_wait_count=time_wait,
             established_count=established,
             total_sockets=total_sockets,
+            tcp_retrans_ps=tcp_ret,
+            udp_in_ps=udp_in,
+            udp_err_ps=udp_err,
+            icmp_in_ps=icmp_in,
         )
-        blocked: List[BlockedIpEntry] = []
-        seen_block_keys = set()
+        blocked: List[PolicyIpEntry] = []
+        whitelisted: List[PolicyIpEntry] = []
+        seen_block: Set[Tuple[str, str]] = set()
+        seen_white: Set[Tuple[str, str]] = set()
 
         if not IS_LINUX:
-            return fs, blocked
+            return fs, blocked, whitelisted
 
-        # 1. XDP attach status via `ip -details link show dev <iface>`
+        # 1. XDP attach status
         rc, out, _ = run_cmd(["ip", "-details", "link", "show", "dev", self.active_iface])
         if rc == 0:
             if "xdpgeneric" in out:
@@ -553,7 +670,7 @@ class TelemetryCollector:
             if m_id:
                 fs.xdp_prog_id = m_id.group(1)
 
-        # 2. SparrowX XDP per-CPU stats (`xdp_stats` from sparrowx_xdp_ddos.c)
+        # 2. SparrowX XDP per-CPU stats (`xdp_stats`), blocklists & whitelist maps
         if shutil.which("bpftool"):
             for dump_cmd in (
                 ["bpftool", "-j", "map", "dump", "pinned", "/sys/fs/bpf/sparrowx/xdp_stats"],
@@ -567,19 +684,14 @@ class TelemetryCollector:
                         for entry in entries:
                             key = entry.get("key")
                             idx = key if isinstance(key, int) else (
-                                int.from_bytes(
-                                    bytes(int(x, 16) for x in key), "little"
-                                )
+                                int.from_bytes(bytes(int(x, 16) for x in key), "little")
                                 if isinstance(key, list)
                                 else -1
                             )
                             if idx not in totals:
                                 continue
                             if "values" in entry and isinstance(entry["values"], list):
-                                s = 0
-                                for cpu_v in entry["values"]:
-                                    s += parse_u64_value(cpu_v.get("value", 0))
-                                totals[idx] = s
+                                totals[idx] = sum(parse_u64_value(c.get("value", 0)) for c in entry["values"])
                             elif "value" in entry:
                                 totals[idx] = parse_u64_value(entry["value"])
                         fs.xdp_passed = totals[0]
@@ -589,33 +701,45 @@ class TelemetryCollector:
                         now = time.monotonic()
                         if self._prev_xdp_drop is not None:
                             dt = max(0.1, now - self._prev_xdp_drop[0])
-                            fs.xdp_drop_pps = max(
-                                0.0, (fs.xdp_dropped - self._prev_xdp_drop[1]) / dt
-                            )
+                            fs.xdp_drop_pps = max(0.0, (fs.xdp_dropped - self._prev_xdp_drop[1]) / dt)
                         self._prev_xdp_drop = (now, fs.xdp_dropped)
                         break
                     except (json.JSONDecodeError, ValueError, TypeError):
                         pass
 
-            # 3. XDP blocked IPv4 maps (`blocked_ipv4` and `sparrowx_blacklist`)
+            # XDP Blocklist maps
             for map_name in ("blocked_ipv4", "sparrowx_blacklist"):
-                rc, out, _ = run_cmd(
-                    ["bpftool", "-j", "map", "dump", "name", map_name], timeout=1.2
-                )
+                rc, out, _ = run_cmd(["bpftool", "-j", "map", "dump", "name", map_name], timeout=1.2)
                 if rc == 0 and out.strip().startswith("["):
                     try:
-                        entries = json.loads(out)
-                        for entry in entries[:60]:
+                        for entry in json.loads(out)[:80]:
                             ip = parse_hex_key_to_ipv4(entry.get("key"))
-                            if ip and (ip, "XDP") not in seen_block_keys:
+                            if ip and (ip, "XDP") not in seen_block:
                                 val = parse_u64_value(entry.get("value", 0))
                                 note = f"{fmt_count(val)} hits" if val > 0 else map_name
-                                blocked.append(BlockedIpEntry(ip, "XDP", note))
-                                seen_block_keys.add((ip, "XDP"))
+                                blocked.append(PolicyIpEntry(ip, "XDP", note))
+                                seen_block.add((ip, "XDP"))
                     except (json.JSONDecodeError, ValueError, TypeError):
                         pass
 
-        # 4. nftables drops & sparrowx_shield blacklist
+            # XDP Whitelist map (`whitelist` in sparrowx_xdp_ddos.c)
+            for dump_cmd in (
+                ["bpftool", "-j", "map", "dump", "pinned", "/sys/fs/bpf/sparrowx/whitelist"],
+                ["bpftool", "-j", "map", "dump", "name", "whitelist"],
+            ):
+                rc, out, _ = run_cmd(dump_cmd, timeout=1.2)
+                if rc == 0 and out.strip().startswith("["):
+                    try:
+                        for entry in json.loads(out)[:80]:
+                            ip = parse_hex_key_to_ipv4(entry.get("key"))
+                            if ip and (ip, "XDP") not in seen_white:
+                                whitelisted.append(PolicyIpEntry(ip, "XDP", "XDP_PASS (fast-path)"))
+                                seen_white.add((ip, "XDP"))
+                        break
+                    except (json.JSONDecodeError, ValueError, TypeError):
+                        pass
+
+        # 3. nftables drops, blacklist & whitelist sets
         if shutil.which("nft"):
             rc, out, _ = run_cmd(["nft", "list", "ruleset"], timeout=1.2)
             if rc == 0:
@@ -627,16 +751,21 @@ class TelemetryCollector:
                             drop_pkts += int(m.group(1))
                 fs.nft_drops = drop_pkts
 
-            rc, out, _ = run_cmd(
-                ["nft", "list", "set", "inet", "sparrowx_shield", "blacklist"], timeout=1.0
-            )
+            rc, out, _ = run_cmd(["nft", "list", "set", "inet", "sparrowx_shield", "blacklist"], timeout=1.0)
             if rc == 0:
                 for ip in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", out):
-                    if is_valid_ipv4(ip) and (ip, "NFT") not in seen_block_keys:
-                        blocked.append(BlockedIpEntry(ip, "NFT", "sparrowx_shield"))
-                        seen_block_keys.add((ip, "NFT"))
+                    if is_valid_ipv4(ip) and (ip, "NFT") not in seen_block:
+                        blocked.append(PolicyIpEntry(ip, "NFT", "sparrowx_shield"))
+                        seen_block.add((ip, "NFT"))
 
-        # 5. iptables drop counters (fallback / alongside nft)
+            rc, out, _ = run_cmd(["nft", "list", "set", "inet", "sparrowx_shield", "whitelist"], timeout=1.0)
+            if rc == 0:
+                for ip in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", out):
+                    if is_valid_ipv4(ip) and (ip, "NFT") not in seen_white:
+                        whitelisted.append(PolicyIpEntry(ip, "NFT", "sparrowx_shield WL"))
+                        seen_white.add((ip, "NFT"))
+
+        # 4. iptables drop counters
         if shutil.which("iptables"):
             rc, out, _ = run_cmd(["iptables", "-L", "INPUT", "-n", "-v", "-x"], timeout=1.0)
             if rc == 0:
@@ -647,7 +776,7 @@ class TelemetryCollector:
                         ipt_drops += int(parts[0])
                 fs.iptables_drops = ipt_drops
 
-        # 6. Conntrack table usage
+        # 5. Conntrack & Strict SYN status
         try:
             p_cnt = Path("/proc/sys/net/netfilter/nf_conntrack_count")
             p_max = Path("/proc/sys/net/netfilter/nf_conntrack_max")
@@ -658,19 +787,15 @@ class TelemetryCollector:
         except (OSError, ValueError):
             pass
 
-        # 7. Strict SYN protection check
         try:
             p_syn = Path("/proc/sys/net/ipv4/tcp_syncookies")
             p_ret = Path("/proc/sys/net/ipv4/tcp_synack_retries")
             if p_syn.exists() and p_ret.exists():
-                fs.strict_mode = (
-                    p_syn.read_text().strip() == "1"
-                    and int(p_ret.read_text().strip()) <= 2
-                )
+                fs.strict_mode = p_syn.read_text().strip() == "1" and int(p_ret.read_text().strip()) <= 2
         except (OSError, ValueError):
             pass
 
-        # 8. Fail2Ban active jails & banned IPs
+        # 6. Fail2Ban active jails & banned IPs
         if shutil.which("fail2ban-client"):
             rc, out, _ = run_cmd(["fail2ban-client", "status"], timeout=1.0)
             if rc == 0:
@@ -688,26 +813,45 @@ class TelemetryCollector:
                             m_ips = re.search(r"Banned IP list:\s*(.+)", out2)
                             if m_ips:
                                 for ip in m_ips.group(1).split():
-                                    if is_valid_ipv4(ip) and (ip, "F2B") not in seen_block_keys:
-                                        blocked.append(BlockedIpEntry(ip, "F2B", jail))
-                                        seen_block_keys.add((ip, "F2B"))
+                                    if is_valid_ipv4(ip) and (ip, "F2B") not in seen_block:
+                                        blocked.append(PolicyIpEntry(ip, "F2B", jail))
+                                        seen_block.add((ip, "F2B"))
                     fs.fail2ban_banned = total_banned
 
-        # 9. UFW active status & deny rules
+        # 7. UFW DENY (blocklist) & ALLOW IN (whitelist) IP rules
         if shutil.which("ufw"):
             rc, out, _ = run_cmd(["ufw", "status"], timeout=1.0)
             if rc == 0:
                 fs.ufw_active = "Status: active" in out
                 for line in out.splitlines():
-                    if "DENY" in line:
-                        m = re.search(r"\b((?:\d{1,3}\.){3}\d{1,3})\b", line)
-                        if m:
-                            ip = m.group(1)
-                            if is_valid_ipv4(ip) and (ip, "UFW") not in seen_block_keys:
-                                blocked.append(BlockedIpEntry(ip, "UFW", "DENY IN"))
-                                seen_block_keys.add((ip, "UFW"))
+                    m = re.search(r"\b((?:\d{1,3}\.){3}\d{1,3})\b", line)
+                    if not m:
+                        continue
+                    ip = m.group(1)
+                    if not is_valid_ipv4(ip):
+                        continue
+                    if "DENY" in line and (ip, "UFW") not in seen_block:
+                        blocked.append(PolicyIpEntry(ip, "UFW", "DENY IN"))
+                        seen_block.add((ip, "UFW"))
+                    elif "ALLOW" in line and "Anywhere" in line.split("ALLOW")[0] and (ip, "UFW") not in seen_white:
+                        whitelisted.append(PolicyIpEntry(ip, "UFW", "ALLOW IN"))
+                        seen_white.add((ip, "UFW"))
 
-        # Compute Threat Level from real telemetry
+        # 8. Persistent SparrowX whitelist file (/opt/sparrowx/xdp/whitelist_ipv4.txt)
+        if WHITELIST_FILE.exists():
+            try:
+                existing_wl_ips = {w.ip for w in whitelisted}
+                for raw in WHITELIST_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    parts = raw.split("#", 1)
+                    ip = parts[0].strip()
+                    note = parts[1].strip() if len(parts) > 1 and parts[1].strip() else "persisted WL"
+                    if is_valid_ipv4(ip) and ip not in existing_wl_ips:
+                        whitelisted.append(PolicyIpEntry(ip, "FILE", note[:22]))
+                        existing_wl_ips.add(ip)
+            except OSError:
+                pass
+
+        # Threat Level calculation from real telemetry
         if fs.xdp_drop_pps >= 1000 or fs.syn_recv_count >= 50:
             fs.threat_level = "UNDER ATTACK"
         elif fs.xdp_drop_pps >= 50 or fs.syn_recv_count >= 15 or fs.fail2ban_banned >= 20:
@@ -715,25 +859,24 @@ class TelemetryCollector:
         else:
             fs.threat_level = "NORMAL"
 
-        return fs, blocked
+        return fs, blocked, whitelisted
 
-    # -- Protected Downstream Servers & WireGuard Tunnels ----------------------
+    # -- Protected Downstream Servers, WireGuard Tunnels & Open Ports ----------
 
-    def _collect_backends(self) -> List[ProtectedBackend]:
+    def _collect_backends_and_ports(self) -> Tuple[List[ProtectedBackend], List[str]]:
         backends: List[ProtectedBackend] = []
+        listening_ports: List[str] = []
         if not IS_LINUX:
-            return backends
+            return backends, listening_ports
 
         now = time.monotonic()
 
-        # 1. WireGuard tunnels (`wg show all dump`) — SparrowXNet protected servers
+        # 1. WireGuard tunnels (`wg show all dump`)
         if shutil.which("wg"):
             rc, out, _ = run_cmd(["wg", "show", "all", "dump"], timeout=1.2)
             if rc == 0:
                 for line in out.splitlines():
                     cols = line.split("\t")
-                    # Peer lines have 9 tab-separated columns:
-                    # iface, pubkey, psk, endpoint, allowed_ips, latest_hs, rx, tx, keepalive
                     if len(cols) >= 8:
                         iface = cols[0]
                         endpoint = cols[3] if cols[3] != "(none)" else "awaiting"
@@ -753,12 +896,7 @@ class TelemetryCollector:
                         self._prev_wg_bytes[key] = (now, rx_b, tx_b)
 
                         age_sec = (int(time.time()) - latest_hs) if latest_hs > 0 else 999999
-                        if latest_hs > 0 and age_sec < 180:
-                            status = "PROTECTED"
-                        elif latest_hs > 0:
-                            status = "IDLE"
-                        else:
-                            status = "WAITING"
+                        status = "PROTECTED" if (latest_hs > 0 and age_sec < 180) else ("IDLE" if latest_hs > 0 else "WAITING")
 
                         backends.append(
                             ProtectedBackend(
@@ -777,9 +915,7 @@ class TelemetryCollector:
 
         # 2. nftables detroit_nat protected masquerade backend IPs
         if shutil.which("nft"):
-            rc, out, _ = run_cmd(
-                ["nft", "list", "set", "ip", "detroit_nat", "postrouting_masq"], timeout=1.0
-            )
+            rc, out, _ = run_cmd(["nft", "list", "set", "ip", "detroit_nat", "postrouting_masq"], timeout=1.0)
             if rc == 0:
                 existing_ips = {b.tunnel_ip.split("/")[0] for b in backends}
                 for ip in re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", out):
@@ -795,12 +931,9 @@ class TelemetryCollector:
                         )
                         existing_ips.add(ip)
 
-        # 3. Local Docker services behind SparrowX edge (sparrowx-*)
+        # 3. Local Docker services
         if shutil.which("docker"):
-            rc, out, _ = run_cmd(
-                ["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"],
-                timeout=1.2,
-            )
+            rc, out, _ = run_cmd(["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"], timeout=1.2)
             if rc == 0:
                 for line in out.splitlines():
                     parts = line.split("\t")
@@ -822,22 +955,39 @@ class TelemetryCollector:
                             )
                         )
 
-        return backends
+        # 4. Exposed listening ports (`ss -tuln`)
+        rc, out, _ = run_cmd(["ss", "-tuln"], timeout=1.0)
+        if rc == 0:
+            ports_set: Set[str] = set()
+            for line in out.splitlines()[1:]:
+                cols = line.split()
+                if len(cols) >= 5:
+                    proto = cols[0].upper()[:3]
+                    local = cols[4]
+                    if local.startswith(("127.", "[::1]")):
+                        continue
+                    port = local.rsplit(":", 1)[-1]
+                    if port.isdigit():
+                        ports_set.add(f"{port}/{proto}")
+            listening_ports = sorted(ports_set, key=lambda x: int(x.split("/")[0]))[:10]
+
+        return backends, listening_ports
 
     # -- Live Active IP Connections (`ss -tunapn`) -----------------------------
 
-    def _collect_connections(self) -> Tuple[List[RemoteTalker], int, int, int]:
+    def _collect_connections(self) -> Tuple[List[RemoteTalker], int, int, int, int]:
         if not IS_LINUX:
-            return [], 0, 0, 0
+            return [], 0, 0, 0, 0
 
         rc, out, _ = run_cmd(["ss", "-tunapn"], timeout=1.5)
         if rc != 0:
             rc, out, _ = run_cmd(["ss", "-tunan"], timeout=1.5)
         if rc != 0:
-            return [], 0, 0, 0
+            return [], 0, 0, 0, 0
 
         agg: Dict[str, dict] = {}
         syn_total = 0
+        tw_total = 0
         est_total = 0
         total_sockets = 0
 
@@ -856,10 +1006,11 @@ class TelemetryCollector:
             total_sockets += 1
             if state == "SYN-RECV":
                 syn_total += 1
+            elif state == "TIME-WAIT":
+                tw_total += 1
             elif state == "ESTAB":
                 est_total += 1
 
-            # Extract remote IP (strip port & IPv6 brackets/mapped prefix)
             peer_ip = peer_addr
             if peer_ip.startswith("["):
                 peer_ip = peer_ip.split("]")[0].lstrip("[")
@@ -869,10 +1020,7 @@ class TelemetryCollector:
             if peer_ip in ("*", "0.0.0.0", "::", "127.0.0.1", "::1", ""):
                 continue
 
-            # Extract local port
             local_port = local_addr.rsplit(":", 1)[-1] if ":" in local_addr else ""
-
-            # Extract process name if present
             proc = "-"
             m_proc = re.search(r'users:\(\("([^"]+)"', line)
             if m_proc:
@@ -880,21 +1028,16 @@ class TelemetryCollector:
 
             entry = agg.get(peer_ip)
             if entry is None:
-                entry = {
-                    "total": 0,
-                    "est": 0,
-                    "syn": 0,
-                    "udp": 0,
-                    "ports": set(),
-                    "proc": proc,
-                }
+                entry = {"total": 0, "est": 0, "syn": 0, "tw": 0, "udp": 0, "ports": set(), "proc": proc}
                 agg[peer_ip] = entry
 
             entry["total"] += 1
             if state == "ESTAB":
                 entry["est"] += 1
-            if state == "SYN-RECV":
+            elif state == "SYN-RECV":
                 entry["syn"] += 1
+            elif state == "TIME-WAIT":
+                entry["tw"] += 1
             if proto.startswith("udp"):
                 entry["udp"] += 1
             if local_port and len(entry["ports"]) < 4:
@@ -910,22 +1053,23 @@ class TelemetryCollector:
                 risk = "WARN"
             else:
                 risk = "OK"
-            ports_str = ",".join(sorted(info["ports"]))[:14] or "-"
+            ports_str = ",".join(sorted(info["ports"]))[:12] or "-"
             talkers.append(
                 RemoteTalker(
                     ip=ip,
                     total_conns=info["total"],
                     established=info["est"],
                     syn_recv=info["syn"],
+                    time_wait=info["tw"],
                     udp_conns=info["udp"],
                     ports=ports_str,
-                    process=info["proc"][:12],
+                    process=info["proc"][:10],
                     risk=risk,
                 )
             )
 
         talkers.sort(key=lambda t: (t.syn_recv * 10 + t.total_conns), reverse=True)
-        return talkers[:50], syn_total, est_total, total_sockets
+        return talkers[:60], syn_total, tw_total, est_total, total_sockets
 
     # -- Live Multi-Source Security Log Tailer ---------------------------------
 
@@ -951,7 +1095,7 @@ class TelemetryCollector:
                 with open(p, "r", encoding="utf-8", errors="ignore") as f:
                     f.seek(read_from)
                     if read_from > 0:
-                        f.readline()  # align to newline
+                        f.readline()
                     tail_lines = f.readlines()[-12:]
                     self._log_offsets[path_str] = f.tell()
                 for line in tail_lines:
@@ -970,7 +1114,7 @@ class TelemetryCollector:
                 size = p.stat().st_size
                 offset = self._log_offsets.get(path_str, size)
                 if size < offset:
-                    offset = 0  # rotated
+                    offset = 0
                 if size == offset:
                     continue
                 with open(p, "r", encoding="utf-8", errors="ignore") as f:
@@ -995,7 +1139,33 @@ class TelemetryCollector:
         clean = re.sub(r"\s+", " ", text)
         self.log_buffer.append(LogEvent(ts=ts, tag=tag, message=clean[:180]))
 
-    # -- Interactive Mitigation Actions (Real Linux Commands) ------------------
+    # -- Interactive Mitigation & Whitelist Actions ----------------------------
+
+    def _persist_ip_line(self, file_path: Path, ip: str, comment: str = "") -> bool:
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines() if file_path.exists() else []
+            existing = {ln.split("#", 1)[0].strip() for ln in lines}
+            if ip not in existing:
+                entry = f"{ip}  # {comment}" if comment else ip
+                with open(file_path, "a", encoding="utf-8") as f:
+                    f.write(f"{entry}\n")
+            return True
+        except OSError:
+            return False
+
+    def _remove_ip_line(self, file_path: Path, ip: str) -> bool:
+        if not file_path.exists():
+            return False
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            kept = [ln for ln in lines if ln.split("#", 1)[0].strip() != ip]
+            if len(kept) != len(lines):
+                file_path.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+                return True
+        except OSError:
+            pass
+        return False
 
     def ban_ip(self, ip: str) -> str:
         ip = ip.strip()
@@ -1005,15 +1175,17 @@ class TelemetryCollector:
             return msg
 
         if self.demo:
+            self._demo_whitelisted = [w for w in self._demo_whitelisted if w.ip != ip]
             if not any(b.ip == ip for b in self._demo_banned):
-                self._demo_banned.insert(0, BlockedIpEntry(ip, "XDP", "manual ban"))
+                self._demo_banned.insert(0, PolicyIpEntry(ip, "XDP", "manual ban"))
             msg = f"[DEMO] Banned {ip} across XDP + nftables + UFW"
             self.push_event("BAN", msg)
             return msg
 
-        applied: List[str] = []
+        # Ensure IP is removed from whitelist first to avoid policy conflict
+        self.unwhitelist_ip(ip, silent=True)
 
-        # 1. Inject into XDP maps (`blocked_ipv4` / `sparrowx_blacklist`)
+        applied: List[str] = []
         if shutil.which("bpftool"):
             hex_key = [f"{int(oct_):02x}" for oct_ in ip.split(".")]
             epoch_hex = [f"{b:02x}" for b in struct.pack("<Q", int(time.time()))]
@@ -1025,16 +1197,11 @@ class TelemetryCollector:
                 if rc == 0:
                     applied.append(f"XDP:{map_name}")
 
-        # 2. Inject into nftables `inet sparrowx_shield blacklist`
         if shutil.which("nft"):
-            rc, _, _ = run_cmd(
-                ["nft", "add", "element", "inet", "sparrowx_shield", "blacklist", f"{{ {ip} }}"],
-                timeout=1.5,
-            )
+            rc, _, _ = run_cmd(["nft", "add", "element", "inet", "sparrowx_shield", "blacklist", f"{{ {ip} }}"], timeout=1.5)
             if rc == 0:
                 applied.append("nft")
 
-        # 3. UFW or iptables fallback
         if shutil.which("ufw"):
             rc, _, _ = run_cmd(["ufw", "insert", "1", "deny", "from", ip, "to", "any"], timeout=2.0)
             if rc == 0:
@@ -1044,17 +1211,8 @@ class TelemetryCollector:
             if rc == 0:
                 applied.append("iptables")
 
-        # 4. Persist to /opt/sparrowx/xdp/blocked_ipv4.txt if directory exists
-        persist_file = Path("/opt/sparrowx/xdp/blocked_ipv4.txt")
-        if persist_file.parent.exists():
-            try:
-                existing = set(persist_file.read_text().splitlines()) if persist_file.exists() else set()
-                if ip not in existing:
-                    with open(persist_file, "a", encoding="utf-8") as f:
-                        f.write(f"{ip}\n")
-                    applied.append("persisted")
-            except OSError:
-                pass
+        if self._persist_ip_line(BLOCKLIST_FILE, ip):
+            applied.append("file")
 
         if applied:
             msg = f"BANNED {ip} -> [{', '.join(applied)}]"
@@ -1064,35 +1222,31 @@ class TelemetryCollector:
         self.push_event("SYS", msg)
         return msg
 
-    def unban_ip(self, ip: str) -> str:
+    def unban_ip(self, ip: str, silent: bool = False) -> str:
         ip = ip.strip()
         if not is_valid_ipv4(ip):
             msg = f"Invalid IPv4 address: {ip}"
-            self.push_event("SYS", msg)
+            if not silent:
+                self.push_event("SYS", msg)
             return msg
 
         if self.demo:
             self._demo_banned = [b for b in self._demo_banned if b.ip != ip]
-            msg = f"[DEMO] Unbanned {ip} from all tables"
-            self.push_event("SYS", msg)
+            msg = f"[DEMO] Unbanned {ip} from all blocklists"
+            if not silent:
+                self.push_event("SYS", msg)
             return msg
 
         removed: List[str] = []
         if shutil.which("bpftool"):
             hex_key = [f"{int(oct_):02x}" for oct_ in ip.split(".")]
             for map_name in ("blocked_ipv4", "sparrowx_blacklist"):
-                rc, _, _ = run_cmd(
-                    ["bpftool", "map", "delete", "name", map_name, "key", "hex", *hex_key],
-                    timeout=1.5,
-                )
+                rc, _, _ = run_cmd(["bpftool", "map", "delete", "name", map_name, "key", "hex", *hex_key], timeout=1.5)
                 if rc == 0:
                     removed.append(f"XDP:{map_name}")
 
         if shutil.which("nft"):
-            rc, _, _ = run_cmd(
-                ["nft", "delete", "element", "inet", "sparrowx_shield", "blacklist", f"{{ {ip} }}"],
-                timeout=1.5,
-            )
+            rc, _, _ = run_cmd(["nft", "delete", "element", "inet", "sparrowx_shield", "blacklist", f"{{ {ip} }}"], timeout=1.5)
             if rc == 0:
                 removed.append("nft")
 
@@ -1106,12 +1260,119 @@ class TelemetryCollector:
             if rc == 0:
                 removed.append("fail2ban")
 
-        if removed:
-            msg = f"UNBANNED {ip} <- [{', '.join(removed)}]"
+        if self._remove_ip_line(BLOCKLIST_FILE, ip):
+            removed.append("file")
+
+        msg = f"UNBANNED {ip} <- [{', '.join(removed)}]" if removed else f"No active ban found for {ip}"
+        if not silent:
+            self.push_event("SYS", msg)
+        return msg
+
+    def whitelist_ip(self, ip: str, note: str = "trusted") -> str:
+        ip = ip.strip()
+        if not is_valid_ipv4(ip):
+            msg = f"Invalid IPv4 address: {ip}"
             self.push_event("SYS", msg)
             return msg
-        msg = f"Unban found no active rule for {ip} (or requires root)"
+
+        if self.demo:
+            self._demo_banned = [b for b in self._demo_banned if b.ip != ip]
+            if not any(w.ip == ip for w in self._demo_whitelisted):
+                self._demo_whitelisted.insert(0, PolicyIpEntry(ip, "XDP", f"XDP_PASS ({note})"))
+            msg = f"[DEMO] Whitelisted {ip} across XDP + nftables + UFW"
+            self.push_event("WHT", msg)
+            return msg
+
+        # Clear any existing ban on this IP first
+        self.unban_ip(ip, silent=True)
+
+        applied: List[str] = []
+        # 1. Inject into XDP whitelist map (`whitelist` per-CPU LRU or pinned)
+        if shutil.which("bpftool"):
+            hex_key = [f"{int(oct_):02x}" for oct_ in ip.split(".")]
+            ts_ns_hex = [f"{b:02x}" for b in struct.pack("<Q", int(time.time() * 1_000_000_000))]
+            rc, _, _ = run_cmd(
+                ["bpftool", "map", "update", "name", "whitelist", "key", "hex", *hex_key, "value", "hex", *ts_ns_hex],
+                timeout=1.5,
+            )
+            if rc == 0:
+                applied.append("XDP:whitelist")
+
+        # 2. nftables whitelist set (auto-create set if table exists)
+        if shutil.which("nft"):
+            rc_t, _, _ = run_cmd(["nft", "list", "table", "inet", "sparrowx_shield"], timeout=1.0)
+            if rc_t == 0:
+                run_cmd(
+                    ["nft", "add", "set", "inet", "sparrowx_shield", "whitelist", "{ type ipv4_addr; }"],
+                    timeout=1.0,
+                )
+                rc, _, _ = run_cmd(
+                    ["nft", "add", "element", "inet", "sparrowx_shield", "whitelist", f"{{ {ip} }}"],
+                    timeout=1.2,
+                )
+                if rc == 0:
+                    applied.append("nft")
+
+        # 3. UFW ALLOW IN rule at priority 1
+        if shutil.which("ufw"):
+            rc, _, _ = run_cmd(["ufw", "insert", "1", "allow", "from", ip, "to", "any"], timeout=2.0)
+            if rc == 0:
+                applied.append("ufw")
+        elif shutil.which("iptables"):
+            rc, _, _ = run_cmd(["iptables", "-I", "INPUT", "1", "-s", ip, "-j", "ACCEPT"], timeout=1.5)
+            if rc == 0:
+                applied.append("iptables")
+
+        # 4. Persist to /opt/sparrowx/xdp/whitelist_ipv4.txt
+        if self._persist_ip_line(WHITELIST_FILE, ip, note):
+            applied.append("file")
+
+        if applied:
+            msg = f"WHITELISTED {ip} -> [{', '.join(applied)}]"
+            self.push_event("WHT", msg)
+            return msg
+        msg = f"Whitelist failed for {ip} (run with sudo/root privileges)"
         self.push_event("SYS", msg)
+        return msg
+
+    def unwhitelist_ip(self, ip: str, silent: bool = False) -> str:
+        ip = ip.strip()
+        if not is_valid_ipv4(ip):
+            msg = f"Invalid IPv4 address: {ip}"
+            if not silent:
+                self.push_event("SYS", msg)
+            return msg
+
+        if self.demo:
+            self._demo_whitelisted = [w for w in self._demo_whitelisted if w.ip != ip]
+            msg = f"[DEMO] Removed {ip} from whitelist"
+            if not silent:
+                self.push_event("WHT", msg)
+            return msg
+
+        removed: List[str] = []
+        if shutil.which("bpftool"):
+            hex_key = [f"{int(oct_):02x}" for oct_ in ip.split(".")]
+            rc, _, _ = run_cmd(["bpftool", "map", "delete", "name", "whitelist", "key", "hex", *hex_key], timeout=1.5)
+            if rc == 0:
+                removed.append("XDP:whitelist")
+
+        if shutil.which("nft"):
+            rc, _, _ = run_cmd(["nft", "delete", "element", "inet", "sparrowx_shield", "whitelist", f"{{ {ip} }}"], timeout=1.2)
+            if rc == 0:
+                removed.append("nft")
+
+        if shutil.which("ufw"):
+            rc, _, _ = run_cmd(["ufw", "delete", "allow", "from", ip, "to", "any"], timeout=2.0)
+            if rc == 0:
+                removed.append("ufw")
+
+        if self._remove_ip_line(WHITELIST_FILE, ip):
+            removed.append("file")
+
+        msg = f"UN-WHITELISTED {ip} <- [{', '.join(removed)}]" if removed else f"No whitelist entry found for {ip}"
+        if not silent:
+            self.push_event("WHT", msg)
         return msg
 
     def toggle_strict_mode(self) -> str:
@@ -1162,6 +1423,7 @@ class TelemetryCollector:
     def _seed_demo_logs(self) -> None:
         samples = [
             ("XDP", "eBPF sparrowx_xdp_ddos attached NATIVE on enp1s0f0 (prog id 42) — wire-speed scrubbing active"),
+            ("WHT", "Whitelisted 51.79.142.18 & 139.99.84.201 in XDP fast-path + nft sparrowx_shield"),
             ("WG", "Tunnel spx_8f12a09c (10.66.0.2/32) handshake OK — routing clean L4/L7 traffic to origin"),
             ("DROP", "XDP_DROP UDP amplification burst src=185.220.101.42 dport=53 rate=41.2 kpps"),
             ("XDP", "SPX1 Challenge-Cookie sent via XDP_TX to 45.155.205.91:49102 (unverified UDP)"),
@@ -1180,8 +1442,10 @@ class TelemetryCollector:
         self._demo_tick += 1
         t = self._demo_tick
         wave = 0.65 + 0.35 * math.sin(t * 0.6)
-        rx_bps = (380_000_000 + 240_000_000 * wave)
-        tx_bps = (110_000_000 + 45_000_000 * math.cos(t * 0.4))
+        rx_bps = 380_000_000 + 240_000_000 * wave
+        tx_bps = 110_000_000 + 45_000_000 * math.cos(t * 0.4)
+        self._peak_rx_bps = max(self._peak_rx_bps, rx_bps)
+        self._peak_tx_bps = max(self._peak_tx_bps, tx_bps)
         self.rx_history.append(rx_bps)
         self.tx_history.append(tx_bps)
 
@@ -1191,22 +1455,32 @@ class TelemetryCollector:
                 f"XDP_DROP scrubbed {int(32000 + 8000 * wave)} invalid UDP/SYN pkts/s on enp1s0f0 -> clean forward",
             )
 
+        wl_set = {w.ip for w in self._demo_whitelisted}
+        bl_set = {b.ip for b in self._demo_banned}
+
         host = HostStats(
             hostname="ovh-edge-01.sparrowx.net",
             kernel="6.8.0-49-generic",
             is_root=True,
             cpu_pct=18.4 + 4.2 * wave,
+            cpu_cores=16,
             mem_used_gb=6.8,
             mem_total_gb=32.0,
             mem_pct=21.2,
             load_1m=1.42,
+            load_5m=1.18,
+            load_15m=0.94,
             uptime_str="42d 11h 08m",
         )
         nic = NicStats(
             iface=self.active_iface or "enp1s0f0",
+            ipv4="51.79.210.44",
+            link_speed="10GbE",
             available_ifaces=["enp1s0f0", "spx_8f12a09c", "spx_3b90e411", "docker0"],
             rx_bps=rx_bps,
             tx_bps=tx_bps,
+            peak_rx_bps=self._peak_rx_bps,
+            peak_tx_bps=self._peak_tx_bps,
             rx_pps=64200 + 18500 * wave,
             tx_pps=21400 + 4100 * wave,
             rx_drop_ps=38400 + 9200 * wave,
@@ -1232,8 +1506,13 @@ class TelemetryCollector:
             conntrack_count=18_420,
             conntrack_max=524_288,
             syn_recv_count=62 if wave > 0.7 else 19,
+            time_wait_count=214,
             established_count=1_482,
-            total_sockets=1_714,
+            total_sockets=1_758,
+            tcp_retrans_ps=14.2,
+            udp_in_ps=48_200.0,
+            udp_err_ps=124.0,
+            icmp_in_ps=8.5,
             fail2ban_jails=4,
             fail2ban_banned=len(self._demo_banned) + 12,
             ufw_active=True,
@@ -1248,22 +1527,30 @@ class TelemetryCollector:
             ProtectedBackend("sparrowx-app", "DOCKER", "127.0.0.1", ":3000", "PROTECTED", handshake_age="14d"),
             ProtectedBackend("sparrowx-netsec", "DOCKER", "127.0.0.1", ":8090", "PROTECTED", handshake_age="14d"),
         ]
-        talkers = [
-            RemoteTalker("45.155.205.91", 74, 2, 34, 38, "443,51820", "nginx", "FLOOD"),
-            RemoteTalker("185.220.101.42", 52, 0, 19, 33, "53,28015", "kernel", "FLOOD"),
-            RemoteTalker("194.26.135.88", 29, 18, 4, 0, "443,80", "nginx", "WARN"),
-            RemoteTalker("51.79.142.18", 12, 12, 0, 1, "51820,443", "wg", "OK"),
-            RemoteTalker("139.99.84.201", 9, 9, 0, 1, "51821,443", "wg", "OK"),
-            RemoteTalker("172.69.34.102", 6, 6, 0, 0, "443", "nginx", "OK"),
+        raw_talkers = [
+            RemoteTalker("45.155.205.91", 74, 2, 34, 14, 38, "443,51820", "nginx", "FLOOD"),
+            RemoteTalker("185.220.101.42", 52, 0, 19, 8, 33, "53,28015", "kernel", "FLOOD"),
+            RemoteTalker("194.26.135.88", 29, 18, 4, 7, 0, "443,80", "nginx", "WARN"),
+            RemoteTalker("51.79.142.18", 12, 12, 0, 0, 1, "51820,443", "wg", "OK"),
+            RemoteTalker("139.99.84.201", 9, 9, 0, 0, 1, "51821,443", "wg", "OK"),
+            RemoteTalker("172.69.34.102", 6, 6, 0, 0, 0, "443", "nginx", "OK"),
         ]
+        for tk in raw_talkers:
+            if tk.ip in wl_set:
+                tk.risk = "WHITELIST"
+            elif tk.ip in bl_set and tk.risk != "FLOOD":
+                tk.risk = "BLOCKED"
+
         return DashboardSnapshot(
             timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             host=host,
             nic=nic,
             filtration=filt,
             backends=backends,
-            talkers=talkers,
+            listening_ports=["22/TCP", "80/TCP", "443/TCP", "51820/UDP", "51821/UDP", "28015/UDP"],
+            talkers=raw_talkers,
             blocked_ips=list(self._demo_banned),
+            whitelisted_ips=list(self._demo_whitelisted),
             logs=list(self.log_buffer),
             demo_mode=True,
         )
@@ -1276,13 +1563,23 @@ class TelemetryCollector:
 
         host = self._collect_host()
         nic = self._collect_nic()
-        talkers, syn_recv, established, total_sockets = self._collect_connections()
-        filtration, blocked = self._collect_filtration_and_blocks(
+        talkers, syn_recv, time_wait, established, total_sockets = self._collect_connections()
+        filtration, blocked, whitelisted = self._collect_filtration_and_policies(
             syn_recv=syn_recv,
+            time_wait=time_wait,
             established=established,
             total_sockets=total_sockets,
         )
-        backends = self._collect_backends()
+        # Cross-tag remote talkers with live WHITELIST / BLOCKED policy status
+        wl_set = {w.ip for w in whitelisted}
+        bl_set = {b.ip for b in blocked}
+        for tk in talkers:
+            if tk.ip in wl_set:
+                tk.risk = "WHITELIST"
+            elif tk.ip in bl_set and tk.risk != "FLOOD":
+                tk.risk = "BLOCKED"
+
+        backends, listening_ports = self._collect_backends_and_ports()
         self._poll_logs()
 
         return DashboardSnapshot(
@@ -1291,35 +1588,58 @@ class TelemetryCollector:
             nic=nic,
             filtration=filtration,
             backends=backends,
+            listening_ports=listening_ports,
             talkers=talkers,
             blocked_ips=blocked,
+            whitelisted_ips=whitelisted,
             logs=list(self.log_buffer),
             demo_mode=False,
         )
 
 
 # ------------------------------------------------------------------------------
-# Interactive Curses 5-Pane Linux Master Cybersecurity Terminal UI
+# Aesthetic 256-Color SOC Theme Engine & 5-Pane Curses UI
 # ------------------------------------------------------------------------------
 
 class SparrowxCursesApp:
-    def __init__(self, collector: TelemetryCollector, interval: float = 1.0):
+    # Color pair IDs
+    P_BORDER = 1
+    P_ACCENT = 2
+    P_GOOD = 3
+    P_WARN = 4
+    P_DANGER = 5
+    P_XDP = 6
+    P_TEXT = 7
+    P_MUTED = 8
+    P_HEADER_BAR = 9
+    P_BADGE_RED = 10
+    P_BADGE_GREEN = 11
+    P_BADGE_AMBER = 12
+    P_TITLE_PILL = 13
+    P_WHITELIST = 14
+
+    def __init__(self, collector: TelemetryCollector, interval: float = 1.0, theme: str = "cyber"):
         self.collector = collector
         self.interval = max(0.3, interval)
-        self.focused_pane = 0  # 0 = All 5 panes; 1..5 = zoomed pane
+        self.theme_idx = THEMES.index(theme) if theme in THEMES else 0
+        self.focused_pane = 0  # 0 = 5-pane grid; 1..5 = zoomed pane
+        self.policy_view = 0   # 0 = SPLIT (Block+White), 1 = BLOCKLIST ONLY, 2 = WHITELIST ONLY
         self.paused = False
         self.filter_text = ""
         self.selected_talker_idx = 0
-        self.selected_block_idx = 0
         self.status_banner = ""
         self.status_banner_until = 0.0
         self.snapshot: Optional[DashboardSnapshot] = None
+
+    @property
+    def theme_name(self) -> str:
+        return THEMES[self.theme_idx]
 
     def set_banner(self, text: str, duration: float = 5.0) -> None:
         self.status_banner = text
         self.status_banner_until = time.monotonic() + duration
 
-    def _init_colors(self) -> None:
+    def _apply_theme(self) -> None:
         curses.start_color()
         try:
             curses.use_default_colors()
@@ -1327,16 +1647,74 @@ class SparrowxCursesApp:
         except curses.error:
             bg = curses.COLOR_BLACK
 
-        curses.init_pair(1, curses.COLOR_CYAN, bg)     # Headers / Borders
-        curses.init_pair(2, curses.COLOR_GREEN, bg)    # Healthy / RX / Clean
-        curses.init_pair(3, curses.COLOR_YELLOW, bg)   # Elevated / TX / Warn
-        curses.init_pair(4, curses.COLOR_RED, bg)      # Attack / Drop / Flood
-        curses.init_pair(5, curses.COLOR_MAGENTA, bg)  # XDP / eBPF / WG
-        curses.init_pair(6, curses.COLOR_WHITE, bg)    # Normal text
-        curses.init_pair(7, curses.COLOR_BLACK, curses.COLOR_CYAN)    # Top Bar
-        curses.init_pair(8, curses.COLOR_WHITE, curses.COLOR_RED)     # Threat Red Badge
-        curses.init_pair(9, curses.COLOR_BLACK, curses.COLOR_GREEN)   # Threat Green Badge
-        curses.init_pair(10, curses.COLOR_BLACK, curses.COLOR_YELLOW) # Threat Amber Badge
+        hi = getattr(curses, "COLORS", 8) >= 256
+        t = self.theme_name
+
+        if hi:
+            if t == "cyber":
+                # Sleek Neon Cyan / Electric Violet / Emerald / Crimson SOC
+                curses.init_pair(self.P_BORDER, 39, bg)        # Electric Cyan
+                curses.init_pair(self.P_ACCENT, 51, bg)        # Neon Aqua
+                curses.init_pair(self.P_GOOD, 48, bg)          # Neon Mint/Emerald
+                curses.init_pair(self.P_WARN, 214, bg)         # Warm Amber
+                curses.init_pair(self.P_DANGER, 197, bg)       # Vivid Crimson
+                curses.init_pair(self.P_XDP, 177, bg)          # Electric Violet
+                curses.init_pair(self.P_TEXT, 253, bg)         # Crisp Ice White
+                curses.init_pair(self.P_MUTED, 245, bg)        # Cool Slate
+                curses.init_pair(self.P_HEADER_BAR, 255, 24)   # White on Deep Navy-Cyan
+                curses.init_pair(self.P_BADGE_RED, 255, 196)   # Alert Red Pill
+                curses.init_pair(self.P_BADGE_GREEN, 16, 48)   # Healthy Mint Pill
+                curses.init_pair(self.P_BADGE_AMBER, 16, 214)  # Warning Amber Pill
+                curses.init_pair(self.P_TITLE_PILL, 16, 45)    # Dark on Bright Cyan
+                curses.init_pair(self.P_WHITELIST, 84, bg)     # Bright Seafoam Green
+            elif t == "emerald":
+                # Matrix / Stealth Phosphor NOC
+                curses.init_pair(self.P_BORDER, 35, bg)
+                curses.init_pair(self.P_ACCENT, 46, bg)
+                curses.init_pair(self.P_GOOD, 82, bg)
+                curses.init_pair(self.P_WARN, 220, bg)
+                curses.init_pair(self.P_DANGER, 196, bg)
+                curses.init_pair(self.P_XDP, 50, bg)
+                curses.init_pair(self.P_TEXT, 194, bg)
+                curses.init_pair(self.P_MUTED, 244, bg)
+                curses.init_pair(self.P_HEADER_BAR, 16, 40)
+                curses.init_pair(self.P_BADGE_RED, 255, 196)
+                curses.init_pair(self.P_BADGE_GREEN, 16, 46)
+                curses.init_pair(self.P_BADGE_AMBER, 16, 220)
+                curses.init_pair(self.P_TITLE_PILL, 16, 46)
+                curses.init_pair(self.P_WHITELIST, 120, bg)
+            else:
+                # Crimson Tactical Red-Team Ops
+                curses.init_pair(self.P_BORDER, 161, bg)
+                curses.init_pair(self.P_ACCENT, 204, bg)
+                curses.init_pair(self.P_GOOD, 80, bg)
+                curses.init_pair(self.P_WARN, 214, bg)
+                curses.init_pair(self.P_DANGER, 196, bg)
+                curses.init_pair(self.P_XDP, 213, bg)
+                curses.init_pair(self.P_TEXT, 255, bg)
+                curses.init_pair(self.P_MUTED, 245, bg)
+                curses.init_pair(self.P_HEADER_BAR, 255, 88)
+                curses.init_pair(self.P_BADGE_RED, 255, 196)
+                curses.init_pair(self.P_BADGE_GREEN, 16, 48)
+                curses.init_pair(self.P_BADGE_AMBER, 16, 214)
+                curses.init_pair(self.P_TITLE_PILL, 255, 161)
+                curses.init_pair(self.P_WHITELIST, 86, bg)
+        else:
+            # Clean 16-color fallback
+            curses.init_pair(self.P_BORDER, curses.COLOR_CYAN, bg)
+            curses.init_pair(self.P_ACCENT, curses.COLOR_CYAN, bg)
+            curses.init_pair(self.P_GOOD, curses.COLOR_GREEN, bg)
+            curses.init_pair(self.P_WARN, curses.COLOR_YELLOW, bg)
+            curses.init_pair(self.P_DANGER, curses.COLOR_RED, bg)
+            curses.init_pair(self.P_XDP, curses.COLOR_MAGENTA, bg)
+            curses.init_pair(self.P_TEXT, curses.COLOR_WHITE, bg)
+            curses.init_pair(self.P_MUTED, curses.COLOR_WHITE, bg)
+            curses.init_pair(self.P_HEADER_BAR, curses.COLOR_BLACK, curses.COLOR_CYAN)
+            curses.init_pair(self.P_BADGE_RED, curses.COLOR_WHITE, curses.COLOR_RED)
+            curses.init_pair(self.P_BADGE_GREEN, curses.COLOR_BLACK, curses.COLOR_GREEN)
+            curses.init_pair(self.P_BADGE_AMBER, curses.COLOR_BLACK, curses.COLOR_YELLOW)
+            curses.init_pair(self.P_TITLE_PILL, curses.COLOR_BLACK, curses.COLOR_CYAN)
+            curses.init_pair(self.P_WHITELIST, curses.COLOR_GREEN, bg)
 
     def _safe_addstr(self, win, y: int, x: int, text: str, attr: int = 0) -> None:
         max_y, max_x = win.getmaxyx()
@@ -1350,50 +1728,63 @@ class SparrowxCursesApp:
         except curses.error:
             pass
 
-    def _draw_box(
+    def _draw_rounded_box(
         self, stdscr, y: int, x: int, h: int, w: int, title: str, active: bool = False
     ):
-        if h < 3 or w < 10:
+        """Draw a sleek rounded Unicode pane card with a high-contrast title pill."""
+        if h < 4 or w < 14:
             return None
         win = stdscr.derwin(h, w, y, x)
-        border_attr = curses.color_pair(2) | curses.A_BOLD if active else curses.color_pair(1)
-        win.attron(border_attr)
+        b_attr = curses.color_pair(self.P_ACCENT if active else self.P_BORDER) | (curses.A_BOLD if active else 0)
         try:
-            win.box()
+            top_line = "╭" + "─" * (w - 2) + "╮"
+            bot_line = "╰" + "─" * (w - 2) + "╯"
+            win.addnstr(0, 0, top_line, w - 1, b_attr)
+            for row in range(1, h - 1):
+                win.addnstr(row, 0, "│", 1, b_attr)
+                win.addnstr(row, w - 1, "│", 1, b_attr)
+            win.addnstr(h - 1, 0, bot_line, w - 1, b_attr)
         except curses.error:
             pass
-        win.attroff(border_attr)
-        header = f" {title} "
-        self._safe_addstr(win, 0, 2, header, border_attr | curses.A_BOLD)
+
+        pill_attr = curses.color_pair(self.P_TITLE_PILL if active else self.P_ACCENT) | curses.A_BOLD
+        self._safe_addstr(win, 0, 2, f" ◆ {title} ", pill_attr)
         return win
 
-    # -- Top Master Telemetry Header -------------------------------------------
+    # -- Top Master Telemetry Header (2-Line Aesthetic Strip) ------------------
 
     def _render_header(self, stdscr, snap: DashboardSnapshot, w: int) -> None:
-        mode_tag = " [DEMO]" if snap.demo_mode else ""
-        root_tag = "ROOT" if snap.host.is_root else "NON-ROOT"
+        mode_tag = " DEMO" if snap.demo_mode else " LIVE"
+        root_tag = "ROOT" if snap.host.is_root else "USER"
         left = (
-            f" SPARROWX MASTER CYBERSECURITY NOC v{VERSION}{mode_tag}  │  "
-            f"{snap.host.hostname} ({root_tag})  │  NIC: {snap.nic.iface}  │  "
-            f"CPU:{snap.host.cpu_pct:4.1f}%  RAM:{snap.host.mem_pct:4.1f}%  "
-            f"LOAD:{snap.host.load_1m:.2f}"
+            f" ◆ SPARROWX MASTER CYBERSECURITY NOC v{VERSION} [{mode_tag.strip()}]  │  "
+            f"{snap.host.hostname} ({root_tag})  │  NIC: {snap.nic.iface} ({snap.nic.ipv4} · {snap.nic.link_speed})  │  "
+            f"THEME: {self.theme_name.upper()}"
         )
-        stdscr.attron(curses.color_pair(7) | curses.A_BOLD)
-        self._safe_addstr(stdscr, 0, 0, left.ljust(max(1, w - 1)))
-        stdscr.attroff(curses.color_pair(7) | curses.A_BOLD)
+        self._safe_addstr(stdscr, 0, 0, left.ljust(max(1, w - 1)), curses.color_pair(self.P_HEADER_BAR) | curses.A_BOLD)
 
         threat = snap.filtration.threat_level
-        if threat == "UNDER ATTACK":
-            t_attr = curses.color_pair(8) | curses.A_BOLD
-        elif threat == "ELEVATED":
-            t_attr = curses.color_pair(10) | curses.A_BOLD
-        else:
-            t_attr = curses.color_pair(9) | curses.A_BOLD
-        badge = f" {threat} │ {snap.timestamp.split()[-1]} "
+        t_pair = (
+            self.P_BADGE_RED if threat == "UNDER ATTACK"
+            else (self.P_BADGE_AMBER if threat == "ELEVATED" else self.P_BADGE_GREEN)
+        )
+        badge = f" ● {threat} │ {snap.timestamp.split()[-1]} "
         bx = max(0, w - len(badge) - 1)
-        self._safe_addstr(stdscr, 0, bx, badge, t_attr)
+        self._safe_addstr(stdscr, 0, bx, badge, curses.color_pair(t_pair) | curses.A_BOLD)
 
-    # -- Pane 1: Traffic & Kernel/XDP Filtration -------------------------------
+        # Sub-header hardware & policy summary strip (line 1)
+        cpu_bar = make_bar(snap.host.cpu_pct / 100.0, 8)
+        ram_bar = make_bar(snap.host.mem_pct / 100.0, 8)
+        sub = (
+            f" CPU [{cpu_bar}] {snap.host.cpu_pct:4.1f}% ({snap.host.cpu_cores}c)  │  "
+            f"RAM [{ram_bar}] {snap.host.mem_used_gb:.1f}/{snap.host.mem_total_gb:.1f}GB  │  "
+            f"LOAD {snap.host.load_1m:.2f}/{snap.host.load_5m:.2f}/{snap.host.load_15m:.2f}  │  "
+            f"UP {snap.host.uptime_str}  │  "
+            f"⛔ {len(snap.blocked_ips)} BLOCKED  ·  ✓ {len(snap.whitelisted_ips)} WHITELISTED"
+        )
+        self._safe_addstr(stdscr, 1, 0, sub, curses.color_pair(self.P_MUTED))
+
+    # -- Pane 1: Traffic, Sparklines, Kernel SNMP & XDP Filtration -------------
 
     def _render_pane_traffic(self, win, snap: DashboardSnapshot) -> None:
         if win is None:
@@ -1406,47 +1797,46 @@ class SparrowxCursesApp:
         row = 1
         self._safe_addstr(
             win, row, 2,
-            f"IN  (RX): {fmt_bps(nic.rx_bps):>11}  │  {fmt_pps(nic.rx_pps):>10}  │  Drop: {fmt_pps(nic.rx_drop_ps)}",
-            curses.color_pair(2) | curses.A_BOLD,
+            f"IN  (RX) {fmt_bps(nic.rx_bps):>10}  │ {fmt_pps(nic.rx_pps):>9}  │ Peak {fmt_bps(nic.peak_rx_bps):>10}  │ Drop {fmt_pps(nic.rx_drop_ps)}",
+            curses.color_pair(self.P_GOOD) | curses.A_BOLD,
         )
         row += 1
         if row < h - 1:
-            spark_rx = make_sparkline(nic.rx_history, max(8, inner_w - 8))
-            self._safe_addstr(win, row, 2, f"RX ▸ {spark_rx}", curses.color_pair(2))
+            self._safe_addstr(win, row, 2, f"RX ▸ {make_sparkline(nic.rx_history, max(8, inner_w - 6))}", curses.color_pair(self.P_GOOD))
             row += 1
 
         if row < h - 1:
             self._safe_addstr(
                 win, row, 2,
-                f"OUT (TX): {fmt_bps(nic.tx_bps):>11}  │  {fmt_pps(nic.tx_pps):>10}  │  Tot: {fmt_bytes(nic.rx_bytes_total)}/{fmt_bytes(nic.tx_bytes_total)}",
-                curses.color_pair(3) | curses.A_BOLD,
+                f"OUT (TX) {fmt_bps(nic.tx_bps):>10}  │ {fmt_pps(nic.tx_pps):>9}  │ Peak {fmt_bps(nic.peak_tx_bps):>10}  │ Tot {fmt_bytes(nic.rx_bytes_total)}/{fmt_bytes(nic.tx_bytes_total)}",
+                curses.color_pair(self.P_WARN) | curses.A_BOLD,
             )
             row += 1
         if row < h - 1:
-            spark_tx = make_sparkline(nic.tx_history, max(8, inner_w - 8))
-            self._safe_addstr(win, row, 2, f"TX ▸ {spark_tx}", curses.color_pair(3))
+            self._safe_addstr(win, row, 2, f"TX ▸ {make_sparkline(nic.tx_history, max(8, inner_w - 6))}", curses.color_pair(self.P_WARN))
             row += 1
 
         if row < h - 1:
-            self._safe_addstr(win, row, 2, "─" * inner_w, curses.color_pair(1))
+            self._safe_addstr(win, row, 2, "╌" * inner_w, curses.color_pair(self.P_MUTED))
             row += 1
 
         if row < h - 1:
-            xdp_col = curses.color_pair(5) | curses.A_BOLD if f.xdp_attached else curses.color_pair(4)
-            strict_tag = "STRICT-SYN:ON" if f.strict_mode else "STRICT-SYN:STD"
+            xdp_attr = curses.color_pair(self.P_XDP) | curses.A_BOLD if f.xdp_attached else curses.color_pair(self.P_DANGER)
+            strict_s = "STRICT-SYN:ON" if f.strict_mode else "STRICT-SYN:STD"
             self._safe_addstr(
                 win, row, 2,
-                f"XDP/eBPF: {f.xdp_mode:<9} (id:{f.xdp_prog_id})  │  DropRate: {fmt_pps(f.xdp_drop_pps)}  │  {strict_tag}",
-                xdp_col,
+                f"XDP/eBPF {f.xdp_mode:<9} (id:{f.xdp_prog_id})  │ Drop {fmt_pps(f.xdp_drop_pps):>9}  │ {strict_s}",
+                xdp_attr,
             )
             row += 1
 
         if row < h - 1:
+            total_xdp = f.xdp_passed + f.xdp_dropped
+            scrub_pct = (f.xdp_dropped / total_xdp * 100.0) if total_xdp > 0 else 0.0
             self._safe_addstr(
                 win, row, 2,
-                f"XDP Pass: {fmt_count(f.xdp_passed):>7}  Challenged: {fmt_count(f.xdp_challenged):>7}  "
-                f"Dropped: {fmt_count(f.xdp_dropped):>7}  WL: {fmt_count(f.xdp_whitelisted):>6}",
-                curses.color_pair(6),
+                f"XDP Pass:{fmt_count(f.xdp_passed):>6}  Chal:{fmt_count(f.xdp_challenged):>6}  Drop:{fmt_count(f.xdp_dropped):>6} ({scrub_pct:4.1f}%)  WL:{fmt_count(f.xdp_whitelisted):>5}",
+                curses.color_pair(self.P_TEXT),
             )
             row += 1
 
@@ -1454,24 +1844,30 @@ class SparrowxCursesApp:
             ufw_s = "ON" if f.ufw_active else "OFF"
             self._safe_addstr(
                 win, row, 2,
-                f"Firewall: nftDrop={fmt_count(f.nft_drops)}  iptDrop={fmt_count(f.iptables_drops)}  "
-                f"UFW={ufw_s}  F2B={f.fail2ban_banned} ({f.fail2ban_jails} jails)",
-                curses.color_pair(6),
+                f"Firewall nftDrop={fmt_count(f.nft_drops)}  iptDrop={fmt_count(f.iptables_drops)}  UFW={ufw_s}  F2B={f.fail2ban_banned} ({f.fail2ban_jails}j)",
+                curses.color_pair(self.P_TEXT),
+            )
+            row += 1
+
+        if row < h - 1:
+            self._safe_addstr(
+                win, row, 2,
+                f"L3/L4    UDP:{fmt_pps(f.udp_in_ps)} (err:{f.udp_err_ps:.0f}/s)  TCP-Retrans:{f.tcp_retrans_ps:.1f}/s  ICMP:{f.icmp_in_ps:.1f}/s",
+                curses.color_pair(self.P_MUTED),
             )
             row += 1
 
         if row < h - 1:
             ct_ratio = (f.conntrack_count / f.conntrack_max) if f.conntrack_max > 0 else 0.0
-            bar = make_bar(ct_ratio, 12)
-            syn_attr = curses.color_pair(4) | curses.A_BOLD if f.syn_recv_count >= 15 else curses.color_pair(2)
+            bar = make_block_bar(ct_ratio, 10)
+            syn_attr = curses.color_pair(self.P_DANGER) | curses.A_BOLD if f.syn_recv_count >= 15 else curses.color_pair(self.P_GOOD)
             self._safe_addstr(
                 win, row, 2,
-                f"Conntrack: {fmt_count(f.conntrack_count)}/{fmt_count(f.conntrack_max)} [{bar}]  "
-                f"SYN_RECV:{f.syn_recv_count}  ESTAB:{f.established_count}",
+                f"State    CT:{fmt_count(f.conntrack_count)}/{fmt_count(f.conntrack_max)} [{bar}]  SYN:{f.syn_recv_count}  TW:{f.time_wait_count}  EST:{f.established_count}",
                 syn_attr,
             )
 
-    # -- Pane 2: Protected Downstream Servers & WireGuard Tunnels --------------
+    # -- Pane 2: Protected Downstream Servers, Tunnels & Open Ports ------------
 
     def _render_pane_backends(self, win, snap: DashboardSnapshot) -> None:
         if win is None:
@@ -1479,39 +1875,36 @@ class SparrowxCursesApp:
         h, w = win.getmaxyx()
         self._safe_addstr(
             win, 1, 2,
-            f"{'TARGET':<15} {'TYPE':<9} {'TUNNEL IP':<15} {'STATUS':<10} {'FLOW / AGE'}",
-            curses.color_pair(1) | curses.A_BOLD,
+            f"{'TARGET':<14} {'TYPE':<9} {'TUNNEL IP':<15} {'STATUS':<10} {'FLOW / AGE'}",
+            curses.color_pair(self.P_ACCENT) | curses.A_BOLD,
         )
-        if not snap.backends:
-            self._safe_addstr(
-                win, 3, 2,
-                "No WireGuard tunnels (spx_*/wg*) or Docker backends active.",
-                curses.color_pair(3),
-            )
-            self._safe_addstr(
-                win, 4, 2,
-                "Connect a downstream server via tunnel-manager.sh to monitor it here.",
-                curses.color_pair(6),
-            )
-            return
+        max_row = h - 2 if snap.listening_ports else h - 1
 
-        row = 2
-        for b in snap.backends:
-            if row >= h - 1:
-                break
-            st_attr = (
-                curses.color_pair(2) | curses.A_BOLD
-                if b.status == "PROTECTED"
-                else (curses.color_pair(3) if b.status in ("IDLE", "WAITING") else curses.color_pair(4))
-            )
-            flow = (
-                f"{fmt_bps(b.rx_bps)}/{fmt_bps(b.tx_bps)}"
-                if b.kind == "WG-TUNNEL" and (b.rx_bps > 0 or b.tx_bps > 0)
-                else f"{b.endpoint} ({b.handshake_age})"
-            )
-            line = f"{b.name[:15]:<15} {b.kind[:9]:<9} {b.tunnel_ip[:15]:<15} {b.status[:10]:<10} {flow}"
-            self._safe_addstr(win, row, 2, line, st_attr)
-            row += 1
+        if not snap.backends:
+            self._safe_addstr(win, 3, 2, "No WireGuard tunnels (spx_*/wg*) or Docker backends active.", curses.color_pair(self.P_WARN))
+            self._safe_addstr(win, 4, 2, "Attach downstream servers via tunnel-manager.sh to protect them.", curses.color_pair(self.P_MUTED))
+        else:
+            row = 2
+            for b in snap.backends:
+                if row >= max_row:
+                    break
+                st_attr = (
+                    curses.color_pair(self.P_GOOD) | curses.A_BOLD
+                    if b.status == "PROTECTED"
+                    else (curses.color_pair(self.P_WARN) if b.status in ("IDLE", "WAITING") else curses.color_pair(self.P_DANGER))
+                )
+                flow = (
+                    f"{fmt_bps(b.rx_bps)}/{fmt_bps(b.tx_bps)}"
+                    if b.kind == "WG-TUNNEL" and (b.rx_bps > 0 or b.tx_bps > 0)
+                    else f"{b.endpoint} ({b.handshake_age})"
+                )
+                line = f"{b.name[:14]:<14} {b.kind[:9]:<9} {b.tunnel_ip[:15]:<15} {b.status[:10]:<10} {flow}"
+                self._safe_addstr(win, row, 2, line, st_attr)
+                row += 1
+
+        if snap.listening_ports and h >= 5:
+            ports_line = "OPEN PORTS: " + "  ".join(snap.listening_ports)
+            self._safe_addstr(win, h - 2, 2, ports_line, curses.color_pair(self.P_MUTED))
 
     # -- Pane 3: Live Active IP Connections & Top Talkers ----------------------
 
@@ -1530,17 +1923,13 @@ class SparrowxCursesApp:
         h, w = win.getmaxyx()
         self._safe_addstr(
             win, 1, 2,
-            f"{'REMOTE IP':<16} {'TOT':>4} {'EST':>4} {'SYN':>4} {'UDP':>4} {'PORTS':<11} {'PROC':<10} {'RISK'}",
-            curses.color_pair(1) | curses.A_BOLD,
+            f"{'REMOTE IP':<16} {'TOT':>4} {'EST':>4} {'SYN':>4} {'TW':>3} {'UDP':>4} {'PORTS':<10} {'PROC':<8} {'STATE'}",
+            curses.color_pair(self.P_ACCENT) | curses.A_BOLD,
         )
         talkers = self._filtered_talkers(snap)
         if not talkers:
-            msg = (
-                f"No active connections matching filter '{self.filter_text}'."
-                if self.filter_text
-                else "No external remote connections currently open."
-            )
-            self._safe_addstr(win, 3, 2, msg, curses.color_pair(6))
+            msg = f"No connections matching '{self.filter_text}'." if self.filter_text else "No external remote connections currently active."
+            self._safe_addstr(win, 3, 2, msg, curses.color_pair(self.P_MUTED))
             return
 
         self.selected_talker_idx = max(0, min(self.selected_talker_idx, len(talkers) - 1))
@@ -1552,53 +1941,121 @@ class SparrowxCursesApp:
             if row >= h - 1:
                 break
             t = talkers[idx]
-            if t.risk == "FLOOD":
-                attr = curses.color_pair(4) | curses.A_BOLD
+            if t.risk == "WHITELIST":
+                attr = curses.color_pair(self.P_WHITELIST) | curses.A_BOLD
+            elif t.risk in ("FLOOD", "BLOCKED"):
+                attr = curses.color_pair(self.P_DANGER) | curses.A_BOLD
             elif t.risk == "WARN":
-                attr = curses.color_pair(3) | curses.A_BOLD
+                attr = curses.color_pair(self.P_WARN) | curses.A_BOLD
             else:
-                attr = curses.color_pair(6)
+                attr = curses.color_pair(self.P_TEXT)
             if idx == self.selected_talker_idx:
                 attr |= curses.A_REVERSE
+            badge = "✓ WL" if t.risk == "WHITELIST" else ("⛔ BLK" if t.risk == "BLOCKED" else t.risk)
             line = (
                 f"{t.ip[:16]:<16} {t.total_conns:>4} {t.established:>4} {t.syn_recv:>4} "
-                f"{t.udp_conns:>4} {t.ports[:11]:<11} {t.process[:10]:<10} {t.risk}"
+                f"{t.time_wait:>3} {t.udp_conns:>4} {t.ports[:10]:<10} {t.process[:8]:<8} {badge}"
             )
             self._safe_addstr(win, row, 2, line, attr)
             row += 1
 
-    # -- Pane 4: Active Mitigation Rules & Blocked IPs -------------------------
+    # -- Pane 4: Dedicated Blocklist & Whitelist Manager -----------------------
 
-    def _render_pane_blocked(self, win, snap: DashboardSnapshot) -> None:
+    def _render_pane_policies(self, win, snap: DashboardSnapshot) -> None:
         if win is None:
             return
         h, w = win.getmaxyx()
-        self._safe_addstr(
-            win, 1, 2,
-            f"{'BLOCKED IP':<17} {'LAYER':<7} {'COUNTER / JAIL'}",
-            curses.color_pair(1) | curses.A_BOLD,
-        )
-        if not snap.blocked_ips:
-            self._safe_addstr(
-                win, 3, 2,
-                "0 blocked IPs in XDP / nftables / UFW / Fail2Ban.",
-                curses.color_pair(2),
-            )
-            self._safe_addstr(
-                win, 4, 2,
-                "Press [b] to instant-ban an attacking IP at wire speed.",
-                curses.color_pair(6),
-            )
-            return
+        inner_w = max(10, w - 4)
 
-        row = 2
-        for b in snap.blocked_ips:
-            if row >= h - 1:
-                break
-            attr = curses.color_pair(5) | curses.A_BOLD if b.source == "XDP" else curses.color_pair(4)
-            line = f"{b.ip:<17} {b.source:<7} {b.hits_or_note}"
-            self._safe_addstr(win, row, 2, line, attr)
+        blocked = snap.blocked_ips
+        whitelisted = snap.whitelisted_ips
+        if self.filter_text:
+            q = self.filter_text.lower()
+            blocked = [b for b in blocked if q in b.ip.lower() or q in b.source.lower() or q in b.note.lower()]
+            whitelisted = [x for x in whitelisted if q in x.ip.lower() or q in x.source.lower() or q in x.note.lower()]
+
+        row = 1
+        if self.policy_view == 0:
+            # SPLIT VIEW: Both current BLOCKLISTED and WHITELISTED visible simultaneously
+            avail = max(2, h - 2)
+            bl_budget = max(2, avail // 2)
+
+            self._safe_addstr(
+                win, row, 2,
+                f"⛔ BLOCKLISTED ({len(blocked)})  [b] Ban  [u] Unban",
+                curses.color_pair(self.P_DANGER) | curses.A_BOLD,
+            )
             row += 1
+            if not blocked:
+                if row < h - 1:
+                    self._safe_addstr(win, row, 2, "  0 IPs currently blocklisted", curses.color_pair(self.P_MUTED))
+                    row += 1
+            else:
+                shown = 0
+                for b in blocked:
+                    if row >= min(h - 3, 1 + bl_budget):
+                        break
+                    attr = curses.color_pair(self.P_XDP if b.source == "XDP" else self.P_DANGER)
+                    self._safe_addstr(win, row, 2, f"  {b.ip:<16} [{b.source:<4}] {b.note}", attr)
+                    row += 1
+                    shown += 1
+
+            if row < h - 2:
+                self._safe_addstr(win, row, 2, "╌" * inner_w, curses.color_pair(self.P_MUTED))
+                row += 1
+
+            if row < h - 1:
+                self._safe_addstr(
+                    win, row, 2,
+                    f"✓ WHITELISTED ({len(whitelisted)})  [w] Allow  [W] Remove",
+                    curses.color_pair(self.P_WHITELIST) | curses.A_BOLD,
+                )
+                row += 1
+            if not whitelisted:
+                if row < h - 1:
+                    self._safe_addstr(win, row, 2, "  0 IPs whitelisted (press [w] to trust an IP)", curses.color_pair(self.P_MUTED))
+            else:
+                for x in whitelisted:
+                    if row >= h - 1:
+                        break
+                    self._safe_addstr(
+                        win, row, 2,
+                        f"  {x.ip:<16} [{x.source:<4}] {x.note}",
+                        curses.color_pair(self.P_WHITELIST),
+                    )
+                    row += 1
+
+        elif self.policy_view == 1:
+            # BLOCKLIST ONLY VIEW
+            self._safe_addstr(
+                win, row, 2,
+                f"⛔ BLOCKLISTED ({len(blocked)}) — [t] Toggle Split/Whitelist",
+                curses.color_pair(self.P_DANGER) | curses.A_BOLD,
+            )
+            row += 1
+            if not blocked:
+                self._safe_addstr(win, row + 1, 2, "0 IPs currently blocklisted.", curses.color_pair(self.P_GOOD))
+            for b in blocked:
+                if row >= h - 1:
+                    break
+                attr = curses.color_pair(self.P_XDP if b.source == "XDP" else self.P_DANGER)
+                self._safe_addstr(win, row, 2, f"  {b.ip:<16} [{b.source:<4}] {b.note}", attr)
+                row += 1
+        else:
+            # WHITELIST ONLY VIEW
+            self._safe_addstr(
+                win, row, 2,
+                f"✓ WHITELISTED ({len(whitelisted)}) — [t] Toggle Split/Blocklist",
+                curses.color_pair(self.P_WHITELIST) | curses.A_BOLD,
+            )
+            row += 1
+            if not whitelisted:
+                self._safe_addstr(win, row + 1, 2, "0 IPs whitelisted. Press [w] to add a trusted IP.", curses.color_pair(self.P_MUTED))
+            for x in whitelisted:
+                if row >= h - 1:
+                    break
+                self._safe_addstr(win, row, 2, f"  {x.ip:<16} [{x.source:<4}] {x.note}", curses.color_pair(self.P_WHITELIST))
+                row += 1
 
     # -- Pane 5: Live Security & Filtration Event Stream -----------------------
 
@@ -1618,18 +2075,20 @@ class SparrowxCursesApp:
             if row >= h - 1:
                 break
             if ev.tag in ("DROP", "BAN"):
-                tag_attr = curses.color_pair(4) | curses.A_BOLD
+                tag_attr = curses.color_pair(self.P_DANGER) | curses.A_BOLD
+            elif ev.tag == "WHT":
+                tag_attr = curses.color_pair(self.P_WHITELIST) | curses.A_BOLD
             elif ev.tag == "XDP":
-                tag_attr = curses.color_pair(5) | curses.A_BOLD
+                tag_attr = curses.color_pair(self.P_XDP) | curses.A_BOLD
             elif ev.tag in ("WAF", "AUTH"):
-                tag_attr = curses.color_pair(3) | curses.A_BOLD
+                tag_attr = curses.color_pair(self.P_WARN) | curses.A_BOLD
             elif ev.tag == "WG":
-                tag_attr = curses.color_pair(2) | curses.A_BOLD
+                tag_attr = curses.color_pair(self.P_GOOD) | curses.A_BOLD
             else:
-                tag_attr = curses.color_pair(1)
+                tag_attr = curses.color_pair(self.P_ACCENT)
             prefix = f"{ev.ts} [{ev.tag:<4}] "
             self._safe_addstr(win, row, 2, prefix, tag_attr)
-            self._safe_addstr(win, row, 2 + len(prefix), ev.message, curses.color_pair(6))
+            self._safe_addstr(win, row, 2 + len(prefix), ev.message, curses.color_pair(self.P_TEXT))
             row += 1
 
     # -- Footer Keybind Bar ----------------------------------------------------
@@ -1637,15 +2096,15 @@ class SparrowxCursesApp:
     def _render_footer(self, stdscr, h: int, w: int) -> None:
         if self.status_banner and time.monotonic() < self.status_banner_until:
             bar = f" ➤ {self.status_banner} "
-            attr = curses.color_pair(10) | curses.A_BOLD
+            attr = curses.color_pair(self.P_BADGE_AMBER) | curses.A_BOLD
         else:
             pause_lbl = "RESUME" if self.paused else "PAUSE"
             filt_lbl = f" FILTER='{self.filter_text}'" if self.filter_text else ""
             bar = (
-                f" [1-5/0] Pane  [b] Ban IP  [u] Unban  [x] StrictSYN  [i] NIC  "
-                f"[p] {pause_lbl}  [/] Filter  [r] Refresh  [q] Quit{filt_lbl}"
+                f" [1-5/0] Pane  [b] Ban  [u] Unban  [w] Whitelist  [W] UnWL  [t] WL/BL View  "
+                f"[x] StrictSYN  [c] Theme  [i] NIC  [p] {pause_lbl}  [/] Filter  [q] Quit{filt_lbl}"
             )
-            attr = curses.color_pair(7) | curses.A_BOLD
+            attr = curses.color_pair(self.P_HEADER_BAR) | curses.A_BOLD
         self._safe_addstr(stdscr, h - 1, 0, bar.ljust(max(1, w - 1)), attr)
 
     # -- Modal Input Prompt Inside Footer --------------------------------------
@@ -1661,14 +2120,14 @@ class SparrowxCursesApp:
         buf = list(prefill)
         while True:
             line = f" {prompt}{''.join(buf)}"
-            self._safe_addstr(stdscr, h - 1, 0, line.ljust(max(1, w - 1)), curses.color_pair(10) | curses.A_BOLD)
+            self._safe_addstr(stdscr, h - 1, 0, line.ljust(max(1, w - 1)), curses.color_pair(self.P_BADGE_AMBER) | curses.A_BOLD)
             stdscr.move(h - 1, min(w - 2, len(line)))
             stdscr.refresh()
             ch = stdscr.getch()
-            if ch in (27,):  # ESC
+            if ch == 27:
                 result = None
                 break
-            if ch in (10, 13):  # Enter
+            if ch in (10, 13):
                 result = "".join(buf).strip()
                 break
             if ch in (curses.KEY_BACKSPACE, 127, 8):
@@ -1687,7 +2146,7 @@ class SparrowxCursesApp:
     # -- Main Event Loop -------------------------------------------------------
 
     def run(self, stdscr) -> None:
-        self._init_colors()
+        self._apply_theme()
         try:
             curses.curs_set(0)
         except curses.error:
@@ -1695,7 +2154,6 @@ class SparrowxCursesApp:
         stdscr.nodelay(True)
         stdscr.timeout(100)
 
-        last_collect = 0.0
         self.snapshot = self.collector.collect()
         last_collect = time.monotonic()
 
@@ -1709,26 +2167,27 @@ class SparrowxCursesApp:
             h, w = stdscr.getmaxyx()
             stdscr.erase()
 
-            if h < 18 or w < 72:
+            if h < 20 or w < 76:
                 self._safe_addstr(
                     stdscr, 1, 2,
-                    f"Terminal too small ({w}x{h}). Resize to at least 72x18 (press q to quit).",
-                    curses.color_pair(4) | curses.A_BOLD,
+                    f"Terminal too small ({w}x{h}). Resize to at least 76x20 (press q to quit).",
+                    curses.color_pair(self.P_DANGER) | curses.A_BOLD,
                 )
             else:
                 self._render_header(stdscr, snap, w)
-                body_y = 1
-                body_h = h - 2
+                body_y = 2
+                body_h = h - 3
+                view_names = ("SPLIT", "BLOCKLIST", "WHITELIST")
 
                 if self.focused_pane in (1, 2, 3, 4, 5):
                     titles = {
                         1: "[1] TRAFFIC & KERNEL/XDP PACKET FILTRATION (ZOOMED — press 0)",
                         2: "[2] PROTECTED DOWNSTREAM SERVERS & WIREGUARD TUNNELS (ZOOMED — press 0)",
                         3: "[3] LIVE ACTIVE IP CONNECTIONS & TOP TALKERS (ZOOMED — press 0)",
-                        4: "[4] ACTIVE MITIGATION RULES & BLOCKED IPS (ZOOMED — press 0)",
+                        4: f"[4] WHITELIST & BLOCKLIST MANAGER [{view_names[self.policy_view]}] (ZOOMED — press 0)",
                         5: "[5] LIVE SECURITY & FILTRATION EVENT STREAM (ZOOMED — press 0)",
                     }
-                    win = self._draw_box(stdscr, body_y, 0, body_h, w, titles[self.focused_pane], active=True)
+                    win = self._draw_rounded_box(stdscr, body_y, 0, body_h, w, titles[self.focused_pane], active=True)
                     if self.focused_pane == 1:
                         self._render_pane_traffic(win, snap)
                     elif self.focused_pane == 2:
@@ -1736,37 +2195,33 @@ class SparrowxCursesApp:
                     elif self.focused_pane == 3:
                         self._render_pane_connections(win, snap)
                     elif self.focused_pane == 4:
-                        self._render_pane_blocked(win, snap)
+                        self._render_pane_policies(win, snap)
                     elif self.focused_pane == 5:
                         self._render_pane_logs(win, snap)
                 else:
-                    # 3-tier partitioned Master Cybersecurity Grid:
-                    # Top Row: Pane 1 (Traffic & Filtration) | Pane 2 (Protected Backends)
-                    # Mid Row: Pane 3 (Active IP Connections) | Pane 4 (Blocked IPs)
-                    # Bot Row: Pane 5 (Live Security & Filtration Log Stream)
-                    top_h = max(10, min(12, body_h // 3))
-                    bot_h = max(6, min(11, body_h // 3))
-                    mid_h = max(6, body_h - top_h - bot_h)
+                    top_h = max(11, min(13, body_h // 3 + 1))
+                    bot_h = max(6, min(10, body_h // 3 - 1))
+                    mid_h = max(7, body_h - top_h - bot_h)
                     left_w = int(w * 0.56)
                     right_w = w - left_w
 
-                    w1 = self._draw_box(
+                    w1 = self._draw_rounded_box(
                         stdscr, body_y, 0, top_h, left_w,
                         f"[1] TRAFFIC & XDP FILTRATION ({snap.nic.iface})",
                     )
-                    w2 = self._draw_box(
+                    w2 = self._draw_rounded_box(
                         stdscr, body_y, left_w, top_h, right_w,
                         f"[2] PROTECTED SERVERS & TUNNELS ({len(snap.backends)})",
                     )
-                    w3 = self._draw_box(
+                    w3 = self._draw_rounded_box(
                         stdscr, body_y + top_h, 0, mid_h, left_w,
-                        f"[3] ACTIVE IP CONNECTIONS ({len(snap.talkers)} remote / {snap.filtration.total_sockets} sock)",
+                        f"[3] ACTIVE CONNECTIONS ({len(snap.talkers)} IPs / {snap.filtration.total_sockets} sock)",
                     )
-                    w4 = self._draw_box(
+                    w4 = self._draw_rounded_box(
                         stdscr, body_y + top_h, left_w, mid_h, right_w,
-                        f"[4] BLOCKED IPS & MITIGATION ({len(snap.blocked_ips)})",
+                        f"[4] BLOCKLIST ({len(snap.blocked_ips)}) & WHITELIST ({len(snap.whitelisted_ips)}) [{view_names[self.policy_view]}]",
                     )
-                    w5 = self._draw_box(
+                    w5 = self._draw_rounded_box(
                         stdscr, body_y + top_h + mid_h, 0, bot_h, w,
                         f"[5] LIVE SECURITY & FILTRATION LOGS {'[PAUSED]' if self.paused else '[LIVE]'}",
                     )
@@ -1774,7 +2229,7 @@ class SparrowxCursesApp:
                     self._render_pane_traffic(w1, snap)
                     self._render_pane_backends(w2, snap)
                     self._render_pane_connections(w3, snap)
-                    self._render_pane_blocked(w4, snap)
+                    self._render_pane_policies(w4, snap)
                     self._render_pane_logs(w5, snap)
 
                 self._render_footer(stdscr, h, w)
@@ -1793,6 +2248,14 @@ class SparrowxCursesApp:
                 self.focused_pane = 0 if self.focused_pane == num else num
             elif ch == 9:  # Tab
                 self.focused_pane = (self.focused_pane + 1) % 6
+            elif ch in (ord("c"), ord("C")):
+                self.theme_idx = (self.theme_idx + 1) % len(THEMES)
+                self._apply_theme()
+                self.set_banner(f"Theme switched to {self.theme_name.upper()}")
+            elif ch in (ord("t"), ord("T")):
+                self.policy_view = (self.policy_view + 1) % 3
+                labels = ("SPLIT (Blocklist + Whitelist)", "BLOCKLIST ONLY", "WHITELIST ONLY")
+                self.set_banner(f"Pane 4 view: {labels[self.policy_view]}")
             elif ch in (ord("p"), ord("P")):
                 self.paused = not self.paused
                 self.set_banner("Live telemetry PAUSED" if self.paused else "Live telemetry RESUMED")
@@ -1828,6 +2291,21 @@ class SparrowxCursesApp:
                     msg = self.collector.unban_ip(target)
                     self.snapshot = self.collector.collect()
                     self.set_banner(msg)
+            elif ch == ord("w"):
+                talkers = self._filtered_talkers(snap)
+                prefill = talkers[self.selected_talker_idx].ip if talkers and self.selected_talker_idx < len(talkers) else ""
+                target = self._prompt_input(stdscr, "WHITELIST IPv4 (XDP+nft+UFW): ", prefill=prefill)
+                if target:
+                    msg = self.collector.whitelist_ip(target)
+                    self.snapshot = self.collector.collect()
+                    self.set_banner(msg)
+            elif ch == ord("W"):
+                prefill = snap.whitelisted_ips[0].ip if snap.whitelisted_ips else ""
+                target = self._prompt_input(stdscr, "REMOVE WHITELIST IPv4: ", prefill=prefill)
+                if target:
+                    msg = self.collector.unwhitelist_ip(target)
+                    self.snapshot = self.collector.collect()
+                    self.set_banner(msg)
             elif ch == ord("/"):
                 q = self._prompt_input(stdscr, "FILTER (IP/port/tag, blank to clear): ", prefill=self.filter_text)
                 if q is not None:
@@ -1836,74 +2314,105 @@ class SparrowxCursesApp:
 
 
 # ------------------------------------------------------------------------------
-# Non-Interactive ANSI Snapshot Renderer (--once)
+# Non-Interactive Aesthetic ANSI Snapshot Renderer (--once)
 # ------------------------------------------------------------------------------
 
-def render_ansi_snapshot(snap: DashboardSnapshot, use_color: bool = True) -> str:
-    C = {
-        "rst": "\033[0m" if use_color else "",
-        "bold": "\033[1m" if use_color else "",
-        "cyan": "\033[36m" if use_color else "",
-        "green": "\033[32m" if use_color else "",
-        "yellow": "\033[33m" if use_color else "",
-        "red": "\033[31m" if use_color else "",
-        "magenta": "\033[35m" if use_color else "",
-        "dim": "\033[2m" if use_color else "",
-    }
+def render_ansi_snapshot(snap: DashboardSnapshot, use_color: bool = True, theme: str = "cyber") -> str:
+    if not use_color:
+        C = {k: "" for k in ("rst", "bold", "accent", "good", "warn", "danger", "xdp", "wl", "dim")}
+    elif theme == "emerald":
+        C = {
+            "rst": "\033[0m", "bold": "\033[1m",
+            "accent": "\033[38;5;46m", "good": "\033[38;5;82m", "warn": "\033[38;5;220m",
+            "danger": "\033[38;5;196m", "xdp": "\033[38;5;50m", "wl": "\033[38;5;120m", "dim": "\033[38;5;244m",
+        }
+    elif theme == "crimson":
+        C = {
+            "rst": "\033[0m", "bold": "\033[1m",
+            "accent": "\033[38;5;204m", "good": "\033[38;5;80m", "warn": "\033[38;5;214m",
+            "danger": "\033[38;5;196m", "xdp": "\033[38;5;213m", "wl": "\033[38;5;86m", "dim": "\033[38;5;245m",
+        }
+    else:
+        C = {
+            "rst": "\033[0m", "bold": "\033[1m",
+            "accent": "\033[38;5;45m", "good": "\033[38;5;48m", "warn": "\033[38;5;214m",
+            "danger": "\033[38;5;197m", "xdp": "\033[38;5;177m", "wl": "\033[38;5;84m", "dim": "\033[38;5;245m",
+        }
+
     f = snap.filtration
     nic = snap.nic
-    t_col = C["red"] if f.threat_level == "UNDER ATTACK" else (C["yellow"] if f.threat_level == "ELEVATED" else C["green"])
-    demo_badge = " [DEMO]" if snap.demo_mode else ""
-    plain_title = f" SPARROWX MASTER CYBERSECURITY & DDoS FILTRATION NOC v{VERSION}{demo_badge} │ THREAT: {f.threat_level:<12} │ {snap.timestamp} "
+    t_col = C["danger"] if f.threat_level == "UNDER ATTACK" else (C["warn"] if f.threat_level == "ELEVATED" else C["good"])
+    demo_badge = " [DEMO]" if snap.demo_mode else " [LIVE]"
+    plain_title = f" ◆ SPARROWX MASTER CYBERSECURITY & DDoS FILTRATION NOC v{VERSION}{demo_badge} │ THREAT: {f.threat_level:<12} │ {snap.timestamp} "
     box_w = len(plain_title)
-    color_title = f" SPARROWX MASTER CYBERSECURITY & DDoS FILTRATION NOC v{VERSION}{demo_badge} │ THREAT: {t_col}{f.threat_level:<12}{C['cyan']} │ {snap.timestamp} "
+    color_title = f" ◆ SPARROWX MASTER CYBERSECURITY & DDoS FILTRATION NOC v{VERSION}{demo_badge} │ THREAT: {t_col}{f.threat_level:<12}{C['accent']} │ {snap.timestamp} "
+
+    cpu_bar = make_bar(snap.host.cpu_pct / 100.0, 8)
+    ram_bar = make_bar(snap.host.mem_pct / 100.0, 8)
+    total_xdp = f.xdp_passed + f.xdp_dropped
+    scrub_pct = (f.xdp_dropped / total_xdp * 100.0) if total_xdp > 0 else 0.0
 
     lines = [
-        f"{C['cyan']}{C['bold']}╔{'═' * box_w}╗{C['rst']}",
-        f"{C['cyan']}{C['bold']}║{color_title}║{C['rst']}",
-        f"{C['cyan']}{C['bold']}╚{'═' * box_w}╝{C['rst']}",
-        f" Host: {C['bold']}{snap.host.hostname}{C['rst']} (kernel {snap.host.kernel}) │ NIC: {C['cyan']}{nic.iface}{C['rst']} │ CPU: {snap.host.cpu_pct:.1f}% │ RAM: {snap.host.mem_used_gb:.1f}/{snap.host.mem_total_gb:.1f}GB ({snap.host.mem_pct:.1f}%) │ Load: {snap.host.load_1m:.2f}",
+        f"{C['accent']}{C['bold']}╭{'─' * box_w}╮{C['rst']}",
+        f"{C['accent']}{C['bold']}│{color_title}│{C['rst']}",
+        f"{C['accent']}{C['bold']}╰{'─' * box_w}╯{C['rst']}",
+        f" Host: {C['bold']}{snap.host.hostname}{C['rst']} ({snap.host.kernel}) │ NIC: {C['accent']}{nic.iface}{C['rst']} ({nic.ipv4} · {nic.link_speed}) │ Up: {snap.host.uptime_str}",
+        f" CPU [{C['good']}{cpu_bar}{C['rst']}] {snap.host.cpu_pct:.1f}% ({snap.host.cpu_cores}c) │ RAM [{C['accent']}{ram_bar}{C['rst']}] {snap.host.mem_used_gb:.1f}/{snap.host.mem_total_gb:.1f}GB │ Load: {snap.host.load_1m:.2f}/{snap.host.load_5m:.2f}/{snap.host.load_15m:.2f} │ {C['danger']}⛔ {len(snap.blocked_ips)} Blocked{C['rst']} · {C['wl']}✓ {len(snap.whitelisted_ips)} Whitelisted{C['rst']}",
         "",
-        f"{C['cyan']}{C['bold']}[1] REAL-TIME TRAFFIC & PACKET FILTRATION{C['rst']}",
-        f"  {C['green']}IN  (RX): {fmt_bps(nic.rx_bps):>11} │ {fmt_pps(nic.rx_pps):>10} │ Drops: {fmt_pps(nic.rx_drop_ps)}{C['rst']}",
-        f"  {C['yellow']}OUT (TX): {fmt_bps(nic.tx_bps):>11} │ {fmt_pps(nic.tx_pps):>10} │ Totals: RX {fmt_bytes(nic.rx_bytes_total)} / TX {fmt_bytes(nic.tx_bytes_total)}{C['rst']}",
-        f"  {C['magenta']}XDP/eBPF: {f.xdp_mode:<9} (prog:{f.xdp_prog_id}) │ Pass:{fmt_count(f.xdp_passed)} Challenged:{fmt_count(f.xdp_challenged)} Dropped:{fmt_count(f.xdp_dropped)} ({fmt_pps(f.xdp_drop_pps)}){C['rst']}",
-        f"  Firewall: nftDrops={fmt_count(f.nft_drops)} │ iptDrops={fmt_count(f.iptables_drops)} │ UFW={'ON' if f.ufw_active else 'OFF'} │ Fail2Ban={f.fail2ban_banned} ({f.fail2ban_jails} jails)",
-        f"  Sockets : Conntrack={fmt_count(f.conntrack_count)}/{fmt_count(f.conntrack_max)} │ SYN_RECV={f.syn_recv_count} │ ESTAB={f.established_count} │ StrictSYN={'ON' if f.strict_mode else 'STD'}",
+        f"{C['accent']}{C['bold']}╭─ ◆ [1] REAL-TIME TRAFFIC, KERNEL SNMP & XDP FILTRATION{C['rst']}",
+        f"│  {C['good']}IN  (RX): {fmt_bps(nic.rx_bps):>10} │ {fmt_pps(nic.rx_pps):>9} │ Peak: {fmt_bps(nic.peak_rx_bps):>10} │ Drops: {fmt_pps(nic.rx_drop_ps)}{C['rst']}",
+        f"│  {C['warn']}OUT (TX): {fmt_bps(nic.tx_bps):>10} │ {fmt_pps(nic.tx_pps):>9} │ Peak: {fmt_bps(nic.peak_tx_bps):>10} │ Totals: {fmt_bytes(nic.rx_bytes_total)} / {fmt_bytes(nic.tx_bytes_total)}{C['rst']}",
+        f"│  {C['xdp']}XDP/eBPF: {f.xdp_mode:<9} (prog:{f.xdp_prog_id}) │ Pass:{fmt_count(f.xdp_passed)} Chal:{fmt_count(f.xdp_challenged)} Drop:{fmt_count(f.xdp_dropped)} ({scrub_pct:.1f}%) WL:{fmt_count(f.xdp_whitelisted)}{C['rst']}",
+        f"│  Firewall: nftDrops={fmt_count(f.nft_drops)} │ iptDrops={fmt_count(f.iptables_drops)} │ UFW={'ON' if f.ufw_active else 'OFF'} │ Fail2Ban={f.fail2ban_banned} ({f.fail2ban_jails} jails) │ StrictSYN={'ON' if f.strict_mode else 'STD'}",
+        f"│  L3/L4   : UDP={fmt_pps(f.udp_in_ps)} (err {f.udp_err_ps:.0f}/s) │ TCP-Retrans={f.tcp_retrans_ps:.1f}/s │ ICMP={f.icmp_in_ps:.1f}/s │ CT={fmt_count(f.conntrack_count)}/{fmt_count(f.conntrack_max)} │ SYN={f.syn_recv_count} TW={f.time_wait_count} EST={f.established_count}",
         "",
-        f"{C['cyan']}{C['bold']}[2] PROTECTED DOWNSTREAM SERVERS & WIREGUARD TUNNELS ({len(snap.backends)}){C['rst']}",
+        f"{C['accent']}{C['bold']}╭─ ◆ [2] PROTECTED DOWNSTREAM SERVERS, WIREGUARD TUNNELS ({len(snap.backends)}) & OPEN PORTS{C['rst']}",
     ]
     if snap.backends:
-        lines.append(f"  {'TARGET':<16} {'TYPE':<10} {'TUNNEL IP':<16} {'ENDPOINT':<22} {'STATUS':<10} {'AGE'}")
+        lines.append(f"│  {'TARGET':<16} {'TYPE':<10} {'TUNNEL IP':<16} {'ENDPOINT':<22} {'STATUS':<10} {'AGE'}")
         for b in snap.backends[:10]:
-            sc = C["green"] if b.status == "PROTECTED" else C["yellow"]
-            lines.append(f"  {b.name:<16} {b.kind:<10} {b.tunnel_ip:<16} {b.endpoint:<22} {sc}{b.status:<10}{C['rst']} {b.handshake_age}")
+            sc = C["good"] if b.status == "PROTECTED" else C["warn"]
+            lines.append(f"│  {b.name:<16} {b.kind:<10} {b.tunnel_ip:<16} {b.endpoint:<22} {sc}{b.status:<10}{C['rst']} {b.handshake_age}")
     else:
-        lines.append("  No active WireGuard tunnels or Docker backends detected.")
+        lines.append("│  No active WireGuard tunnels or Docker backends detected.")
+    if snap.listening_ports:
+        lines.append(f"│  {C['dim']}Open Ports: {', '.join(snap.listening_ports)}{C['rst']}")
 
     lines.append("")
-    lines.append(f"{C['cyan']}{C['bold']}[3] LIVE ACTIVE IP CONNECTIONS & TOP TALKERS ({len(snap.talkers)} remote){C['rst']}")
+    lines.append(f"{C['accent']}{C['bold']}╭─ ◆ [3] LIVE ACTIVE IP CONNECTIONS & TOP TALKERS ({len(snap.talkers)} remote){C['rst']}")
     if snap.talkers:
-        lines.append(f"  {'REMOTE IP':<17} {'TOT':>4} {'EST':>4} {'SYN':>4} {'UDP':>4} {'PORTS':<14} {'PROC':<12} {'RISK'}")
+        lines.append(f"│  {'REMOTE IP':<17} {'TOT':>4} {'EST':>4} {'SYN':>4} {'TW':>3} {'UDP':>4} {'PORTS':<12} {'PROC':<10} {'STATE'}")
         for t in snap.talkers[:10]:
-            rc = C["red"] if t.risk == "FLOOD" else (C["yellow"] if t.risk == "WARN" else C["green"])
-            lines.append(f"  {t.ip:<17} {t.total_conns:>4} {t.established:>4} {t.syn_recv:>4} {t.udp_conns:>4} {t.ports:<14} {t.process:<12} {rc}{t.risk}{C['rst']}")
+            rc = C["wl"] if t.risk == "WHITELIST" else (C["danger"] if t.risk in ("FLOOD", "BLOCKED") else (C["warn"] if t.risk == "WARN" else C["good"]))
+            lbl = "✓ WHITELIST" if t.risk == "WHITELIST" else ("⛔ BLOCKED" if t.risk == "BLOCKED" else t.risk)
+            lines.append(f"│  {t.ip:<17} {t.total_conns:>4} {t.established:>4} {t.syn_recv:>4} {t.time_wait:>3} {t.udp_conns:>4} {t.ports:<12} {t.process:<10} {rc}{lbl}{C['rst']}")
     else:
-        lines.append("  No external active IP connections.")
+        lines.append("│  No external active IP connections.")
 
     lines.append("")
-    lines.append(f"{C['cyan']}{C['bold']}[4] BLOCKED IPS & ACTIVE MITIGATION ({len(snap.blocked_ips)}){C['rst']}")
+    lines.append(f"{C['accent']}{C['bold']}╭─ ◆ [4] BLOCKLIST ({len(snap.blocked_ips)}) & WHITELIST ({len(snap.whitelisted_ips)}) POLICY MANAGER{C['rst']}")
+    lines.append(f"│  {C['danger']}{C['bold']}⛔ BLOCKLISTED ({len(snap.blocked_ips)}):{C['rst']}")
     if snap.blocked_ips:
         for b in snap.blocked_ips[:8]:
-            lines.append(f"  {C['red']}{b.ip:<17}{C['rst']} [{b.source:<3}]  {b.hits_or_note}")
+            lines.append(f"│    {C['danger']}{b.ip:<17}{C['rst']} [{b.source:<4}]  {b.note}")
     else:
-        lines.append("  0 IPs currently blocked.")
+        lines.append(f"│    {C['dim']}0 IPs currently blocklisted.{C['rst']}")
+
+    lines.append(f"│  {C['wl']}{C['bold']}✓ WHITELISTED ({len(snap.whitelisted_ips)}):{C['rst']}")
+    if snap.whitelisted_ips:
+        for x in snap.whitelisted_ips[:8]:
+            lines.append(f"│    {C['wl']}{x.ip:<17}{C['rst']} [{x.source:<4}]  {x.note}")
+    else:
+        lines.append(f"│    {C['dim']}0 IPs currently whitelisted.{C['rst']}")
 
     lines.append("")
-    lines.append(f"{C['cyan']}{C['bold']}[5] LIVE SECURITY & FILTRATION EVENT STREAM{C['rst']}")
+    lines.append(f"{C['accent']}{C['bold']}╭─ ◆ [5] LIVE SECURITY & FILTRATION EVENT STREAM{C['rst']}")
     for ev in snap.logs[-8:]:
-        tc = C["red"] if ev.tag in ("DROP", "BAN") else (C["magenta"] if ev.tag == "XDP" else C["yellow"])
-        lines.append(f"  {C['dim']}{ev.ts}{C['rst']} {tc}[{ev.tag:<4}]{C['rst']} {ev.message}")
+        tc = (
+            C["danger"] if ev.tag in ("DROP", "BAN")
+            else (C["wl"] if ev.tag == "WHT" else (C["xdp"] if ev.tag == "XDP" else C["warn"]))
+        )
+        lines.append(f"│  {C['dim']}{ev.ts}{C['rst']} {tc}[{ev.tag:<4}]{C['rst']} {ev.message}")
 
     return "\n".join(lines)
 
@@ -1915,27 +2424,27 @@ def render_ansi_snapshot(snap: DashboardSnapshot, use_color: bool = True) -> str
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="sparrowx-noc",
-        description="SparrowX Linux Master Cybersecurity & DDoS Filtration Terminal Dashboard",
+        description="SparrowX Linux Master Cybersecurity, Whitelist/Blocklist & DDoS Filtration Terminal Dashboard",
     )
     parser.add_argument("--iface", "-i", default=None, help="Network interface to monitor (default: auto-detect)")
     parser.add_argument("--interval", "-t", type=float, default=1.0, help="Refresh interval in seconds (default: 1.0)")
+    parser.add_argument("--theme", choices=THEMES, default="cyber", help="Aesthetic SOC color theme (cyber|emerald|crimson)")
     parser.add_argument("--once", action="store_true", help="Print a single ANSI terminal snapshot and exit")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors in --once mode")
-    parser.add_argument("--demo", action="store_true", help="Run with simulated DDoS telemetry (preview mode)")
+    parser.add_argument("--demo", action="store_true", help="Run with simulated DDoS telemetry (opt-in preview)")
     args = parser.parse_args(argv)
 
     collector = TelemetryCollector(iface=args.iface, demo=args.demo)
 
     if args.once or curses is None or not sys.stdout.isatty():
-        # Take two brief samples on Linux live mode so delta RX/TX rate is populated
         if not args.demo and IS_LINUX:
             collector.collect()
             time.sleep(0.35)
         snap = collector.collect()
-        print(render_ansi_snapshot(snap, use_color=not args.no_color))
+        print(render_ansi_snapshot(snap, use_color=not args.no_color, theme=args.theme))
         return 0
 
-    app = SparrowxCursesApp(collector=collector, interval=args.interval)
+    app = SparrowxCursesApp(collector=collector, interval=args.interval, theme=args.theme)
     try:
         curses.wrapper(app.run)
     except KeyboardInterrupt:
