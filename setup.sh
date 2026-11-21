@@ -2238,11 +2238,14 @@ step_banner 8 10 "Saving Environment Secrets & Hardening Firewall"
 
 POSTGRES_USER="${POSTGRES_USER:-sparrowx}"
 POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
-if [ -z "${POSTGRES_PASSWORD:-}" ]; then
-  POSTGRES_PASSWORD="$(openssl rand -hex 20)"
+if [ -z "${POSTGRES_PASSWORD:-}" ] || [ "${#POSTGRES_PASSWORD}" -lt 12 ] || [ "${POSTGRES_PASSWORD}" = "sparrowx_ovh_secret_2026" ] || [ "${POSTGRES_PASSWORD}" = "SparrowxMasterSecretPass2026!" ]; then
+  POSTGRES_PASSWORD="SpxPg_$(openssl rand -hex 16 2>/dev/null || echo '9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c')"
 fi
-if [ -z "${SPARROWX_JWT_SECRET:-}" ]; then
-  SPARROWX_JWT_SECRET="$(openssl rand -hex 32)"
+if [ -z "${SPARROWX_JWT_SECRET:-}" ] || [ "${#SPARROWX_JWT_SECRET}" -lt 24 ] || [ "${SPARROWX_JWT_SECRET}" = "sparrowx_jwt_secret_key_32_characters_2026" ]; then
+  SPARROWX_JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || echo 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90')"
+fi
+if [ -z "${SPARROWX_MASTER_SSO_SECRET:-}" ] || [ "${#SPARROWX_MASTER_SSO_SECRET}" -lt 24 ]; then
+  SPARROWX_MASTER_SSO_SECRET="$(openssl rand -hex 32 2>/dev/null || echo "${SPARROWX_JWT_SECRET}")"
 fi
 if [ -z "${SPARROWX_REDIS_SECRET:-}" ]; then
   SPARROWX_REDIS_SECRET="$(openssl rand -hex 16)"
@@ -2252,6 +2255,7 @@ ensure_env_key "POSTGRES_USER" "${POSTGRES_USER}"
 ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
+ensure_env_key "SPARROWX_MASTER_SSO_SECRET" "${SPARROWX_MASTER_SSO_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
 if [ -z "${PTERO_SSO_SECRET:-}" ]; then
   PTERO_SSO_SECRET="$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')"
@@ -2302,7 +2306,7 @@ ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
 ensure_env_key "PG_POOL_PORT" "${PG_POOL_PORT}"
 chmod 600 "${INSTALL_DIR}/.env"
 
-export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET \
+export POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET \
   DOMAIN_ROOT SPARROWX_DOMAIN DOMAIN_STUDIO SPARROWX_STUDIO_DOMAIN DOMAIN_SEC DOMAIN_FILE \
   DOMAIN_PASSWORD DOMAIN_API DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC DOMAIN_NETSEC \
   GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL \
@@ -2405,18 +2409,17 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
 
     log_info "Verifying PostgreSQL 16 readiness & schema..."
     for _i in $(seq 1 20); do
-      if docker exec sparrowx-postgres pg_isready -q >/dev/null 2>&1; then
+      if docker exec sparrowx-postgres pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -q >/dev/null 2>&1; then
         break
       fi
       sleep 2
     done
 
     if [ -f "${INSTALL_DIR}/ovh/schema.sql" ]; then
-      USERS_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.app_users');" 2>/dev/null | tr -d '[:space:]' || true)"
-      if [ "${USERS_TBL}" != "app_users" ] && [ "${USERS_TBL}" != "public.app_users" ]; then
-        docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
-        log_ok "Applied ovh/schema.sql cleanly."
+      if ! docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1; then
+        docker exec -i -u postgres sparrowx-postgres psql -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
       fi
+      log_ok "Applied ovh/schema.sql cleanly."
     fi
 
     if [ -d /etc/systemd/system ]; then

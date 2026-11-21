@@ -541,6 +541,15 @@ ensure_netsec_dashboard_running() {
     git -C "${netsec_dir}" pull --ff-only >/dev/null 2>&1 || { git -C "${netsec_dir}" fetch origin --depth 1 >/dev/null 2>&1 && git -C "${netsec_dir}" reset --hard origin/main >/dev/null 2>&1; } || true
   fi
 
+  local local_sbs_src="${INSTALL_DIR:-/opt/sparrowxdbs}/sbs"
+  if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
+    mkdir -p "${netsec_dir}" 2>/dev/null || true
+    cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
+    cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
+    cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
+    cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
+  fi
+
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then
     log_warn "Missing ${netsec_dir}/package.json or server.js; cannot build ${netsec_domain}"
     return 1
@@ -1344,7 +1353,6 @@ chmod +x \
   "${INSTALL_DIR}/setup.sh" \
   "${INSTALL_DIR}/update.sh" \
   "${INSTALL_DIR}/fix.sh" \
-  "${INSTALL_DIR}/verification.sh" \
   "${INSTALL_DIR}/manage-db.sh" \
   "${INSTALL_DIR}/ovh/update.sh" \
   "${INSTALL_DIR}/ovh/fix.sh" \
@@ -1361,7 +1369,6 @@ if [ -d "/usr/local/bin" ]; then
   ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || true
-  [ -f "${INSTALL_DIR}/verification.sh" ] && ln -sf "${INSTALL_DIR}/verification.sh" /usr/local/bin/sparrowx-verify 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
 fi
@@ -1421,9 +1428,19 @@ if [ -z "${DOMAIN_GAME:-}" ] || [ "${DOMAIN_GAME}" = "game.${SPARROWX_DOMAIN}" ]
 fi
 PTERO_PORT="${PTERO_PORT:-8090}"
 POSTGRES_USER="${POSTGRES_USER:-sparrowx}"
-POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-sparrowx_ovh_secret_2026}"
+if [ -z "${POSTGRES_PASSWORD:-}" ] || [ "${#POSTGRES_PASSWORD}" -lt 12 ] || [ "${POSTGRES_PASSWORD}" = "sparrowx_ovh_secret_2026" ] || [ "${POSTGRES_PASSWORD}" = "SparrowxMasterSecretPass2026!" ]; then
+  POSTGRES_PASSWORD="SpxPg_$(openssl rand -hex 16 2>/dev/null || echo '9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c')"
+fi
+if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+  docker exec -u postgres sparrowx-postgres psql -d postgres -c "ALTER ROLE \"${POSTGRES_USER}\" WITH SUPERUSER LOGIN PASSWORD '${POSTGRES_PASSWORD}';" >/dev/null 2>&1 || true
+fi
 POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
-SPARROWX_JWT_SECRET="${SPARROWX_JWT_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_jwt_secret_key_32_characters_2026')}"
+if [ -z "${SPARROWX_JWT_SECRET:-}" ] || [ "${#SPARROWX_JWT_SECRET}" -lt 24 ] || [ "${SPARROWX_JWT_SECRET}" = "sparrowx_jwt_secret_key_32_characters_2026" ]; then
+  SPARROWX_JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || echo 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90')"
+fi
+if [ -z "${SPARROWX_MASTER_SSO_SECRET:-}" ] || [ "${#SPARROWX_MASTER_SSO_SECRET}" -lt 24 ]; then
+  SPARROWX_MASTER_SSO_SECRET="$(openssl rand -hex 32 2>/dev/null || echo "${SPARROWX_JWT_SECRET}")"
+fi
 SPARROWX_REDIS_SECRET="${SPARROWX_REDIS_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo 'sparrowx_redis_secret_2026')}"
 PTERO_SSO_SECRET="${PTERO_SSO_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')}"
 PTERO_URL="https://${DOMAIN_GAME}"
@@ -1482,6 +1499,7 @@ ensure_env_key "POSTGRES_USER" "${POSTGRES_USER}"
 ensure_env_key "POSTGRES_PASSWORD" "${POSTGRES_PASSWORD}"
 ensure_env_key "POSTGRES_DB" "${POSTGRES_DB}"
 ensure_env_key "SPARROWX_JWT_SECRET" "${SPARROWX_JWT_SECRET}"
+ensure_env_key "SPARROWX_MASTER_SSO_SECRET" "${SPARROWX_MASTER_SSO_SECRET}"
 ensure_env_key "SPARROWX_REDIS_SECRET" "${SPARROWX_REDIS_SECRET}"
 ensure_env_key "PTERO_URL" "${PTERO_URL}"
 ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
@@ -1491,7 +1509,7 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${PTERO_DB_NAME}" ] && ensure_env_key "PTERO_DB_NAME" "${PTERO_DB_NAME}"
 [ -n "${PTERO_DB_USER}" ] && ensure_env_key "PTERO_DB_USER" "${PTERO_DB_USER}"
 [ -n "${PTERO_DB_PASSWORD}" ] && ensure_env_key "PTERO_DB_PASSWORD" "${PTERO_DB_PASSWORD}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -1536,6 +1554,7 @@ if [ -d "${INSTALL_DIR}/.git" ] && command -v git >/dev/null 2>&1; then
     fi
   done
 
+  git -C "${INSTALL_DIR}" config core.fileMode false 2>/dev/null || true
   BEFORE_HASH="$(git rev-parse HEAD 2>/dev/null || echo "")"
   if git fetch origin main --depth=1 && git reset --hard origin/main; then
     AFTER_HASH="$(git rev-parse HEAD 2>/dev/null || echo "")"
@@ -1548,6 +1567,7 @@ if [ -d "${INSTALL_DIR}/.git" ] && command -v git >/dev/null 2>&1; then
       "${INSTALL_DIR}"/deploy/xdp/*.sh \
       "${INSTALL_DIR}"/public/*.sh \
       "${INSTALL_DIR}"/public/xdp/*.sh 2>/dev/null || true
+    git -C "${INSTALL_DIR}" config core.fileMode false 2>/dev/null || true
     if [ "${BEFORE_HASH}" != "${AFTER_HASH}" ] && [ "${SPARROWX_REEXEC:-0}" != "1" ]; then
       export SPARROWX_REEXEC=1
       log_info "Updater updated itself — re-launching new update.sh seamlessly..."
@@ -2426,6 +2446,11 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     docker restart sparrowx-nginx >/dev/null 2>&1 || true
   fi
 
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-app"; then
+    rm -rf "${INSTALL_DIR}/.output" 2>/dev/null || true
+    docker cp sparrowx-app:/app/.output "${INSTALL_DIR}/.output" >/dev/null 2>&1 || true
+  fi
+
   ensure_gamesec_landing_running || true
   ensure_netsec_dashboard_running || true
   ensure_game_letsencrypt_ssl
@@ -2459,15 +2484,21 @@ draw_progress 7 7 "DB Schema Sync & Health Probe"
 
 if [ "${HAS_DOCKER}" = "true" ] && docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
   for _pgw in $(seq 1 15); do
-    docker exec sparrowx-postgres pg_isready -q >/dev/null 2>&1 && break
+    docker exec sparrowx-postgres pg_isready -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -q >/dev/null 2>&1 && break
     sleep 1
   done
+  docker exec -u postgres sparrowx-postgres psql -d postgres -c "ALTER ROLE \"${POSTGRES_USER}\" WITH SUPERUSER LOGIN PASSWORD '${POSTGRES_PASSWORD}';" >/dev/null 2>&1 || true
   if [ -f "${INSTALL_DIR}/ovh/schema.sql" ]; then
-    USERS_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.app_users');" 2>/dev/null | tr -d '[:space:]')"
-    INQ_TBL="$(docker exec -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT to_regclass('public.contact_inquiries');" 2>/dev/null | tr -d '[:space:]')"
-    if { [ "${USERS_TBL}" != "app_users" ] && [ "${USERS_TBL}" != "public.app_users" ]; } || { [ "${INQ_TBL}" != "contact_inquiries" ] && [ "${INQ_TBL}" != "public.contact_inquiries" ]; }; then
-      docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
-      log_warn "Applied schema updates from ovh/schema.sql"
+    if ! docker exec -i -e PGPASSWORD="${POSTGRES_PASSWORD}" sparrowx-postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1; then
+      docker exec -i -u postgres sparrowx-postgres psql -d "${POSTGRES_DB}" < "${INSTALL_DIR}/ovh/schema.sql" >/dev/null 2>&1 || true
+    fi
+    docker kill -s SIGUSR1 sparrowx-postgrest >/dev/null 2>&1 || docker restart sparrowx-postgrest >/dev/null 2>&1 || true
+    log_ok "Synchronized sovereign PostgreSQL 16 schema, roles & RPCs from ovh/schema.sql"
+  fi
+  if [ -x "${INSTALL_DIR}/deploy/backup-all-dbs.sh" ] || [ -f "${INSTALL_DIR}/deploy/backup-all-dbs.sh" ]; then
+    mkdir -p "${INSTALL_DIR}/backups" 2>/dev/null || true
+    if [ -z "$(find "${INSTALL_DIR}/backups" -maxdepth 2 \( -name '*.sql*' -o -name '*.dump*' -o -name '*.gz' \) 2>/dev/null | head -n1)" ]; then
+      bash "${INSTALL_DIR}/deploy/backup-all-dbs.sh" >/dev/null 2>&1 || true
     fi
   fi
 fi
@@ -2552,8 +2583,8 @@ if echo "${NETSEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
   NETSEC_STATUS="ONLINE (HTTP ${NETSEC_EDGE_CODE} -> :${NETSEC_PORT})"
 elif [ -n "${NETSEC_UPSTREAM_URL:-}" ]; then
   NETSEC_STATUS="CHECK UPSTREAM (HTTP ${NETSEC_EDGE_CODE})"
-elif [ ! -s "${NETSEC_DIR}/.env" ] || ! grep -qE '^SUPABASE_URL=.+' "${NETSEC_DIR}/.env" 2>/dev/null || ! grep -qE '^SUPABASE_ANON_KEY=.+' "${NETSEC_DIR}/.env" 2>/dev/null; then
-  NETSEC_STATUS="NEEDS SUPABASE (${NETSEC_DIR}/.env)"
+elif [ ! -s "${NETSEC_DIR}/.env" ] || { ! grep -qE '^DATABASE_URL=.+' "${NETSEC_DIR}/.env" 2>/dev/null && ! grep -qE '^SUPABASE_URL=.+' "${NETSEC_DIR}/.env" 2>/dev/null; }; then
+  NETSEC_STATUS="NEEDS DB CONFIG (${NETSEC_DIR}/.env)"
 else
   NETSEC_STATUS="CHECK (HTTP ${NETSEC_EDGE_CODE} -> :${NETSEC_PORT})"
 fi

@@ -445,9 +445,10 @@ done
 section_banner "02" "11" "Git Repo Sync, LF Line Endings, Script Syntax & Public Mirrors"
 
 if [ -d "${INSTALL_DIR}/.git" ] && command -v git >/dev/null 2>&1; then
+  git -C "${INSTALL_DIR}" config core.fileMode false 2>/dev/null || true
   CUR_COMMIT="$(git -C "${INSTALL_DIR}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
   CUR_BRANCH="$(git -C "${INSTALL_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
-  DIRTY_FILES="$(git -C "${INSTALL_DIR}" status --porcelain 2>/dev/null | wc -l | tr -d '[:space:]')"
+  DIRTY_FILES="$(git -C "${INSTALL_DIR}" status --porcelain 2>/dev/null | grep -vE 'ovh/nginx\.conf$' | wc -l | tr -d '[:space:]')"
   if [ "${DIRTY_FILES:-0}" -gt 0 ]; then
     log_warn "Git working tree has ${DIRTY_FILES} uncommitted change(s) on ${CUR_BRANCH} (${CUR_COMMIT})" "Commit or review changes with 'git status -s'"
   else

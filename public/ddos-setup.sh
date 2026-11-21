@@ -177,9 +177,13 @@ if command -v apt-get >/dev/null 2>&1; then
   fi
   log_info "Ensuring kernel DDoS, UFW, Fail2Ban & XDP/eBPF toolchain packages..."
   apt-get update -qq >/dev/null 2>&1 || true
-  apt-get install -y -qq iproute2 ufw fail2ban psmisc curl clang llvm libbpf-dev >/dev/null 2>&1 || \
+  apt-get install -y -qq iproute2 ufw fail2ban python3-systemd psmisc curl clang llvm libbpf-dev linux-libc-dev >/dev/null 2>&1 || \
+    apt-get install -y -qq iproute2 ufw fail2ban psmisc curl clang llvm libbpf-dev >/dev/null 2>&1 || \
     apt-get install -y -qq iproute2 ufw fail2ban psmisc curl >/dev/null 2>&1 || true
   apt-get install -y -qq "linux-headers-$(uname -r)" linux-tools-common "linux-tools-$(uname -r)" bpftool >/dev/null 2>&1 || true
+  if [ ! -e /usr/include/asm ] && [ -d "/usr/include/$(uname -m)-linux-gnu/asm" ]; then
+    ln -s "/usr/include/$(uname -m)-linux-gnu/asm" /usr/include/asm 2>/dev/null || true
+  fi
 fi
 
 # ------------------------------------------------------------------------------
@@ -217,8 +221,13 @@ log_ok "Applied /etc/sysctl.d/99-sparrowx-hardening.conf (SYN cookies, BBR, RP-f
 # 3. Fail2Ban DDoS & Brute-Force Protection + UFW Policy
 # ------------------------------------------------------------------------------
 if command -v fail2ban-server >/dev/null 2>&1 || [ -d /etc/fail2ban ]; then
-  mkdir -p /etc/fail2ban/jail.d
-  cat > /etc/fail2ban/jail.d/sparrowx-ddos.conf <<'EOF'
+  mkdir -p /etc/fail2ban/jail.d /var/log /var/run/fail2ban
+  touch /var/log/auth.log 2>/dev/null || true
+  F2B_BACKEND="auto"
+  if command -v python3 >/dev/null 2>&1 && python3 -c "import systemd.journal" >/dev/null 2>&1; then
+    F2B_BACKEND="systemd"
+  fi
+  cat > /etc/fail2ban/jail.d/sparrowx-ddos.conf <<EOF
 [DEFAULT]
 bantime = 3600
 findtime = 600
@@ -226,10 +235,15 @@ maxretry = 8
 
 [sshd]
 enabled = true
+backend = ${F2B_BACKEND}
+logpath = /var/log/auth.log
 maxretry = 5
 bantime = 7200
 EOF
-  systemctl enable --now fail2ban >/dev/null 2>&1 || systemctl restart fail2ban >/dev/null 2>&1 || true
+  systemctl unmask fail2ban >/dev/null 2>&1 || true
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable --now fail2ban >/dev/null 2>&1 || true
+  systemctl restart fail2ban >/dev/null 2>&1 || true
   log_ok "Configured Fail2Ban DDoS/SSH jail (/etc/fail2ban/jail.d/sparrowx-ddos.conf)"
 fi
 

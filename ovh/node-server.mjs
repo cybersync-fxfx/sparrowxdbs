@@ -687,22 +687,27 @@ const server = createServer(async (req, res) => {
     // =========================================================================
     const isInternalAppApi =
       pathname.startsWith("/api/") || pathname.startsWith("/_serverFn");
+    const hasExplicitApiAuthHeader = Boolean(
+      req.headers["apikey"] || req.headers["authorization"],
+    );
+    const isApiWebPortalRoute =
+      pathname === "/" ||
+      pathname === "/gateway" ||
+      pathname === "/docs" ||
+      pathname.startsWith("/docs/") ||
+      pathname === "/errors" ||
+      pathname === "/story" ||
+      pathname === "/db" ||
+      pathname === "/drop" ||
+      pathname === "/keys" ||
+      pathname === "/shield" ||
+      pathname === "/game" ||
+      pathname.startsWith("/game/") ||
+      pathname.startsWith("/f/");
     const isBrowserNavigationToApiHtmlRoute =
       isApiHost &&
-      acceptsHtml &&
-      (pathname === "/" ||
-        pathname === "/gateway" ||
-        pathname === "/docs" ||
-        pathname.startsWith("/docs/") ||
-        pathname === "/errors" ||
-        pathname === "/story" ||
-        pathname === "/db" ||
-        pathname === "/drop" ||
-        pathname === "/keys" ||
-        pathname === "/shield" ||
-        pathname === "/game" ||
-        pathname.startsWith("/game/") ||
-        pathname.startsWith("/f/"));
+      isApiWebPortalRoute &&
+      (acceptsHtml || !hasExplicitApiAuthHeader);
 
     // If it's a programmatic query to PostgREST (/rest/v1 or api domain table queries)
     if (
