@@ -103,6 +103,8 @@ export function Floating3DVisual({
 
   const imgFetchPriority = priority === "lcp" ? "high" : undefined;
   const imgLoading = priority === "lazy" ? "lazy" : undefined;
+  const isRasterDarkBackdrop = /\.(jpe?g)$/i.test(src);
+  const hasFooterBar = Boolean(caption || showMotionControl);
 
   return (
     <div
@@ -126,22 +128,28 @@ export function Floating3DVisual({
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at 50% 54%, var(--spx-accent-glow), transparent 68%)",
+            "radial-gradient(circle at 50% 50%, var(--spx-accent-glow), transparent 70%)",
         }}
       />
 
-      {/* Subtle perspective floor ring */}
+      {/* Soft ambient levitation floor glow (zero hard pill border) */}
       <div
         aria-hidden="true"
-        className="spx-3d-orbit pointer-events-none absolute left-1/2 bottom-9 -translate-x-1/2 w-[62%] h-4 rounded-full"
+        className={`spx-3d-orbit pointer-events-none absolute left-1/2 -translate-x-1/2 w-[56%] h-6 rounded-full blur-md ${
+          hasFooterBar ? "bottom-7" : "bottom-2"
+        }`}
         style={{
-          border: "1px solid var(--spx-accent-ring)",
-          boxShadow: "0 0 24px var(--spx-accent-glow)",
+          background:
+            "radial-gradient(ellipse at center, var(--spx-accent-ring) 0%, transparent 72%)",
         }}
       />
 
       {/* 3D Floating & Pointer-Tilting Artwork */}
-      <div className="spx-3d-tilt relative z-10 flex size-full items-center justify-center p-2 pb-9">
+      <div
+        className={`spx-3d-tilt relative z-10 flex size-full items-center justify-center p-2 ${
+          hasFooterBar ? "pb-9" : ""
+        } ${isRasterDarkBackdrop ? "spx-3d-blend" : ""}`}
+      >
         <div className="spx-3d-float relative flex size-full items-center justify-center">
           <img
             src={src}
@@ -151,7 +159,9 @@ export function Floating3DVisual({
             decoding={priority === "lcp" ? "sync" : "async"}
             {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
             {...(imgLoading ? { loading: imgLoading } : {})}
-            className="spx-3d-img max-h-full max-w-full object-contain pointer-events-none"
+            className={`max-h-full max-w-full object-contain pointer-events-none ${
+              isRasterDarkBackdrop ? "spx-3d-img-raster" : "spx-3d-img-vector"
+            }`}
           />
         </div>
       </div>
