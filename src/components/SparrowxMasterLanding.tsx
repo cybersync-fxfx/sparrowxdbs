@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import {
   AlertCircle,
   Database,
@@ -311,6 +313,15 @@ function OperatorLoginDialog({
           </div>
         )}
 
+        <div className="px-6 pb-3 space-y-3">
+          <GoogleSignInButton label="Continue with Google" />
+          <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+            <span className="h-px flex-1 bg-white/10" />
+            <span>or use email &amp; password</span>
+            <span className="h-px flex-1 bg-white/10" />
+          </div>
+        </div>
+
         <form onSubmit={authTab === "signin" ? handleSignIn : handleRegister} className="px-6 pb-5 space-y-4">
           {authTab === "register" && (
             <>
@@ -464,21 +475,47 @@ export function SparrowxMasterLanding({
   const [connectingDb, setConnectingDb] = useState(false);
   const [copiedUri, setCopiedUri] = useState(false);
 
-  // Hydrate authenticated session on client mount so SSR and initial client HTML stay identical.
+  // Hydrate authenticated session on client mount (local JWT or Google/Master SSO cookie).
   useEffect(() => {
     const verified = verifySessionToken();
-    if (!verified) return;
-    setSessionUser({
-      id: verified.sub,
-      email: verified.email,
-      fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
-      password: "",
-      admin: verified.role === "admin" ? "yes" : "no",
-      tenantId: verified.tenantId,
+    if (verified) {
+      setSessionUser({
+        id: verified.sub,
+        email: verified.email,
+        fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
+        password: "",
+        admin: verified.role === "admin" ? "yes" : "no",
+        tenantId: verified.tenantId,
+      });
+      const cached = getCachedDeveloperConnection(verified.tenantId, verified.email);
+      if (cached) setDevConnection(cached);
+      return;
+    }
+    let active = true;
+    void fetchMasterSsoUser().then((ssoUser) => {
+      if (!active || !ssoUser) return;
+      issueSignedSessionToken({
+        id: ssoUser.id,
+        email: ssoUser.email,
+        fullName: ssoUser.fullName,
+        role: ssoUser.role,
+        tenantId: ssoUser.tenantId,
+      });
+      const hydrated: AppUser = {
+        id: ssoUser.id,
+        email: ssoUser.email,
+        fullName: ssoUser.fullName,
+        password: "",
+        admin: ssoUser.role === "admin" ? "yes" : "no",
+        tenantId: ssoUser.tenantId,
+      };
+      setSessionUser(hydrated);
+      if (onUserAuthenticated) onUserAuthenticated(hydrated);
     });
-    const cached = getCachedDeveloperConnection(verified.tenantId, verified.email);
-    if (cached) setDevConnection(cached);
-  }, []);
+    return () => {
+      active = false;
+    };
+  }, [onUserAuthenticated]);
 
   useEffect(() => {
     if (!sessionUser) {

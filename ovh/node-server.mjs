@@ -1,6 +1,24 @@
 import { createServer, request as httpRequest } from "node:http";
+import { readFileSync } from "node:fs";
 import { readFile, stat, writeFile, mkdir, unlink } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
+
+// Load gitignored .env.local (if present) without overriding existing process.env vars
+try {
+  const localEnvRaw = readFileSync(resolve(process.cwd(), ".env.local"), "utf-8");
+  for (const line of localEnvRaw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const val = trimmed.slice(eq + 1).trim().replace(/^['"]|['"]$/g, "");
+    if (key && !process.env[key]) process.env[key] = val;
+  }
+} catch {
+  // .env.local is optional
+}
+
 import serverModule from "../.output/server/index.mjs";
 import { migrateCloudSupabaseToLocal } from "./migrate-from-supabase.mjs";
 

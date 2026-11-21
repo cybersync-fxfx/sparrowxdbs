@@ -17,8 +17,10 @@ import {
 import {
   clearMasterSsoSession,
   ensureDeveloperConnection,
+  fetchMasterSsoUser,
   syncMasterSsoSession,
 } from "@/lib/developer-connection";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
@@ -1042,6 +1044,32 @@ export function SovereignDatabaseStudio({
           tenantId: verified.tenantId,
         });
         setViewMode("studio");
+      } else {
+        let active = true;
+        void fetchMasterSsoUser().then((ssoUser) => {
+          if (!active || !ssoUser) return;
+          issueSignedSessionToken({
+            id: ssoUser.id,
+            email: ssoUser.email,
+            fullName: ssoUser.fullName,
+            role: ssoUser.role,
+            tenantId: ssoUser.tenantId,
+          });
+          const hydrated: AppUser = {
+            id: ssoUser.id,
+            email: ssoUser.email,
+            fullName: ssoUser.fullName,
+            password: "",
+            admin: ssoUser.role === "admin" ? "yes" : "no",
+            tenantId: ssoUser.tenantId,
+          };
+          setSessionUser(hydrated);
+          setViewMode("studio");
+          if (onUserAuthenticated) onUserAuthenticated(hydrated);
+        });
+        return () => {
+          active = false;
+        };
       }
     }
   }, [currentUser]);
@@ -2527,6 +2555,12 @@ export function SovereignDatabaseStudio({
                   }}
                   className="space-y-3 font-mono text-xs"
                 >
+                  <GoogleSignInButton nextPath="/db" label="Continue with Google" />
+                  <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                    <span className="h-px flex-1 bg-white/10" />
+                    <span>OR EMAIL LOGIN</span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
                   <div>
                     <label className="text-[10px] text-zinc-400 uppercase tracking-wider block mb-1">
                       Developer Email

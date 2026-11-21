@@ -33,6 +33,8 @@ import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
 import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
+import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
+import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
 import { Route as ApiPublicAuthDiscordCallbackRouteImport } from './routes/api/public/auth/discord/callback'
 import { Route as ApiPublicAuthDiscordLoginRouteImport } from './routes/api/public/auth/discord/login'
@@ -157,6 +159,16 @@ const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
   path: '/api/game/panel-sso',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
+  id: '/api/auth/google/callback',
+  path: '/api/auth/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthGoogleLoginRoute = ApiAuthGoogleLoginRouteImport.update({
+  id: '/api/auth/google/login',
+  path: '/api/auth/google/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicRazorpayWebhookRoute =
   ApiPublicRazorpayWebhookRouteImport.update({
     id: '/api/public/razorpay/webhook',
@@ -201,6 +213,8 @@ export interface FileRoutesByFullPath {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -230,6 +244,8 @@ export interface FileRoutesByTo {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -260,6 +276,8 @@ export interface FileRoutesById {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
+  '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
+  '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/public/auth/discord/callback': typeof ApiPublicAuthDiscordCallbackRoute
   '/api/public/auth/discord/login': typeof ApiPublicAuthDiscordLoginRoute
@@ -291,6 +309,8 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/game/panel-sso'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/login'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -320,6 +340,8 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/game/panel-sso'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/login'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -349,6 +371,8 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/game/panel-sso'
+    | '/api/auth/google/callback'
+    | '/api/auth/google/login'
     | '/api/public/razorpay/webhook'
     | '/api/public/auth/discord/callback'
     | '/api/public/auth/discord/login'
@@ -379,6 +403,8 @@ export interface RootRouteChildren {
   ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
+  ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
+  ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
   ApiPublicAuthDiscordCallbackRoute: typeof ApiPublicAuthDiscordCallbackRoute
   ApiPublicAuthDiscordLoginRoute: typeof ApiPublicAuthDiscordLoginRoute
@@ -554,6 +580,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGamePanelSsoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/google/callback': {
+      id: '/api/auth/google/callback'
+      path: '/api/auth/google/callback'
+      fullPath: '/api/auth/google/callback'
+      preLoaderRoute: typeof ApiAuthGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/google/login': {
+      id: '/api/auth/google/login'
+      path: '/api/auth/google/login'
+      fullPath: '/api/auth/google/login'
+      preLoaderRoute: typeof ApiAuthGoogleLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/razorpay/webhook': {
       id: '/api/public/razorpay/webhook'
       path: '/api/public/razorpay/webhook'
@@ -603,6 +643,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
+  ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
+  ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
   ApiPublicAuthDiscordCallbackRoute: ApiPublicAuthDiscordCallbackRoute,
   ApiPublicAuthDiscordLoginRoute: ApiPublicAuthDiscordLoginRoute,

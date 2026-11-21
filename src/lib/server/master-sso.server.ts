@@ -456,3 +456,258 @@ export async function authenticateMasterCredentialsInDb(input: {
 
   return { user: null, source: "none" };
 }
+
+export const GOOGLE_OAUTH_STATE_COOKIE = "spx_google_oauth_state";
+
+export interface GoogleOAuthStatePayload {
+  nonce: string;
+  next: string;
+  origin: string;
+  exp: number;
+}
+
+export function sanitizeGoogleNextUrl(rawNext: string | null | undefined, origin: string): string {
+  const fallback = `${origin}/`;
+  if (!rawNext || typeof rawNext !== "string") return fallback;
+  const trimmed = rawNext.trim();
+  if (!trimmed) return fallback;
+  // Allow safe relative paths like /infra/dashboard, /db, /sec, /file, /gateway
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//")) {
+    return `${origin}${trimmed}`;
+  }
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const isSparrowx = host === "sparrowx.net" || host.endsWith(".sparrowx.net");
+    const isLocal = host === "127.0.0.1" || host === "localhost";
+    if ((parsed.protocol === "https:" && isSparrowx) || (parsed.protocol === "http:" && isLocal)) {
+      return parsed.toString();
+    }
+  } catch {
+    // invalid URL -> fallback
+  }
+  return fallback;
+}
+
+export async function createGoogleOAuthState(payload: {
+  nonce: string;
+  next: string;
+  origin: string;
+  ttlSeconds?: number;
+}): Promise<string> {
+  const exp = Math.floor(Date.now() / 1000) + (payload.ttlSeconds ?? 600);
+  const body: GoogleOAuthStatePayload = {
+    nonce: payload.nonce,
+    next: payload.next,
+    origin: payload.origin,
+    exp,
+  };
+  const b64 = toBase64Url(JSON.stringify(body));
+  const sig = await hmacSha256Hex(getMasterSsoSecret(), b64);
+  return `${b64}.${sig}`;
+}
+
+export async function verifyGoogleOAuthState(
+  token: string | null | undefined,
+): Promise<GoogleOAuthStatePayload | null> {
+  if (!token || typeof token !== "string") return null;
+  const parts = token.trim().split(".");
+  if (parts.length !== 2) return null;
+  const [b64, sigHex] = parts;
+  if (!b64 || !sigHex) return null;
+
+  const expectedSig = await hmacSha256Hex(getMasterSsoSecret(), b64);
+  if (!timingSafeEqual(sigHex.toLowerCase(), expectedSig.toLowerCase())) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(fromBase64Url(b64)) as Partial<GoogleOAuthStatePayload>;
+    if (!parsed.nonce || !parsed.next || !parsed.origin || typeof parsed.exp !== "number") {
+      return null;
+    }
+    if (parsed.exp <= Math.floor(Date.now() / 1000)) return null;
+    return {
+      nonce: String(parsed.nonce),
+      next: String(parsed.next),
+      origin: String(parsed.origin),
+      exp: parsed.exp,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function buildGoogleStateCookieHeader(
+  request: Request,
+  value: string,
+  maxAgeSeconds = 600,
+): string {
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const isHttps = forwardedProto === "https" || new URL(request.url).protocol === "https:";
+  const attrs = [
+    `${GOOGLE_OAUTH_STATE_COOKIE}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${Math.max(0, Math.floor(maxAgeSeconds))}`,
+  ];
+  if (isHttps) attrs.push("Secure");
+  return attrs.join("; ");
+}
+
+/**
+ * Finds or provisions a verified SparrowX user authenticated via Google OAuth 2.0.
+ * Preserves existing admin privileges (e.g. cybersync790@gmail.com / master-db@sparrowx.net)
+ * and persists across PostgreSQL -> PostgREST -> local JSON store.
+ */
+export async function upsertGoogleSsoUserInDb(profile: {
+  email: string;
+  fullName?: string | null;
+  googleSub?: string | null;
+}): Promise<MasterSsoUser> {
+  const emailClean = profile.email.trim().toLowerCase();
+  const fallbackName = (profile.fullName || emailClean.split("@")[0] || "SparrowX User").trim();
+  const slug = emailClean.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "USER";
+  const generatedId = `USR-G-${Date.now().toString(36).toUpperCase()}`;
+  const generatedTenantId = `TNT-${slug}`;
+  const googlePlaceholderDigest = hashSecretPassword(
+    `google_oauth_verified::${profile.googleSub || emailClean}::${getMasterSsoSecret().slice(0, 8)}`,
+  );
+
+  // 1. Primary sovereign PostgreSQL store
+  try {
+    const pool = await openMasterAuthPool();
+    try {
+      await ensureAppUsersTable(pool);
+      const existing = await pool.query<{
+        id: string;
+        email: string;
+        full_name: string | null;
+        admin: string | null;
+        tenant_id: string | null;
+      }>(
+        `SELECT id, email, full_name, admin, tenant_id
+           FROM public.app_users
+          WHERE LOWER(email) = $1
+          LIMIT 1`,
+        [emailClean],
+      );
+      const row = existing.rows[0];
+      if (row) {
+        await pool
+          .query(
+            `UPDATE public.app_users
+                SET email_verified = TRUE,
+                    email_verified_at = COALESCE(email_verified_at, NOW()),
+                    full_name = CASE WHEN COALESCE(full_name, '') = '' THEN $2 ELSE full_name END
+              WHERE id = $1`,
+            [row.id, fallbackName],
+          )
+          .catch(() => {});
+        return {
+          id: row.id,
+          email: row.email.trim().toLowerCase(),
+          fullName: row.full_name || fallbackName,
+          role: String(row.admin || "no").toLowerCase() === "yes" ? "admin" : "client",
+          tenantId: row.tenant_id || generatedTenantId,
+        };
+      }
+
+      const inserted = await pool.query<{
+        id: string;
+        email: string;
+        full_name: string;
+        admin: string;
+        tenant_id: string | null;
+      }>(
+        `INSERT INTO public.app_users (id, email, password, full_name, admin, tenant_id)
+         VALUES ($1, $2, $3, $4, 'no', $5)
+         ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name
+         RETURNING id, email, full_name, admin, tenant_id`,
+        [generatedId, emailClean, googlePlaceholderDigest, fallbackName, generatedTenantId],
+      );
+      const created = inserted.rows[0];
+      if (created) {
+        await pool
+          .query(
+            `UPDATE public.app_users SET email_verified = TRUE, email_verified_at = NOW() WHERE id = $1`,
+            [created.id],
+          )
+          .catch(() => {});
+        return {
+          id: created.id,
+          email: created.email.trim().toLowerCase(),
+          fullName: created.full_name || fallbackName,
+          role: String(created.admin || "no").toLowerCase() === "yes" ? "admin" : "client",
+          tenantId: created.tenant_id || generatedTenantId,
+        };
+      }
+    } finally {
+      await pool.end().catch(() => {});
+    }
+  } catch {
+    // Fallback to PostgREST / local seed store when PG isn't running locally
+  }
+
+  // 2. Local JSON store / seed fallback (for local preview without Docker PG)
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const dataPath = path.resolve(
+      process.env.SPARROWX_DATA_DIR || path.resolve(process.cwd(), "data"),
+      "sparrowx-ovh-db.json",
+    );
+    const raw = await fs.readFile(dataPath, "utf-8");
+    const store = JSON.parse(raw) as {
+      app_users?: Array<{
+        id: string;
+        email: string;
+        password?: string;
+        full_name?: string;
+        admin?: string;
+        tenant_id?: string | null;
+        created_at?: string;
+      }>;
+    };
+    const users = Array.isArray(store.app_users) ? store.app_users : [];
+    const match = users.find((u) => String(u.email || "").trim().toLowerCase() === emailClean);
+    if (match) {
+      return {
+        id: match.id,
+        email: emailClean,
+        fullName: match.full_name || fallbackName,
+        role: String(match.admin || "no").toLowerCase() === "yes" ? "admin" : "client",
+        tenantId: match.tenant_id || generatedTenantId,
+      };
+    }
+    const newRow = {
+      id: generatedId,
+      email: emailClean,
+      password: googlePlaceholderDigest,
+      full_name: fallbackName,
+      admin: "no",
+      tenant_id: generatedTenantId,
+      created_at: new Date().toISOString(),
+    };
+    users.push(newRow);
+    store.app_users = users;
+    await fs.writeFile(dataPath, JSON.stringify(store, null, 2) + "\n", "utf-8").catch(() => {});
+    return {
+      id: newRow.id,
+      email: emailClean,
+      fullName: fallbackName,
+      role: "client",
+      tenantId: generatedTenantId,
+    };
+  } catch {
+    // Final safe fallback
+  }
+
+  return {
+    id: generatedId,
+    email: emailClean,
+    fullName: fallbackName,
+    role: "client",
+    tenantId: generatedTenantId,
+  };
+}

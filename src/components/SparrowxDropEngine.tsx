@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import {
   UploadCloud,
   Shield,
@@ -1331,6 +1332,15 @@ export function SparrowxDropEngine() {
                           ? "Use your SparrowX credentials to access your persistent storage."
                           : "Provision an encrypted NVMe vault backed by your SparrowX account."}
                       </p>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <GoogleSignInButton nextPath="/drop" label="Continue with Google" />
+                      <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
+                        <span className="h-px flex-1 bg-white/10" />
+                        <span>OR VAULT CREDENTIALS</span>
+                        <span className="h-px flex-1 bg-white/10" />
+                      </div>
                     </div>
 
                     {authError && (

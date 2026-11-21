@@ -116,6 +116,38 @@ export async function clearMasterSsoSession(): Promise<void> {
   }
 }
 
+export interface HydratedMasterSsoUser {
+  id: string;
+  email: string;
+  fullName: string;
+  role: "admin" | "client";
+  tenantId: string | null;
+}
+
+/** Reads the active `.sparrowx.net` HttpOnly Master SSO session (e.g. after Google OAuth sign-in). */
+export async function fetchMasterSsoUser(): Promise<HydratedMasterSsoUser | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const res = await fetch("/api/auth/master-sso", {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ok?: boolean;
+      authenticated?: boolean;
+      user?: HydratedMasterSsoUser;
+    };
+    if (data.ok && data.authenticated && data.user?.email) {
+      return data.user;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetches the signed-in developer's live PostgreSQL connection via `/api/db/summary`
  * or automatically provisions a dedicated PostgreSQL database via `/api/db/provision`

@@ -33,6 +33,8 @@ import {
   issueSignedSessionToken,
   clearSessionToken,
 } from "@/lib/advanced-features";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
@@ -108,15 +110,39 @@ export function SparrowxApiGatewayPortal() {
 
   useEffect(() => {
     const verified = verifySessionToken();
-    if (!verified) return;
-    setSessionUser({
-      id: verified.sub,
-      email: verified.email,
-      fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
-      password: "",
-      admin: verified.role === "admin" ? "yes" : "no",
-      tenantId: verified.tenantId,
+    if (verified) {
+      setSessionUser({
+        id: verified.sub,
+        email: verified.email,
+        fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
+        password: "",
+        admin: verified.role === "admin" ? "yes" : "no",
+        tenantId: verified.tenantId,
+      });
+      return;
+    }
+    let active = true;
+    void fetchMasterSsoUser().then((ssoUser) => {
+      if (!active || !ssoUser) return;
+      issueSignedSessionToken({
+        id: ssoUser.id,
+        email: ssoUser.email,
+        fullName: ssoUser.fullName,
+        role: ssoUser.role,
+        tenantId: ssoUser.tenantId,
+      });
+      setSessionUser({
+        id: ssoUser.id,
+        email: ssoUser.email,
+        fullName: ssoUser.fullName,
+        password: "",
+        admin: ssoUser.role === "admin" ? "yes" : "no",
+        tenantId: ssoUser.tenantId,
+      });
     });
+    return () => {
+      active = false;
+    };
   }, []);
 
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
@@ -366,6 +392,15 @@ print(response.json())`;
               <p className="text-xs text-[#9CA3AF] leading-relaxed">
                 For your security, SparrowX does not expose database schemas, endpoints, or API keys publicly. Sign in with your account to view and generate your personal Database API credentials (also available in Dashboard Settings).
               </p>
+            </div>
+
+            <div className="space-y-3">
+              <GoogleSignInButton nextPath="/gateway" label="Continue with Google" />
+              <div className="flex items-center gap-3 text-[11px] font-mono text-[#64748B]">
+                <span className="h-px flex-1 bg-white/10" />
+                <span>OR ACCOUNT EMAIL</span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-4">

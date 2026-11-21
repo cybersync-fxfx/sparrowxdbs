@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import {
   AlertTriangle,
   ArrowRight,
@@ -340,6 +341,15 @@ export function SparrowxShieldEngine({
               <User className="size-3.5" />
               <span>Register</span>
             </button>
+          </div>
+
+          <div className="px-6 pb-3 space-y-2.5">
+            <GoogleSignInButton nextPath="/shield" label="Continue with Google" />
+            <div className="flex items-center gap-3 text-[11px] text-[#F4F6FA]/45">
+              <span className="h-px flex-1 bg-white/10" />
+              <span>or operator credentials</span>
+              <span className="h-px flex-1 bg-white/10" />
+            </div>
           </div>
 
           {authError && (

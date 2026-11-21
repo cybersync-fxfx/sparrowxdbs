@@ -29,6 +29,13 @@ import {
 import { INFRA_OS_IMAGES } from "@/lib/infra-plans";
 import { UpiAutoPayModal, type UpiCheckoutOrder } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import {
+  clearMasterSsoSession,
+  fetchMasterSsoUser,
+  type HydratedMasterSsoUser,
+} from "@/lib/developer-connection";
+import { clearSessionToken, issueSignedSessionToken } from "@/lib/advanced-features";
 import type { ManagedInfraServer, ProxmoxConfigStatus } from "@/lib/server/proxmox.server";
 
 type PanelSection =
@@ -89,6 +96,25 @@ export function SparrowxInfraDashboard() {
   const [recentOrders, setRecentOrders] = useState<UpiCheckoutOrder[]>([]);
   const [upiModalOpen, setUpiModalOpen] = useState(false);
   const [topupAmount, setTopupAmount] = useState(849);
+  const [ssoUser, setSsoUser] = useState<HydratedMasterSsoUser | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetchMasterSsoUser().then((u) => {
+      if (!active || !u) return;
+      setSsoUser(u);
+      issueSignedSessionToken({
+        id: u.id,
+        email: u.email,
+        fullName: u.fullName,
+        role: u.role,
+        tenantId: u.tenantId,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const notify = (tone: "ok" | "err", text: string) => {
     setToastMsg({ tone, text });
@@ -346,6 +372,30 @@ export function SparrowxInfraDashboard() {
               <QrCode className="size-3.5" aria-hidden="true" />
               <span>UPI Top-Up / Pay</span>
             </button>
+
+            {ssoUser ? (
+              <div className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-xs">
+                <span className="size-2 rounded-full bg-emerald-400" />
+                <span className="text-zinc-200 max-w-[140px] truncate">{ssoUser.email}</span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    clearSessionToken();
+                    await clearMasterSsoSession();
+                    setSsoUser(null);
+                  }}
+                  className="text-[11px] text-zinc-400 hover:text-white cursor-pointer"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <GoogleSignInButton
+                nextPath="/infra/dashboard"
+                label="Google Sign-In"
+                className="!w-auto !py-1.5 !px-3 !text-xs"
+              />
+            )}
           </div>
         </div>
       </header>
