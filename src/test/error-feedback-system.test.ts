@@ -137,7 +137,7 @@ describe("SparrowX Safe Diagnostics & Error Reporting", () => {
   });
 
   it("records diagnostic events with unique SPX-ERR reference IDs and updates metrics", () => {
-    const event1 = recordDiagnosticError("FIREWALL_DEPLOYMENT_FAILED", {
+    const event1 = recordDiagnosticError("FIREWALL_RULE_SAVE_FAILED", {
       module: "Firewall Engine",
       customMessage: "Firewall deployment rejected: Syntax error in ingress rule CIDR block",
       context: { ruleId: "r-9012" },
@@ -146,7 +146,7 @@ describe("SparrowX Safe Diagnostics & Error Reporting", () => {
     expect(event1.referenceId).toMatch(/^SPX-ERR-\d{8}-[A-Z0-9]+$/);
     expect(event1.resolved).toBe(false);
 
-    const event2 = recordDiagnosticError("FIREWALL_DEPLOYMENT_FAILED", {
+    const event2 = recordDiagnosticError("FIREWALL_RULE_SAVE_FAILED", {
       module: "Firewall Engine",
       customMessage: "Secondary deployment timeout",
     });
@@ -157,13 +157,13 @@ describe("SparrowX Safe Diagnostics & Error Reporting", () => {
     const summary = computeErrorMetricSummary();
     expect(summary.totalErrors).toBe(2);
     expect(summary.unresolvedCount).toBe(2);
-    expect(summary.topErrors[0]?.code).toBe("FIREWALL_DEPLOYMENT_FAILED");
+    expect(summary.topErrors[0]?.code).toBe("FIREWALL_RULE_SAVE_FAILED");
     expect(summary.topErrors[0]?.count).toBe(2);
     expect(summary.affectedModules.some((m) => m.module === "Firewall Engine")).toBe(true);
   });
 
   it("toggles event resolution and submits problem reports", () => {
-    const event = recordDiagnosticError("PAYMENT_GATEWAY_TIMEOUT", {
+    const event = recordDiagnosticError("PAYMENT_LEDGER_UNCONFIRMED", {
       module: "Billing",
       customMessage: "Stripe connection timed out after 10000ms",
     });
@@ -194,14 +194,12 @@ describe("SparrowX User Activity & Operations History", () => {
 
   it("records, updates and filters operations history transparently", () => {
     const op = recordUserOperation({
-      action: "Deploy WAF Rule",
       category: "Firewall & WAF",
-      target: "api.acmeweb.com",
       title: "Deploy WAF Rule",
       affectedResource: "api.acmeweb.com",
       status: "pending",
       details: "Deploying rate limiting rule (100 req/min)",
-    } as any);
+    });
 
     expect(op.id).toMatch(/^ACT-\d+-[A-Z0-9]+$/);
     expect(op.status).toBe("pending");

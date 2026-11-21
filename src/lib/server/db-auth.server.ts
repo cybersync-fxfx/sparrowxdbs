@@ -7,9 +7,9 @@ export interface DbAuthContext {
   authorized: boolean;
   isAdmin: boolean;
   actorId: string;
-  actorEmail?: string;
-  tenantId?: string;
-  reason?: string;
+  actorEmail?: string | undefined;
+  tenantId?: string | undefined;
+  reason?: string | undefined;
 }
 
 interface RateBucket {
@@ -18,12 +18,33 @@ interface RateBucket {
 }
 
 const rateBuckets = new Map<string, RateBucket>();
+const MAX_RATE_BUCKETS = 10_000;
+
+function isLoopbackRequest(request: Request): boolean {
+  try {
+    const reqHost = new URL(request.url).hostname.toLowerCase();
+    const hdrHost = (request.headers.get("host") || "").split(":")[0]?.toLowerCase() || "";
+    const effective = hdrHost || reqHost;
+    return effective === "localhost" || effective === "127.0.0.1" || effective === "::1" || effective === "[::1]";
+  } catch {
+    return false;
+  }
+}
 
 export function extractClientIp(request: Request): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp?.trim()) return cfIp.trim();
+  // Prefer X-Real-IP (set authoritatively by Nginx $remote_addr) before X-Forwarded-For.
   const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
+  if (realIp?.trim()) return realIp.trim();
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const hops = xff
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1]!;
+  }
   return "127.0.0.1";
 }
 
@@ -33,6 +54,15 @@ export function checkDbRateLimit(
   windowMs: number,
 ): { allowed: boolean; retryAfterSec: number } {
   const now = Date.now();
+  if (rateBuckets.size > 2000) {
+    for (const [bucketKey, bucket] of rateBuckets.entries()) {
+      if (bucket.resetAt <= now) rateBuckets.delete(bucketKey);
+    }
+    if (rateBuckets.size > MAX_RATE_BUCKETS) {
+      const firstKey = rateBuckets.keys().next().value;
+      if (firstKey !== undefined) rateBuckets.delete(firstKey);
+    }
+  }
   const existing = rateBuckets.get(key);
   if (!existing || existing.resetAt <= now) {
     rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
@@ -81,10 +111,21 @@ export async function authorizeDbRequest(
     };
   }
 
+  const masterSso = await readMasterSsoFromRequest(request).catch(() => null);
+
   if (options?.requireAdmin) {
+    if (masterSso && masterSso.role === "admin") {
+      return {
+        authorized: true,
+        isAdmin: true,
+        actorId: masterSso.sub,
+        actorEmail: masterSso.email,
+        tenantId: masterSso.tenantId ?? undefined,
+      };
+    }
     const configured = env("SPARROWX_ADMIN_API_KEY") || env("SPARROWX_SERVICE_KEY");
-    // In local dev without configured admin key, allow local loopback admin inspection; in production require key.
-    if (process.env.NODE_ENV === "production" || configured) {
+    // Only allow unauthenticated admin inspection on non-production loopback dev without a configured admin key.
+    if (process.env.NODE_ENV === "production" || configured || !isLoopbackRequest(request)) {
       return {
         authorized: false,
         isAdmin: false,
@@ -99,12 +140,39 @@ export async function authorizeDbRequest(
     };
   }
 
-  const masterSso = await readMasterSsoFromRequest(request).catch(() => null);
   if (masterSso) {
-    const resolvedTenantId = masterSso.tenantId ?? options?.targetTenantId;
+    const isAdmin = masterSso.role === "admin";
+    if (!isAdmin) {
+      if (
+        options?.targetEmail &&
+        options.targetEmail.trim().toLowerCase() !== masterSso.email.trim().toLowerCase()
+      ) {
+        return {
+          authorized: false,
+          isAdmin: false,
+          actorId: masterSso.sub,
+          reason: "Forbidden: target email does not match authenticated Master SSO account.",
+        };
+      }
+      if (
+        options?.targetTenantId &&
+        masterSso.tenantId &&
+        options.targetTenantId.trim() !== masterSso.tenantId.trim()
+      ) {
+        return {
+          authorized: false,
+          isAdmin: false,
+          actorId: masterSso.sub,
+          reason: "Forbidden: target tenant does not match authenticated Master SSO tenant.",
+        };
+      }
+    }
+    const resolvedTenantId = isAdmin
+      ? options?.targetTenantId ?? masterSso.tenantId ?? undefined
+      : masterSso.tenantId ?? undefined;
     return {
       authorized: true,
-      isAdmin: masterSso.role === "admin",
+      isAdmin,
       actorId: masterSso.sub,
       actorEmail: masterSso.email,
       ...(resolvedTenantId ? { tenantId: resolvedTenantId } : {}),
@@ -116,18 +184,33 @@ export async function authorizeDbRequest(
   const sessionUserId = session?.data?.clientId || session?.data?.discordId || undefined;
 
   if (sessionUserId) {
+    if (
+      sessionEmail &&
+      options?.targetEmail &&
+      options.targetEmail.trim().toLowerCase() !== sessionEmail.trim().toLowerCase()
+    ) {
+      return {
+        authorized: false,
+        isAdmin: false,
+        actorId: sessionUserId,
+        reason: "Forbidden: target email does not match authenticated session.",
+      };
+    }
     return {
       authorized: true,
       isAdmin: false,
       actorId: sessionUserId,
       actorEmail: sessionEmail,
-      tenantId: options?.targetTenantId,
     };
   }
 
-  // Self-service Studio session fallback (scoped strictly to the caller's own tenant/email)
-  const strictMode = env("SPARROWX_STRICT_DB_AUTH") === "true";
-  if (strictMode) {
+  // Fail closed in production or on non-loopback hosts unless explicitly disabled for local testing.
+  const strictFlag = env("SPARROWX_STRICT_DB_AUTH");
+  const isLocalDevOverride =
+    strictFlag === "false" ||
+    (strictFlag !== "true" && process.env.NODE_ENV !== "production" && isLoopbackRequest(request));
+
+  if (!isLocalDevOverride) {
     return {
       authorized: false,
       isAdmin: false,

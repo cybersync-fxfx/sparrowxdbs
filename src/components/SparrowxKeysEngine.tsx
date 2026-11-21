@@ -51,8 +51,8 @@ function generateCryptoUUID(): string {
   }
   const buf = new Uint8Array(16);
   crypto.getRandomValues(buf);
-  buf[6] = (buf[6] & 0x0f) | 0x40;
-  buf[8] = (buf[8] & 0x3f) | 0x80;
+  buf[6] = ((buf[6] ?? 0) & 0x0f) | 0x40;
+  buf[8] = ((buf[8] ?? 0) & 0x3f) | 0x80;
   const hex = Array.from(buf).map((b) => b.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
@@ -100,7 +100,7 @@ export function SparrowxKeysEngine() {
   const getCryptoRandomInt = (max: number): number => {
     const array = new Uint32Array(1);
     window.crypto.getRandomValues(array);
-    return array[0] % max;
+    return (array[0] ?? 0) % max;
   };
 
   // 1. Password Generator
@@ -130,7 +130,8 @@ export function SparrowxKeysEngine() {
     window.crypto.getRandomValues(values);
     let result = "";
     for (let i = 0; i < pwdLength; i++) {
-      result += pool[values[i] % pool.length];
+      const randVal = values[i] ?? 0;
+      result += pool[randVal % pool.length] ?? lower[0]!;
     }
     setMasterPassword(result);
     setGenerationCount((c) => c + 1);
@@ -140,7 +141,7 @@ export function SparrowxKeysEngine() {
   const generatePassphrase = useCallback(() => {
     const words: string[] = [];
     for (let i = 0; i < wordCount; i++) {
-      let w = EFF_WORDLIST[getCryptoRandomInt(EFF_WORDLIST.length)];
+      let w = EFF_WORDLIST[getCryptoRandomInt(EFF_WORDLIST.length)] ?? "sparrow";
       if (capitalizeWords) {
         w = w.charAt(0).toUpperCase() + w.slice(1);
       }
@@ -167,7 +168,7 @@ export function SparrowxKeysEngine() {
     window.crypto.getRandomValues(jwtBytes);
     let bin = "";
     for (let i = 0; i < jwtBytes.byteLength; i++) {
-      bin += String.fromCharCode(jwtBytes[i]);
+      bin += String.fromCharCode(jwtBytes[i] ?? 0);
     }
     setJwtSecret512(btoa(bin));
 
@@ -177,7 +178,8 @@ export function SparrowxKeysEngine() {
     window.crypto.getRandomValues(uriValues);
     let uKey = "";
     for (let i = 0; i < 32; i++) {
-      uKey += uriCharset[uriValues[i] % uriCharset.length];
+      const val = uriValues[i] ?? 0;
+      uKey += uriCharset[val % uriCharset.length] ?? "x";
     }
     setPostgresUriKey(uKey);
 

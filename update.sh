@@ -16,12 +16,17 @@ set -u
 AUTO_MODE="false"
 FORCE_DB_INSTALL="false"
 DELEGATE_FIX="false"
+XDP_SETUP_MODE="auto"
+FORCE_REBUILD="false"
 
 for arg in "$@"; do
   case "${arg}" in
     --auto|-y|--yes) AUTO_MODE="true" ;;
     --reinstall-db|--force-db) FORCE_DB_INSTALL="true" ;;
     --fix|--doctor) DELEGATE_FIX="true" ;;
+    --ddos|--xdp) XDP_SETUP_MODE="auto" ;;
+    --no-xdp) XDP_SETUP_MODE="off" ;;
+    --rebuild) FORCE_REBUILD="true" ;;
     --help|-h)
       cat <<'HELP'
 SparrowX A-to-Z Full-Stack Updater & Auto-Healer (update.sh)
@@ -32,6 +37,9 @@ Usage:
 Options:
   --auto, -y        Non-interactive mode (used by systemd auto-updater)
   --reinstall-db    Force re-sync of Local OVH PostgreSQL & per-user folders
+  --ddos, --xdp     Compile/refresh XDP/eBPF DDoS kernel scrubber alongside update
+  --no-xdp          Skip XDP attachment (keep sysctl, UFW & Fail2Ban hardening)
+  --rebuild         Force fresh app container image + host Vite/Nitro build
   --fix, --doctor   Run deep 12-stage recovery engine (./fix.sh) immediately
   --help, -h        Show this help screen
 HELP
@@ -1295,6 +1303,9 @@ strip_crlf_all() {
     "${INSTALL_DIR}"/*.sh \
     "${INSTALL_DIR}"/ovh/*.sh \
     "${INSTALL_DIR}"/deploy/*.sh \
+    "${INSTALL_DIR}"/deploy/xdp/*.sh \
+    "${INSTALL_DIR}"/public/*.sh \
+    "${INSTALL_DIR}"/public/xdp/*.sh \
     "${INSTALL_DIR}"/init-scripts/*.sh \
     "${INSTALL_DIR}/ovh/nginx.conf" \
     "${INSTALL_DIR}/ovh/schema.sql" \
@@ -1330,19 +1341,29 @@ fi
 
 strip_crlf_all
 chmod +x \
+  "${INSTALL_DIR}/setup.sh" \
   "${INSTALL_DIR}/update.sh" \
   "${INSTALL_DIR}/fix.sh" \
+  "${INSTALL_DIR}/verification.sh" \
   "${INSTALL_DIR}/manage-db.sh" \
   "${INSTALL_DIR}/ovh/update.sh" \
   "${INSTALL_DIR}/ovh/fix.sh" \
   "${INSTALL_DIR}/ovh/manage-db.sh" \
-  "${INSTALL_DIR}/deploy/doctor-fix.sh" 2>/dev/null || true
+  "${INSTALL_DIR}/deploy/ddos-setup.sh" \
+  "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" \
+  "${INSTALL_DIR}/deploy/doctor-fix.sh" \
+  "${INSTALL_DIR}/public/"*.sh \
+  "${INSTALL_DIR}/public/xdp/"*.sh 2>/dev/null || true
 
 if [ -d "/usr/local/bin" ]; then
+  ln -sf "${INSTALL_DIR}/setup.sh" /usr/local/bin/sparrowx-setup 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || true
+  [ -f "${INSTALL_DIR}/verification.sh" ] && ln -sf "${INSTALL_DIR}/verification.sh" /usr/local/bin/sparrowx-verify 2>/dev/null || true
+  [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
+  [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
 fi
 
 if [ -f "${INSTALL_DIR}/.env" ]; then
@@ -1520,7 +1541,13 @@ if [ -d "${INSTALL_DIR}/.git" ] && command -v git >/dev/null 2>&1; then
     AFTER_HASH="$(git rev-parse HEAD 2>/dev/null || echo "")"
     log_ok "Repository synced to commit $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
     strip_crlf_all
-    chmod +x "${INSTALL_DIR}"/*.sh "${INSTALL_DIR}"/ovh/*.sh "${INSTALL_DIR}"/deploy/*.sh 2>/dev/null || true
+    chmod +x \
+      "${INSTALL_DIR}"/*.sh \
+      "${INSTALL_DIR}"/ovh/*.sh \
+      "${INSTALL_DIR}"/deploy/*.sh \
+      "${INSTALL_DIR}"/deploy/xdp/*.sh \
+      "${INSTALL_DIR}"/public/*.sh \
+      "${INSTALL_DIR}"/public/xdp/*.sh 2>/dev/null || true
     if [ "${BEFORE_HASH}" != "${AFTER_HASH}" ] && [ "${SPARROWX_REEXEC:-0}" != "1" ]; then
       export SPARROWX_REEXEC=1
       log_info "Updater updated itself — re-launching new update.sh seamlessly..."
@@ -1534,7 +1561,7 @@ fi
 # ==============================================================================
 # STEP 3/7: Kernel Security Hardening, Package Locks & UFW Firewall
 # ==============================================================================
-draw_progress 3 7 "Kernel Hardening & Firewall"
+draw_progress 3 7 "Kernel Hardening & DDoS Protection"
 
 if command -v apt-get >/dev/null 2>&1; then
   export DEBIAN_FRONTEND=noninteractive
@@ -1549,30 +1576,43 @@ if command -v apt-get >/dev/null 2>&1; then
   fi
 fi
 
+if [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ]; then
+  log_info "Synchronizing L3/L4 kernel sysctl, Fail2Ban, UFW ports & XDP/eBPF DDoS scrubber (mode=${XDP_SETUP_MODE})..."
+  bash "${INSTALL_DIR}/deploy/ddos-setup.sh" --auto --xdp-mode "${XDP_SETUP_MODE}" || \
+    log_warn "DDoS/XDP refresh reported a warning; verifying baseline sysctl profile"
+fi
+
 if [ ! -f /etc/sysctl.d/99-sparrowx-hardening.conf ]; then
   cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
-# SparrowX Autonomous Kernel Security & High-Throughput Tuning
+# SparrowX L3/L4 DDoS, SYN-Flood & Anti-Spoofing Kernel Profile
 net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_synack_retries = 2
+net.ipv4.tcp_syn_retries = 3
+net.ipv4.tcp_fin_timeout = 15
+net.ipv4.tcp_rfc1337 = 1
 net.ipv4.conf.all.rp_filter = 1
 net.ipv4.conf.default.rp_filter = 1
 net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
 net.ipv4.conf.all.send_redirects = 0
 net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.all.log_martians = 1
 net.core.somaxconn = 65535
+net.core.netdev_max_backlog = 16384
 net.ipv4.tcp_max_syn_backlog = 65535
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
 EOF
   sysctl --system >/dev/null 2>&1 || true
-  if command -v apt-get >/dev/null 2>&1; then
-    apt-get install -y -qq unattended-upgrades fail2ban psmisc iproute2 >/dev/null 2>&1 || true
-    systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
-    systemctl enable --now fail2ban >/dev/null 2>&1 || true
-  fi
-  log_ok "Kernel SYN-cookie shield, Fail2Ban & unattended CVE patching active"
-else
-  log_ok "OS kernel hardening & Fail2Ban active"
 fi
+if [ ! -f /etc/apt/apt.conf.d/20auto-upgrades ] && command -v apt-get >/dev/null 2>&1; then
+  apt-get install -y -qq unattended-upgrades fail2ban psmisc iproute2 >/dev/null 2>&1 || true
+  systemctl enable --now unattended-upgrades >/dev/null 2>&1 || true
+  systemctl enable --now fail2ban >/dev/null 2>&1 || true
+fi
+log_ok "Kernel SYN-cookie shield, BBR, Fail2Ban & L3/L4 DDoS layer active"
 
 if command -v ufw >/dev/null 2>&1; then
   ufw allow 22/tcp >/dev/null 2>&1 || true
@@ -1798,6 +1838,13 @@ render_sparrowx_nginx_conf() {
   fi
 
   cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
+# ============================================================================
+# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (L7 DDOS SHIELD ENABLED)
+# ============================================================================
+limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=45r/s;
+limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=25r/s;
+limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
+
 # 1. Master SparrowX Command Center & Default Fallback (${SPARROWX_DOMAIN})
 server {
     listen 80 default_server;
@@ -1806,19 +1853,34 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
     client_max_body_size 150M;
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    send_timeout 15s;
+    keepalive_timeout 30s;
+    reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
+
+    limit_conn spx_conn_limit 40;
+    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-SparrowX-WAF "ACTIVE" always;
+    add_header X-SparrowX-Shield "PROTECTED" always;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     location /rest/v1/ {
+        limit_req zone=spx_api_req burst=60 nodelay;
         set \$upstream_app http://sparrowx:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
@@ -1869,15 +1931,34 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
     client_max_body_size 150M;
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    send_timeout 15s;
+    keepalive_timeout 30s;
+    reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
+
+    limit_conn spx_conn_limit 40;
+    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_req_status 429;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-SparrowX-WAF "ACTIVE" always;
+    add_header X-SparrowX-Shield "PROTECTED" always;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     location /rest/v1/ {
+        limit_req zone=spx_api_req burst=60 nodelay;
         set \$upstream_app http://sparrowx:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
@@ -1930,15 +2011,34 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
     client_max_body_size 150M;
+    client_body_timeout 10s;
+    client_header_timeout 10s;
+    send_timeout 15s;
+    keepalive_timeout 30s;
+    reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
+
+    limit_conn spx_conn_limit 40;
+    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_req_status 429;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-SparrowX-WAF "ACTIVE" always;
+    add_header X-SparrowX-Shield "PROTECTED" always;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
     location /rest/v1/ {
+        limit_req zone=spx_api_req burst=60 nodelay;
         set \$upstream_app http://sparrowx:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
@@ -2276,7 +2376,10 @@ if [ "${HAS_DOCKER}" = "true" ]; then
 
   if [ -n "${IS_PG_RUNNING}" ] && [ -n "${IS_PGRST_RUNNING}" ] && [ "${FORCE_DB_INSTALL}" = "false" ]; then
     log_info "PostgreSQL & PostgREST running cleanly — rebuilding ${APP_SERVICE} container..."
-    if compose_cmd -f "${COMPOSE_FILE}" build "${APP_SERVICE}" && compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
+    BUILD_ARGS=("build")
+    [ "${FORCE_REBUILD}" = "true" ] && BUILD_ARGS+=("--no-cache")
+    BUILD_ARGS+=("${APP_SERVICE}")
+    if compose_cmd -f "${COMPOSE_FILE}" "${BUILD_ARGS[@]}" && compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
       docker start sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
       render_sparrowx_nginx_conf
       docker restart sparrowx-nginx >/dev/null 2>&1 || true
@@ -2300,7 +2403,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     if ! compose_cmd -f "${COMPOSE_FILE}" up --build -d --remove-orphans; then
       log_warn "Initial Compose startup hit conflict — cleaning bridge networks, stale containers & retrying"
       compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
-      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
       docker network prune -f >/dev/null 2>&1 || true
       free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
       command -v fuser >/dev/null 2>&1 && fuser -k 5432/tcp >/dev/null 2>&1 || true
@@ -2499,8 +2602,11 @@ echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres Host    : 
 echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres DB/User : ${C_WHITE}${POSTGRES_DB} / ${POSTGRES_USER}${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} Postgres Pass    : ${C_YELLOW}${POSTGRES_PASSWORD}${C_RESET}"
 echo -e "${C_GREEN}╠══════════════════════════════════════════════════════════════════════════╣${C_RESET}"
-echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}Quick Operations CLI:${C_RESET}                                                   ${C_GREEN}║${C_RESET}"
+echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}Quick Operations CLI & Setup Links:${C_RESET}                                     ${C_GREEN}║${C_RESET}"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Full Update      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./update.sh  (or: sparrowx-update)"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Auto-Heal Doctor : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./fix.sh     (or: sparrowx-fix / sparrowx-doctor)"
+printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} DDoS / XDP Setup : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "sparrowx-ddos (or: sparrowx-xdp --status)"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Database TUI     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "./manage-db.sh (or: sparrowx-db)"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Single-File DDoS : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${SPARROWX_DOMAIN}/ddos-setup.sh"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} XDP C / Setup    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${SPARROWX_DOMAIN}/setup.sh"
 echo -e "${C_GREEN}╚══════════════════════════════════════════════════════════════════════════╝${C_RESET}"

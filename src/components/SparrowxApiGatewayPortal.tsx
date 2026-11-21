@@ -69,16 +69,23 @@ const ENDPOINTS: EndpointMeta[] = [
     exampleQuery: "select=*&severity=eq.High&order=created_at.desc&limit=5",
   },
   {
-    path: "/rest/v1/threat_indicators",
+    path: "/rest/v1/threat_feeds",
     method: "GET",
     description: "Harvested IOCs, malicious IP ranges, and MITRE ATT&CK patterns.",
     category: "Security Telemetry",
-    exampleQuery: "select=*&severity=eq.Critical",
+    exampleQuery: "select=*&severity=eq.High&limit=10",
   },
   {
     path: "/api/v1/health",
     method: "GET",
     description: "Edge health probe reporting node availability and latency.",
+    category: "System Health",
+    exampleQuery: "",
+  },
+  {
+    path: "/api/db/health",
+    method: "GET",
+    description: "Sovereign PostgreSQL 16 cluster connectivity and provisioner status.",
     category: "System Health",
     exampleQuery: "",
   },
@@ -95,18 +102,20 @@ function getOrCreateUserDbApiKey(userId: string): string {
 }
 
 export function SparrowxApiGatewayPortal() {
-  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => {
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(null);
+
+  useEffect(() => {
     const verified = verifySessionToken();
-    if (!verified) return null;
-    return {
+    if (!verified) return;
+    setSessionUser({
       id: verified.sub,
       email: verified.email,
       fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
       password: "",
       admin: verified.role === "admin" ? "yes" : "no",
       tenantId: verified.tenantId,
-    };
-  });
+    });
+  }, []);
 
   const [authMode, setAuthMode] = useState<"signin" | "register">("signin");
   const [fullName, setFullName] = useState("");
@@ -117,8 +126,8 @@ export function SparrowxApiGatewayPortal() {
 
   const [userApiKey, setUserApiKey] = useState<string>("");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [selectedEndpoint, setSelectedEndpoint] = useState<EndpointMeta>(ENDPOINTS[0]);
-  const [customParams, setCustomParams] = useState(ENDPOINTS[0].exampleQuery);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<EndpointMeta>(() => ENDPOINTS[0]!);
+  const [customParams, setCustomParams] = useState(ENDPOINTS[0]?.exampleQuery ?? "");
   const [apiResponse, setApiResponse] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [statusCode, setStatusCode] = useState<number | null>(null);
@@ -388,11 +397,14 @@ print(response.json())`;
 
               {authMode === "register" && (
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
+                  <label htmlFor="api-gw-fullname" className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
                     Full Name
                   </label>
                   <input
+                    id="api-gw-fullname"
+                    name="fullName"
                     type="text"
+                    autoComplete="name"
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
@@ -403,11 +415,15 @@ print(response.json())`;
               )}
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
+                <label htmlFor="api-gw-email" className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
                   Account Email
                 </label>
                 <input
+                  id="api-gw-email"
+                  name="email"
                   type="email"
+                  autoComplete="username"
+                  spellCheck={false}
                   required
                   value={loginEmail}
                   onChange={(e) => setLoginEmail(e.target.value)}
@@ -417,11 +433,14 @@ print(response.json())`;
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
+                <label htmlFor="api-gw-password" className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
                   Password (min 6 chars)
                 </label>
                 <input
+                  id="api-gw-password"
+                  name="password"
                   type="password"
+                  autoComplete={authMode === "signin" ? "current-password" : "new-password"}
                   required
                   minLength={6}
                   value={loginPassword}

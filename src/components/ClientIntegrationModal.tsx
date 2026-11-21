@@ -69,6 +69,7 @@ export function ClientIntegrationModal({
   onOpenAttackSimulator?: (serviceName: string) => void;
 }) {
   const isAiService =
+    service.category?.includes("ai_shield") ||
     service.category?.includes("ai_agent_shield") ||
     service.category?.includes("AI") ||
     service.name.toLowerCase().includes("ai") ||
@@ -81,9 +82,11 @@ export function ClientIntegrationModal({
     ? service.category?.includes("Voice") || service.endpoint.includes("voice")
       ? "voice_multimodal"
       : "ai_agent"
-    : service.category?.includes("api") || service.endpoint.includes("api.")
-      ? "api_backend"
-      : "website";
+    : service.category?.includes("edge_container") || service.category?.includes("docker")
+      ? "edge_container"
+      : service.category?.includes("api") || service.endpoint.includes("api.")
+        ? "api_backend"
+        : "website";
 
   const [selectedCategory, setSelectedCategory] = useState<ProductTechnologyCategory>(initialCategory);
 
@@ -133,10 +136,12 @@ export function ClientIntegrationModal({
   };
 
   const handleVerifyDns = async () => {
-    const targetHost = (customEndpoint || service.endpoint)
-      .replace(/^https?:\/\//i, "")
-      .split("/")[0]
-      .split(":")[0];
+    const targetHost =
+      (
+        (customEndpoint || service.endpoint)
+          .replace(/^https?:\/\//i, "")
+          .split("/")[0] ?? ""
+      ).split(":")[0] ?? "";
     if (!targetHost) return;
 
     setIsVerifyingDns(true);
@@ -620,7 +625,7 @@ export function ClientIntegrationModal({
                     <tr className="bg-black/40 text-zinc-200">
                       <td className="py-2 px-3 font-bold text-amber-400">CNAME</td>
                       <td className="py-2 px-3 font-semibold text-white">
-                        {(customEndpoint || service.endpoint).replace(/^https?:\/\//i, "").split("/")[0].split(".")[0] || "@"}
+                        {((customEndpoint || service.endpoint).replace(/^https?:\/\//i, "").split("/")[0] ?? "").split(".")[0] || "@"}
                       </td>
                       <td className="py-2 px-3 font-bold text-primary">proxy.sparrowx.net</td>
                       <td className="py-2 px-3 text-zinc-400">300s (Auto)</td>
@@ -675,6 +680,7 @@ export function ClientIntegrationModal({
                 { id: "python_fastapi", label: "Python FastAPI / ASGI", category: "api_backend" },
                 { id: "cloudflare_worker", label: "Cloudflare Edge Worker", category: "edge_container" },
                 { id: "docker_sidecar", label: "Docker Edge Armor", category: "edge_container" },
+                { id: "xdp_ebpf", label: "Linux XDP / eBPF (L4 DDoS)", category: "edge_container" },
                 { id: "curl", label: "Terminal cURL Probe", category: "api_backend" },
               ] as const
             )

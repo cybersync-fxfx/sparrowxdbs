@@ -621,12 +621,13 @@ STACK_STARTED="no"
 if [ "${DOCKER_AVAILABLE}" = "yes" ]; then
   LAUNCH_TRY=1
   while [ "${LAUNCH_TRY}" -le 3 ]; do
-    if docker compose -f docker-compose.ovh.yml up -d --build; then
+    if docker compose -f docker-compose.ovh.yml up -d --build --remove-orphans; then
       STACK_STARTED="yes"
       break
     fi
-    log_warn "Docker Compose launch attempt ${LAUNCH_TRY}/3 encountered a conflict; re-scanning ports & healing..."
+    log_warn "Docker Compose launch attempt ${LAUNCH_TRY}/3 encountered a container/port conflict; clearing stale sparrowx-* containers & re-scanning ports..."
     docker compose -f docker-compose.ovh.yml down --remove-orphans >/dev/null 2>&1 || true
+    docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
     docker network prune -f >/dev/null 2>&1 || true
     HTTP_PORT="$(find_free_port "${HTTP_PORT}" 8080 "HTTP Web Server")"
     HTTPS_PORT="$(find_free_port "${HTTPS_PORT}" 8443 "HTTPS SSL Web Server")"
@@ -638,6 +639,7 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ]; then
     sed -i "s/^APP_HOST_PORT=.*/APP_HOST_PORT=${APP_HOST_PORT}/" .env
     sed -i "s/^PGRST_HOST_PORT=.*/PGRST_HOST_PORT=${PGRST_HOST_PORT}/" .env
     sed -i "s/^PG_HOST_PORT=.*/PG_HOST_PORT=${PG_HOST_PORT}/" .env
+    sleep 2
     LAUNCH_TRY=$((LAUNCH_TRY + 1))
   done
 
@@ -706,9 +708,17 @@ fi
 # ============================================================================
 log_info "[Step 9/9] Verifying live HTTP/HTTPS, shifting Cloud DB to Local OVH DB & installing CLI tools..."
 echo "SPARROWX_STUDIO_DOMAIN=${SPARROWX_STUDIO_DOMAIN}" >> "${INSTALL_DIR}/.env" 2>/dev/null || true
-chmod +x "${INSTALL_DIR}/manage-db.sh" "${INSTALL_DIR}/update.sh" 2>/dev/null || true
+chmod +x "${INSTALL_DIR}"/*.sh "${INSTALL_DIR}"/deploy/*.sh "${INSTALL_DIR}"/deploy/xdp/*.sh "${INSTALL_DIR}"/public/*.sh "${INSTALL_DIR}"/public/xdp/*.sh 2>/dev/null || true
+ln -sf "${INSTALL_DIR}/setup.sh" /usr/local/bin/sparrowx-setup 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
+ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
+[ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
+[ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
+
+if [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ]; then
+  bash "${INSTALL_DIR}/deploy/ddos-setup.sh" --auto >/dev/null 2>&1 || true
+fi
 
 ATTEMPTS=0
 while [ "${ATTEMPTS}" -lt 30 ]; do

@@ -412,13 +412,11 @@ export async function runLivePublicDomainScan(
   // 3. Live HTTPS Reachability, Header & CORS Inspection Probe
   try {
     const probeStart = performance.now();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
     try {
       const corsRes = await fetch(fullUrl, {
         method: "GET",
         mode: "cors",
-        signal: controller.signal,
+        signal: AbortSignal.timeout(3500),
       });
       httpsReachable = true;
       latencyMs = Math.max(8, Math.round(performance.now() - probeStart));
@@ -434,12 +432,11 @@ export async function runLivePublicDomainScan(
       await fetch(fullUrl, {
         method: "HEAD",
         mode: "no-cors",
-        signal: controller.signal,
+        signal: AbortSignal.timeout(3500),
       });
       httpsReachable = true;
       latencyMs = Math.max(8, Math.round(performance.now() - probeStart));
     }
-    clearTimeout(timeoutId);
   } catch {
     latencyMs = Math.max(18, Math.round(performance.now() - startMs));
     // Honest result: the HTTPS probe failed, so the site is NOT reachable over HTTPS
@@ -450,14 +447,11 @@ export async function runLivePublicDomainScan(
 
   // 4. Safe public endpoint check (/.well-known/security.txt)
   try {
-    const secController = new AbortController();
-    const secTimeout = setTimeout(() => secController.abort(), 2000);
     const secRes = await fetch(`${fullUrl}/.well-known/security.txt`, {
       method: "GET",
       mode: "cors",
-      signal: secController.signal,
+      signal: AbortSignal.timeout(2000),
     });
-    clearTimeout(secTimeout);
     if (secRes.ok) {
       const text = await secRes.text();
       if (text.toLowerCase().includes("contact:")) {
@@ -1378,22 +1372,20 @@ export function LandingLiveSecurityScanner({
                     <span>{scanResult.cleanHost}</span>
                   </span>
                   <CyberPill
-                    icon="shield"
-                    label={scanResult.targetCategory}
-                    variant="cyan"
-                    size="sm"
+                    variant="shield"
+                    title={scanResult.targetCategory}
+                    actionClass="border-cyan-500/30 bg-cyan-500/10 text-cyan-300"
                   />
                   <CyberPill
-                    icon={scanResult.score < 80 ? "alert" : "check"}
-                    label={scanResult.riskLevel}
-                    variant={
+                    variant={scanResult.score < 80 ? "shield-alert" : "shield"}
+                    title={scanResult.riskLevel}
+                    actionClass={
                       scanResult.score < 60
-                        ? "red"
+                        ? "border-red-500/30 bg-red-500/10 text-red-300"
                         : scanResult.score < 80
-                          ? "amber"
-                          : "emerald"
+                          ? "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                          : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
                     }
-                    size="sm"
                   />
                 </div>
 

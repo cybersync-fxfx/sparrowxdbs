@@ -53,8 +53,8 @@ export const Route = createFileRoute("/docs/errors")({
   }),
   validateSearch: (search: Record<string, unknown>): { code?: string; ref?: string } => {
     return {
-      code: typeof search.code === "string" ? search.code : undefined,
-      ref: typeof search.ref === "string" ? search.ref : undefined,
+      ...(typeof search.code === "string" ? { code: search.code } : {}),
+      ...(typeof search.ref === "string" ? { ref: search.ref } : {}),
     };
   },
   component: DocsErrorsPage,

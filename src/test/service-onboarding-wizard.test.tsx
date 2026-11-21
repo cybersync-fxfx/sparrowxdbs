@@ -70,7 +70,7 @@ describe("ServiceOnboardingWizard Contextual Setup Flow", () => {
         name: "Support LLM Bot",
         domain: "agent://support-prod",
         assetType: "ai_agent",
-        enabledModules: expect.arrayContaining(["ai_agent_shield"]),
+        enabledModules: expect.arrayContaining(["ai_shield"]),
       })
     );
   });

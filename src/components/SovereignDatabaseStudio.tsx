@@ -19,6 +19,7 @@ import {
   ensureDeveloperConnection,
   syncMasterSsoSession,
 } from "@/lib/developer-connection";
+import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
@@ -457,7 +458,18 @@ function inferColumnType(col: string, pk: string, sampleVal: unknown): string {
 }
 
 interface FrameworkGuide {
-  id: "react" | "nextjs" | "tanstack" | "astro" | "vue" | "nuxt" | "sveltekit" | "solidjs" | "redwood";
+  id:
+    | "react"
+    | "nextjs"
+    | "tanstack"
+    | "astro"
+    | "vue"
+    | "nuxt"
+    | "sveltekit"
+    | "solidjs"
+    | "redwood"
+    | "prisma"
+    | "python";
   label: string;
   badge: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -913,30 +925,16 @@ export function SovereignDatabaseStudio({
   const tableDialogTitleId = useId();
   const bucketDialogTitleId = useId();
 
-  // Resolve effective user: prop currentUser or verified token in localStorage
-  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => {
-    if (currentUser) return currentUser;
-    const verified = verifySessionToken();
-    if (verified) {
-      return {
-        id: verified.sub,
-        email: verified.email,
-        fullName: verified.fullName || verified.email.split("@")[0] || "Developer",
-        password: "",
-        admin: verified.role === "admin" ? "yes" : "no",
-        tenantId: verified.tenantId,
-      };
-    }
-    return null;
-  });
+  // Resolve effective user safely for SSR; mount effect below hydrates browser token
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => currentUser ?? null);
 
   // Environment state: "production" | "staging" | "development"
   const [activeEnv, setActiveEnv] = useState<"production" | "staging" | "development">("production");
 
   // Navigation mode: "landing" (public) or "studio" (authenticated workspace)
-  const [viewMode, setViewMode] = useState<"landing" | "studio">(() => {
-    return currentUser || verifySessionToken() ? "studio" : "landing";
-  });
+  const [viewMode, setViewMode] = useState<"landing" | "studio">(() =>
+    currentUser ? "studio" : "landing",
+  );
 
   useEffect(() => {
     if (currentUser) {
@@ -1358,16 +1356,17 @@ export function SovereignDatabaseStudio({
             prev?.connectionString ||
             connected.connectionString ||
             `postgresql://${connected.dbUser}@${connected.dbHost}:${connected.dbPort}/${connected.dbName}?sslmode=require`,
-          planId: connected.planId,
-          planName: connected.planName,
-          storageLimitMb: connected.storageLimitMb,
-          maxConnections: connected.maxConnections,
+          ...(connected.planId !== undefined ? { planId: connected.planId } : {}),
+          ...(connected.planName !== undefined ? { planName: connected.planName } : {}),
+          ...(connected.storageLimitMb !== undefined ? { storageLimitMb: connected.storageLimitMb } : {}),
+          ...(connected.maxConnections !== undefined ? { maxConnections: connected.maxConnections } : {}),
         }));
       });
       return () => {
         active = false;
       };
     }
+    return undefined;
   }, [sessionUser]);
 
   // SQL Studio state
@@ -3341,13 +3340,17 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             setActiveSection("settings");
                             setSettingsSubTab("billing");
                             setViewMode("studio");
-                            toast.success(
+                            emitEngineToast(
                               `Selected ${tier.name} plan (${tier.price}${tier.unit || ""}) — review in Subscription & Billing`,
+                              "success",
+                              "Plan Selected",
                             );
                           } else {
                             scrollToAuthCard("register");
-                            toast.info(
+                            emitEngineToast(
                               `Selected ${tier.name} plan — create your isolated account to continue`,
+                              "info",
+                              "Create Account",
                             );
                           }
                         }}
@@ -5251,9 +5254,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] text-zinc-400 uppercase block mb-1">Display Name</label>
+                          <label htmlFor="studio-account-display-name" className="text-[10px] text-zinc-400 uppercase block mb-1">Display Name</label>
                           <input
+                            id="studio-account-display-name"
+                            name="displayName"
                             type="text"
+                            autoComplete="name"
                             required
                             value={accountDisplayName}
                             onChange={(e) => setAccountDisplayName(e.target.value)}
@@ -5261,11 +5267,14 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] text-zinc-400 uppercase block mb-1">
+                          <label htmlFor="studio-account-new-password" className="text-[10px] text-zinc-400 uppercase block mb-1">
                             New Password (optional)
                           </label>
                           <input
+                            id="studio-account-new-password"
+                            name="newPassword"
                             type="password"
+                            autoComplete="new-password"
                             minLength={6}
                             value={accountNewPassword}
                             onChange={(e) => setAccountNewPassword(e.target.value)}
@@ -5304,6 +5313,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs font-mono">
                         <input
                           type="text"
+                          name="newUserFullName"
+                          autoComplete="name"
                           required
                           value={newUserFullName}
                           onChange={(e) => setNewUserFullName(e.target.value)}
@@ -5312,6 +5323,9 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         />
                         <input
                           type="email"
+                          name="newUserEmail"
+                          autoComplete="email"
+                          spellCheck={false}
                           required
                           value={newUserEmail}
                           onChange={(e) => setNewUserEmail(e.target.value)}
@@ -5320,6 +5334,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         />
                         <input
                           type="password"
+                          name="newUserPassword"
+                          autoComplete="new-password"
                           required
                           minLength={6}
                           value={newUserPassword}
@@ -6406,7 +6422,11 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                                 type="button"
                                 onClick={() => {
                                   setSelectedPricingPlan(tier.id);
-                                  toast.success(`Workspace plan updated to ${tier.name} (${tier.price}${tier.unit || ""})`);
+                                  emitEngineToast(
+                                    `Workspace plan updated to ${tier.name} (${tier.price}${tier.unit || ""})`,
+                                    "success",
+                                    "Plan Updated",
+                                  );
                                 }}
                                 className={`rounded-lg border p-3 text-left transition-colors cursor-pointer ${
                                   active

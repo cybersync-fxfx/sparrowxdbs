@@ -6,7 +6,7 @@ async function run<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (e) {
-    if (e instanceof PortalError) throw new Error(`${e.code}: ${e.message}`);
+    if (e instanceof PortalError) throw new Error(`${e.code}: ${e.message}`, { cause: e });
     console.error(e);
     throw new Error(e instanceof Error ? e.message : "Something went wrong");
   }

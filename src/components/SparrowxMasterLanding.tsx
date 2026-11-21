@@ -459,24 +459,26 @@ export function SparrowxMasterLanding({
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
-  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => {
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(null);
+  const [devConnection, setDevConnection] = useState<DeveloperDbConnectionInfo | null>(null);
+  const [connectingDb, setConnectingDb] = useState(false);
+  const [copiedUri, setCopiedUri] = useState(false);
+
+  // Hydrate authenticated session on client mount so SSR and initial client HTML stay identical.
+  useEffect(() => {
     const verified = verifySessionToken();
-    if (!verified) return null;
-    return {
+    if (!verified) return;
+    setSessionUser({
       id: verified.sub,
       email: verified.email,
       fullName: verified.fullName || verified.email.split("@")[0] || "Operator",
       password: "",
       admin: verified.role === "admin" ? "yes" : "no",
       tenantId: verified.tenantId,
-    };
-  });
-  const [devConnection, setDevConnection] = useState<DeveloperDbConnectionInfo | null>(() => {
-    const verified = verifySessionToken();
-    return verified ? getCachedDeveloperConnection(verified.tenantId, verified.email) : null;
-  });
-  const [connectingDb, setConnectingDb] = useState(false);
-  const [copiedUri, setCopiedUri] = useState(false);
+    });
+    const cached = getCachedDeveloperConnection(verified.tenantId, verified.email);
+    if (cached) setDevConnection(cached);
+  }, []);
 
   useEffect(() => {
     if (!sessionUser) {
@@ -505,7 +507,7 @@ export function SparrowxMasterLanding({
       active = false;
       window.removeEventListener(DEVELOPER_CONNECTION_EVENT, onUpdate);
     };
-  }, [sessionUser?.email, sessionUser?.tenantId]);
+  }, [sessionUser]);
 
   // Highlight the nav link for the section currently in view.
   useEffect(() => {
@@ -738,6 +740,45 @@ export function SparrowxMasterLanding({
                       <div className="text-[11px] text-zinc-400">REST API &amp; SDKs</div>
                     </div>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductDropdownOpen(false);
+                      handleLaunch("game", "https://game.sparrowx.net", "game");
+                    }}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <Server className="size-4 text-white shrink-0" aria-hidden="true" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX Game Hosting</div>
+                      <div className="text-[11px] text-zinc-400">FiveM, Minecraft &amp; Pterodactyl</div>
+                    </div>
+                  </button>
+
+                  <a
+                    href="https://gamesec.sparrowx.net"
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <Shield className="size-4 text-red-400 shrink-0" aria-hidden="true" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX GameSec L4</div>
+                      <div className="text-[11px] text-zinc-400">Anycast Game DDoS Defense</div>
+                    </div>
+                  </a>
+
+                  <a
+                    href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <Globe className="size-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX NetSec Guard</div>
+                      <div className="text-[11px] text-zinc-400">Linux Agent &amp; WireGuard Tunnels</div>
+                    </div>
+                  </a>
                 </div>
               )}
             </div>
@@ -912,6 +953,54 @@ export function SparrowxMasterLanding({
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">api.sparrowx.net</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleLaunch("game", "https://game.sparrowx.net", "game");
+                }}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
+                  <Server className="size-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Game Hosting</div>
+                  <div className="text-[10px] text-zinc-400 truncate">FiveM, Minecraft, SA-MP &amp; Pterodactyl SSO</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">game.sparrowx.net</span>
+              </button>
+
+              <a
+                href="https://gamesec.sparrowx.net"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-red-500/15 border border-red-500/35 grid place-items-center text-red-400 shrink-0">
+                  <Shield className="size-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX GameSec L4</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Dedicated Anycast Game Server DDoS Defense</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">gamesec.sparrowx.net</span>
+              </a>
+
+              <a
+                href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400 shrink-0">
+                  <Globe className="size-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX NetSec Guard</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Linux Firewall Agent &amp; WireGuard Tunnels</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">netsec.sparrowx.net</span>
+              </a>
             </div>
 
             <div className="pt-2 border-t border-white/15 flex flex-col gap-2 font-mono text-xs">
@@ -1162,14 +1251,14 @@ export function SparrowxMasterLanding({
         </div>
       </section>
 
-      {/* SECTION 3: 6 DEDICATED PRODUCT TOOLS (BENTO GRID) */}
+      {/* SECTION 3: 9 DEDICATED PRODUCT TOOLS (UNIFIED ECOSYSTEM BENTO GRID) */}
       <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
         <div className="space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-            Six Focused Tools. Zero Clutter.
+            Nine Focused Platforms. One Connected Ecosystem.
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400">
-            Each tool has its own dedicated home with specialized features built for speed and security.
+            Every platform runs on its own dedicated subdomain and synchronizes seamlessly with your SparrowX Developer account.
           </p>
         </div>
 
@@ -1327,6 +1416,82 @@ export function SparrowxMasterLanding({
             >
               <span>View VPS Pricing</span>
               <ArrowRight className="size-3" aria-hidden="true" />
+            </a>
+          </div>
+
+          {/* 7. SparrowX Game Hosting */}
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
+                  <Server className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  DISCORD + PTERO SSO
+                </span>
+              </div>
+              <h3 className="font-bold text-white text-base font-sans">SparrowX Game Hosting</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Low-ping Asia-IN NVMe Gen4 servers for FiveM, SA-MP, Minecraft, and Discord bots with SparrowCoins wallet and 1-click Pterodactyl panel auto-login.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleLaunch("game", "https://game.sparrowx.net", "game")}
+              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>game.sparrowx.net</span>
+              <ArrowUpRight className="size-3" aria-hidden="true" />
+            </button>
+          </div>
+
+          {/* 8. SparrowX GameSec L4 Defense */}
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-red-500/15 border border-red-500/35 grid place-items-center text-red-400">
+                  <Shield className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  L3/L4 ANYCAST
+                </span>
+              </div>
+              <h3 className="font-bold text-white text-base font-sans">SparrowX GameSec L4</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Dedicated Anycast L3/L4 packet scrubbing and stateful UDP/RakNet/ENet filtering engineered to keep multiplayer game servers online under flood attacks.
+              </p>
+            </div>
+            <a
+              href="https://gamesec.sparrowx.net"
+              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>gamesec.sparrowx.net</span>
+              <ArrowUpRight className="size-3" aria-hidden="true" />
+            </a>
+          </div>
+
+          {/* 9. SparrowX NetSec Guard */}
+          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-t border-white/15">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="size-9 rounded-md bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400">
+                  <Globe className="size-4" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                  WIREGUARD + XDP
+                </span>
+              </div>
+              <h3 className="font-bold text-white text-base font-sans">SparrowX NetSec Guard</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Autonomous Linux security agent, WireGuard Guard tunnels, nftables firewall automation, and live IP threat radar connected via Master SSO.
+              </p>
+            </div>
+            <a
+              href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
+              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>netsec.sparrowx.net</span>
+              <ArrowUpRight className="size-3" aria-hidden="true" />
             </a>
           </div>
         </div>

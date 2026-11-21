@@ -10,7 +10,7 @@ const { Pool } = pg;
 
 const SAFE_PG_IDENTIFIER_RE = /^[a-z][a-z0-9_]{2,54}$/;
 const DANGEROUS_SQL_RE =
-  /\b(alter\s+system|drop\s+database|create\s+database|pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|lo_import|lo_export|dblink)\b|copy\s+.+\s+program\b|\bsuperuser\b/i;
+  /\b(alter\s+system|drop\s+database|create\s+database|pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|pg_execute_server_program|pg_terminate_backend|pg_cancel_backend|pg_reload_conf|lo_import|lo_export|dblink|create\s+role|alter\s+role|drop\s+role|set\s+(?:local\s+)?role|reset\s+role|reset\s+all|discard\s+all|set\s+(?:local\s+)?session\s+authorization|reset\s+session\s+authorization|security\s+definer|create\s+language|create\s+extension\s+(?:if\s+not\s+exists\s+)?(?:dblink|file_fdw|adminpack|plperlu|plpython3u|pltclu))\b|copy\s+.+\s+program\b|\bsuperuser\b|\bdo\s*\$/i;
 
 export interface ProvisionDbRequest {
   tenantId: string;
@@ -147,6 +147,13 @@ export function assertSafePgIdentifier(name: string): string {
   return name;
 }
 
+function stripSqlComments(sql: string): string {
+  // Strip block and line comments before keyword policy evaluation so comment obfuscation cannot bypass checks.
+  return sql
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/--[^\r\n]*/g, " ");
+}
+
 export function validateTenantSqlSafety(sql: string): string {
   const trimmed = sql.trim();
   if (!trimmed) {
@@ -155,7 +162,8 @@ export function validateTenantSqlSafety(sql: string): string {
   if (trimmed.length > 32_000) {
     throw new DbProvisionerError(400, "SQL query exceeds 32 KB limit.");
   }
-  if (DANGEROUS_SQL_RE.test(trimmed)) {
+  const normalizedForCheck = stripSqlComments(trimmed);
+  if (DANGEROUS_SQL_RE.test(trimmed) || DANGEROUS_SQL_RE.test(normalizedForCheck)) {
     throw new DbProvisionerError(
       403,
       "Cluster-level or filesystem PostgreSQL commands are blocked in tenant SQL runner.",
@@ -376,9 +384,7 @@ export async function provisionSeparateUserDatabase(
 
     if (existingReg.rowCount && existingReg.rowCount > 0 && !input.isAdminOverride) {
       const owner = existingReg.rows[0];
-      const sameOwner =
-        owner.user_email.toLowerCase() === email ||
-        owner.user_id === input.userId;
+      const sameOwner = Boolean(owner && owner.user_email.toLowerCase() === email);
       if (!sameOwner) {
         await recordAuditLog(adminPool, {
           action: "provision_blocked",
@@ -386,7 +392,7 @@ export async function provisionSeparateUserDatabase(
           tenantId: input.tenantId,
           actor: email,
           status: "Denied",
-          detail: `Ownership mismatch against existing tenant ${owner.tenant_id}`,
+          detail: `Ownership mismatch against existing tenant ${owner?.tenant_id ?? "unknown"}`,
         });
         throw new DbProvisionerError(
           409,
@@ -532,6 +538,7 @@ async function assertDatabaseOwnership(
   dbName: string,
   actorEmail?: string,
   isAdmin?: boolean,
+  actorTenantId?: string,
 ) {
   const safeDb = assertSafePgIdentifier(dbName);
   const res = await adminPool.query<{
@@ -551,9 +558,23 @@ async function assertDatabaseOwnership(
   if (res.rowCount === 0) {
     throw new DbProvisionerError(404, `Database ${safeDb} not found in SparrowX registry.`);
   }
-  const row = res.rows[0];
-  if (!isAdmin && actorEmail && row.user_email.toLowerCase() !== actorEmail.toLowerCase()) {
-    throw new DbProvisionerError(403, `Forbidden: you do not own database ${safeDb}.`);
+  const row = res.rows[0]!;
+  if (!isAdmin) {
+    const cleanActorEmail = actorEmail?.trim().toLowerCase() || "";
+    const cleanActorTenant = actorTenantId?.trim() || "";
+    if (!cleanActorEmail && !cleanActorTenant) {
+      throw new DbProvisionerError(
+        403,
+        `Forbidden: authenticated identity required to access database ${safeDb}.`,
+      );
+    }
+    if (cleanActorEmail) {
+      if (row.user_email.toLowerCase() !== cleanActorEmail) {
+        throw new DbProvisionerError(403, `Forbidden: you do not own database ${safeDb}.`);
+      }
+    } else if (row.tenant_id !== cleanActorTenant) {
+      throw new DbProvisionerError(403, `Forbidden: you do not own database ${safeDb}.`);
+    }
   }
   return row;
 }
@@ -818,11 +839,16 @@ export async function executeTenantSqlQuery(
   }
 
   const plan = resolveDbPlan(row.plan_id);
+  const tenantRole = row.db_user ? assertSafePgIdentifier(row.db_user) : null;
   const tenantPool = await openAdminPool(dbName);
   const started = Date.now();
+  const client = await tenantPool.connect();
   try {
-    await tenantPool.query(`SET statement_timeout = '${plan.statementTimeoutMs}ms';`);
-    const result = await tenantPool.query(safeSql);
+    await client.query(`SET statement_timeout = '${plan.statementTimeoutMs}ms';`);
+    if (tenantRole && !isAdmin) {
+      await client.query(`SET ROLE "${tenantRole}";`);
+    }
+    const result = await client.query(safeSql);
     const durationMs = Date.now() - started;
     const allRows = Array.isArray(result.rows) ? result.rows : [];
     const truncated = allRows.length > 500;
@@ -841,6 +867,8 @@ export async function executeTenantSqlQuery(
       durationMs,
     };
   } finally {
+    await client.query("RESET ROLE;").catch(() => {});
+    client.release();
     await tenantPool.end().catch(() => {});
   }
 }
@@ -896,10 +924,23 @@ export async function listDatabaseSnapshots(
 export async function listDbAuditLogs(
   dbName?: string,
   limit = 50,
+  actorEmail?: string,
+  isAdmin = true,
+  actorTenantId?: string,
 ): Promise<DbAuditLogItem[]> {
+  if (dbName) {
+    assertSafePgIdentifier(dbName);
+  }
+  const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
   const adminPool = await openAdminPool();
   try {
     await ensureProvisionRegistryTables(adminPool);
+    if (!isAdmin) {
+      if (!dbName) {
+        throw new DbProvisionerError(403, "Forbidden: admin privileges required to list global audit logs.");
+      }
+      await assertDatabaseOwnership(adminPool, dbName, actorEmail, false, actorTenantId);
+    }
     const res = await adminPool.query<{
       id: string;
       action: string;
@@ -918,7 +959,7 @@ export async function listDbAuditLogs(
         : `SELECT id, action, db_name, tenant_id, actor, status, detail, created_at::text
            FROM public.provisioned_db_audit_logs
            ORDER BY created_at DESC LIMIT $1`,
-      dbName ? [dbName, limit] : [limit],
+      dbName ? [dbName, safeLimit] : [safeLimit],
     );
     return res.rows.map((r) => ({
       id: r.id,
@@ -988,13 +1029,27 @@ export async function listProvisionedDatabases(filter?: {
   try {
     await ensureProvisionRegistryTables(adminPool);
 
-    const usersRes = await adminPool
-      .query<{ cnt: string }>("SELECT COUNT(*)::text AS cnt FROM public.app_users")
-      .catch(() => ({ rows: [{ cnt: "0" }] }));
-    const totalUsers = Number(usersRes.rows[0]?.cnt ?? 0);
-
     const scopedEmail = !filter?.isAdmin && filter?.userEmail ? filter.userEmail.toLowerCase() : null;
     const scopedTenant = !filter?.isAdmin && filter?.tenantId ? filter.tenantId : null;
+
+    if (!filter?.isAdmin && !scopedEmail && !scopedTenant) {
+      return {
+        totalUsers: 0,
+        totalProvisionedDbs: 0,
+        totalStorageBytes: 0,
+        databases: [],
+      };
+    }
+
+    const totalUsers = filter?.isAdmin
+      ? Number(
+          (
+            await adminPool
+              .query<{ cnt: string }>("SELECT COUNT(*)::text AS cnt FROM public.app_users")
+              .catch(() => ({ rows: [{ cnt: "0" }] }))
+          ).rows[0]?.cnt ?? 0,
+        )
+      : 1;
 
     const whereClauses = [`d.datname LIKE 'spx_db_%'`];
     const params: string[] = [];

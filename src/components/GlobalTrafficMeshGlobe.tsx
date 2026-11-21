@@ -106,13 +106,15 @@ export interface RippleWave {
 
 // Clean any protocol, path, or port from domain strings
 export function sanitizeDomainName(raw: string): string {
-  return raw
-    .replace(/^https?:\/\//i, "")
-    .replace(/^agent:\/\//i, "")
-    .split("/")[0]
+  return (
+    raw
+      .replace(/^https?:\/\//i, "")
+      .replace(/^agent:\/\//i, "")
+      .split("/")[0] ?? ""
+  )
     .split(":")[0]
-    .trim()
-    .toLowerCase();
+    ?.trim()
+    .toLowerCase() ?? "";
 }
 
 // Preset Verified Real Webapps with Verified Authoritative DNS (No dummy or fake mock entries)
@@ -437,6 +439,26 @@ export function GlobalTrafficMeshGlobe({
   const [selectedPacket, setSelectedPacket] = useState<LiveConnectionPacket | null>(null);
   const [showIntegrationGuide, setShowIntegrationGuide] = useState<boolean>(false);
   const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string>("");
+
+  const copyToClipboard = async (text: string, snippetId: string) => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setCopiedSnippet(snippetId);
+        setCopyFeedback(`Copied ${snippetId} integration snippet to clipboard.`);
+        showToast?.("Copied snippet to clipboard.");
+        setTimeout(() => {
+          setCopiedSnippet((curr) => (curr === snippetId ? null : curr));
+        }, 2500);
+        return;
+      }
+      throw new Error("Clipboard API unavailable");
+    } catch {
+      setCopyFeedback("Automatic copy failed; select and copy the snippet manually.");
+      showToast?.("Unable to access clipboard — copy manually from code box.");
+    }
+  };
 
   // Live Domain DNS Resolver Toolbar State
   const [customDomainInput, setCustomDomainInput] = useState<string>("");
@@ -616,7 +638,7 @@ export function GlobalTrafficMeshGlobe({
         return;
       }
     }
-    if (!allOrigins.some((o) => o.id === activeOriginId) && allOrigins.length > 0) {
+    if (!allOrigins.some((o) => o.id === activeOriginId) && allOrigins[0]) {
       setActiveOriginId(allOrigins[0].id);
     }
   }, [allOrigins, activeOriginId, activeTenantId]);
@@ -770,6 +792,7 @@ export function GlobalTrafficMeshGlobe({
           seenPacketIds.add(pktId);
 
           const node = GLOBAL_VISITOR_NODES[idx % GLOBAL_VISITOR_NODES.length];
+          if (!node) return;
           const sev = String(row.severity || "Low");
           const title = String(row.title || "Telemetry Event");
           const isAi =
@@ -804,13 +827,13 @@ export function GlobalTrafficMeshGlobe({
               city: node.city,
               flag: node.flag,
             },
-            originIp: activeOrigin.ip,
-            originName: activeOrigin.domain,
+            originIp: activeOrigin?.ip ?? "51.68.21.44",
+            originName: activeOrigin?.domain ?? "sparrowx.net",
             method: isBlocked ? "POST" : "GET",
             path: isAi ? "/api/v1/ai-guardrail" : "/api/v1/telemetry/ingest",
             status,
             httpCode: status === "BLOCKED" ? 403 : status === "RATE_LIMITED" ? 429 : 200,
-            latencyMs: activeOrigin.baseLatencyMs || 11,
+            latencyMs: activeOrigin?.baseLatencyMs || 11,
             bytes: 1024 + idx * 128,
             userAgent: "SparrowX-Edge-Connector/2.4",
             threatDetails: title,
@@ -986,7 +1009,9 @@ export function GlobalTrafficMeshGlobe({
         let visibleCount = 0;
 
         for (let i = 0; i < polygon.length; i++) {
-          const [lat, lng] = polygon[i];
+          const coord = polygon[i];
+          if (!coord) continue;
+          const [lat, lng] = coord;
           const pt = projectGeo(lat, lng);
           if (pt.visible) {
             avgZ += pt.z;
@@ -1018,6 +1043,7 @@ export function GlobalTrafficMeshGlobe({
       const activeArcs = arcsRef.current;
       for (let i = activeArcs.length - 1; i >= 0; i--) {
         const arc = activeArcs[i];
+        if (!arc) continue;
         arc.progress += 1 / arc.duration;
 
         if (arc.progress >= 1.08) {
@@ -1087,6 +1113,7 @@ export function GlobalTrafficMeshGlobe({
       const activeRipples = ripplesRef.current;
       for (let r = activeRipples.length - 1; r >= 0; r--) {
         const rip = activeRipples[r];
+        if (!rip) continue;
         rip.radius += 0.8;
         rip.alpha -= 0.035;
 
@@ -1226,8 +1253,8 @@ export function GlobalTrafficMeshGlobe({
 
 export function sparrowxShield(options = {}) {
   const apiKey = options.apiKey || "spx_live_948201a";
-  const originIp = options.originIp || "${activeOrigin.ip}";
-  const siteDomain = options.siteDomain || "${activeOrigin.domain}";
+  const originIp = options.originIp || "${activeOrigin?.ip ?? "51.68.21.44"}";
+  const siteDomain = options.siteDomain || "${activeOrigin?.domain ?? "sparrowx.net"}";
 
   return function (req, res, next) {
     const clientIp =
@@ -1778,7 +1805,7 @@ export default sparrowxShield;
                   </td>
 
                   <td className="py-2.5 text-muted-foreground">
-                    <span className="text-foreground font-semibold">{pkt.originIp}</span> ({activeOrigin.region.split(",")[0]})
+                    <span className="text-foreground font-semibold">{pkt.originIp}</span> ({activeOrigin?.region.split(",")[0] ?? "Global"})
                   </td>
 
                   <td className="py-2.5 font-sans">
@@ -2002,8 +2029,8 @@ export default sparrowxShield;
                 <div className="relative rounded-lg bg-background p-3.5 font-mono text-xs text-foreground border border-border overflow-x-auto max-h-48">
                   <pre>{`// sparrowx-shield.js (Save in your project root or /lib/sparrowx-shield.js)
 export function sparrowxShield(options = {}) {
-  const originIp = options.originIp || "${activeOrigin.ip}";
-  const siteDomain = options.siteDomain || "${activeOrigin.domain}";
+  const originIp = options.originIp || "${activeOrigin?.ip ?? "51.68.21.44"}";
+  const siteDomain = options.siteDomain || "${activeOrigin?.domain ?? "sparrowx.net"}";
 
   return function (req, res, next) {
     const clientIp =
@@ -2033,7 +2060,7 @@ export function sparrowxShield(options = {}) {
                     type="button"
                     onClick={() =>
                       copyToClipboard(
-                        `export function sparrowxShield(options = {}) {\n  const originIp = options.originIp || "${activeOrigin.ip}";\n  const siteDomain = options.siteDomain || "${activeOrigin.domain}";\n  return function (req, res, next) {\n    const clientIp = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "127.0.0.1";\n    const path = req.url || "/";\n    const isThreat = /(' OR '1'='1|union select|drop table|<script|eval\\\\(|etc\\\\/passwd|\\\\.env|wp-login)/i.test(path + JSON.stringify(req.body || {}));\n    if (isThreat) {\n      if (res.status && res.json) return res.status(403).json({ error: "Blocked by SparrowX Edge WAF", clientIp });\n      res.writeHead(403, { "Content-Type": "application/json" });\n      return res.end(JSON.stringify({ error: "Blocked by SparrowX Edge WAF", clientIp }));\n    }\n    if (typeof next === "function") next();\n  };\n}`,
+                        `export function sparrowxShield(options = {}) {\n  const originIp = options.originIp || "${activeOrigin?.ip ?? "51.68.21.44"}";\n  const siteDomain = options.siteDomain || "${activeOrigin?.domain ?? "sparrowx.net"}";\n  return function (req, res, next) {\n    const clientIp = (req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "127.0.0.1";\n    const path = req.url || "/";\n    const isThreat = /(' OR '1'='1|union select|drop table|<script|eval\\\\(|etc\\\\/passwd|\\\\.env|wp-login)/i.test(path + JSON.stringify(req.body || {}));\n    if (isThreat) {\n      if (res.status && res.json) return res.status(403).json({ error: "Blocked by SparrowX Edge WAF", clientIp });\n      res.writeHead(403, { "Content-Type": "application/json" });\n      return res.end(JSON.stringify({ error: "Blocked by SparrowX Edge WAF", clientIp }));\n    }\n    if (typeof next === "function") next();\n  };\n}`,
                         "file",
                       )
                     }
@@ -2057,14 +2084,14 @@ const app = express();
 
 // Attach SparrowX Shield (Zero npm dependencies required!)
 app.use(sparrowxShield({
-  originIp: "${activeOrigin.ip}",      // Your server's real public IP (${activeOrigin.ip})
-  siteDomain: "${activeOrigin.domain}", // Your real domain (${activeOrigin.domain})
+  originIp: "${activeOrigin?.ip ?? "51.68.21.44"}",      // Your server's real public IP (${activeOrigin?.ip ?? "51.68.21.44"})
+  siteDomain: "${activeOrigin?.domain ?? "sparrowx.net"}", // Your real domain (${activeOrigin?.domain ?? "sparrowx.net"})
 }));`}</pre>
                   <button
                     type="button"
                     onClick={() =>
                       copyToClipboard(
-                        `import { sparrowxShield } from "./sparrowx-shield.js";\n\napp.use(sparrowxShield({\n  originIp: "${activeOrigin.ip}",\n  siteDomain: "${activeOrigin.domain}",\n}));`,
+                        `import { sparrowxShield } from "./sparrowx-shield.js";\n\napp.use(sparrowxShield({\n  originIp: "${activeOrigin?.ip ?? "51.68.21.44"}",\n  siteDomain: "${activeOrigin?.domain ?? "sparrowx.net"}",\n}));`,
                         "code",
                       )
                     }
@@ -2073,6 +2100,9 @@ app.use(sparrowxShield({
                     {copiedSnippet === "code" ? "Copied!" : "Copy Code"}
                   </button>
                 </div>
+                <span className="sr-only" role="status" aria-live="polite">
+                  {copyFeedback}
+                </span>
               </div>
 
               {/* Step 3: Next.js or Python FastAPI */}

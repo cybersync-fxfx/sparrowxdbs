@@ -12,6 +12,7 @@ export function FirewallRuleExporter({
 }) {
   const [selectedFormat, setSelectedFormat] = useState<FirewallFormat>("cloudflare");
   const [copied, setCopied] = useState(false);
+  const [copyStatusMsg, setCopyStatusMsg] = useState("");
 
   const activeBlocked = indicators.filter((i) => i.blocked);
   const exported = exportFirewallBlocklist(indicators, selectedFormat);
@@ -27,11 +28,23 @@ export function FirewallRuleExporter({
     showToast(`Exported ${activeBlocked.length} rules to ${exported.filename}`);
   };
 
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(exported.content);
-    setCopied(true);
-    showToast(`Copied ${selectedFormat.toUpperCase()} firewall rules to clipboard`);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(exported.content);
+      setCopied(true);
+      setCopyStatusMsg(`Copied ${selectedFormat.toUpperCase()} firewall rules`);
+      showToast(`Copied ${selectedFormat.toUpperCase()} firewall rules to clipboard`);
+      setTimeout(() => {
+        setCopied(false);
+        setCopyStatusMsg("");
+      }, 2000);
+    } catch {
+      setCopyStatusMsg("Copy failed");
+      showToast("Unable to access clipboard; copy or download the rule config instead.");
+    }
   };
 
   return (
@@ -46,15 +59,18 @@ export function FirewallRuleExporter({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Synchronize {activeBlocked.length} actively blocked threat IOCs with your external edge
-            firewalls and load balancers.
+            firewalls, XDP/eBPF L4 DDoS kernel filters, and load balancers.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={handleCopy} size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
+          <Button type="button" onClick={handleCopy} size="sm" variant="outline" className="h-8 gap-1.5 text-xs">
             {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
             Copy Rules
           </Button>
-          <Button onClick={handleDownload} size="sm" className="h-8 gap-1.5 text-xs">
+          <span className="sr-only" role="status" aria-live="polite">
+            {copyStatusMsg}
+          </span>
+          <Button type="button" onClick={handleDownload} size="sm" className="h-8 gap-1.5 text-xs">
             <Download className="size-3.5" />
             Download Rule Config
           </Button>
@@ -70,6 +86,7 @@ export function FirewallRuleExporter({
               { id: "aws_waf", label: "AWS WAF IPSet" },
               { id: "nginx", label: "NGINX conf" },
               { id: "iptables", label: "Linux iptables" },
+              { id: "xdp_ebpf", label: "Linux XDP / eBPF (L4 DDoS)" },
               { id: "csv", label: "SIEM CSV" },
             ] as const
           ).map((fmt) => (

@@ -737,8 +737,8 @@ export function createBinanceOrder(params: {
     createdAt: new Date().toISOString(),
     expiresAt: now + (params.expiryMinutes ?? 15) * 60 * 1000,
     status: "pending",
-    tenantId: params.tenantId,
-    userEmail: params.userEmail,
+    ...(params.tenantId !== undefined ? { tenantId: params.tenantId } : {}),
+    ...(params.userEmail !== undefined ? { userEmail: params.userEmail } : {}),
   };
 
   saveStoredBinanceOrder(order);
@@ -879,8 +879,8 @@ export function createUpiOrder(params: {
     memo: orderId,
     createdAt: new Date().toISOString(),
     status: "pending",
-    tenantId: params.tenantId,
-    userEmail: params.userEmail,
+    ...(params.tenantId !== undefined ? { tenantId: params.tenantId } : {}),
+    ...(params.userEmail !== undefined ? { userEmail: params.userEmail } : {}),
   };
   saveStoredUpiOrder(order);
   return order;

@@ -18,6 +18,8 @@ LOG_FILE="/var/log/sparrowx-install.log"
 AUTO_MODE="false"
 INSTALL_PTERO="ask"
 INTERACTIVE_PTERO="false"
+XDP_SETUP_MODE="auto"
+FORCE_REBUILD="false"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -25,6 +27,9 @@ for arg in "$@"; do
     --ptero|--with-ptero|--pterodactyl) INSTALL_PTERO="yes" ;;
     --interactive-ptero) INSTALL_PTERO="yes"; INTERACTIVE_PTERO="true" ;;
     --no-ptero) INSTALL_PTERO="no" ;;
+    --ddos|--xdp) XDP_SETUP_MODE="auto" ;;
+    --no-xdp) XDP_SETUP_MODE="off" ;;
+    --rebuild) FORCE_REBUILD="true" ;;
     --help|-h)
       cat <<'HELP'
 SparrowX Blueprint Installer & Pterodactyl Port-Flow Manager (setup.sh)
@@ -36,6 +41,9 @@ Options:
   --ptero             Install or heal Pterodactyl Game Panel (game.<domain>)
   --interactive-ptero Launch upstream interactive pterodactyl-installer prompts
   --no-ptero          Skip automatic Pterodactyl installation
+  --ddos, --xdp       Ensure L3/L4 XDP/eBPF DDoS kernel protection is compiled & attached
+  --no-xdp            Skip XDP/eBPF attach (still applies sysctl, UFW & Fail2Ban)
+  --rebuild           Force container image rebuild even if stack already passes ping audit
   --auto, -y          Non-interactive mode (accept saved .env / smart defaults)
   --help, -h          Show this help screen
 HELP
@@ -1974,8 +1982,8 @@ if [ ! -e "/opt/sparrowx" ] && [ "${INSTALL_DIR}" != "/opt/sparrowx" ]; then
   ln -sfn "${INSTALL_DIR}" /opt/sparrowx 2>/dev/null || true
 fi
 
-mkdir -p ./ovh/dns ./ovh/ssl ./ovh/certbot-www/.well-known/acme-challenge ./data/storage ./data/users ./data/backups ./backups
-chmod +x ./setup.sh ./update.sh ./fix.sh ./manage-db.sh ./ovh/*.sh ./deploy/*.sh ./init-scripts/*.sh 2>/dev/null || true
+mkdir -p ./ovh/dns ./ovh/ssl ./ovh/certbot-www/.well-known/acme-challenge ./data/storage ./data/users ./data/backups ./backups ./deploy/xdp ./public/xdp
+chmod +x ./setup.sh ./update.sh ./fix.sh ./manage-db.sh ./ovh/*.sh ./deploy/*.sh ./deploy/xdp/*.sh ./init-scripts/*.sh ./public/*.sh ./public/xdp/*.sh 2>/dev/null || true
 
 # Launch Pterodactyl installer (unattended by default, or interactive if --interactive-ptero)
 if [ "${PTERO_ACTION}" = "install" ] || [ "${PTERO_ACTION}" = "reinstall" ]; then
@@ -2324,6 +2332,12 @@ if command -v ufw >/dev/null 2>&1; then
   log_ok "UFW Firewall configured (SSH:${ACTIVE_SSH_PORT}, HTTP:${HTTP_PORT}, HTTPS:${HTTPS_PORT}, Ptero:${PTERO_PORT} internal)."
 fi
 
+if [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ]; then
+  log_info "Deploying SparrowX Layer 3/4/7 DDoS & XDP/eBPF Protection (mode=${XDP_SETUP_MODE})..."
+  bash "${INSTALL_DIR}/deploy/ddos-setup.sh" --auto --xdp-mode "${XDP_SETUP_MODE}" || \
+    log_warn "DDoS/XDP layer reported non-fatal host driver warning; sysctl & UFW hardening remain active"
+fi
+
 # ==============================================================================
 # STEP 9: LAUNCH OR RECONCILE BACKEND FLEET (docker-compose.ovh.yml)
 # ==============================================================================
@@ -2333,12 +2347,19 @@ COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
 STACK_STARTED="no"
 
 if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
-  if [ "${SPARROWX_ALREADY_HEALTHY}" = "yes" ]; then
+  if [ "${SPARROWX_ALREADY_HEALTHY}" = "yes" ] && [ "${FORCE_REBUILD}" != "true" ]; then
     # Reconcile edge proxy only so zero downtime occurs on healthy containers
     compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --force-recreate nginx >/dev/null 2>&1 || \
       docker start sparrowx-nginx >/dev/null 2>&1 || true
     STACK_STARTED="yes"
     log_ok "Reloaded sparrowx-nginx zero-downtime while preserving running DB & App containers."
+  elif [ "${SPARROWX_ALREADY_HEALTHY}" = "yes" ] && [ "${FORCE_REBUILD}" = "true" ]; then
+    log_info "--rebuild requested: rebuilding SparrowX app container & reloading nginx..."
+    if compose_cmd -f "${COMPOSE_FILE}" build sparrowx && compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
+      docker start sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+      STACK_STARTED="yes"
+      log_ok "Rebuilt sparrowx app container cleanly."
+    fi
   else
     for pg_vol in $(docker volume ls -q 2>/dev/null | grep 'sparrowx_pgdata' || true); do
       vol_mp="$(docker volume inspect -f '{{.Mountpoint}}' "${pg_vol}" 2>/dev/null || true)"
@@ -2353,8 +2374,9 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
     if compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans; then
       STACK_STARTED="yes"
     else
-      log_warn "First launch attempt hit a conflict. Healing networks/ports & retrying..."
+      log_warn "First launch attempt hit a conflict. Healing conflicting containers/networks/ports & retrying..."
       compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
+      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
       docker network prune -f >/dev/null 2>&1 || true
       reclaim_web_ports
       HTTP_PORT="$(find_free_port "${HTTP_PORT}" 8180 "HTTP Edge Proxy" "sparrowx-nginx")"
@@ -2487,10 +2509,15 @@ EOF
   bash "${INSTALL_DIR}/deploy/ssl-renew.sh" || true
 fi
 
+ln -sf "${INSTALL_DIR}/setup.sh" /usr/local/bin/sparrowx-setup 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/manage-db.sh" /usr/local/bin/sparrowx-db 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
+ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || true
+[ -f "${INSTALL_DIR}/verification.sh" ] && ln -sf "${INSTALL_DIR}/verification.sh" /usr/local/bin/sparrowx-verify 2>/dev/null || true
 ln -sf "${INSTALL_DIR}/deploy/watchdog.sh" /usr/local/bin/sparrowx-heal 2>/dev/null || true
+[ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
+[ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
 
 # Seed DB only if app_users table has no rows yet
 if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -x "${INSTALL_DIR}/manage-db.sh" ]; then
@@ -2608,8 +2635,15 @@ echo -e "    • Postgres DB/User : ${C_WHITE}${POSTGRES_DB} / ${POSTGRES_USER}$
 echo -e "    • Postgres Pass    : ${C_YELLOW}${POSTGRES_PASSWORD}${C_RESET}"
 echo -e "    • Saved Creds File : ${C_WHITE}/root/.sparrowx-ptero-credentials.txt${C_RESET}"
 echo ""
+echo -e "  ${C_BOLD}SETUP, UPDATE & DDOS LINKS:${C_RESET}"
+echo -e "    • Single Setup   : ${C_CYAN}curl -sSL https://${DOMAIN_ROOT}/setup.sh | sudo bash${C_RESET}"
+echo -e "    • DDoS + XDP Setup: ${C_CYAN}curl -sSL https://${DOMAIN_ROOT}/ddos-setup.sh | sudo bash${C_RESET}"
+echo -e "    • XDP Kernel C   : ${C_WHITE}https://${DOMAIN_ROOT}/xdp/sparrowx_xdp_ddos.c${C_RESET}"
+echo -e "    • Updater / Heal : ${C_WHITE}https://${DOMAIN_ROOT}/update.sh${C_RESET}  |  ${C_WHITE}https://${DOMAIN_ROOT}/fix.sh${C_RESET}"
+echo ""
 echo -e "  ${C_BOLD}CLI TOOLS:${C_RESET}"
 echo -e "    • Watchdog (2m)  : ${C_DIM}${INSTALL_DIR}/deploy/watchdog.sh${C_RESET} (or ${C_BOLD}sparrowx-heal${C_RESET})"
 echo -e "    • Auto-Heal (fix): ${C_BOLD}sparrowx-fix${C_RESET}   |  DB Studio TUI: ${C_BOLD}sparrowx-db${C_RESET}"
-echo -e "    • 1-Click Update : ${C_BOLD}sparrowx-update${C_RESET}"
+echo -e "    • DDoS / XDP CLI : ${C_BOLD}sparrowx-ddos${C_RESET}  |  XDP NIC Probe: ${C_BOLD}sparrowx-xdp --status${C_RESET}"
+echo -e "    • 1-Click Update : ${C_BOLD}sparrowx-update${C_RESET} |  Full Setup  : ${C_BOLD}sparrowx-setup${C_RESET}"
 echo -e "${C_ORANGE}========================================================================${C_RESET}"

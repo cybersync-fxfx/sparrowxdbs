@@ -4,14 +4,25 @@
 # ==============================================================================
 # Usage:
 #   curl -sSL https://sparrowx.net/install-connector.sh | SPX_KEY="YOUR_KEY" SPX_TENANT="YOUR_TENANT_ID" bash
+# Optional L3/L4 XDP + Kernel DDoS Shield:
+#   curl -sSL https://sparrowx.net/install-connector.sh | SPX_KEY="YOUR_KEY" SPX_TENANT="YOUR_TENANT_ID" SPX_ENABLE_DDOS=1 bash
 # ==============================================================================
 
 set -e
 
 SPX_KEY="${SPX_KEY:-}"
 SPX_TENANT="${SPX_TENANT:-}"
-SPX_ENDPOINT="${SPX_ENDPOINT:-https://sparrowx.net/api/v1/verify}"
-SPX_TELEMETRY="${SPX_TELEMETRY:-https://sparrowx.net/api/v1/telemetry}"
+SPX_CLIENT_ID="${SPX_CLIENT_ID:-}"
+SPX_ENABLE_DDOS="${SPX_ENABLE_DDOS:-0}"
+SPX_BASE_URL="${SPX_BASE_URL:-https://sparrowx.net}"
+SPX_ENDPOINT="${SPX_ENDPOINT:-${SPX_BASE_URL}/api/v1/verify}"
+SPX_TELEMETRY="${SPX_TELEMETRY:-${SPX_BASE_URL}/api/v1/telemetry}"
+
+for arg in "$@"; do
+  case "${arg}" in
+    --ddos|--with-ddos|--xdp) SPX_ENABLE_DDOS=1 ;;
+  esac
+done
 
 echo "=========================================================="
 echo "  SPARROWX SOVEREIGN VPS & SERVER CONNECTOR INSTALLER     "
@@ -20,7 +31,7 @@ echo "=========================================================="
 if [ -z "$SPX_KEY" ] || [ -z "$SPX_TENANT" ]; then
   echo "[-] ERROR: Missing SPX_KEY or SPX_TENANT environment variables."
   echo "    Example:"
-  echo "    curl -sSL https://sparrowx.net/install-connector.sh | SPX_KEY=\"spx_live_...\" SPX_TENANT=\"TNT-...\" bash"
+  echo "    curl -sSL ${SPX_BASE_URL}/install-connector.sh | SPX_KEY=\"spx_live_...\" SPX_TENANT=\"TNT-...\" bash"
   exit 1
 fi
 
@@ -37,7 +48,7 @@ echo "[+] Establishing cryptographic handshake with SparrowX Edge..."
 HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$SPX_ENDPOINT" \
   -H "Content-Type: application/json" \
   -H "x-sparrowx-key: $SPX_KEY" \
-  -d "{\"apiKey\":\"$SPX_KEY\",\"tenantId\":\"$SPX_TENANT\",\"source\":\"$HOSTNAME\",\"serverIp\":\"$HOST_IP\",\"type\":\"vps_connector_install\"}")
+  -d "{\"apiKey\":\"$SPX_KEY\",\"tenantId\":\"$SPX_TENANT\",\"clientId\":\"$SPX_CLIENT_ID\",\"source\":\"$HOSTNAME\",\"serverIp\":\"$HOST_IP\",\"type\":\"vps_connector_install\"}")
 
 if [ "$HTTP_RESPONSE" -eq 200 ] || [ "$HTTP_RESPONSE" -eq 204 ]; then
   echo "[✓] SUCCESS: Handshake confirmed (HTTP $HTTP_RESPONSE)."
@@ -53,14 +64,28 @@ if [ "$(id -u)" -eq 0 ]; then
   cat <<EOF > /etc/sparrowx/connector.conf
 SPX_KEY=$SPX_KEY
 SPX_TENANT=$SPX_TENANT
+SPX_CLIENT_ID=$SPX_CLIENT_ID
 SPX_ENDPOINT=$SPX_ENDPOINT
 SPX_TELEMETRY=$SPX_TELEMETRY
 SPX_HOST_IP=$HOST_IP
 EOF
   chmod 600 /etc/sparrowx/connector.conf
   echo "[+] Configuration saved to /etc/sparrowx/connector.conf"
+
+  if [ "${SPX_ENABLE_DDOS}" = "1" ]; then
+    echo "[+] Deploying SparrowX Layer 3/4/7 DDoS & XDP/eBPF protection..."
+    curl -sSL "${SPX_BASE_URL}/ddos-setup.sh" | bash -s -- --auto
+  else
+    echo "[i] Enable L3/L4 XDP Kernel DDoS Defense anytime:"
+    echo "    curl -sSL ${SPX_BASE_URL}/ddos-setup.sh | sudo bash"
+  fi
 fi
 
 echo "=========================================================="
-echo "  INSTALLATION COMPLETED SUCCESSFULLY                     "
+echo "  SPARROWX SETUP & DDOS ENDPOINTS"
+echo "  • Full Stack Setup : curl -sSL ${SPX_BASE_URL}/setup.sh | sudo bash"
+echo "  • DDoS & XDP Setup : curl -sSL ${SPX_BASE_URL}/ddos-setup.sh | sudo bash"
+echo "  • XDP Kernel C     : ${SPX_BASE_URL}/xdp/sparrowx_xdp_ddos.c"
+echo "  • Full Updater     : curl -sSL ${SPX_BASE_URL}/update.sh | sudo bash"
+echo "  • Auto-Heal Doctor : curl -sSL ${SPX_BASE_URL}/fix.sh | sudo bash"
 echo "=========================================================="

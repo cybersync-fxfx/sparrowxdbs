@@ -324,15 +324,7 @@ function Dashboard() {
     | { role: "admin"; operatorName: string; operatorEmail: string }
   >({ role: "unauthenticated" });
 
-  const [showAuthLogin, setShowAuthLogin] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    const params = new URLSearchParams(window.location.search);
-    return (
-      params.get("login") === "1" ||
-      params.get("auth") === "1" ||
-      params.get("signin") === "1"
-    );
-  });
+  const [showAuthLogin, setShowAuthLogin] = useState<boolean>(false);
 
   // Internal SparrowX Access Control policies
   const [staffMfaEnforced, setStaffMfaEnforced] = useState(true);
@@ -414,7 +406,7 @@ function Dashboard() {
 
   const showToast = (
     message: string,
-    type: "success" | "error" | "info" | "cooking" = "success",
+    type: "success" | "error" | "info" | "cooking" | "warning" | "default" = "success",
   ) => {
     setNotice(message);
     if (type === "success") {
@@ -443,6 +435,14 @@ function Dashboard() {
       if (refId) setActiveDocRef(refId);
       handleNavigate("Troubleshooting & Docs");
     });
+    const params = new URLSearchParams(window.location.search);
+    if (
+      params.get("login") === "1" ||
+      params.get("auth") === "1" ||
+      params.get("signin") === "1"
+    ) {
+      setShowAuthLogin(true);
+    }
   }, []);
 
   useEffect(() => {
@@ -512,7 +512,7 @@ function Dashboard() {
         issueSignedSessionToken({
           id: dbUser.id || storedSession.sub,
           email: dbUser.email,
-          fullName: dbUser.fullName || storedSession.fullName,
+          fullName: dbUser.fullName || storedSession.fullName || "SparrowX Operator",
           role: isDbAdmin ? "admin" : "client",
           tenantId: dbUser.tenantId ?? storedSession.tenantId,
         });
@@ -1466,25 +1466,30 @@ function Dashboard() {
     const clientDomains = new Set(
       visibleClientTenants
         .map((t) =>
-          t.primaryDomain
-            .replace(/^https?:\/\//i, "")
-            .replace(/^agent:\/\//i, "")
-            .split("/")[0]
+          (
+            t.primaryDomain
+              .replace(/^https?:\/\//i, "")
+              .replace(/^agent:\/\//i, "")
+              .split("/")[0] ?? ""
+          )
             .split(":")[0]
-            .trim()
-            .toLowerCase(),
+            ?.trim()
+            .toLowerCase() ?? "",
         )
         .filter(Boolean),
     );
     return protectedServices.filter((s) => {
       if (s.tenantId && clientTenantIds.has(s.tenantId)) return true;
-      const cleanEp = s.endpoint
-        .replace(/^https?:\/\//i, "")
-        .replace(/^agent:\/\//i, "")
-        .split("/")[0]
-        .split(":")[0]
-        .trim()
-        .toLowerCase();
+      const cleanEp =
+        (
+          s.endpoint
+            .replace(/^https?:\/\//i, "")
+            .replace(/^agent:\/\//i, "")
+            .split("/")[0] ?? ""
+        )
+          .split(":")[0]
+          ?.trim()
+          .toLowerCase() ?? "";
       if (clientDomains.has(cleanEp)) return true;
       return false;
     });
@@ -1804,6 +1809,223 @@ function Dashboard() {
     }
   }, []);
 
+  const searchResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+
+    const results: Array<{
+      id: string;
+      title: string;
+      description: string;
+      category: "Security Module" | "Navigation" | "Incident" | "Service" | "Database";
+      badge: string;
+      action: () => void;
+    }> = [];
+
+    // 1. Core Security & WAF Rules
+    const securityItems = [
+      {
+        title: "Web & WAF Security",
+        description: "Edge reverse proxy, SQL injection filters, OWASP Top 10, rate limiting & DDoS mitigation",
+        category: "Security Module" as const,
+        badge: "WAF Active",
+        keywords: ["waf", "web", "firewall", "shield", "sqli", "sql injection", "xss", "ddos", "proxy", "edge", "rules"],
+        action: () => {
+          handleNavigate("Web & WAF Security");
+          setSearch("");
+          setSearchOpen(false);
+          showToast("Navigated to Web & WAF Security module");
+        },
+      },
+      {
+        title: "AI Agent & LLM Shield",
+        description: "Zero-latency prompt firewall, adversarial jailbreak protection, and MCP tool call defense",
+        category: "Security Module" as const,
+        badge: "AI Guard",
+        keywords: ["ai", "llm", "agent", "prompt", "jailbreak", "mcp", "guardrails", "guard"],
+        action: () => {
+          handleNavigate("AI Agent & LLM Shield");
+          setSearch("");
+          setSearchOpen(false);
+          showToast("Navigated to AI Agent & LLM Shield");
+        },
+      },
+      {
+        title: "Protection Status & Verification",
+        description: "Live health probe, edge DNS verification, latency checks, and inline protection auditing",
+        category: "Security Module" as const,
+        badge: "Verification",
+        keywords: ["verify", "verification", "status", "probe", "dns", "latency", "health", "audit"],
+        action: () => {
+          handleNavigate("Protection Status & Verification");
+          setSearch("");
+          setSearchOpen(false);
+          showToast("Navigated to Protection Status & Verification Center");
+        },
+      },
+      {
+        title: "SparrowX DB (DBaaS)",
+        description: "Sovereign Postgres 16, pgvector embeddings, connection pooler (:6543), and REST APIs",
+        category: "Database" as const,
+        badge: "DBaaS",
+        keywords: ["db", "database", "postgres", "sparrowbase", "supabase", "sql", "pooler", "keys", "vector"],
+        action: () => {
+          handleNavigate("SparrowX DB");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Live Traffic Mesh & Threat Map",
+        description: "Visual attack vectors, live threat arcs, host beacons, and connection streams",
+        category: "Navigation" as const,
+        badge: "Threat Map",
+        keywords: ["map", "globe", "traffic", "mesh", "matrix", "threats", "arcs", "streams", "live"],
+        action: () => {
+          handleNavigate("Live Traffic Mesh");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Client Portal & Services",
+        description: "Service onboarding wizard, DNS CNAME configuration, and active service credentials",
+        category: "Navigation" as const,
+        badge: "Client Area",
+        keywords: ["client", "services", "portal", "onboarding", "dns", "cname", "customer", "my services"],
+        action: () => {
+          handleNavigate("My Services");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "SIEM & Detection Rules",
+        description: "Configured perimeter detection triggers, anomaly heuristics, and automated block rules",
+        category: "Security Module" as const,
+        badge: "SIEM",
+        keywords: ["siem", "rules", "detection", "anomaly", "heuristics", "block rules"],
+        action: () => {
+          handleNavigate("SIEM Rules");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Activity & Operations History",
+        description: "Immutable security audit log, operator access events, and incident resolution history",
+        category: "Navigation" as const,
+        badge: "Audit Log",
+        keywords: ["audit", "logs", "activity", "history", "events", "compliance"],
+        action: () => {
+          handleNavigate("Activity History");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Billing & Credits",
+        description: "Manage subscription plans, top up usage credits, and inspect payment transactions",
+        category: "Navigation" as const,
+        badge: "Finance",
+        keywords: ["billing", "credits", "payment", "invoice", "plan", "subscription", "pricing"],
+        action: () => {
+          handleNavigate("Billing & Credits");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+    ];
+
+    securityItems.forEach((item, idx) => {
+      const matchTitle = item.title.toLowerCase().includes(q);
+      const matchDesc = item.description.toLowerCase().includes(q);
+      const matchKw = item.keywords.some((k) => k.includes(q) || q.includes(k));
+      if (matchTitle || matchDesc || matchKw) {
+        results.push({
+          id: `sec-${idx}`,
+          title: item.title,
+          description: item.description,
+          category: item.category,
+          badge: item.badge,
+          action: item.action,
+        });
+      }
+    });
+
+    // 2. Search Protected Services & Client Tenants
+    clientTenants.forEach((tenant) => {
+      if (
+        tenant.name.toLowerCase().includes(q) ||
+        (tenant.primaryDomain && tenant.primaryDomain.toLowerCase().includes(q)) ||
+        tenant.enabledModules.some((m) => m.toLowerCase().includes(q))
+      ) {
+        results.push({
+          id: `tenant-${tenant.id}`,
+          title: tenant.name,
+          description: `Domain: ${tenant.primaryDomain || "Internal"} · Plan: ${tenant.planTier} · Modules: ${tenant.enabledModules.join(", ")}`,
+          category: "Service",
+          badge: tenant.planTier,
+          action: () => {
+            setSelectedTenantId(tenant.id);
+            handleNavigate("Client Overview");
+            setSearch("");
+            setSearchOpen(false);
+          },
+        });
+      }
+    });
+
+    // 3. Search Incidents
+    incidents.forEach((inc) => {
+      if (
+        inc.title.toLowerCase().includes(q) ||
+        inc.id.toLowerCase().includes(q) ||
+        inc.source.toLowerCase().includes(q) ||
+        inc.summary.toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `inc-${inc.id}`,
+          title: `${inc.id}: ${inc.title}`,
+          description: `Source: ${inc.source} · Severity: ${inc.severity} · Status: ${inc.status}`,
+          category: "Incident",
+          badge: inc.severity,
+          action: () => {
+            setSelectedIncidentId(inc.id);
+            handleNavigate("Incidents");
+            setSearch("");
+            setSearchOpen(false);
+          },
+        });
+      }
+    });
+
+    // 4. Search Vulnerabilities
+    vulnerabilities.forEach((vuln) => {
+      if (
+        vuln.cve.toLowerCase().includes(q) ||
+        vuln.packageName.toLowerCase().includes(q) ||
+        vuln.fixVersion.toLowerCase().includes(q) ||
+        vuln.severity.toLowerCase().includes(q)
+      ) {
+        results.push({
+          id: `vuln-${vuln.id}`,
+          title: `${vuln.cve} in ${vuln.packageName}`,
+          description: `${vuln.severity} · Fix: ${vuln.fixVersion} · CVSS ${vuln.cvss}`,
+          category: "Security Module",
+          badge: vuln.severity,
+          action: () => {
+            handleNavigate("CVEs & Patch Tracker");
+            setSearch("");
+            setSearchOpen(false);
+          },
+        });
+      }
+    });
+
+    return results.slice(0, 10);
+  }, [search, clientTenants, incidents, vulnerabilities, handleNavigate]);
+
   if (!showAuthLogin) {
     // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
     if (isStudioDomainOrParam) {
@@ -2055,222 +2277,6 @@ function Dashboard() {
       </>
     );
   }
-
-  const searchResults = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-
-    const results: Array<{
-      id: string;
-      title: string;
-      description: string;
-      category: "Security Module" | "Navigation" | "Incident" | "Service" | "Database";
-      badge: string;
-      action: () => void;
-    }> = [];
-
-    // 1. Core Security & WAF Rules
-    const securityItems = [
-      {
-        title: "Web & WAF Security",
-        description: "Edge reverse proxy, SQL injection filters, OWASP Top 10, rate limiting & DDoS mitigation",
-        category: "Security Module" as const,
-        badge: "WAF Active",
-        keywords: ["waf", "web", "firewall", "shield", "sqli", "sql injection", "xss", "ddos", "proxy", "edge", "rules"],
-        action: () => {
-          handleNavigate("Web & WAF Security");
-          setSearch("");
-          setSearchOpen(false);
-          showToast("Navigated to Web & WAF Security module");
-        },
-      },
-      {
-        title: "AI Agent & LLM Shield",
-        description: "Zero-latency prompt firewall, adversarial jailbreak protection, and MCP tool call defense",
-        category: "Security Module" as const,
-        badge: "AI Guard",
-        keywords: ["ai", "llm", "agent", "prompt", "jailbreak", "mcp", "guardrails", "guard"],
-        action: () => {
-          handleNavigate("AI Agent & LLM Shield");
-          setSearch("");
-          setSearchOpen(false);
-          showToast("Navigated to AI Agent & LLM Shield");
-        },
-      },
-      {
-        title: "Protection Status & Verification",
-        description: "Live health probe, edge DNS verification, latency checks, and inline protection auditing",
-        category: "Security Module" as const,
-        badge: "Verification",
-        keywords: ["verify", "verification", "status", "probe", "dns", "latency", "health", "audit"],
-        action: () => {
-          handleNavigate("Protection Status & Verification");
-          setSearch("");
-          setSearchOpen(false);
-          showToast("Navigated to Protection Status & Verification Center");
-        },
-      },
-      {
-        title: "SparrowX DB (DBaaS)",
-        description: "Sovereign Postgres 16, pgvector embeddings, connection pooler (:6543), and REST APIs",
-        category: "Database" as const,
-        badge: "DBaaS",
-        keywords: ["db", "database", "postgres", "sparrowbase", "supabase", "sql", "pooler", "keys", "vector"],
-        action: () => {
-          handleNavigate("SparrowX DB");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "Live Traffic Mesh & Threat Map",
-        description: "Visual attack vectors, live threat arcs, host beacons, and connection streams",
-        category: "Navigation" as const,
-        badge: "Threat Map",
-        keywords: ["map", "globe", "traffic", "mesh", "matrix", "threats", "arcs", "streams", "live"],
-        action: () => {
-          handleNavigate("Live Traffic Mesh");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "Client Portal & Services",
-        description: "Service onboarding wizard, DNS CNAME configuration, and active service credentials",
-        category: "Navigation" as const,
-        badge: "Client Area",
-        keywords: ["client", "services", "portal", "onboarding", "dns", "cname", "customer", "my services"],
-        action: () => {
-          handleNavigate("My Services");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "SIEM & Detection Rules",
-        description: "Configured perimeter detection triggers, anomaly heuristics, and automated block rules",
-        category: "Security Module" as const,
-        badge: "SIEM",
-        keywords: ["siem", "rules", "detection", "anomaly", "heuristics", "block rules"],
-        action: () => {
-          handleNavigate("SIEM Rules");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "Activity & Operations History",
-        description: "Immutable security audit log, operator access events, and incident resolution history",
-        category: "Navigation" as const,
-        badge: "Audit Log",
-        keywords: ["audit", "logs", "activity", "history", "events", "compliance"],
-        action: () => {
-          handleNavigate("Activity History");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "Billing & Credits",
-        description: "Manage subscription plans, top up usage credits, and inspect payment transactions",
-        category: "Navigation" as const,
-        badge: "Finance",
-        keywords: ["billing", "credits", "payment", "invoice", "plan", "subscription", "pricing"],
-        action: () => {
-          handleNavigate("Billing & Credits");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-    ];
-
-    securityItems.forEach((item, idx) => {
-      const matchTitle = item.title.toLowerCase().includes(q);
-      const matchDesc = item.description.toLowerCase().includes(q);
-      const matchKw = item.keywords.some((k) => k.includes(q) || q.includes(k));
-      if (matchTitle || matchDesc || matchKw) {
-        results.push({
-          id: `sec-${idx}`,
-          title: item.title,
-          description: item.description,
-          category: item.category,
-          badge: item.badge,
-          action: item.action,
-        });
-      }
-    });
-
-    // 2. Search Protected Services & Client Tenants
-    clientTenants.forEach((tenant) => {
-      if (
-        tenant.name.toLowerCase().includes(q) ||
-        (tenant.primaryDomain && tenant.primaryDomain.toLowerCase().includes(q)) ||
-        tenant.enabledModules.some((m) => m.toLowerCase().includes(q))
-      ) {
-        results.push({
-          id: `tenant-${tenant.id}`,
-          title: tenant.name,
-          description: `Domain: ${tenant.primaryDomain || "Internal"} · Plan: ${tenant.planTier} · Modules: ${tenant.enabledModules.join(", ")}`,
-          category: "Service",
-          badge: tenant.planTier,
-          action: () => {
-            setSelectedTenantId(tenant.id);
-            handleNavigate("Client Overview");
-            setSearch("");
-            setSearchOpen(false);
-          },
-        });
-      }
-    });
-
-    // 3. Search Incidents
-    incidents.forEach((inc) => {
-      if (
-        inc.title.toLowerCase().includes(q) ||
-        inc.id.toLowerCase().includes(q) ||
-        inc.source.toLowerCase().includes(q) ||
-        inc.summary.toLowerCase().includes(q)
-      ) {
-        results.push({
-          id: `inc-${inc.id}`,
-          title: `${inc.id}: ${inc.title}`,
-          description: `Source: ${inc.source} · Severity: ${inc.severity} · Status: ${inc.status}`,
-          category: "Incident",
-          badge: inc.severity,
-          action: () => {
-            setSelectedIncidentId(inc.id);
-            handleNavigate("Incidents");
-            setSearch("");
-            setSearchOpen(false);
-          },
-        });
-      }
-    });
-
-    // 4. Search Vulnerabilities
-    vulnerabilities.forEach((vuln) => {
-      if (
-        vuln.cve.toLowerCase().includes(q) ||
-        vuln.package.toLowerCase().includes(q) ||
-        vuln.title.toLowerCase().includes(q)
-      ) {
-        results.push({
-          id: `vuln-${vuln.id}`,
-          title: `${vuln.cve} in ${vuln.package}`,
-          description: `${vuln.title} · CVSS ${vuln.cvss}`,
-          category: "Security Module",
-          badge: vuln.severity,
-          action: () => {
-            handleNavigate("CVEs & Patch Tracker");
-            setSearch("");
-            setSearchOpen(false);
-          },
-        });
-      }
-    });
-
-    return results.slice(0, 10);
-  }, [search, clientTenants, incidents, vulnerabilities, handleNavigate]);
 
   const userInitials = currentUser?.fullName
     ? currentUser.fullName
@@ -2621,19 +2627,6 @@ function Dashboard() {
                 </>
               ) : (
                 <>
-                {authSession.role === "admin" && (
-                  <Button
-                    className="w-full justify-start text-xs font-medium"
-                    onClick={() => {
-                      handleNavigate("Overview");
-                      setMenuOpen(false);
-                    }}
-                    size="sm"
-                    variant={portalMode === "soc" ? "secondary" : "ghost"}
-                  >
-                    <ShieldAlert className="size-3.5 text-primary" /> SOC Dashboard & Incidents
-                  </Button>
-                )}
                   <Button
                     className="w-full justify-start text-xs font-medium"
                     onClick={() => {
@@ -2691,7 +2684,7 @@ function Dashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                {searchResults.length > 0 && (
+                {searchResults[0] && (
                   <button
                     type="button"
                     onClick={searchResults[0].action}

@@ -70,6 +70,25 @@ npm run build
 
 ---
 
+## Server Deployment, Updater & L3/L4 DDoS XDP Links
+
+Run any SparrowX installer or DDoS defense script directly over HTTPS (`https://sparrowx.net/...`) or from a cloned repository (`/opt/sparrowxdbs`):
+
+| Purpose | Single-Line Command | Repo File |
+|---|---|---|
+| Full A-to-Z Stack + Build Setup | `curl -sSL https://sparrowx.net/setup.sh \| sudo bash` | [setup.sh](setup.sh) / [public/setup.sh](public/setup.sh) |
+| Single-File DDoS + XDP/eBPF Setup | `curl -sSL https://sparrowx.net/ddos-setup.sh \| sudo bash` | [deploy/ddos-setup.sh](deploy/ddos-setup.sh) |
+| XDP/eBPF Kernel C Scrubber | `curl -sSL https://sparrowx.net/xdp/sparrowx_xdp_ddos.c -o sparrowx_xdp_ddos.c` | [deploy/xdp/sparrowx_xdp_ddos.c](deploy/xdp/sparrowx_xdp_ddos.c) |
+| XDP Compiler & NIC Loader | `curl -sSL https://sparrowx.net/xdp/attach-xdp.sh \| sudo bash -s -- --attach` | [deploy/xdp/attach-xdp.sh](deploy/xdp/attach-xdp.sh) |
+| Updater, Rebuild & DDoS Sync | `curl -sSL https://sparrowx.net/update.sh \| sudo bash` | [update.sh](update.sh) |
+| Autonomous 12-Stage Auto-Heal Doctor | `curl -sSL https://sparrowx.net/fix.sh \| sudo bash -s -- --auto` | [fix.sh](fix.sh) |
+| Total Infrastructure Audit (11 Layers) | `curl -sSL https://sparrowx.net/verification.sh \| sudo bash` | [verification.sh](verification.sh) / [public/verification.sh](public/verification.sh) |
+| VPS Telemetry Connector (+optional XDP) | `curl -sSL https://sparrowx.net/install-connector.sh \| SPX_KEY=... SPX_TENANT=... SPX_ENABLE_DDOS=1 bash` | [public/install-connector.sh](public/install-connector.sh) |
+
+Global CLI symlinks installed on Ubuntu/Debian hosts: `sparrowx-setup`, `sparrowx-ddos`, `sparrowx-xdp`, `sparrowx-update`, `sparrowx-fix`, `sparrowx-doctor`, `sparrowx-verify`, `sparrowx-db`, `sparrowx-heal`.
+
+---
+
 ## License & Sovereignty
 
 Proprietary software developed for **SparrowX Security Operations**. All data sovereignty and encryption keys remain in your sovereign infrastructure.

@@ -66,7 +66,7 @@ export function notifySuccess(
     affectedResource: target,
     status: "successful",
     details: options?.details ?? message,
-    latencyMs: options?.latencyMs,
+    ...(options?.latencyMs !== undefined ? { latencyMs: options.latencyMs } : {}),
   });
 
   // 2. Emit engine activity log
@@ -91,14 +91,15 @@ export function notifyError(
   const doc = getErrorDoc(code);
 
   // 1. Centralized Diagnostic Record
+  const customMsg =
+    options?.customMessage ?? (!isErrorCode(codeOrMessage) ? codeOrMessage : undefined);
   const diagnosticEvent = recordDiagnosticError(code, {
-    error: options?.error,
+    ...(options?.error !== undefined ? { error: options.error } : {}),
     module: options?.module ?? doc.module,
-    target: options?.target,
-    context: options?.context,
-    customMessage:
-      options?.customMessage ?? (!isErrorCode(codeOrMessage) ? codeOrMessage : undefined),
-    customNextStep: options?.customNextStep,
+    ...(options?.target !== undefined ? { target: options.target } : {}),
+    ...(options?.context !== undefined ? { context: options.context } : {}),
+    ...(customMsg !== undefined ? { customMessage: customMsg } : {}),
+    ...(options?.customNextStep !== undefined ? { customNextStep: options.customNextStep } : {}),
   });
 
   const refId = diagnosticEvent.referenceId;
@@ -130,24 +131,26 @@ export function notifyError(
     code,
     referenceId: refId,
     nextStep,
-    onRetry: options?.retryAction
-      ? async () => {
-          try {
-            emitEngineToast("Retrying operation...", "cooking", "Retry in Progress");
-            await options.retryAction!();
-            notifySuccess(`Retried action succeeded for ${doc.title}`, {
-              category,
-              target: options?.target,
-            });
-          } catch (retryErr) {
-            notifyError(code, {
-              ...options,
-              error: retryErr,
-              customMessage: `Retry attempt failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`,
-            });
-          }
+    ...(options?.retryAction
+      ? {
+          onRetry: async () => {
+            try {
+              emitEngineToast("Retrying operation...", "cooking", "Retry in Progress");
+              await options.retryAction!();
+              notifySuccess(`Retried action succeeded for ${doc.title}`, {
+                category,
+                ...(options?.target !== undefined ? { target: options.target } : {}),
+              });
+            } catch (retryErr) {
+              notifyError(code, {
+                ...options,
+                error: retryErr,
+                customMessage: `Retry attempt failed: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`,
+              });
+            }
+          },
         }
-      : undefined,
+      : {}),
     onTroubleshoot: () => {
       if (options?.onNavigateToDocs) {
         options.onNavigateToDocs(code, refId);
@@ -245,7 +248,7 @@ export function notifyLoading(
         title,
         category,
         target,
-        details,
+        ...(details !== undefined ? { details } : {}),
         latencyMs: latency,
       });
     },

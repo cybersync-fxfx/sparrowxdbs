@@ -1,4 +1,5 @@
 import { type Incident, type Severity } from "@/lib/supabase";
+import { generateSparrowxXdpProgram } from "@/lib/xdp-ddos-layer";
 
 export type WebhookChannel = "slack" | "discord" | "pagerduty" | "custom";
 
@@ -320,7 +321,7 @@ export function analyzePromptInSandbox(promptText: string): AiGuardrailTestResul
 // -------------------------------------------------------------
 // 4. WAF & Firewall Exporters (Cloudflare / AWS WAF / NGINX)
 // -------------------------------------------------------------
-export type FirewallFormat = "cloudflare" | "aws_waf" | "nginx" | "iptables" | "csv";
+export type FirewallFormat = "cloudflare" | "aws_waf" | "nginx" | "iptables" | "xdp_ebpf" | "csv";
 
 export function exportFirewallBlocklist(
   indicators: Array<{ indicator: string; type: string; blocked: boolean; actor?: string }>,
@@ -388,6 +389,14 @@ export function exportFirewallBlocklist(
         content: lines.join("\n"),
         filename: "sparrowx-iptables-rules.sh",
         mimeType: "text/x-shellscript",
+      };
+    }
+    case "xdp_ebpf": {
+      const generated = generateSparrowxXdpProgram({ blockedIpv4s: ips });
+      return {
+        content: generated.cSource,
+        filename: "sparrowx_xdp_ddos.c",
+        mimeType: "text/x-c",
       };
     }
     case "csv":

@@ -453,9 +453,10 @@ export function generateEarthCloudTexture(width = 2048, height = 1024): THREE.Ca
   for (let i = 0; i < numCloudPuffs; i++) {
     // Bias towards tropical bands (ITCZ) and mid-latitude storm tracks
     let lat = (Math.random() - 0.5) * 140;
-    if (Math.random() < 0.35) lat = (Math.random() - 0.5) * 25; // Intertropical convergence
-    else if (Math.random() < 0.4) lat = 45 + (Math.random() - 0.5) * 20; // North storm track
-    else if (Math.random() < 0.4) lat = -45 + (Math.random() - 0.5) * 20; // South storm track
+    const bandRoll = Math.random();
+    if (bandRoll < 0.35) lat = (Math.random() - 0.5) * 25; // Intertropical convergence
+    else if (bandRoll < 0.65) lat = 45 + (Math.random() - 0.5) * 20; // North storm track
+    else if (bandRoll < 0.85) lat = -45 + (Math.random() - 0.5) * 20; // South storm track
 
     const lon = (Math.random() - 0.5) * 360;
     const [cx, cy] = project(lat, lon, width, height);

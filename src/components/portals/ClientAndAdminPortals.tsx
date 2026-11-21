@@ -50,6 +50,7 @@ import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import { CyberEmblem, CyberPill, type CyberEmblemVariant } from "@/components/ui/CyberBadge";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
+import { XdpDdosLayerCard } from "@/components/XdpDdosLayerCard";
 import { ServiceOnboardingWizard } from "@/components/ServiceOnboardingWizard";
 import {
   AdminRevenueAndOutreachEngine,
@@ -1750,8 +1751,9 @@ export function ClientPortalView({
             }}
             showToast={showToast}
             onOpenAttackSimulator={() => {
-              setShowAttackSimulator(true);
               setIntegrationTenant(null);
+              onNavigate("Protection Status & Verification");
+              showToast("Opened Protection Status & Verification for threat simulation.");
             }}
           />
         )}
@@ -2257,40 +2259,48 @@ export async function emitSecurityTelemetry(event: {
 
       {/* 4. DEDICATED CLOUD & ENDPOINT SECURITY DASHBOARD */}
       {activeNav === "Cloud & Endpoint Security" && (
-        <section className="border border-border bg-card p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold uppercase text-success">
-                Cloud API & Infrastructure Module
+        <>
+          <section className="border border-border bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase text-success">
+                  Cloud API & Infrastructure Module
+                </div>
+                <h2 className="mt-1 text-xl font-semibold">
+                  Monitored Cloud Nodes, API Gateways & CVEs
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {assets.length} registered host(s) · {vulnerabilities.length} tracked CVE(s)
+                </p>
               </div>
-              <h2 className="mt-1 text-xl font-semibold">
-                Monitored Cloud Nodes, API Gateways & CVEs
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {assets.length} registered host(s) · {vulnerabilities.length} tracked CVE(s)
-              </p>
             </div>
-          </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="border border-border bg-background p-4">
-              <div className="text-xs font-semibold">Registered Infrastructure Hosts</div>
-              <p className="mt-1 text-2xl font-semibold">{assets.length}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Nodes monitored with instant network isolation capability.
-              </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="border border-border bg-background p-4">
+                <div className="text-xs font-semibold">Registered Infrastructure Hosts</div>
+                <p className="mt-1 text-2xl font-semibold">{assets.length}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Nodes monitored with instant network isolation capability.
+                </p>
+              </div>
+              <div className="border border-border bg-background p-4">
+                <div className="text-xs font-semibold">Open Vulnerabilities (CVEs)</div>
+                <p className="mt-1 text-2xl font-semibold">
+                  {vulnerabilities.filter((v) => v.status !== "Patched").length}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Unpatched package advisories across production workloads.
+                </p>
+              </div>
             </div>
-            <div className="border border-border bg-background p-4">
-              <div className="text-xs font-semibold">Open Vulnerabilities (CVEs)</div>
-              <p className="mt-1 text-2xl font-semibold">
-                {vulnerabilities.filter((v) => v.status !== "Patched").length}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Unpatched package advisories across production workloads.
-              </p>
-            </div>
-          </div>
-        </section>
+          </section>
+
+          <XdpDdosLayerCard
+            serviceName={activeTenant.name}
+            endpoint={activeTenant.primaryDomain}
+            showToast={showToast}
+          />
+        </>
       )}
 
       {/* 5. DEDICATED COMPLIANCE & EVIDENCE DASHBOARD */}
@@ -2486,8 +2496,9 @@ export async function emitSecurityTelemetry(event: {
           }}
           showToast={showToast}
           onOpenAttackSimulator={() => {
-            setShowAttackSimulator(true);
             setIntegrationTenant(null);
+            onNavigate("Protection Status & Verification");
+            showToast("Opened Protection Status & Verification for threat simulation.");
           }}
         />
       )}

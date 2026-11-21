@@ -49,7 +49,10 @@ import {
 interface DashboardSettingsAndConnectorProps {
   tenant: ClientTenant | null;
   onVerifyTenantSdk?: (tenant: ClientTenant) => Promise<void>;
-  showToast: (msg: string, variant?: "default" | "error" | "warning") => void;
+  showToast: (
+    msg: string,
+    variant?: "default" | "error" | "warning" | "success" | "info" | "cooking",
+  ) => void;
   autoContainCritical?: boolean;
   setAutoContainCritical?: (v: boolean) => void;
   realtimePagerDuty?: boolean;
@@ -1252,6 +1255,58 @@ print(r.json())`;
           <pre className="overflow-x-auto text-amber-300 leading-relaxed text-[11px]">
             {vpsConnectorCommand}
           </pre>
+        </div>
+
+        {/* All Setup & L3/L4 DDoS XDP Script Links */}
+        <div className="rounded-lg border border-border bg-background p-4 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-semibold text-xs text-foreground">
+                SparrowX Single-File DDoS / XDP Setup &amp; Server Links
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Deploy L3/L4/L7 DDoS protection (XDP/eBPF + sysctl + Fail2Ban + UFW) or full-stack updates in one command.
+              </p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => handleCopy("curl -sSL https://sparrowx.net/ddos-setup.sh | sudo bash", "vps")}
+              className="h-7 gap-1 text-[11px]"
+            >
+              <Copy className="size-3" /> Copy DDoS Setup
+            </Button>
+          </div>
+          <code className="block overflow-x-auto rounded border border-border bg-card px-2.5 py-1.5 font-mono text-[11px] text-emerald-400">
+            curl -sSL https://sparrowx.net/ddos-setup.sh | sudo bash
+          </code>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-mono">
+            <a href="/setup.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /setup.sh
+            </a>
+            <a href="/ddos-setup.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /ddos-setup.sh
+            </a>
+            <a href="/xdp/sparrowx_xdp_ddos.c" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /xdp/sparrowx_xdp_ddos.c
+            </a>
+            <a href="/xdp/attach-xdp.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /xdp/attach-xdp.sh
+            </a>
+            <a href="/update.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /update.sh
+            </a>
+            <a href="/fix.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /fix.sh
+            </a>
+            <a href="/verification.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /verification.sh
+            </a>
+            <a href="/install-connector.sh" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              /install-connector.sh
+            </a>
+          </div>
         </div>
 
         {/* Server Probe Form */}

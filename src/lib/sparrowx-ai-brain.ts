@@ -1215,23 +1215,37 @@ Respond with ONLY a raw JSON object (no markdown code fence) with these exact ke
           const fallback = buildDeterministicScanAdvisory(params);
 
           // Strictly filter vulnerabilities so prompt injection / LLM items NEVER leak into standard websites
-          const rawVulns = Array.isArray(parsed.aiVulnerabilities) && parsed.aiVulnerabilities.length > 0
-            ? parsed.aiVulnerabilities
-            : fallback.aiVulnerabilities;
+          const rawVulns: Array<Partial<AiVulnerabilityItem>> =
+            Array.isArray(parsed.aiVulnerabilities) && parsed.aiVulnerabilities.length > 0
+              ? (parsed.aiVulnerabilities as Array<Partial<AiVulnerabilityItem>>)
+              : fallback.aiVulnerabilities;
 
-          const sanitizedVulns = rawVulns.filter((v: any) => {
-            if (!isAiTarget) {
-              const str = `${v.name || ""} ${v.owaspCategory || ""} ${v.description || ""}`.toLowerCase();
-              return (
-                !str.includes("prompt injection") &&
-                !str.includes("llm") &&
-                !str.includes("jailbreak") &&
-                !str.includes("token-drain") &&
-                !str.includes("ai agent")
-              );
-            }
-            return true;
-          });
+          const sanitizedVulns: AiVulnerabilityItem[] = rawVulns
+            .filter((v) => {
+              if (!isAiTarget) {
+                const str = `${v.name || ""} ${v.owaspCategory || ""} ${v.description || ""}`.toLowerCase();
+                return (
+                  !str.includes("prompt injection") &&
+                  !str.includes("llm") &&
+                  !str.includes("jailbreak") &&
+                  !str.includes("token-drain") &&
+                  !str.includes("ai agent")
+                );
+              }
+              return true;
+            })
+            .map((v, idx): AiVulnerabilityItem => ({
+              id: v.id || `vuln-ai-${idx + 1}`,
+              name: v.name || "Target Security Exposure",
+              riskRating:
+                v.riskRating === "Critical" || v.riskRating === "High" || v.riskRating === "Medium"
+                  ? v.riskRating
+                  : "High",
+              owaspCategory: v.owaspCategory || "OWASP Perimeter Security",
+              description: v.description || "Detected potential exposure during autonomous edge scan.",
+              howSparrowxProtects:
+                v.howSparrowxProtects || "Mitigated inline at the SparrowX Edge reverse proxy and WAF.",
+            }));
 
           return {
             executiveSummary: parsed.executiveSummary,

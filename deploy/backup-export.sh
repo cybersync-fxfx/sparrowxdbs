@@ -34,12 +34,17 @@ mkdir -p "${BACKUP_DIR}/data"
 mkdir -p "${BACKUP_DIR}/config"
 
 # 1. Export PostgreSQL Dump (if container is running)
-if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "sparrowx_postgres"; then
+if docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+    [ -f "${ROOT_DIR}/.env" ] && source "${ROOT_DIR}/.env" 2>/dev/null || true
+    echo "-> Dumping active OVH PostgreSQL cluster (${POSTGRES_USER:-sparrowx})..."
+    docker exec -e PGPASSWORD="${POSTGRES_PASSWORD:-}" sparrowx-postgres pg_dumpall -U "${POSTGRES_USER:-sparrowx}" > "${BACKUP_DIR}/data/postgres_dumpall.sql"
+    echo "   [✓] PostgreSQL dump completed."
+elif docker ps --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx_postgres"; then
     echo "-> Dumping active PostgreSQL schemas, roles, and pgvector tables..."
-    docker exec -t sparrowx_postgres pg_dumpall -U postgres > "${BACKUP_DIR}/data/postgres_dumpall.sql"
+    docker exec sparrowx_postgres pg_dumpall -U postgres > "${BACKUP_DIR}/data/postgres_dumpall.sql"
     echo "   [✓] PostgreSQL dump completed."
 else
-    echo "-> [!] sparrowx_postgres is not running. Backing up local data directory if present."
+    echo "-> [!] PostgreSQL container not running. Backing up local data directory if present."
     if [ -d "./init-scripts" ]; then
         cp -r ./init-scripts "${BACKUP_DIR}/data/"
     fi
@@ -50,13 +55,9 @@ fi
 
 # 2. Copy Configurations, Source & Compose Definitions
 echo "-> Archiving platform configs and orchestration files..."
-[ -f "docker-compose.sparrowx.yml" ] && cp docker-compose.sparrowx.yml "${BACKUP_DIR}/"
-[ -f "Dockerfile" ] && cp Dockerfile "${BACKUP_DIR}/"
-[ -f "package.json" ] && cp package.json "${BACKUP_DIR}/"
-[ -f "package-lock.json" ] && cp package-lock.json "${BACKUP_DIR}/"
-[ -f "Caddyfile" ] && cp Caddyfile "${BACKUP_DIR}/"
-[ -f "nginx.conf" ] && cp nginx.conf "${BACKUP_DIR}/"
-[ -f ".env" ] && cp .env "${BACKUP_DIR}/"
+for cfg in docker-compose.ovh.yml docker-compose.yml docker-compose.sparrowx.yml Dockerfile package.json package-lock.json Caddyfile nginx.conf .env setup.sh update.sh fix.sh manage-db.sh; do
+    [ -f "${cfg}" ] && cp "${cfg}" "${BACKUP_DIR}/"
+done
 [ -d "deploy" ] && cp -r deploy "${BACKUP_DIR}/"
 [ -d "ovh" ] && cp -r ovh "${BACKUP_DIR}/"
 [ -d "src" ] && cp -r src "${BACKUP_DIR}/"

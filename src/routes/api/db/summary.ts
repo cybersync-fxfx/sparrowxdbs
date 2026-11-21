@@ -10,8 +10,8 @@ export const Route = createFileRoute("/api/db/summary")({
 
         const { authorizeDbRequest } = await import("@/lib/server/db-auth.server");
         const auth = await authorizeDbRequest(request, {
-          targetEmail: queryEmail,
-          targetTenantId: queryTenant,
+          ...(queryEmail ? { targetEmail: queryEmail } : {}),
+          ...(queryTenant ? { targetTenantId: queryTenant } : {}),
         });
 
         if (!auth.authorized) {
@@ -28,22 +28,55 @@ export const Route = createFileRoute("/api/db/summary")({
           );
         }
 
-        // Non-admin callers must scope by their own email or tenantId when not in local dev
+        // Strict tenant & account scoping: non-admin callers are pinned to verified identity
+        const verifiedEmail = auth.actorEmail?.trim().toLowerCase() || "";
+        const verifiedTenant = auth.tenantId?.trim() || "";
+
+        if (!auth.isAdmin) {
+          if (queryEmail && verifiedEmail && queryEmail.toLowerCase() !== verifiedEmail) {
+            return Response.json(
+              {
+                ok: false,
+                error: "Forbidden: cannot inspect databases belonging to another account.",
+              },
+              { status: 403 },
+            );
+          }
+          if (queryTenant && verifiedTenant && queryTenant !== verifiedTenant) {
+            return Response.json(
+              {
+                ok: false,
+                error: "Forbidden: cannot inspect databases belonging to another tenant.",
+              },
+              { status: 403 },
+            );
+          }
+          if (!verifiedEmail && !verifiedTenant && !queryEmail && !queryTenant) {
+            return Response.json(
+              {
+                ok: false,
+                error: "Unauthorized: authenticated session or tenant scope required.",
+              },
+              { status: 401 },
+            );
+          }
+        }
+
         const effectiveEmail = auth.isAdmin
           ? queryEmail
-          : queryEmail || auth.actorEmail;
+          : verifiedEmail || (!verifiedTenant ? queryEmail : "");
         const effectiveTenant = auth.isAdmin
           ? queryTenant
-          : queryTenant || auth.tenantId;
+          : verifiedTenant || (!verifiedEmail ? queryTenant : "");
 
         try {
           const { listProvisionedDatabases } = await import(
             "@/lib/server/pg-provisioner.server"
           );
           const summary = await listProvisionedDatabases({
-            isAdmin: auth.isAdmin || (!effectiveEmail && !effectiveTenant),
-            userEmail: effectiveEmail,
-            tenantId: effectiveTenant,
+            isAdmin: Boolean(auth.isAdmin),
+            ...(effectiveEmail ? { userEmail: effectiveEmail } : {}),
+            ...(effectiveTenant ? { tenantId: effectiveTenant } : {}),
           });
           return Response.json({ ok: true, ...summary });
         } catch (err) {

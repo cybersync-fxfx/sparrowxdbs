@@ -95,14 +95,12 @@ export function SparrowxShieldEngine({
   onSignOut,
   initialStage,
 }: SparrowxShieldEngineProps = {}) {
-  const [sessionUser, setSessionUser] = useState<AppUser | null>(() =>
-    readInitialShieldUser(currentUser),
-  );
+  const [sessionUser, setSessionUser] = useState<AppUser | null>(() => currentUser ?? null);
   const activeUser = currentUser ?? sessionUser;
 
   const [viewStage, setViewStage] = useState<ShieldStage>(() => {
     if (initialStage) return initialStage;
-    return readInitialShieldUser(currentUser) ? "client-area" : "landing";
+    return currentUser ? "client-area" : "landing";
   });
 
   // Workspace collections loaded ONLY after authentication
@@ -129,7 +127,11 @@ export function SparrowxShieldEngine({
     } else {
       const next = readInitialShieldUser(null);
       setSessionUser(next);
-      if (!next) setViewStage("landing");
+      if (next) {
+        setViewStage((prev) => (prev === "landing" ? "client-area" : prev));
+      } else {
+        setViewStage("landing");
+      }
     }
   }, [currentUser]);
 

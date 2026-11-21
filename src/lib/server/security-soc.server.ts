@@ -3,6 +3,8 @@ import { SPARROWX_PLANS, type SparrowxPlan } from "../sparrowx-plans";
 
 export type SocSeverity = "Critical" | "High" | "Medium" | "Low" | "Info";
 
+export type SerializableScalar = string | number | boolean | null;
+
 export interface ImmutableAuditLogEntry {
   id: string;
   previousHash: string;
@@ -14,7 +16,7 @@ export interface ImmutableAuditLogEntry {
   target: string;
   severity: SocSeverity;
   timestamp: string;
-  details?: Record<string, unknown>;
+  details?: Record<string, SerializableScalar> | undefined;
 }
 
 export interface FirewallRule {
@@ -45,7 +47,7 @@ export interface ContainmentRequest {
   target: string;
   actor: string;
   reason: string;
-  durationMinutes?: number;
+  durationMinutes?: number | undefined;
 }
 
 export interface ContainmentResult {
@@ -109,7 +111,7 @@ export function appendAuditLog(params: {
   action: string;
   target: string;
   severity: SocSeverity;
-  details?: Record<string, unknown>;
+  details?: Record<string, SerializableScalar> | undefined;
 }): ImmutableAuditLogEntry {
   const previousHash =
     GLOBAL_AUDIT_CHAIN.length > 0
@@ -139,7 +141,7 @@ export function appendAuditLog(params: {
     target: params.target,
     severity: params.severity,
     timestamp,
-    details: params.details,
+    ...(params.details !== undefined ? { details: params.details } : {}),
   };
 
   GLOBAL_AUDIT_CHAIN.push(entry);
@@ -179,7 +181,7 @@ export function verifyAuditChain(): { valid: boolean; totalEntries: number; brok
  */
 export function getTenantAuditLogs(tenantId?: string): ImmutableAuditLogEntry[] {
   if (!tenantId || tenantId === "all" || tenantId === "tnt-system") {
-    return [...GLOBAL_AUDIT_CHAIN].reverse().slice(0, 100);
+    return GLOBAL_AUDIT_CHAIN.toReversed().slice(0, 100);
   }
   return GLOBAL_AUDIT_CHAIN.filter((e) => e.tenantId === tenantId)
     .reverse()
@@ -256,7 +258,7 @@ export async function executeSocContainment(
       incidentId: req.incidentId,
       actionId,
       reason: req.reason,
-      durationMinutes: req.durationMinutes,
+      ...(req.durationMinutes !== undefined ? { durationMinutes: req.durationMinutes } : {}),
     },
   });
 

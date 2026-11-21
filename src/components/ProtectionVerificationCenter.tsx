@@ -204,7 +204,7 @@ export function ProtectionVerificationCenter({
       Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
     const newProof: AssetVerificationProof = {
       id: `VRF-${Date.now().toString().slice(-6)}`,
-      tenantId: currentClientTenant?.id,
+      ...(currentClientTenant?.id ? { tenantId: currentClientTenant.id } : {}),
       name: newAssetName.trim(),
       category: newAssetCategory,
       targetIdentifier: newAssetTarget.trim(),

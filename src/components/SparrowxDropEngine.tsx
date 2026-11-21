@@ -116,11 +116,17 @@ export function SparrowxDropEngine() {
   // Service Mode: "ephemeral" (default no-login zero-disk RAM burn) or "storage" (10GB persistent vault)
   const [activeMode, setActiveMode] = useState<"storage" | "ephemeral">("ephemeral");
 
-  // Vault authentication state
-  const [vaultUser, setVaultUser] = useState<AppUser | null>(() => readInitialVaultUser());
-  const [isVaultAuthenticated, setIsVaultAuthenticated] = useState<boolean>(
-    () => readInitialVaultUser() !== null,
-  );
+  // Vault authentication state (hydrated on client mount to keep SSR HTML identical)
+  const [vaultUser, setVaultUser] = useState<AppUser | null>(null);
+  const [isVaultAuthenticated, setIsVaultAuthenticated] = useState<boolean>(false);
+
+  useEffect(() => {
+    const initial = readInitialVaultUser();
+    if (initial) {
+      setVaultUser(initial);
+      setIsVaultAuthenticated(true);
+    }
+  }, []);
   const [vaultAuthMode, setVaultAuthMode] = useState<"signin" | "register">("signin");
   const [authFullName, setAuthFullName] = useState("");
   const [authEmail, setAuthEmail] = useState("");
@@ -210,7 +216,7 @@ export function SparrowxDropEngine() {
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onload = () => {
           const res = reader.result as string;
-          const base64 = res.split(",")[1];
+          const base64 = res.split(",")[1] ?? "";
           resolve(base64);
         };
         reader.onerror = reject;
@@ -382,7 +388,9 @@ export function SparrowxDropEngine() {
               return true;
             }
           }
-        } catch {}
+        } catch {
+          // Ignore malformed localStorage cache
+        }
         return false;
       };
 
@@ -418,9 +426,10 @@ export function SparrowxDropEngine() {
     if (!incomingPersistentId) return;
 
     // Direct browser RAM download for client-stored / fallback payloads
-    if (persistentFileInfo && (persistentFileInfo as any).base64Data) {
+    const persistentBase64 = (persistentFileInfo as (PersistentFile & { base64Data?: string }) | null)?.base64Data;
+    if (persistentFileInfo && persistentBase64) {
       const a = document.createElement("a");
-      a.href = `data:${persistentFileInfo.type || "application/octet-stream"};base64,${(persistentFileInfo as any).base64Data}`;
+      a.href = `data:${persistentFileInfo.type || "application/octet-stream"};base64,${persistentBase64}`;
       a.download = persistentFileInfo.name || "downloaded-file";
       document.body.appendChild(a);
       a.click();
@@ -443,7 +452,7 @@ export function SparrowxDropEngine() {
 
   const processAndEncryptFile = async (rawFile: File) => {
     if (rawFile.size > 100 * 1024 * 1024) {
-      alert("File exceeds maximum allowable size of 100MB for zero-disk RAM transfer.");
+      setBurnNotice("File exceeds maximum allowable size of 100MB for zero-disk RAM transfer.");
       return;
     }
     setEncrypting(true);
@@ -478,7 +487,7 @@ export function SparrowxDropEngine() {
       let binary = "";
       const len = combined.byteLength;
       for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(combined[i]);
+        binary += String.fromCharCode(combined[i] ?? 0);
       }
       const base64Ciphertext = btoa(binary);
 
@@ -509,7 +518,9 @@ export function SparrowxDropEngine() {
           type: rawFile.type,
           size: rawFile.size,
         }));
-      } catch {}
+      } catch {
+        // Ignore sessionStorage quota limits for large files
+      }
 
       fileBufferRef.current = combined.buffer;
       const staged: StagedFile = {
@@ -543,7 +554,7 @@ export function SparrowxDropEngine() {
       setTtlSeconds(15 * 60);
     } catch (err) {
       console.error("Encryption error", err);
-      alert("Failed to encrypt file in browser memory: " + String(err));
+      setBurnNotice("Failed to encrypt file in browser memory: " + String(err));
     } finally {
       setEncrypting(false);
     }
@@ -583,7 +594,9 @@ export function SparrowxDropEngine() {
             const parsed = JSON.parse(cached);
             base64Ciphertext = parsed.ciphertext;
           }
-        } catch {}
+        } catch {
+          // Ignore malformed localStorage cache
+        }
       }
 
       if (!base64Ciphertext) {
@@ -639,9 +652,10 @@ export function SparrowxDropEngine() {
       URL.revokeObjectURL(url);
 
       setDownloadSuccess(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Decryption failed", err);
-      setDecryptError(err.message || "Failed to decrypt file. Key mismatch or corrupted bytes.");
+      const msg = err instanceof Error ? err.message : "";
+      setDecryptError(msg || "Failed to decrypt file. Key mismatch or corrupted bytes.");
     } finally {
       setDecrypting(false);
     }
@@ -960,7 +974,7 @@ export function SparrowxDropEngine() {
                         <span className="text-zinc-600">•</span>
                         <span>NVMe High-Speed Storage</span>
                         <span className="text-zinc-600">•</span>
-                        <span>{new Date(persistentFileInfo.uploadedAt).toLocaleDateString()}</span>
+                        <span>{new Date(persistentFileInfo.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
@@ -1449,7 +1463,7 @@ export function SparrowxDropEngine() {
                               onChange={(e) => {
                                 setAuthFullName(e.target.value);
                                 if (fieldErrors.fullName && e.target.value.trim()) {
-                                  setFieldErrors((prev) => ({ ...prev, fullName: undefined }));
+                                  setFieldErrors(({ fullName: _fn, ...rest }) => rest);
                                 }
                               }}
                               onBlur={(e) => {
@@ -1507,7 +1521,7 @@ export function SparrowxDropEngine() {
                               const val = e.target.value;
                               setAuthEmail(val);
                               if (fieldErrors.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val.trim())) {
-                                setFieldErrors((prev) => ({ ...prev, email: undefined }));
+                                setFieldErrors(({ email: _em, ...rest }) => rest);
                               }
                             }}
                             onBlur={(e) => {
@@ -1572,7 +1586,7 @@ export function SparrowxDropEngine() {
                               const val = e.target.value;
                               setAuthPassword(val);
                               if (fieldErrors.password && val.length >= 6) {
-                                setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                                setFieldErrors(({ password: _pw, ...rest }) => rest);
                               }
                             }}
                             onBlur={(e) => {

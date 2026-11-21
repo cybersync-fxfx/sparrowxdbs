@@ -780,7 +780,7 @@ export function SparrowXVirusFileScanner({
               <div className="relative z-10 flex flex-col items-center text-center">
                 <FileCode className="size-12 text-cyan-300 drop-shadow-[0_0_12px_rgba(0,229,255,0.7)] animate-pulse" />
                 <span className="mt-2 text-[10px] font-mono font-bold text-white max-w-[120px] truncate">
-                  {selectedFile.name}
+                  {selectedFile?.name ?? "Unknown artifact"}
                 </span>
                 <span className="text-[9px] font-mono text-cyan-400">
                   {scanProgress}% COMPLETE

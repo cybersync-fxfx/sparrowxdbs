@@ -121,7 +121,7 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
     if (orderParam) {
       const [col, dir] = orderParam.split(".");
       if (col) {
-        result = [...result].sort((a, b) => {
+        result = result.toSorted((a, b) => {
           const va = String(a[col] ?? "");
           const vb = String(b[col] ?? "");
           return dir === "desc" ? vb.localeCompare(va) : va.localeCompare(vb);

@@ -108,13 +108,13 @@ export function recordUserOperation(input: {
     affectedResource: input.affectedResource,
     status: input.status,
     details: input.details,
-    errorCode: input.errorCode,
-    errorReferenceId: input.errorReferenceId,
-    troubleshootingUrl: input.errorCode
-      ? docsUrlFor(input.errorCode, input.errorReferenceId)
-      : undefined,
-    latencyMs: input.latencyMs,
-    retryable: input.retryable,
+    ...(input.errorCode !== undefined ? { errorCode: input.errorCode } : {}),
+    ...(input.errorReferenceId !== undefined ? { errorReferenceId: input.errorReferenceId } : {}),
+    ...(input.errorCode
+      ? { troubleshootingUrl: docsUrlFor(input.errorCode, input.errorReferenceId) }
+      : {}),
+    ...(input.latencyMs !== undefined ? { latencyMs: input.latencyMs } : {}),
+    ...(input.retryable !== undefined ? { retryable: input.retryable } : {}),
   };
 
   const existing = getUserActivityHistory();
@@ -145,13 +145,14 @@ export function updateOperationStatus(
   const history = getUserActivityHistory();
   const updated = history.map((item) => {
     if (item.id === id) {
+      const nextUrl = updates?.errorCode
+        ? docsUrlFor(updates.errorCode, updates.errorReferenceId)
+        : item.troubleshootingUrl;
       return {
         ...item,
         status,
         ...updates,
-        troubleshootingUrl: updates?.errorCode
-          ? docsUrlFor(updates.errorCode, updates.errorReferenceId)
-          : item.troubleshootingUrl,
+        ...(nextUrl !== undefined ? { troubleshootingUrl: nextUrl } : {}),
       };
     }
     return item;

@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
 
         const auth = await authorizeDbRequest(request, {
           requireAdmin: action === "list_audit" && !dbName,
-          targetEmail: email,
+          ...(email ? { targetEmail: email } : {}),
         });
         if (!auth.authorized) {
           return Response.json(
@@ -66,7 +66,9 @@ export const Route = createFileRoute("/api/db/lifecycle")({
           );
         }
 
-        const actor = auth.actorEmail || email || auth.actorId;
+        const actor =
+          auth.actorEmail ||
+          (auth.actorId === "studio-user" || auth.isAdmin ? email || auth.actorId : auth.actorId);
 
         try {
           const provisioner = await import("@/lib/server/pg-provisioner.server");
@@ -139,7 +141,13 @@ export const Route = createFileRoute("/api/db/lifecycle")({
               return Response.json({ ok: true, ...result });
             }
             case "list_audit": {
-              const logs = await provisioner.listDbAuditLogs(dbName || undefined, 50);
+              const logs = await provisioner.listDbAuditLogs(
+                dbName || undefined,
+                50,
+                auth.actorEmail,
+                auth.isAdmin,
+                auth.tenantId,
+              );
               return Response.json({ ok: true, logs });
             }
             default:

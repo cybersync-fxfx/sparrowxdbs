@@ -36,12 +36,17 @@ export function generatePassword(length = 20): string {
   const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnpqrstuvwxyz", "23456789", "!@#$%^&*-_+="];
   const all = sets.join("");
   const rnd = crypto.getRandomValues(new Uint32Array(length));
-  const chars = Array.from(rnd, (n, i) => (i < sets.length ? sets[i][n % sets[i].length] : all[n % all.length]));
+  const chars = Array.from(rnd, (n, i) => {
+    const s = sets[i];
+    return s && i < sets.length ? (s[n % s.length] ?? all[0]!) : (all[n % all.length] ?? all[0]!);
+  });
   // shuffle
   const sh = crypto.getRandomValues(new Uint32Array(length));
   for (let i = chars.length - 1; i > 0; i--) {
-    const j = sh[i] % (i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
+    const j = (sh[i] ?? 0) % (i + 1);
+    const tmp = chars[i]!;
+    chars[i] = chars[j]!;
+    chars[j] = tmp;
   }
   return chars.join("");
 }

@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportSparrowxError } from "../lib/sparrowx-error-reporting";
 import { useServiceFavicon } from "../lib/service-favicon";
+import { clearSessionToken } from "../lib/advanced-features";
 
 function NotFoundComponent() {
   return (
@@ -72,8 +73,10 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
             onClick={() => {
               try {
                 if (typeof window !== "undefined") {
+                  clearSessionToken();
                   window.localStorage.clear();
                   window.sessionStorage.clear();
+                  void fetch("/api/auth/master-sso", { method: "DELETE", keepalive: true }).catch(() => {});
                   window.location.reload();
                   return;
                 }

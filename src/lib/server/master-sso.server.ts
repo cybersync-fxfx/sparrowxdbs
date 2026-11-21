@@ -338,17 +338,59 @@ export async function authenticateMasterCredentialsInDb(input: {
       }
 
       // If client-side registration just created the account and browser PostgREST sync hasn't landed yet,
-      // persist into public.app_users when no conflicting email exists.
+      // persist into public.app_users when no conflicting email or tenant exists.
       if (!row && input.registerIfMissing) {
-        const anyExisting = await pool.query<{ cnt: string }>(
-          `SELECT COUNT(*)::text AS cnt FROM public.app_users`,
+        const cleanRequestedTenant = input.registerIfMissing.tenantId?.trim() || "";
+        let assignedTenantId = cleanRequestedTenant;
+
+        // Prevent Tenant IDOR: never bind a new self-registered user to another account's tenantId,
+        // and never share generic placeholder tenant IDs across separate users.
+        if (
+          !assignedTenantId ||
+          assignedTenantId.toUpperCase() === "TENANT-SPARROWX" ||
+          !/^[a-zA-Z0-9_-]{4,64}$/.test(assignedTenantId)
+        ) {
+          assignedTenantId = `TNT-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+        } else {
+          const tenantConflict = await pool.query<{ email: string }>(
+            `SELECT email FROM public.app_users
+             WHERE tenant_id = $1 AND LOWER(email) <> $2
+             LIMIT 1`,
+            [assignedTenantId, emailClean],
+          );
+          if ((tenantConflict.rowCount ?? 0) > 0) {
+            return { user: null, source: "postgres" };
+          }
+          const dbTenantConflict = await pool
+            .query<{ user_email: string }>(
+              `SELECT user_email FROM public.provisioned_databases
+               WHERE tenant_id = $1 AND LOWER(user_email) <> $2
+               LIMIT 1`,
+              [assignedTenantId, emailClean],
+            )
+            .catch(() => ({ rowCount: 0 }));
+          if ((dbTenantConflict.rowCount ?? 0) > 0) {
+            return { user: null, source: "postgres" };
+          }
+        }
+
+        const rawRequestedId = (input.registerIfMissing.id || "").trim();
+        let userId =
+          rawRequestedId && /^[a-zA-Z0-9_-]{4,64}$/.test(rawRequestedId)
+            ? rawRequestedId
+            : `USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+        const existingId = await pool.query<{ id: string }>(
+          `SELECT id FROM public.app_users WHERE id = $1 LIMIT 1`,
+          [userId],
         );
-        const isFirstUser = Number(anyExisting.rows[0]?.cnt ?? 0) === 0;
-        const userId =
-          input.registerIfMissing.id || `USR-${Date.now().toString().slice(-6)}`;
+        if ((existingId.rowCount ?? 0) > 0) {
+          userId = `USR-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+        }
+
         const fullName =
           input.registerIfMissing.fullName?.trim() || emailClean.split("@")[0] || "Developer";
-        const roleAdmin = isFirstUser ? "yes" : "no";
+        // Security invariant: public self-registration never auto-grants admin privileges.
+        const roleAdmin = "no";
         const digest = hashSecretPassword(input.password);
         const inserted = await pool.query<{
           id: string;
@@ -361,7 +403,7 @@ export async function authenticateMasterCredentialsInDb(input: {
            VALUES ($1, $2, $3, $4, $5, $6)
            ON CONFLICT (email) DO NOTHING
            RETURNING id, email, full_name, admin, tenant_id`,
-          [userId, emailClean, digest, fullName, roleAdmin, input.registerIfMissing.tenantId ?? null],
+          [userId, emailClean, digest, fullName, roleAdmin, assignedTenantId],
         );
         const created = inserted.rows[0];
         if (created) {

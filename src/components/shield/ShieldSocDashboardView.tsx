@@ -524,6 +524,7 @@ export function ShieldSocDashboardView({
                   <option value="cloudflare">Cloudflare WAF</option>
                   <option value="nginx">NGINX deny</option>
                   <option value="iptables">Linux iptables</option>
+                  <option value="xdp_ebpf">Linux XDP / eBPF (L4 DDoS)</option>
                   <option value="aws_waf">AWS WAF IPSet</option>
                   <option value="csv">CSV Blocklist</option>
                 </select>

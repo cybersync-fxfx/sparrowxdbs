@@ -195,7 +195,7 @@ export const CURATED_INTERNET_THREAT_FEEDS: InternetThreatItem[] = [
     description:
       "Template injection vulnerability allowing attackers to execute arbitrary shell commands inside Node.js and Java microservices.",
     mitreTechnique: "T1059.004 · Unix Shell Execution",
-    wafRuleTemplate: `sparrowx.waf.virtualPatch({ cve: "CVE-2026-4490", pattern: /\$\{[^}]*(runtime|exec|processbuilder)/i })`,
+    wafRuleTemplate: `sparrowx.waf.virtualPatch({ cve: "CVE-2026-4490", pattern: /[$]\\{[^}]*(runtime|exec|processbuilder)/i })`,
     cloudflareExpression: `(http.request.body.raw contains "\${" and (http.request.body.raw contains "runtime" or http.request.body.raw contains "exec"))`,
     ufwRule: `sudo ufw insert 1 deny from 103.151.125.99 to any comment "RCE Exploit Source CVE-2026-4490"`,
     aiShieldPolicy: `DROP code_exec IF payload_matches(/runtime|exec|processbuilder/i)`,

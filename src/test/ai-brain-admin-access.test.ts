@@ -3,7 +3,11 @@ import { describe, it, expect } from "vitest";
 describe("SparrowX AI Brain Admin-Only Access Control", () => {
   it("restricts SparrowX AI Brain navigation and dock visibility strictly to admin accounts", () => {
     // 1. Client Session (Regular customer/tenant)
-    const clientSession = { role: "client" as const, tenantId: "tnt-1", userEmail: "client@acme.com" };
+    const clientSession: { role: "admin" | "client"; tenantId: string; userEmail: string } = {
+      role: "client",
+      tenantId: "tnt-1",
+      userEmail: "client@acme.com",
+    };
     const isClientAdmin = clientSession.role === "admin";
     expect(isClientAdmin).toBe(false);
 
@@ -18,7 +22,11 @@ describe("SparrowX AI Brain Admin-Only Access Control", () => {
     expect(clientNavItems.some((item) => item.label === "SparrowX AI Brain")).toBe(false);
 
     // 2. Admin Session (SOC Operator / Administrator)
-    const adminSession = { role: "admin" as const, operatorName: "SecOps Admin", operatorEmail: "admin@sparrowx.net" };
+    const adminSession: { role: "admin" | "client"; operatorName: string; operatorEmail: string } = {
+      role: "admin",
+      operatorName: "SecOps Admin",
+      operatorEmail: "admin@sparrowx.net",
+    };
     const isAdmin = adminSession.role === "admin";
     expect(isAdmin).toBe(true);
 

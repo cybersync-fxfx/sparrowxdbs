@@ -49,7 +49,7 @@ describe("Multi-Tenant Isolation & Zero Fake Data Verification", () => {
 
     // Must only have SparrowX Edge Mesh platform baseline
     expect(PRESET_ORIGINS.length).toBe(1);
-    expect(PRESET_ORIGINS[0].domain).toBe("sparrowx.net");
+    expect(PRESET_ORIGINS[0]?.domain).toBe("sparrowx.net");
   });
 
   it("sanitizes domain inputs properly", () => {
@@ -191,18 +191,18 @@ describe("Multi-Tenant Isolation & Zero Fake Data Verification", () => {
     writeTenantIsolatedStorage("TNT-A", "incidents", [{ id: "INC-A1", title: "Tenant A Alert" }]);
     writeTenantIsolatedStorage("TNT-B", "incidents", [{ id: "INC-B1", title: "Tenant B Alert" }]);
 
-    const tenantAIncidents = readTenantIsolatedStorage("TNT-A", "incidents");
-    const tenantBIncidents = readTenantIsolatedStorage("TNT-B", "incidents");
+    const tenantAIncidents = readTenantIsolatedStorage<{ id: string; title: string }>("TNT-A", "incidents");
+    const tenantBIncidents = readTenantIsolatedStorage<{ id: string; title: string }>("TNT-B", "incidents");
 
     expect(tenantAIncidents).toHaveLength(1);
-    expect(tenantAIncidents[0].id).toBe("INC-A1");
+    expect(tenantAIncidents[0]?.id).toBe("INC-A1");
 
     expect(tenantBIncidents).toHaveLength(1);
-    expect(tenantBIncidents[0].id).toBe("INC-B1");
+    expect(tenantBIncidents[0]?.id).toBe("INC-B1");
 
     // Zero cross-tenant leakage
-    expect(tenantAIncidents.find((i: any) => i.id === "INC-B1")).toBeUndefined();
-    expect(tenantBIncidents.find((i: any) => i.id === "INC-A1")).toBeUndefined();
+    expect(tenantAIncidents.find((i) => i.id === "INC-B1")).toBeUndefined();
+    expect(tenantBIncidents.find((i) => i.id === "INC-A1")).toBeUndefined();
   });
 
   it("verifies website connector returns honest error when domain is invalid", async () => {

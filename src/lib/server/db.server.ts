@@ -70,7 +70,9 @@ export async function insertClient(row: Omit<ClientRow, "id" | "created_at" | "c
     body: JSON.stringify(row),
     prefer: "return=representation",
   });
-  return rows[0];
+  const first = rows[0];
+  if (!first) throw new Error("Failed to insert client row");
+  return first;
 }
 
 export async function updateClient(id: string, patch: Partial<ClientRow>): Promise<ClientRow> {
@@ -79,7 +81,9 @@ export async function updateClient(id: string, patch: Partial<ClientRow>): Promi
     body: JSON.stringify(patch),
     prefer: "return=representation",
   });
-  return rows[0];
+  const first = rows[0];
+  if (!first) throw new Error("Failed to update client row");
+  return first;
 }
 
 /** Atomic debit (SQL function). Throws DbError with "insufficient_coins" when the balance is too low. */
@@ -108,7 +112,12 @@ export async function creditCoins(
       p_reference: reference,
     }),
   });
-  return Array.isArray(rows) ? rows[0] : (rows as unknown as { balance: number; applied: boolean });
+  if (Array.isArray(rows)) {
+    const first = rows[0];
+    if (!first) throw new Error("credit_coins returned empty array");
+    return first;
+  }
+  return rows as unknown as { balance: number; applied: boolean };
 }
 
 export async function listTransactions(clientId: string, limit = 25): Promise<Transaction[]> {
@@ -127,7 +136,9 @@ export async function insertSubscription(row: Omit<SubRow, "id" | "created_at">)
     body: JSON.stringify(row),
     prefer: "return=representation",
   });
-  return subFromRow(rows[0]);
+  const first = rows[0];
+  if (!first) throw new Error("Failed to insert subscription row");
+  return subFromRow(first);
 }
 
 export async function findPromo(code: string): Promise<{ code: string; coins: number } | null> {

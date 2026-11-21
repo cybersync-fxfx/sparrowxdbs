@@ -46,8 +46,8 @@ export interface ServiceOnboardingWizardProps {
     useDnsProxy?: boolean;
   }) => Promise<void> | void;
   showToast: (msg: string) => void;
-  initialAssetType?: AssetType;
-  existingTenant?: ClientTenant;
+  initialAssetType?: AssetType | undefined;
+  existingTenant?: ClientTenant | undefined;
 }
 
 export function ServiceOnboardingWizard({
@@ -109,19 +109,16 @@ export function ServiceOnboardingWizard({
   const getEnabledModules = (): ServiceModuleId[] => {
     if (assetType === "ai_agent") {
       const mods: ServiceModuleId[] = [];
-      if (enablePromptShield) mods.push("ai_agent_shield");
-      if (enableDdosRateLimit) mods.push("anti_ddos");
+      if (enablePromptShield || enableDdosRateLimit) mods.push("ai_shield");
       return mods;
     }
     if (assetType === "database") {
-      const mods: ServiceModuleId[] = ["sovereign_db"];
-      if (enableDdosRateLimit) mods.push("anti_ddos");
-      return mods;
+      return ["cloud_security", "compliance"];
     }
     // Website / API
     const mods: ServiceModuleId[] = [];
-    if (enableWaf) mods.push("web_waf");
-    if (enableDdosRateLimit) mods.push("anti_ddos");
+    if (enableWaf) mods.push("web_security");
+    if (enableDdosRateLimit) mods.push("cloud_security");
     return mods;
   };
 
@@ -131,7 +128,7 @@ export function ServiceOnboardingWizard({
     setIsVerifyingDns(true);
     setDnsCheckResult(null);
 
-    const cleanHost = domain.replace(/^https?:\/\//i, "").split("/")[0].split(":")[0];
+    const cleanHost = (domain.replace(/^https?:\/\//i, "").split("/")[0] ?? "").split(":")[0] ?? "";
     try {
       const res = await fetch(`https://dns.google/resolve?name=${cleanHost}&type=A`);
       const data = await res.json();

@@ -12,7 +12,7 @@ describe("ClientPortalView render test", () => {
     primaryDomain: "api.company.com",
     planTier: "Growth",
     status: "Active",
-    enabledModules: ["web_waf"],
+    enabledModules: ["web_security"],
     apiKey: "spx_test_key_1234567890",
     sdkVerified: true,
     guardrailsActive: true,
@@ -27,7 +27,7 @@ describe("ClientPortalView render test", () => {
       <ClientPortalView
         activeNav="My Services"
         assets={[]}
-        currentUser={{ id: "u1", email: "admin@company.com", fullName: "Admin User", role: "admin" } as any}
+        currentUser={{ email: "admin@company.com", fullName: "Admin User" }}
         incidents={[]}
         onCreateTenant={vi.fn()}
         onDeleteTenant={vi.fn()}
@@ -56,7 +56,7 @@ describe("ClientPortalView render test", () => {
       <ClientPortalView
         activeNav="My Services"
         assets={[]}
-        currentUser={{ id: "u1", email: "admin@company.com", fullName: "Admin User", role: "admin" } as any}
+        currentUser={{ email: "admin@company.com", fullName: "Admin User" }}
         incidents={[]}
         onCreateTenant={vi.fn()}
         onDeleteTenant={vi.fn()}

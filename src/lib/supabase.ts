@@ -110,6 +110,12 @@ export type ProtectedService = {
 export type ServiceModuleId = "web_security" | "ai_shield" | "cloud_security" | "compliance";
 
 export type PlanTier =
+  | "SparrowX Edge Core"
+  | "SparrowX Shield Pulse"
+  | "SparrowX Sentinel SOC"
+  | "SparrowX Neural Guard"
+  | "SparrowX Sovereign Vault"
+  | "SparrowX Apex Node"
   | "Developer Starter"
   | "Startup Shield"
   | "Business Pro"
@@ -715,7 +721,7 @@ export async function fetchProtectedServicesFromBackend(): Promise<ProtectedServ
         const isConnected = hb !== "Awaiting Verification" && hb !== "Disconnected";
         return {
           id: String(row.id ?? ""),
-          tenantId: row.tenant_id ? String(row.tenant_id) : undefined,
+          ...(row.tenant_id ? { tenantId: String(row.tenant_id) } : {}),
           name: String(row.name ?? ""),
           category: (row.category as ServiceCategory) ?? "Web App & Website",
           endpoint: String(row.endpoint ?? ""),
@@ -1587,7 +1593,7 @@ export async function fetchVerificationProofsFromBackend(
 
     initial.push({
       id: `VRF-${s.id}`,
-      tenantId: s.tenantId,
+      ...(s.tenantId ? { tenantId: s.tenantId } : {}),
       name: s.name,
       category: isWaf ? "Web Application" : isAi ? "AI Agent (LLM / MCP)" : "API & Microservice",
       targetIdentifier: s.endpoint,

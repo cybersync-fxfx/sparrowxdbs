@@ -4,6 +4,7 @@ import {
   type Incident,
   maskSecretKey,
 } from "@/lib/supabase";
+import { generateSparrowxXdpProgram } from "@/lib/xdp-ddos-layer";
 
 export type SdkTargetLanguage =
   | "html_script"
@@ -14,6 +15,7 @@ export type SdkTargetLanguage =
   | "ai_voice_multimodal"
   | "cloudflare_worker"
   | "docker_sidecar"
+  | "xdp_ebpf"
   | "curl";
 
 export type DiagnosticStep = {
@@ -329,6 +331,20 @@ services:
       - SPARROWX_TELEMETRY_INGEST=${baseUrl}/api/v1/telemetry`,
       };
 
+    case "xdp_ebpf": {
+      const generated = generateSparrowxXdpProgram({
+        serviceName: service.name,
+        endpoint: service.endpoint,
+      });
+      return {
+        filename: "sparrowx_xdp_ddos.c",
+        language: "c",
+        installCmd:
+          'clang -O2 -g -Wall -target bpf -c sparrowx_xdp_ddos.c -o sparrowx_xdp_ddos.o && sudo ip link set dev eth0 xdp obj sparrowx_xdp_ddos.o sec xdp',
+        code: generated.cSource,
+      };
+    }
+
     case "curl":
       return {
         filename: "test-telemetry.sh",
@@ -454,12 +470,13 @@ export async function runAutomatedServiceDiagnostic(service: {
   }
 
   // Step 3: Real Edge WAF Telemetry & DNS Ownership Handshake Check (Zero Mock Responses)
-  const cleanHost = service.endpoint
-    .trim()
-    .toLowerCase()
-    .replace(/^[a-z]+:\/\//, "")
-    .split("/")[0]
-    .split(":")[0];
+  const cleanHost = (
+    service.endpoint
+      .trim()
+      .toLowerCase()
+      .replace(/^[a-z]+:\/\//, "")
+      .split("/")[0] ?? ""
+  ).split(":")[0] ?? "";
 
   const pingStart = performance.now();
   let dnsTxtVerified = false;

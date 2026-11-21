@@ -205,7 +205,7 @@ export function recordDiagnosticError(
     message: rawMessage,
     userFacingMessage: options?.customMessage ?? doc.userMessage,
     nextStep: options?.customNextStep ?? doc.nextStep,
-    context: safeContext,
+    ...(safeContext !== undefined ? { context: safeContext } : {}),
     resolved: false,
   };
 
@@ -330,11 +330,18 @@ export function toggleEventResolution(referenceId: string, resolvedBy?: string):
     if (ev.referenceId === referenceId) {
       found = true;
       const nextResolved = !ev.resolved;
+      if (nextResolved) {
+        return {
+          ...ev,
+          resolved: true,
+          resolvedAt: new Date().toISOString(),
+          resolvedBy: resolvedBy || "SOC Admin",
+        };
+      }
+      const { resolvedAt: _ra, resolvedBy: _rb, ...rest } = ev;
       return {
-        ...ev,
-        resolved: nextResolved,
-        resolvedAt: nextResolved ? new Date().toISOString() : undefined,
-        resolvedBy: nextResolved ? resolvedBy || "SOC Admin" : undefined,
+        ...rest,
+        resolved: false,
       };
     }
     return ev;

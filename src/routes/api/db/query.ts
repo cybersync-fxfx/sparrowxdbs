@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/db/query")({
           );
         }
 
-        const auth = await authorizeDbRequest(request, { targetEmail: email });
+        const auth = await authorizeDbRequest(request, email ? { targetEmail: email } : {});
         if (!auth.authorized) {
           return Response.json(
             { ok: false, error: auth.reason || "Unauthorized" },
@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/db/query")({
           const result = await executeTenantSqlQuery(
             dbName,
             sql,
-            auth.actorEmail || email || auth.actorId,
+            auth.actorEmail || (auth.actorId === "studio-user" || auth.isAdmin ? email || auth.actorId : auth.actorId),
             auth.isAdmin,
           );
           return Response.json(result);

@@ -24,11 +24,11 @@ export interface ThreatMapCity {
   lat: number;
   lon: number;
   country: string;
-  countryCode?: string;
-  isOrigin?: boolean;
-  hostingHub?: string;
-  threatLevel?: "nominal" | "elevated" | "critical";
-  ip?: string;
+  countryCode?: string | undefined;
+  isOrigin?: boolean | undefined;
+  hostingHub?: string | undefined;
+  threatLevel?: "nominal" | "elevated" | "critical" | undefined;
+  ip?: string | undefined;
 }
 
 export interface LiveThreatArc {
@@ -49,7 +49,7 @@ export interface LiveThreatArc {
   dstPort: number;
   protocol: string;
   countryName: string;
-  countryCode?: string;
+  countryCode?: string | undefined;
 }
 
 export const MAP_DEFAULT_CITIES: ThreatMapCity[] = [
@@ -71,15 +71,15 @@ export const MAP_DEFAULT_CITIES: ThreatMapCity[] = [
 ];
 
 export interface CyberThreatMatrixMapProps {
-  className?: string;
-  height?: number | string;
-  customCities?: ThreatMapCity[];
-  showControls?: boolean;
-  showFeed?: boolean;
-  showStats?: boolean;
-  enableSimulation?: boolean;
-  simIntervalMs?: number;
-  maxFeed?: number;
+  className?: string | undefined;
+  height?: number | string | undefined;
+  customCities?: ThreatMapCity[] | undefined;
+  showControls?: boolean | undefined;
+  showFeed?: boolean | undefined;
+  showStats?: boolean | undefined;
+  enableSimulation?: boolean | undefined;
+  simIntervalMs?: number | undefined;
+  maxFeed?: number | undefined;
 }
 
 export function CyberThreatMatrixMap({
@@ -101,7 +101,7 @@ export function CyberThreatMatrixMap({
   const [isStatsCollapsed, setIsStatsCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [isFeedCollapsed, setIsFeedCollapsed] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
   const [focusedCity, setFocusedCity] = useState<ThreatMapCity | null>(() => {
-    return MAP_DEFAULT_CITIES.find((c) => c.name === "Roubaix (OVH Host)") || MAP_DEFAULT_CITIES[0];
+    return MAP_DEFAULT_CITIES.find((c) => c.name === "Roubaix (OVH Host)") ?? MAP_DEFAULT_CITIES[0] ?? null;
   });
   const [hoveredCity, setHoveredCity] = useState<{ city: ThreatMapCity; x: number; y: number } | null>(null);
 
@@ -124,8 +124,11 @@ export function CyberThreatMatrixMap({
   const isPointInPolygon = (pt: [number, number], poly: [number, number][]) => {
     let inside = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const xi = poly[i][0], yi = poly[i][1];
-      const xj = poly[j][0], yj = poly[j][1];
+      const pi = poly[i];
+      const pj = poly[j];
+      if (!pi || !pj) continue;
+      const xi = pi[0], yi = pi[1];
+      const xj = pj[0], yj = pj[1];
       const intersect = yi > pt[1] !== yj > pt[1] && pt[0] < ((xj - xi) * (pt[1] - yi)) / (yj - yi) + xi;
       if (intersect) inside = !inside;
     }
@@ -199,6 +202,7 @@ export function CyberThreatMatrixMap({
           const dst = originHubs.length > 0 ? originHubs[idx % originHubs.length] : cities[0];
           const srcPool = cities.filter((c) => !c.isOrigin);
           const src = srcPool.length > 0 ? srcPool[idx % srcPool.length] : cities[1] || cities[0];
+          if (!src || !dst) return;
 
           const sevRaw = String(r.severity || "med").toLowerCase();
           const severity: "critical" | "high" | "med" | "low" =
@@ -332,6 +336,7 @@ export function CyberThreatMatrixMap({
       ctx.fillStyle = "#94a3b8"; // High-visibility light slate
       for (let i = 0; i < dots.length; i++) {
         const d = dots[i];
+        if (!d) continue;
         ctx.globalAlpha = d.alpha;
         ctx.beginPath();
         ctx.arc(d.x, d.y, 1.45, 0, Math.PI * 2);
@@ -361,6 +366,7 @@ export function CyberThreatMatrixMap({
       const arcs = arcsListRef.current;
       for (let i = arcs.length - 1; i >= 0; i--) {
         const arc = arcs[i];
+        if (!arc) continue;
         const elapsed = now - arc.bornTime;
         const progress = Math.min(1, elapsed / arc.durationMs);
 

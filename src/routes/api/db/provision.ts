@@ -64,10 +64,16 @@ export const Route = createFileRoute("/api/db/provision")({
           const { DbProvisionerError, provisionSeparateUserDatabase } = await import(
             "@/lib/server/pg-provisioner.server"
           );
+          const scopedEmail = auth.isAdmin ? email : auth.actorEmail || email;
+          const scopedTenantId = auth.isAdmin ? tenantId : auth.tenantId || tenantId;
+          const scopedUserId =
+            !auth.isAdmin && auth.actorId && auth.actorId !== "studio-user"
+              ? auth.actorId
+              : userId;
           const database = await provisionSeparateUserDatabase({
-            tenantId,
-            userId,
-            email,
+            tenantId: scopedTenantId,
+            userId: scopedUserId,
+            email: scopedEmail,
             projectName,
             planId,
             isAdminOverride: auth.isAdmin,

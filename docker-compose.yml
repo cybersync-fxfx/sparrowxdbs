@@ -53,6 +53,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
+      POSTGREST_HOST: postgrest
+      POSTGREST_PORT: 3001
       POSTGREST_INTERNAL_URL: http://postgrest:3001
       SPARROWX_DB_REST_URL: http://postgrest:3001
       POSTGRES_HOST: postgres

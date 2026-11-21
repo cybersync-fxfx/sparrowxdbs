@@ -201,6 +201,42 @@ function GameDashboard() {
           />
         )}
         <Transactions />
+
+        <section
+          aria-label="SparrowX Security & Cloud Ecosystem"
+          className="surface-3d rim-sheen rounded-3xl border border-border p-6"
+        >
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-sheen">
+                Connected SparrowX Ecosystem
+              </p>
+              <h2 className="text-lg font-bold">
+                Need Anycast L3/L4 DDoS Protection or Managed Cloud Databases?
+              </h2>
+              <p className="text-xs text-muted-foreground max-w-2xl">
+                Protect external dedicated/VPS game nodes against UDP, RakNet, and SYN floods on GameSec, manage Linux firewall agents on NetSec, or provision low-latency PostgreSQL databases on SparrowX Cloud.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button asChild variant="secondary" size="sm" className="rounded-xl">
+                <a href="https://gamesec.sparrowx.net" target="_blank" rel="noreferrer">
+                  <ShieldCheck className="size-4 text-emerald-400" /> GameSec L4 DDoS <ExternalLink className="size-3.5" />
+                </a>
+              </Button>
+              <Button asChild variant="secondary" size="sm" className="rounded-xl">
+                <a href="https://netsec.sparrowx.net/login?sso=master" target="_blank" rel="noreferrer">
+                  NetSec Firewall Panel <ExternalLink className="size-3.5" />
+                </a>
+              </Button>
+              <Button asChild variant="secondary" size="sm" className="rounded-xl">
+                <a href="https://sparrowx.net">
+                  SparrowX Cloud
+                </a>
+              </Button>
+            </div>
+          </div>
+        </section>
       </main>
 
       {data && <TopUpDialog open={topUp} onOpenChange={setTopUp} demo={data.mode === "demo"} razorpay={data.integrations.razorpay} />}

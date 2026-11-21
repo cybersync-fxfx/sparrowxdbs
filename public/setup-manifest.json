@@ -1,0 +1,63 @@
+{
+  "platform": "SparrowX Sovereign Cloud, Database, Security & DDoS Infrastructure",
+  "repository": "https://github.com/cybersync-fxfx/sparrowxdbs",
+  "canonicalBaseUrl": "https://sparrowx.net",
+  "scripts": [
+    {
+      "id": "full-setup",
+      "name": "Full A-to-Z Server & Stack Setup",
+      "url": "https://sparrowx.net/setup.sh",
+      "repoPath": "setup.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/setup.sh | sudo bash"
+    },
+    {
+      "id": "ddos-setup",
+      "name": "Single-File L3/L4/L7 DDoS & XDP/eBPF Setup",
+      "url": "https://sparrowx.net/ddos-setup.sh",
+      "repoPath": "deploy/ddos-setup.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/ddos-setup.sh | sudo bash"
+    },
+    {
+      "id": "xdp-c-source",
+      "name": "Layer 3/4 XDP/eBPF Anti-DDoS Kernel Filter (C)",
+      "url": "https://sparrowx.net/xdp/sparrowx_xdp_ddos.c",
+      "repoPath": "deploy/xdp/sparrowx_xdp_ddos.c",
+      "cliCommand": "curl -sSL https://sparrowx.net/xdp/sparrowx_xdp_ddos.c -o sparrowx_xdp_ddos.c"
+    },
+    {
+      "id": "xdp-attach",
+      "name": "XDP/eBPF Compiler & NIC Loader",
+      "url": "https://sparrowx.net/xdp/attach-xdp.sh",
+      "repoPath": "deploy/xdp/attach-xdp.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/xdp/attach-xdp.sh | sudo bash -s -- --attach"
+    },
+    {
+      "id": "updater",
+      "name": "Full-Stack Updater & Rebuild Engine",
+      "url": "https://sparrowx.net/update.sh",
+      "repoPath": "update.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/update.sh | sudo bash"
+    },
+    {
+      "id": "doctor-fix",
+      "name": "Autonomous 12-Stage Auto-Heal Doctor",
+      "url": "https://sparrowx.net/fix.sh",
+      "repoPath": "fix.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/fix.sh | sudo bash -s -- --auto"
+    },
+    {
+      "id": "vps-connector",
+      "name": "VPS Telemetry & Edge Agent Connector",
+      "url": "https://sparrowx.net/install-connector.sh",
+      "repoPath": "public/install-connector.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/install-connector.sh | SPX_KEY=\"YOUR_KEY\" SPX_TENANT=\"YOUR_TENANT_ID\" bash"
+    },
+    {
+      "id": "infra-verification",
+      "name": "11-Layer Total Infrastructure Verification & Deep Audit",
+      "url": "https://sparrowx.net/verification.sh",
+      "repoPath": "verification.sh",
+      "cliCommand": "curl -sSL https://sparrowx.net/verification.sh | sudo bash"
+    }
+  ]
+}

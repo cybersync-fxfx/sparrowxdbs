@@ -265,11 +265,12 @@ export function resetTenantApiCredentials(
       const TENANTS_STORAGE_KEY = "sparrowx_client_tenants";
       const raw = window.localStorage.getItem(TENANTS_STORAGE_KEY);
       if (raw) {
-        const list = JSON.parse(raw);
+        const list: unknown = JSON.parse(raw);
         if (Array.isArray(list)) {
-          const synced = list.map((t: any) =>
-            t.id === tenantId ? { ...t, apiKey: newKey } : t,
-          );
+          const synced = list.map((t) => {
+            const rec = t as Record<string, unknown>;
+            return rec.id === tenantId ? { ...rec, apiKey: newKey } : rec;
+          });
           window.localStorage.setItem(TENANTS_STORAGE_KEY, JSON.stringify(synced));
         }
       }
@@ -285,7 +286,7 @@ export function resetTenantApiCredentials(
         ? "Dashboard API Key has been reset"
         : "API Client ID has been reset";
 
-  emitEngineActivity("API Keys", `${detailMsg} for ${current.tenantName} (${tenantId})`, "warning");
+  emitEngineActivity("API Keys", `${detailMsg} for ${current.tenantName} (${tenantId})`, "info");
   emitEngineToast(`${detailMsg} successfully. Previous credentials invalidated.`, "success", "Credentials Reset");
 
   return {
@@ -354,7 +355,7 @@ export function addTenantDatabaseIp(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     lastProbeStatus: "Pending",
-    notes: ipData.notes?.trim() || undefined,
+    ...(ipData.notes?.trim() ? { notes: ipData.notes.trim() } : {}),
   };
 
   const updatedList = [newRecord, ...existingIps];
@@ -436,7 +437,7 @@ export function removeTenantDatabaseIp(
   }
 
   emitEngineActivity("Database", `Removed IP ${target.ipAddress} from table ${config.ipTableName}`, "info");
-  emitEngineToast(`Removed IP ${target.ipAddress} from database`, "warning", "IP Removed");
+  emitEngineToast(`Removed IP ${target.ipAddress} from database`, "info", "IP Removed");
 
   return {
     success: true,
@@ -558,7 +559,6 @@ export async function verifyWebsiteConnector(
       targetUrl: cleanDomain,
       lastHeartbeatAt: new Date().toISOString(),
       lastProbeStatus: "Connected",
-      errorMessage: undefined,
     };
     current.lastSyncAt = new Date().toISOString();
     saveTenantDatabaseConfig(current);
@@ -652,7 +652,6 @@ export async function verifyServerConnector(
     serverIp: clean,
     lastHeartbeatAt: new Date().toISOString(),
     lastProbeStatus: "Connected",
-    errorMessage: undefined,
   };
   current.lastSyncAt = new Date().toISOString();
   saveTenantDatabaseConfig(current);

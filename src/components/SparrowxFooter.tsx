@@ -68,6 +68,16 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     sublabel: "game.panel.sparrowx.net",
     href: "https://game.panel.sparrowx.net",
   },
+  {
+    label: "Game DDoS Defense",
+    sublabel: "gamesec.sparrowx.net",
+    href: "https://gamesec.sparrowx.net",
+  },
+  {
+    label: "NetSec DDoS Panel",
+    sublabel: "netsec.sparrowx.net",
+    href: "https://netsec.sparrowx.net",
+  },
 ];
 
 const LINK_CLASSES =

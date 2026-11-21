@@ -38,23 +38,37 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
         <div className="hidden md:block">
           <ServiceSwitcher value={service} onChange={onService} layoutId="nav-pill" />
         </div>
-        {me ? (
-          <Button asChild variant="discord" size="sm" className="rounded-xl">
-            <Link to="/game/dashboard" search={{}}>
-              <img src={me.avatarUrl} alt={`${me.username} player avatar`} width={20} height={20} className="size-5 rounded-full" />
-              <span className="hidden sm:inline">Client Area</span>
-              <LayoutDashboard className="sm:hidden" />
-            </Link>
-          </Button>
-        ) : (
-          <Button asChild variant="discord" size="sm" className="rounded-xl">
-            <a href={LOGIN_HREF}>
-              <DiscordIcon className="size-4" />
-              <span className="hidden sm:inline">Login with Discord</span>
-              <span className="sm:hidden">Login</span>
-            </a>
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          <a
+            href="https://gamesec.sparrowx.net"
+            className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            DDoS Defense
+          </a>
+          <a
+            href="https://sparrowx.net"
+            className="hidden xl:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            SparrowX Cloud
+          </a>
+          {me ? (
+            <Button asChild variant="discord" size="sm" className="rounded-xl">
+              <Link to="/game/dashboard" search={{}}>
+                <img src={me.avatarUrl} alt={`${me.username} player avatar`} width={20} height={20} className="size-5 rounded-full" />
+                <span className="hidden sm:inline">Client Area</span>
+                <LayoutDashboard className="sm:hidden" />
+              </Link>
+            </Button>
+          ) : (
+            <Button asChild variant="discord" size="sm" className="rounded-xl">
+              <a href={LOGIN_HREF}>
+                <DiscordIcon className="size-4" />
+                <span className="hidden sm:inline">Login with Discord</span>
+                <span className="sm:hidden">Login</span>
+              </a>
+            </Button>
+          )}
+        </div>
       </div>
       <div className="mt-2 flex justify-center md:hidden">
         <ServiceSwitcher value={service} onChange={onService} layoutId="nav-pill-mobile" />

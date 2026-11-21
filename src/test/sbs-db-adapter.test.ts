@@ -8,9 +8,16 @@ const {
   DEFAULT_ADMIN_PASSWORD,
 } = require('../../sbs/sparrowx-db-adapter.js');
 
-function makeMockPool(queryImpl) {
+type MockQueryResult = {
+  rows: Record<string, unknown>[];
+  rowCount?: number;
+};
+
+type MockQueryFn = (sql: string, params?: unknown[]) => Promise<MockQueryResult>;
+
+function makeMockPool(queryImpl?: MockQueryFn) {
   return {
-    query: vi.fn(queryImpl || (async () => ({ rows: [], rowCount: 0 }))),
+    query: vi.fn(queryImpl ?? (async () => ({ rows: [], rowCount: 0 }))),
   };
 }
 
@@ -24,7 +31,7 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
   });
 
   it('builds parameterized SELECT queries with count and head options', async () => {
-    const pool = makeMockPool(async (sql) => {
+    const pool = makeMockPool(async (sql: string) => {
       if (sql.includes('COUNT(*)')) {
         return { rows: [{ total: 42 }], rowCount: 1 };
       }
@@ -59,15 +66,25 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
   });
 
   it('registers, hashes password with bcrypt, logs in, and verifies JWT via getUser', async () => {
-    const users = new Map();
-    const profiles = new Map();
+    const users = new Map<
+      unknown,
+      {
+        id: unknown;
+        email: string;
+        password_hash: string;
+        raw_user_meta_data: unknown;
+        created_at: string;
+      }
+    >();
+    const profiles = new Map<unknown, Record<string, unknown>>();
 
-    const pool = makeMockPool(async (sql, params = []) => {
+    const pool = makeMockPool(async (sql: string, params: unknown[] = []) => {
       if (sql === 'BEGIN' || sql === 'COMMIT' || sql === 'ROLLBACK') {
         return { rows: [], rowCount: 0 };
       }
       if (sql.includes('FROM sbs_users WHERE LOWER(email)')) {
-        const found = [...users.values()].find((u) => u.email === params[0].toLowerCase());
+        const target = String(params[0] ?? '').toLowerCase();
+        const found = [...users.values()].find((u) => u.email === target);
         return { rows: found ? [found] : [] };
       }
       if (sql.includes('SELECT COUNT(*)::int AS total FROM user_profiles')) {
@@ -77,9 +94,9 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
         const [id, email, password_hash, rawMeta] = params;
         users.set(id, {
           id,
-          email,
-          password_hash,
-          raw_user_meta_data: JSON.parse(rawMeta),
+          email: String(email ?? ''),
+          password_hash: String(password_hash ?? ''),
+          raw_user_meta_data: JSON.parse(String(rawMeta ?? '{}')),
           created_at: new Date().toISOString(),
         });
         return { rows: [], rowCount: 1 };
@@ -90,7 +107,8 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
         return { rows: [], rowCount: 1 };
       }
       if (sql.includes('FROM sbs_users u') && sql.includes('LEFT JOIN user_profiles p')) {
-        const u = [...users.values()].find((x) => x.email === params[0].toLowerCase());
+        const target = String(params[0] ?? '').toLowerCase();
+        const u = [...users.values()].find((x) => x.email === target);
         if (!u) return { rows: [] };
         const p = profiles.get(u.id);
         return { rows: [{ ...u, role: p?.role, status: p?.status }] };
@@ -119,8 +137,9 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
     expect(reg.data.session?.access_token).toBeTruthy();
 
     const storedUser = [...users.values()][0];
-    expect(storedUser.password_hash).not.toBe('StrongPassword123!');
-    expect(storedUser.password_hash.startsWith('$2')).toBe(true);
+    expect(storedUser).toBeDefined();
+    expect(storedUser!.password_hash).not.toBe('StrongPassword123!');
+    expect(storedUser!.password_hash.startsWith('$2')).toBe(true);
 
     const badLogin = await db.auth.signInWithPassword({
       email: 'operator@sparrowx.sbs',
@@ -135,16 +154,16 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
     expect(goodLogin.error).toBeNull();
     expect(goodLogin.data.session?.access_token).toBeTruthy();
 
-    const verified = await db.auth.getUser(goodLogin.data.session.access_token);
+    const verified = await db.auth.getUser(goodLogin.data.session?.access_token ?? '');
     expect(verified.error).toBeNull();
     expect(verified.data.user.email).toBe('operator@sparrowx.sbs');
   });
 
   it('seeds the default approved admin account idempotently', async () => {
-    const inserted = [];
-    const pool = makeMockPool(async (sql, params = []) => {
+    const inserted: Array<{ id: unknown; username: unknown; email: unknown; role: string; status: string }> = [];
+    const pool = makeMockPool(async (sql: string, params: unknown[] = []) => {
       if (sql.includes('WHERE LOWER(u.email)')) {
-        return { rows: inserted.length ? [inserted[0]] : [] };
+        return { rows: inserted[0] ? [inserted[0]] : [] };
       }
       if (sql.startsWith('INSERT INTO user_profiles')) {
         inserted.push({ id: params[0], username: params[1], email: params[2], role: 'admin', status: 'approved' });

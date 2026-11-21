@@ -167,3 +167,11 @@ elif systemctl is-enabled --quiet sparrowx-netsec.service 2>/dev/null; then
     systemctl restart sparrowx-netsec.service >/dev/null 2>&1 || true
   fi
 fi
+
+# 9. Layer 3/4 XDP/eBPF DDoS scrubber keepalive (if enabled)
+if systemctl is-enabled --quiet sparrowx-xdp.service 2>/dev/null; then
+  if ! systemctl is-active --quiet sparrowx-xdp.service 2>/dev/null; then
+    log_wd "HEAL: Re-attaching sparrowx-xdp.service..."
+    systemctl restart sparrowx-xdp.service >/dev/null 2>&1 || true
+  fi
+fi
