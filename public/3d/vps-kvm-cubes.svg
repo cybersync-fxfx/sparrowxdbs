@@ -22,9 +22,7 @@
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-<circle cx="320" cy="316" r="260" fill="url(#vpsBg)"/>
-
-  <!-- Base fiber grid -->
+<!-- Base fiber grid -->
   <ellipse cx="320" cy="534" rx="188" ry="36" fill="#38BDF8" fill-opacity="0.16" filter="url(#cyanBloom)"/>
 
   <!-- Back Top KVM Cube -->

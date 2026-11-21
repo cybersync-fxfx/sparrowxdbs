@@ -25,9 +25,7 @@
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-<circle cx="320" cy="312" r="265" fill="url(#shieldGlow)"/>
-
-  <!-- Orbital Perimeter Defense Rings -->
+<!-- Orbital Perimeter Defense Rings -->
   <ellipse cx="320" cy="336" rx="236" ry="92" transform="rotate(-14 320 336)" stroke="#F9103A" stroke-opacity="0.4" stroke-width="2" stroke-dasharray="10 8"/>
   <ellipse cx="320" cy="336" rx="196" ry="74" transform="rotate(-14 320 336)" stroke="#F97316" stroke-opacity="0.32" stroke-width="1.5"/>
 

@@ -22,9 +22,7 @@
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-<circle cx="320" cy="318" r="265" fill="url(#apiBg)"/>
-
-  <!-- Optical Fiber Conduits -->
+<!-- Optical Fiber Conduits -->
   <path d="M132 206 L320 304 L508 206" stroke="#10B981" stroke-width="3.5" stroke-linecap="round" filter="url(#emeraldGlow)"/>
   <path d="M320 304 L320 510" stroke="#34D399" stroke-width="3.5" stroke-linecap="round" filter="url(#emeraldGlow)"/>
   <path d="M132 426 L320 330 L508 426" stroke="#10B981" stroke-opacity="0.55" stroke-width="2" stroke-dasharray="6 6"/>

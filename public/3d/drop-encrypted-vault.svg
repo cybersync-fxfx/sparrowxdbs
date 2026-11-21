@@ -27,9 +27,7 @@
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-<circle cx="320" cy="316" r="260" fill="url(#vaultBg)"/>
-
-  <!-- Floor shadow halo -->
+<!-- Floor shadow halo -->
   <ellipse cx="320" cy="540" rx="164" ry="34" fill="#A855F7" fill-opacity="0.2" filter="url(#violetGlow)"/>
 
   <!-- Lower Vault Cube Base -->
