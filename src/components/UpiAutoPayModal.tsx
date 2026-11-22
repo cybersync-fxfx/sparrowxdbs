@@ -43,7 +43,7 @@ interface UpiAutoPayModalProps {
   customerEmail: string;
   metadata?:
     | {
-        category?: "bare-metal" | "dedicated" | "vps";
+        category?: "bare-metal" | "dedicated" | "vds" | "vps";
         hostname?: string;
         region?: string;
         os?: string;

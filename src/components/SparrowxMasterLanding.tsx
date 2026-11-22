@@ -466,7 +466,6 @@ export function SparrowxMasterLanding({
   onUserAuthenticated,
 }: SparrowxMasterLandingProps) {
   const [operatorModalOpen, setOperatorModalOpen] = useState(false);
-  const [vpsCurrency, setVpsCurrency] = useState<"INR" | "USD">("INR");
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
@@ -558,7 +557,7 @@ export function SparrowxMasterLanding({
   // Highlight the nav link for the section currently in view.
   useEffect(() => {
     if (typeof IntersectionObserver === "undefined") return;
-    const ids = ["comparison", "story", "vps", "contact"];
+    const ids = ["comparison", "story", "contact"];
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -577,58 +576,6 @@ export function SparrowxMasterLanding({
   const navLinkClass = (id: string) =>
     `transition-colors ${activeSection === id ? "text-white font-semibold underline decoration-white underline-offset-8" : "hover:text-white"}`;
 
-  const vpsPlans = [
-    {
-      id: "sx-micro",
-      name: "SX-Micro",
-      vCpu: "1 vCPU",
-      ram: "2 GB ECC",
-      storage: "40 GB Fast NVMe",
-      bandwidth: "1 TB Anycast Bandwidth",
-      priceInr: "₹340",
-      priceUsd: "$4",
-      period: "/mo",
-      tag: "Starter",
-    },
-    {
-      id: "sx-core",
-      name: "SX-Core",
-      vCpu: "1 vCPU",
-      ram: "4 GB ECC",
-      storage: "80 GB Fast NVMe",
-      bandwidth: "2 TB Anycast Bandwidth",
-      priceInr: "₹670",
-      priceUsd: "$8",
-      period: "/mo",
-      tag: "Most Popular",
-    },
-    {
-      id: "sx-memory",
-      name: "SX-Memory",
-      vCpu: "2 vCPU",
-      ram: "8 GB ECC",
-      storage: "160 GB Fast NVMe",
-      bandwidth: "4 TB Anycast Bandwidth",
-      priceInr: "₹1,260",
-      priceUsd: "$15",
-      period: "/mo",
-      tag: "BEST VALUE",
-      highlight: true,
-    },
-    {
-      id: "sx-vault",
-      name: "SX-Vault",
-      vCpu: "4 vCPU",
-      ram: "16 GB ECC",
-      storage: "400 GB Fast NVMe",
-      bandwidth: "8 TB Anycast Bandwidth",
-      priceInr: "₹2,440",
-      priceUsd: "$29",
-      period: "/mo",
-      tag: "Heavy Workloads",
-    },
-  ];
-
   const directRoutes: Record<string, string> = {
     db: "/db",
     file: "/drop",
@@ -642,14 +589,20 @@ export function SparrowxMasterLanding({
     infra: "/infra",
   };
 
+  const resolveServiceHref = (targetId: string, url: string) => {
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname.toLowerCase();
+      if (host === "localhost" || host === "127.0.0.1") {
+        const directPath = directRoutes[targetId];
+        if (directPath) return directPath;
+      }
+    }
+    return url;
+  };
+
   const handleLaunch = (targetId: string, url: string, _param?: string) => {
     if (typeof window === "undefined") return;
-    const directPath = directRoutes[targetId];
-    if (directPath) {
-      window.location.href = directPath;
-      return;
-    }
-    window.location.href = url;
+    window.location.href = resolveServiceHref(targetId, url);
   };
 
   const handleLandingSignOut = () => {
@@ -758,72 +711,48 @@ export function SparrowxMasterLanding({
                     </div>
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductDropdownOpen(false);
-                      handleLaunch("sec", "https://sec.sparrowx.net", "shield");
-                    }}
+                  <a
+                    href={resolveServiceHref("sec", "https://sec.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF & Real-Time DDoS Threat Radar" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-[#F9103A]/30" />
+                    <img src="/logos/sparrowx-shield.png" alt="SparrowX Shield — Edge WAF & DDoS Defense" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Shield</div>
-                      <div className="text-[11px] text-zinc-400">Threat Map &amp; DDoS Defense</div>
+                      <div className="text-[11px] text-zinc-400">Edge WAF &amp; Autonomous SOC</div>
                     </div>
-                  </button>
+                  </a>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductDropdownOpen(false);
-                      handleLaunch("api", "https://api.sparrowx.net", "api");
-                    }}
+                  <a
+                    href={resolveServiceHref("infra", "https://infra.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Terminal className="size-4 text-white shrink-0" aria-hidden="true" />
-                    <div>
-                      <div className="font-semibold text-xs">SparrowX API Gateway</div>
-                      <div className="text-[11px] text-zinc-400">REST API &amp; SDKs</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductDropdownOpen(false);
-                      handleLaunch("infra", "https://infra.sparrowx.net", "infra");
-                    }}
-                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
-                  >
-                    <Cpu className="size-4 text-sky-400 shrink-0" aria-hidden="true" />
+                    <img src="/logos/sparrowx-silver.png" alt="SparrowX Cloud Infra" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Cloud Infra</div>
                       <div className="text-[11px] text-zinc-400">Bare Metal, Dedicated &amp; VPS</div>
                     </div>
-                  </button>
+                  </a>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setProductDropdownOpen(false);
-                      handleLaunch("game", "https://game.sparrowx.net", "game");
-                    }}
+                  <a
+                    href={resolveServiceHref("game", "https://game.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Server className="size-4 text-white shrink-0" aria-hidden="true" />
+                    <img src="/logos/sparrowx-main.png" alt="SparrowX Game Hosting" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Game Hosting</div>
                       <div className="text-[11px] text-zinc-400">FiveM, Minecraft &amp; Pterodactyl</div>
                     </div>
-                  </button>
+                  </a>
 
                   <a
                     href="https://gamesec.sparrowx.net"
                     onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Shield className="size-4 text-red-400 shrink-0" aria-hidden="true" />
+                    <img src="/logos/sparrowx-network.png" alt="SparrowX GameSec L4" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX GameSec L4</div>
                       <div className="text-[11px] text-zinc-400">Anycast Game DDoS Defense</div>
@@ -835,7 +764,7 @@ export function SparrowxMasterLanding({
                     onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <Globe className="size-4 text-emerald-400 shrink-0" aria-hidden="true" />
+                    <img src="/logos/sparrowx-netsec-3d.png" alt="SparrowX NetSec Guard" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX NetSec Guard</div>
                       <div className="text-[11px] text-zinc-400">Linux Agent &amp; WireGuard Tunnels</div>
@@ -850,9 +779,6 @@ export function SparrowxMasterLanding({
             </a>
             <a href="#story" aria-current={activeSection === "story" ? "true" : undefined} className={navLinkClass("story")}>
               Story
-            </a>
-            <a href="#vps" aria-current={activeSection === "vps" ? "true" : undefined} className={navLinkClass("vps")}>
-              Pricing
             </a>
             <a href="#contact" aria-current={activeSection === "contact" ? "true" : undefined} className={navLinkClass("contact")}>
               Contact
@@ -998,41 +924,20 @@ export function SparrowxMasterLanding({
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">sec.sparrowx.net</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLaunch("api", "https://api.sparrowx.net", "api");
-                }}
+              <a
+                href={resolveServiceHref("infra", "https://infra.sparrowx.net")}
+                onClick={() => setMobileMenuOpen(false)}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
-                  <Terminal className="size-4" aria-hidden="true" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs text-white">SparrowX API Gateway</div>
-                  <div className="text-[10px] text-zinc-400 truncate">Instant REST API with cURL &amp; SDKs</div>
-                </div>
-                <span className="text-[10px] font-mono text-zinc-300 shrink-0">api.sparrowx.net</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLaunch("infra", "https://infra.sparrowx.net", "infra");
-                }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
-              >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-sky-400 shrink-0">
-                  <Cpu className="size-4" aria-hidden="true" />
+                <div className="size-8 rounded-md overflow-hidden border border-white/20 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-silver.png" alt="SparrowX Cloud Infra" width={28} height={28} className="size-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud Infra</div>
                   <div className="text-[10px] text-zinc-400 truncate">Bare Metal, Dedicated Servers &amp; KVM VPS</div>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">infra.sparrowx.net</span>
-              </button>
+              </a>
 
               <button
                 type="button"
@@ -1099,15 +1004,6 @@ export function SparrowxMasterLanding({
                 className="p-2.5 rounded bg-[#090B10] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
               >
                 <span>Story</span>
-                <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
-              </a>
-
-              <a
-                href="#vps"
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2.5 rounded bg-[#090B10] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
-              >
-                <span>Pricing</span>
                 <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
               </a>
 
@@ -1342,239 +1238,128 @@ export function SparrowxMasterLanding({
           </p>
         </div>
 
-        {/* 6 PRODUCTS GRID */}
-        <div className="border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg divide-y md:divide-y-0 divide-white/15 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 overflow-hidden shadow-xl">
-          {/* 1. SparrowX Cloud DB */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-10 rounded-lg overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0">
-                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL with pgvector AI search" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  POSTGRES + VECTOR
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX Cloud DB</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Fast, reliable managed PostgreSQL with built-in connection pooling and pgvector search. No sudden $1,000 bandwidth bills.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>db.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 2. SparrowX Drop */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-10 rounded-lg overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0">
-                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted Ephemeral File Vault and Secure Sharing" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  FREE • NO LOGIN
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX Drop</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Drop files instantly with zero login (auto-purged from memory for privacy) or unlock your persistent 10GB cloud vault.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("file", "https://file.sparrowx.net", "file")}
-              className="w-full py-2 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono shadow-sm"
-            >
-              <span>file.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 3. SparrowX Keys */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-10 rounded-lg overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0">
-                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — 100% Offline Cryptographic Password Generator" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  FREE • NO LOGIN
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX Keys</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                100% offline cryptographic password generator. Press spacebar to regenerate. Runs directly in your browser with zero network calls.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("password", "https://password.sparrowx.net", "password")}
-              className="w-full py-2 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer font-mono shadow-sm"
-            >
-              <span>password.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 4. SparrowX Shield */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-10 rounded-lg overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] shrink-0">
-                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF and Real-Time DDoS Threat Radar" width={40} height={40} loading="lazy" className="size-full object-cover scale-110" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  EDGE DEFENSE
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX Shield</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Shadowshield defense engine with autonomous edge WAF and real-time DDoS telemetry on NetSec. Sub-second deflection and complete origin IP cloaking.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("sec", "https://sec.sparrowx.net", "shield")}
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>sec.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 5. SparrowX API Gateway */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
-                  <Terminal className="size-4" aria-hidden="true" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  REST &amp; SDKs
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX API Gateway</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Instant RESTful API for your database with one-click code generation in cURL, TypeScript, and Python with ultra-fast latency.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("api", "https://api.sparrowx.net", "api")}
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>api.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 6. SparrowX Cloud Infra */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-t border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
-                  <Cpu className="size-4" aria-hidden="true" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  BARE METAL &amp; VPS
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX Cloud Infra</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Single-tenant AMD Ryzen &amp; EPYC bare metal, dedicated servers, and fast NVMe KVM VPS. Predictable flat monthly rates in INR and USD.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("infra", "https://infra.sparrowx.net", "infra")}
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>infra.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 7. SparrowX Game Hosting */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-white/10 border border-white/25 grid place-items-center text-white">
-                  <Server className="size-4" aria-hidden="true" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  DISCORD + PTERO SSO
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX Game Hosting</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Low-ping Asia-IN NVMe Gen4 servers for FiveM, SA-MP, Minecraft, and Discord bots with SparrowCoins wallet and 1-click Pterodactyl panel auto-login.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLaunch("game", "https://game.sparrowx.net", "game")}
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>game.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* 8. SparrowX GameSec L4 Defense */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-r border-white/15 border-t border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-red-500/15 border border-red-500/35 grid place-items-center text-red-400">
-                  <Shield className="size-4" aria-hidden="true" />
-                </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  L3/L4 ANYCAST
-                </span>
-              </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX GameSec L4</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Dedicated Anycast L3/L4 packet scrubbing and stateful UDP/RakNet/ENet filtering engineered to keep multiplayer game servers online under flood attacks.
-              </p>
-            </div>
+        {/* 8 PRODUCTS GRID (Every card is a direct clickable link with its official SparrowX logo) */}
+        <div className="border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 overflow-hidden shadow-xl">
+          {[
+            {
+              id: "db",
+              name: "SparrowX Cloud DB",
+              badge: "POSTGRES + VECTOR",
+              logo: "/logos/sparrowx-db.png",
+              desc: "Fast, reliable managed PostgreSQL with built-in connection pooling and pgvector search. No sudden bandwidth bills.",
+              domain: "db.sparrowx.net",
+              href: resolveServiceHref("db", "https://db.sparrowx.net"),
+              highlight: false,
+            },
+            {
+              id: "file",
+              name: "SparrowX Drop",
+              badge: "FREE • NO LOGIN",
+              logo: "/logos/sparrowx-drop.png",
+              desc: "Drop files instantly with zero login (auto-purged from memory for privacy) or unlock your persistent 10GB cloud vault.",
+              domain: "file.sparrowx.net",
+              href: resolveServiceHref("file", "https://file.sparrowx.net"),
+              highlight: true,
+            },
+            {
+              id: "password",
+              name: "SparrowX Keys",
+              badge: "FREE • NO LOGIN",
+              logo: "/logos/sparrowx-keys.png",
+              desc: "100% offline cryptographic password generator. Press spacebar to regenerate directly in your browser with zero network calls.",
+              domain: "password.sparrowx.net",
+              href: resolveServiceHref("password", "https://password.sparrowx.net"),
+              highlight: true,
+            },
+            {
+              id: "sec",
+              name: "SparrowX Shield",
+              badge: "EDGE DEFENSE",
+              logo: "/logos/sparrowx-shield.png",
+              desc: "Shadowshield defense engine with autonomous edge WAF and real-time DDoS telemetry on NetSec. Sub-second deflection and origin cloaking.",
+              domain: "sec.sparrowx.net",
+              href: resolveServiceHref("sec", "https://sec.sparrowx.net"),
+              highlight: false,
+            },
+            {
+              id: "infra",
+              name: "SparrowX Cloud Infra",
+              badge: "BARE METAL & VPS",
+              logo: "/logos/sparrowx-silver.png",
+              desc: "Single-tenant AMD Ryzen & EPYC bare metal, dedicated servers, and fast NVMe KVM VPS. Predictable flat monthly rates in INR and USD.",
+              domain: "infra.sparrowx.net",
+              href: resolveServiceHref("infra", "https://infra.sparrowx.net"),
+              highlight: false,
+            },
+            {
+              id: "game",
+              name: "SparrowX Game Hosting",
+              badge: "DISCORD + PTERO SSO",
+              logo: "/logos/sparrowx-main.png",
+              desc: "Low-ping Asia-IN NVMe Gen4 servers for FiveM, SA-MP, Minecraft, and Discord bots with SparrowCoins wallet and 1-click Pterodactyl SSO.",
+              domain: "game.sparrowx.net",
+              href: resolveServiceHref("game", "https://game.sparrowx.net"),
+              highlight: false,
+            },
+            {
+              id: "gamesec",
+              name: "SparrowX GameSec L4",
+              badge: "L3/L4 ANYCAST",
+              logo: "/logos/sparrowx-network.png",
+              desc: "Dedicated Anycast L3/L4 packet scrubbing and stateful UDP/RakNet/ENet filtering engineered to keep multiplayer game servers online.",
+              domain: "gamesec.sparrowx.net",
+              href: "https://gamesec.sparrowx.net",
+              highlight: false,
+            },
+            {
+              id: "netsec",
+              name: "SparrowX NetSec Guard",
+              badge: "WIREGUARD + XDP",
+              logo: "/logos/sparrowx-netsec-3d.png",
+              desc: "Autonomous Linux security agent, WireGuard Guard tunnels, nftables firewall automation, and live IP threat radar connected via Master SSO.",
+              domain: "netsec.sparrowx.net",
+              href: getNetsecSsoUrl({ autoSso: Boolean(sessionUser) }),
+              highlight: false,
+            },
+          ].map((svc) => (
             <a
-              href="https://gamesec.sparrowx.net"
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              key={svc.id}
+              href={svc.href}
+              className="group p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.05] transition-colors border-b border-r border-white/15 cursor-pointer no-underline"
             >
-              <span>gamesec.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            </a>
-          </div>
-
-          {/* 9. SparrowX NetSec Guard */}
-          <div className="p-6 space-y-4 flex flex-col justify-between hover:bg-white/[0.04] transition-colors border-t border-white/15">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="size-9 rounded-md bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400">
-                  <Globe className="size-4" aria-hidden="true" />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="size-11 rounded-lg overflow-hidden border border-white/20 bg-[#0A0E17] p-1.5 shrink-0 flex items-center justify-center group-hover:border-white/45 transition-colors">
+                    <img
+                      src={svc.logo}
+                      alt={svc.name}
+                      width={36}
+                      height={36}
+                      loading="lazy"
+                      className="size-full object-contain"
+                    />
+                  </div>
+                  <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
+                    {svc.badge}
+                  </span>
                 </div>
-                <span className="text-[9px] font-mono text-white bg-white/10 border border-white/25 px-2 py-0.5 rounded font-bold">
-                  WIREGUARD + XDP
-                </span>
+                <h3 className="font-bold text-white text-base font-sans group-hover:text-zinc-100">
+                  {svc.name}
+                </h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">{svc.desc}</p>
               </div>
-              <h3 className="font-bold text-white text-base font-sans">SparrowX NetSec Guard</h3>
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Autonomous Linux security agent, WireGuard Guard tunnels, nftables firewall automation, and live IP threat radar connected via Master SSO.
-              </p>
-            </div>
-            <a
-              href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
-              className="w-full py-2 rounded bg-[#0D1017] hover:bg-white hover:text-black border border-white/25 text-xs font-mono text-white transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <span>netsec.sparrowx.net</span>
-              <ArrowUpRight className="size-3" aria-hidden="true" />
+              <div
+                className={`w-full py-2 rounded text-xs font-mono transition-all flex items-center justify-center gap-1.5 ${
+                  svc.highlight
+                    ? "bg-white group-hover:bg-zinc-200 text-black font-bold shadow-sm"
+                    : "bg-[#0D1017] group-hover:bg-white group-hover:text-black border border-white/25 text-white"
+                }`}
+              >
+                <span>{svc.domain}</span>
+                <ArrowUpRight className="size-3" aria-hidden="true" />
+              </div>
             </a>
-          </div>
+          ))}
         </div>
       </section>
 
@@ -1643,112 +1428,6 @@ export function SparrowxMasterLanding({
                 <ArrowRight className="size-3.5" aria-hidden="true" />
               </a>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 5: AFFORDABLE CLOUD VPS PLANS */}
-      <section id="vps" className="scroll-mt-24 border-t border-white/15 bg-[#05060A]/75 px-4 sm:px-6 py-16 relative z-10">
-        <div className="max-w-7xl mx-auto space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/15 pb-6">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-wider block font-bold">
-                Affordable Cloud Hosting
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-                Simple, High-Speed Cloud VPS
-              </h2>
-              <p className="text-xs text-zinc-400">
-                Dedicated performance with fast NVMe storage and zero hidden egress bandwidth fees.
-              </p>
-            </div>
-
-            {/* Currency Switcher */}
-            <div className="flex items-center gap-1 p-1 bg-[#090B10] rounded-md border border-white/25 text-xs font-mono">
-              <button
-                type="button"
-                onClick={() => setVpsCurrency("INR")}
-                className={`px-3 py-1 rounded transition-colors cursor-pointer ${
-                  vpsCurrency === "INR" ? "bg-white text-black font-bold" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                INR (₹)
-              </button>
-              <button
-                type="button"
-                onClick={() => setVpsCurrency("USD")}
-                className={`px-3 py-1 rounded transition-colors cursor-pointer ${
-                  vpsCurrency === "USD" ? "bg-white text-black font-bold" : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                USD ($)
-              </button>
-            </div>
-          </div>
-
-          {/* 4 Plans Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-white/15 border border-white/20 rounded-lg bg-[#090B10]/90 backdrop-blur-md overflow-hidden shadow-xl">
-            {vpsPlans.map((plan) => (
-              <div
-                key={plan.id}
-                className={`p-6 space-y-5 flex flex-col justify-between ${
-                  plan.highlight ? "bg-white/[0.06] border-t-2 border-t-white" : ""
-                }`}
-              >
-                <div className="space-y-3 font-mono">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-white">{plan.name}</span>
-                    <span
-                      className={`text-[9px] px-2 py-0.5 rounded font-bold ${
-                        plan.highlight
-                          ? "bg-white text-black border border-white"
-                          : "bg-white/10 text-zinc-300 border border-white/20"
-                      }`}
-                    >
-                      {plan.tag}
-                    </span>
-                  </div>
-
-                  <div>
-                    <span className="text-2xl font-bold text-white tabular-nums">
-                      {vpsCurrency === "INR" ? plan.priceInr : plan.priceUsd}
-                    </span>
-                    <span className="text-xs text-zinc-400">{plan.period}</span>
-                  </div>
-
-                  <div className="space-y-2 text-xs text-zinc-300 pt-2 border-t border-white/15">
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400">CPU:</span>
-                      <span className="text-white font-semibold">{plan.vCpu}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400">RAM:</span>
-                      <span className="text-white font-semibold">{plan.ram}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400">Disk:</span>
-                      <span className="text-white font-semibold">{plan.storage}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-zinc-400">Egress:</span>
-                      <span className="text-white font-semibold">{plan.bandwidth}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setOperatorModalOpen(true)}
-                  className={`w-full py-2.5 rounded text-xs font-mono font-bold transition-all cursor-pointer ${
-                    plan.highlight
-                      ? "bg-white hover:bg-zinc-200 text-black shadow-[0_0_15px_rgba(255,255,255,0.25)]"
-                      : "bg-[#0D1017] hover:bg-white hover:text-black border border-white/30 text-white"
-                  }`}
-                >
-                  Deploy {plan.name}
-                </button>
-              </div>
-            ))}
           </div>
         </div>
       </section>
