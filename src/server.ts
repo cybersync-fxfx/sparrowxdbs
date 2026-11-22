@@ -15,6 +15,10 @@ import {
   provisionServerFromPaidOrder,
 } from "./lib/server/proxmox.server";
 import {
+  generateSparrowxBackupBundle,
+  generateSparrowxBackupScript,
+} from "./lib/server/sparrowx-backup.server";
+import {
   createUpiOrder,
   getUpiGatewayConfig,
   getUpiOrder,
@@ -690,6 +694,76 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     } catch {
       return new Response(JSON.stringify({ ok: false, error: "Invalid JSON payload" }), {
         status: 400,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    }
+  }
+
+  // =========================================================================
+  // SPARROWX BACKUP SYSTEM — PORTABLE SELF-RESTORING SH BUNDLE API
+  // =========================================================================
+  if (url.pathname === "/api/infra/servers/backup" && (request.method === "GET" || request.method === "POST")) {
+    try {
+      const serverId = url.searchParams.get("serverId") || "default";
+      const download = url.searchParams.get("download");
+      const list = await listManagedInfraServers();
+      const server = list.servers.find((s) => s.id === serverId) || list.servers[0] || {
+        id: serverId,
+        vmid: 401,
+        node: "pve-in-mum",
+        name: "Ryzen 9 9950X (401)",
+        hostname: "spx-ryzen9-mum01.sparrowx.net",
+        category: "vps" as const,
+        planId: "vps-ryzen-9950x-16gb",
+        planName: "Ryzen 9 9950X — 16GB",
+        region: "Tier IV Mumbai Node",
+        os: "Ubuntu 24.04 LTS (Hardened)",
+        status: "running" as const,
+        ipv4: "103.189.45.142",
+        extraIpv4s: [],
+        ipv6: "2401:4900:8a12:401::/64",
+        rdns: "spx-ryzen9-mum01.sparrowx.net",
+        sshUser: "root",
+        sshPort: 22,
+        sshKeys: [],
+        wireguardEnabled: true,
+        wireguardIp: "10.66.1.142/24",
+        ddosMode: "XDP/eBPF Always-On" as const,
+        cpuCores: 8,
+        cpuUsagePct: 18,
+        ramTotalGb: 16,
+        ramUsedGb: 4.2,
+        diskTotalGb: 250,
+        diskUsedGb: 34,
+        bandwidthUsedTb: 1.2,
+        bandwidthQuotaTb: 100,
+        uptimeSeconds: 123456,
+        monthlyPriceInr: 2599,
+        nextDueDate: "2026-12-22",
+        proxmoxBacked: true,
+        snapshots: [],
+      };
+
+      if (download === "script" || download === "sh") {
+        const script = generateSparrowxBackupScript(server);
+        return new Response(script, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/x-sh; charset=utf-8",
+            "Content-Disposition": `attachment; filename="sparrowx-restore-${server.hostname.split(".")[0]}.sh"`,
+            ...CORS_HEADERS,
+          },
+        });
+      }
+
+      const bundle = generateSparrowxBackupBundle(server);
+      return new Response(JSON.stringify({ ok: true, bundle }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      });
+    } catch (err) {
+      return new Response(JSON.stringify({ ok: false, error: String(err) }), {
+        status: 500,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
       });
     }

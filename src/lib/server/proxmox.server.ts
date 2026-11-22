@@ -8,7 +8,7 @@ export interface ManagedInfraServer {
   node: string;
   name: string;
   hostname: string;
-  category: "bare-metal" | "dedicated" | "vps";
+  category: "bare-metal" | "dedicated" | "vds" | "vps";
   planId: string;
   planName: string;
   region: string;
@@ -186,11 +186,47 @@ export async function listManagedInfraServers(): Promise<{
   };
 }
 
+export async function setupProxmoxVmNetworkAndBridge(
+  node: string,
+  vmid: number,
+  server: ManagedInfraServer,
+): Promise<{ ok: boolean; error?: string }> {
+  const encNode = encodeURIComponent(node);
+  const encVmid = encodeURIComponent(String(vmid));
+  const bridge = process.env.PVE_BRIDGE || "vmbr0";
+  const gateway = process.env.PVE_GATEWAY || "103.189.45.1";
+
+  // Configure Linux Bridge net0, Cloud-Init IP/GW, DNS, CPU cores, and DDR5 RAM
+  const configRes = await callProxmoxApi("PUT", `/nodes/${encNode}/qemu/${encVmid}/config`, {
+    cores: server.cpuCores,
+    memory: server.ramTotalGb * 1024,
+    net0: `virtio,bridge=${bridge},firewall=1`,
+    ipconfig0: `ip=${server.ipv4}/24,gw=${gateway},ip6=${server.ipv6.replace("::/64", "::1/64")}`,
+    nameserver: process.env.PVE_NAMESERVERS || "1.1.1.1 8.8.8.8",
+    searchdomain: "sparrowx.net",
+    onboot: 1,
+    ciuser: "root",
+  });
+
+  // Resize root NVMe disk to plan specification
+  if (server.diskTotalGb > 20) {
+    await callProxmoxApi("PUT", `/nodes/${encNode}/qemu/${encVmid}/resize`, {
+      disk: "scsi0",
+      size: `${server.diskTotalGb}G`,
+    });
+  }
+
+  // Boot VM automatically once network bridge and storage are applied
+  await callProxmoxApi("POST", `/nodes/${encNode}/qemu/${encVmid}/status/start`);
+
+  return configRes;
+}
+
 export function provisionServerFromPaidOrder(input: {
   orderId: string;
   planId: string;
   planName: string;
-  category: "bare-metal" | "dedicated" | "vps";
+  category: "bare-metal" | "dedicated" | "vds" | "vps";
   hostname: string;
   region: string;
   os: string;
@@ -224,12 +260,12 @@ export function provisionServerFromPaidOrder(input: {
     sshKeys: [],
     wireguardEnabled: true,
     wireguardIp: `10.66.1.${octet}/24`,
-    ddosMode: input.category === "dedicated" ? "GameSec L4 Strict" : "XDP/eBPF Always-On",
-    cpuCores: input.cpuCores ?? (input.category === "bare-metal" ? 16 : input.category === "dedicated" ? 12 : 4),
+    ddosMode: input.category === "dedicated" || input.category === "vds" ? "GameSec L4 Strict" : "XDP/eBPF Always-On",
+    cpuCores: input.cpuCores ?? (input.category === "bare-metal" ? 16 : input.category === "vds" ? 4 : input.category === "dedicated" ? 12 : 4),
     cpuUsagePct: 6,
-    ramTotalGb: input.ramTotalGb ?? (input.category === "bare-metal" ? 128 : input.category === "dedicated" ? 64 : 8),
+    ramTotalGb: input.ramTotalGb ?? (input.category === "bare-metal" ? 128 : input.category === "vds" ? 12 : input.category === "dedicated" ? 64 : 8),
     ramUsedGb: 1.2,
-    diskTotalGb: input.diskTotalGb ?? (input.category === "bare-metal" ? 1920 : input.category === "dedicated" ? 960 : 100),
+    diskTotalGb: input.diskTotalGb ?? (input.category === "bare-metal" ? 1920 : input.category === "vds" ? 300 : input.category === "dedicated" ? 960 : 100),
     diskUsedGb: 8.4,
     bandwidthUsedTb: 0.01,
     bandwidthQuotaTb: input.category === "vps" ? 5 : 100,
@@ -242,7 +278,7 @@ export function provisionServerFromPaidOrder(input: {
 
   serverStore.set(id, created);
 
-  // Trigger real Proxmox Cloud-Init clone asynchronously when live PVE credentials exist
+  // Trigger real Proxmox Cloud-Init clone and bridge configuration asynchronously when live PVE credentials exist
   if (getProxmoxConfigStatus().configured && process.env.PVE_TEMPLATE_VMID) {
     const node = encodeURIComponent(created.node);
     const tpl = encodeURIComponent(process.env.PVE_TEMPLATE_VMID);
@@ -250,6 +286,10 @@ export function provisionServerFromPaidOrder(input: {
       newid: nextVmid,
       name: cleanHost.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 48),
       full: 1,
+    }).then(async (cloneRes) => {
+      if (cloneRes.ok) {
+        await setupProxmoxVmNetworkAndBridge(created.node, nextVmid, created);
+      }
     });
   }
 

@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { ComparisonSection } from "./landing/ComparisonSection";
 import { ContactSection } from "./landing/ContactSection";
+import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
 import {
   Dialog,
   DialogContent,
@@ -1226,6 +1227,11 @@ export function SparrowxMasterLanding({
           </div>
         </div>
       </section>
+
+      {/* POWERED BY TECHNOLOGIES & LOGOS SHOWCASE */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-10 pb-4 w-full relative z-10">
+        <SparrowxPoweredByTech />
+      </div>
 
       {/* SECTION 3: 9 DEDICATED PRODUCT TOOLS (UNIFIED ECOSYSTEM BENTO GRID) */}
       <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">

@@ -15,8 +15,11 @@ import { Route as DropRouteImport } from './routes/drop'
 import { Route as ErrorsRouteImport } from './routes/errors'
 import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as KeysRouteImport } from './routes/keys'
+import { Route as RefundRouteImport } from './routes/refund'
+import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as StoryRouteImport } from './routes/story'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsServiceRouteImport } from './routes/docs/$service'
 import { Route as DocsErrorsRouteImport } from './routes/docs/errors'
@@ -37,8 +40,14 @@ import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
 import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
+import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
+import { Route as ApiInfraServersIndexRouteImport } from './routes/api/infra/servers/index'
+import { Route as ApiInfraServersActionRouteImport } from './routes/api/infra/servers/action'
+import { Route as ApiInfraServersBackupRouteImport } from './routes/api/infra/servers/backup'
+import { Route as ApiInfraServersConsoleRouteImport } from './routes/api/infra/servers/console'
+import { Route as ApiInfraServersProvisionRouteImport } from './routes/api/infra/servers/provision'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -71,6 +80,16 @@ const KeysRoute = KeysRouteImport.update({
   path: '/keys',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RefundRoute = RefundRouteImport.update({
+  id: '/refund',
+  path: '/refund',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShieldRoute = ShieldRouteImport.update({
   id: '/shield',
   path: '/shield',
@@ -79,6 +98,11 @@ const ShieldRoute = ShieldRouteImport.update({
 const StoryRoute = StoryRouteImport.update({
   id: '/story',
   path: '/story',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
@@ -183,6 +207,11 @@ const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
   path: '/api/game/panel-sso',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInfraLatencyProbeRoute = ApiInfraLatencyProbeRouteImport.update({
+  id: '/api/infra/latency-probe',
+  path: '/api/infra/latency-probe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   id: '/api/auth/google/callback',
   path: '/api/auth/google/callback',
@@ -193,6 +222,32 @@ const ApiAuthGoogleLoginRoute = ApiAuthGoogleLoginRouteImport.update({
   path: '/api/auth/google/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInfraServersIndexRoute = ApiInfraServersIndexRouteImport.update({
+  id: '/api/infra/servers/',
+  path: '/api/infra/servers/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInfraServersActionRoute = ApiInfraServersActionRouteImport.update({
+  id: '/api/infra/servers/action',
+  path: '/api/infra/servers/action',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInfraServersBackupRoute = ApiInfraServersBackupRouteImport.update({
+  id: '/api/infra/servers/backup',
+  path: '/api/infra/servers/backup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInfraServersConsoleRoute = ApiInfraServersConsoleRouteImport.update({
+  id: '/api/infra/servers/console',
+  path: '/api/infra/servers/console',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInfraServersProvisionRoute =
+  ApiInfraServersProvisionRouteImport.update({
+    id: '/api/infra/servers/provision',
+    path: '/api/infra/servers/provision',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicRazorpayWebhookRoute =
   ApiPublicRazorpayWebhookRouteImport.update({
     id: '/api/public/razorpay/webhook',
@@ -207,8 +262,11 @@ export interface FileRoutesByFullPath {
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
   '/keys': typeof KeysRoute
+  '/refund': typeof RefundRoute
+  '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
+  '/terms': typeof TermsRoute
   '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
@@ -229,9 +287,15 @@ export interface FileRoutesByFullPath {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
+  '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
+  '/api/infra/servers/action': typeof ApiInfraServersActionRoute
+  '/api/infra/servers/backup': typeof ApiInfraServersBackupRoute
+  '/api/infra/servers/console': typeof ApiInfraServersConsoleRoute
+  '/api/infra/servers/provision': typeof ApiInfraServersProvisionRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/infra/servers/': typeof ApiInfraServersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -240,8 +304,11 @@ export interface FileRoutesByTo {
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
   '/keys': typeof KeysRoute
+  '/refund': typeof RefundRoute
+  '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
+  '/terms': typeof TermsRoute
   '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
@@ -262,9 +329,15 @@ export interface FileRoutesByTo {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
+  '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
+  '/api/infra/servers/action': typeof ApiInfraServersActionRoute
+  '/api/infra/servers/backup': typeof ApiInfraServersBackupRoute
+  '/api/infra/servers/console': typeof ApiInfraServersConsoleRoute
+  '/api/infra/servers/provision': typeof ApiInfraServersProvisionRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/infra/servers': typeof ApiInfraServersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -274,8 +347,11 @@ export interface FileRoutesById {
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
   '/keys': typeof KeysRoute
+  '/refund': typeof RefundRoute
+  '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
+  '/terms': typeof TermsRoute
   '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
@@ -296,9 +372,15 @@ export interface FileRoutesById {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
+  '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
+  '/api/infra/servers/action': typeof ApiInfraServersActionRoute
+  '/api/infra/servers/backup': typeof ApiInfraServersBackupRoute
+  '/api/infra/servers/console': typeof ApiInfraServersConsoleRoute
+  '/api/infra/servers/provision': typeof ApiInfraServersProvisionRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
+  '/api/infra/servers/': typeof ApiInfraServersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -309,8 +391,11 @@ export interface FileRouteTypes {
     | '/errors'
     | '/gateway'
     | '/keys'
+    | '/refund'
+    | '/security'
     | '/shield'
     | '/story'
+    | '/terms'
     | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
@@ -331,9 +416,15 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/game/panel-sso'
+    | '/api/infra/latency-probe'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
+    | '/api/infra/servers/action'
+    | '/api/infra/servers/backup'
+    | '/api/infra/servers/console'
+    | '/api/infra/servers/provision'
     | '/api/public/razorpay/webhook'
+    | '/api/infra/servers/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -342,8 +433,11 @@ export interface FileRouteTypes {
     | '/errors'
     | '/gateway'
     | '/keys'
+    | '/refund'
+    | '/security'
     | '/shield'
     | '/story'
+    | '/terms'
     | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
@@ -364,9 +458,15 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/game/panel-sso'
+    | '/api/infra/latency-probe'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
+    | '/api/infra/servers/action'
+    | '/api/infra/servers/backup'
+    | '/api/infra/servers/console'
+    | '/api/infra/servers/provision'
     | '/api/public/razorpay/webhook'
+    | '/api/infra/servers'
   id:
     | '__root__'
     | '/'
@@ -375,8 +475,11 @@ export interface FileRouteTypes {
     | '/errors'
     | '/gateway'
     | '/keys'
+    | '/refund'
+    | '/security'
     | '/shield'
     | '/story'
+    | '/terms'
     | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
@@ -397,9 +500,15 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/game/panel-sso'
+    | '/api/infra/latency-probe'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
+    | '/api/infra/servers/action'
+    | '/api/infra/servers/backup'
+    | '/api/infra/servers/console'
+    | '/api/infra/servers/provision'
     | '/api/public/razorpay/webhook'
+    | '/api/infra/servers/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -409,8 +518,11 @@ export interface RootRouteChildren {
   ErrorsRoute: typeof ErrorsRoute
   GatewayRoute: typeof GatewayRoute
   KeysRoute: typeof KeysRoute
+  RefundRoute: typeof RefundRoute
+  SecurityRoute: typeof SecurityRoute
   ShieldRoute: typeof ShieldRoute
   StoryRoute: typeof StoryRoute
+  TermsRoute: typeof TermsRoute
   DocsServiceRoute: typeof DocsServiceRoute
   DocsErrorsRoute: typeof DocsErrorsRoute
   FIdRoute: typeof FIdRoute
@@ -431,9 +543,15 @@ export interface RootRouteChildren {
   ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
+  ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
+  ApiInfraServersActionRoute: typeof ApiInfraServersActionRoute
+  ApiInfraServersBackupRoute: typeof ApiInfraServersBackupRoute
+  ApiInfraServersConsoleRoute: typeof ApiInfraServersConsoleRoute
+  ApiInfraServersProvisionRoute: typeof ApiInfraServersProvisionRoute
   ApiPublicRazorpayWebhookRoute: typeof ApiPublicRazorpayWebhookRoute
+  ApiInfraServersIndexRoute: typeof ApiInfraServersIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -480,6 +598,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KeysRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/refund': {
+      id: '/refund'
+      path: '/refund'
+      fullPath: '/refund'
+      preLoaderRoute: typeof RefundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shield': {
       id: '/shield'
       path: '/shield'
@@ -492,6 +624,13 @@ declare module '@tanstack/react-router' {
       path: '/story'
       fullPath: '/story'
       preLoaderRoute: typeof StoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/docs/': {
@@ -634,6 +773,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGamePanelSsoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/infra/latency-probe': {
+      id: '/api/infra/latency-probe'
+      path: '/api/infra/latency-probe'
+      fullPath: '/api/infra/latency-probe'
+      preLoaderRoute: typeof ApiInfraLatencyProbeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/google/callback': {
       id: '/api/auth/google/callback'
       path: '/api/auth/google/callback'
@@ -646,6 +792,41 @@ declare module '@tanstack/react-router' {
       path: '/api/auth/google/login'
       fullPath: '/api/auth/google/login'
       preLoaderRoute: typeof ApiAuthGoogleLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/infra/servers/': {
+      id: '/api/infra/servers/'
+      path: '/api/infra/servers'
+      fullPath: '/api/infra/servers/'
+      preLoaderRoute: typeof ApiInfraServersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/infra/servers/action': {
+      id: '/api/infra/servers/action'
+      path: '/api/infra/servers/action'
+      fullPath: '/api/infra/servers/action'
+      preLoaderRoute: typeof ApiInfraServersActionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/infra/servers/backup': {
+      id: '/api/infra/servers/backup'
+      path: '/api/infra/servers/backup'
+      fullPath: '/api/infra/servers/backup'
+      preLoaderRoute: typeof ApiInfraServersBackupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/infra/servers/console': {
+      id: '/api/infra/servers/console'
+      path: '/api/infra/servers/console'
+      fullPath: '/api/infra/servers/console'
+      preLoaderRoute: typeof ApiInfraServersConsoleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/infra/servers/provision': {
+      id: '/api/infra/servers/provision'
+      path: '/api/infra/servers/provision'
+      fullPath: '/api/infra/servers/provision'
+      preLoaderRoute: typeof ApiInfraServersProvisionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/razorpay/webhook': {
@@ -665,8 +846,11 @@ const rootRouteChildren: RootRouteChildren = {
   ErrorsRoute: ErrorsRoute,
   GatewayRoute: GatewayRoute,
   KeysRoute: KeysRoute,
+  RefundRoute: RefundRoute,
+  SecurityRoute: SecurityRoute,
   ShieldRoute: ShieldRoute,
   StoryRoute: StoryRoute,
+  TermsRoute: TermsRoute,
   DocsServiceRoute: DocsServiceRoute,
   DocsErrorsRoute: DocsErrorsRoute,
   FIdRoute: FIdRoute,
@@ -687,9 +871,15 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
+  ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
+  ApiInfraServersActionRoute: ApiInfraServersActionRoute,
+  ApiInfraServersBackupRoute: ApiInfraServersBackupRoute,
+  ApiInfraServersConsoleRoute: ApiInfraServersConsoleRoute,
+  ApiInfraServersProvisionRoute: ApiInfraServersProvisionRoute,
   ApiPublicRazorpayWebhookRoute: ApiPublicRazorpayWebhookRoute,
+  ApiInfraServersIndexRoute: ApiInfraServersIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

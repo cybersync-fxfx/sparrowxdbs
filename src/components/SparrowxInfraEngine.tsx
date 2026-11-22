@@ -25,6 +25,7 @@ import { IntelXeonGoldPricingSection } from "@/components/infra/IntelXeonGoldPri
 import { UpiAutoPayModal } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
+import { SparrowxLivePingProbe } from "@/components/SparrowxLivePingProbe";
 import {
   computePlanPrice,
   INFRA_OS_IMAGES,
@@ -1084,11 +1085,19 @@ export function SparrowxInfraEngine() {
               </div>
             </div>
 
+            {/* Live Edge Latency & Client IP Telemetry Probe HUD */}
+            <div className="mb-6">
+              <SparrowxLivePingProbe
+                selectedRegion={region}
+                onSelectRegion={(reg) => setRegion(reg)}
+              />
+            </div>
+
             {/* Catalog Content: Cards Grid or Responsive Table */}
             {catalogView === "cards" ? (
               filteredPlans.length === 0 ? (
                 <div className="rounded-xl border border-white/10 bg-[#0B0E15] p-12 text-center text-zinc-400">
-                  No configurations available in {activeRegionObj.name} for this filter. Switch to Frankfurt DE-1 or Singapore SG-1 for dual-socket bare metal inventory.
+                  No configurations available in {activeRegionObj.name} for this filter. Switch to Singapore SG-1, Tamil Nadu IN-2, or London UK-1 for inventory.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -1146,7 +1155,7 @@ export function SparrowxInfraEngine() {
                           colSpan={7}
                           className="px-5 py-10 text-center text-zinc-400"
                         >
-                          No configurations available in {activeRegionObj.name} for this filter. Switch to Frankfurt DE-1 or Singapore SG-1 for dual-socket bare metal inventory.
+                          No configurations available in {activeRegionObj.name} for this filter. Switch to Singapore SG-1, Tamil Nadu IN-2, or London UK-1 for inventory.
                         </td>
                       </tr>
                     ) : (
@@ -1426,12 +1435,18 @@ export function SparrowxInfraEngine() {
                 <form onSubmit={handleOrderSubmit} className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label
-                        htmlFor="cfg-region"
-                        className="text-xs font-medium text-zinc-300 block"
-                      >
-                        Datacenter region
-                      </label>
+                      <div className="flex items-center justify-between">
+                        <label
+                          htmlFor="cfg-region"
+                          className="text-xs font-medium text-zinc-300 block"
+                        >
+                          Datacenter region
+                        </label>
+                        <SparrowxLivePingProbe
+                          selectedRegion={configRegion}
+                          compact
+                        />
+                      </div>
                       <select
                         id="cfg-region"
                         value={configRegion}

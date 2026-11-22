@@ -1,13 +1,25 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Coins, Cpu, HardDrive, MemoryStick, Users } from "lucide-react";
+import { Check, Coins, Cpu, Globe2, HardDrive, MemoryStick, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { GoogleGIcon, useSessionSummary } from "./Navbar";
+import { SparrowxLivePingProbe } from "@/components/SparrowxLivePingProbe";
+import type { InfraRegionId } from "@/lib/infra-plans";
 
 export function Pricing({ service }: { service: Service }) {
   const { data: me } = useSessionSummary();
+  const [selectedRegion, setSelectedRegion] = useState<InfraRegionId>("sg-sin");
+
+  const regionNames: Record<string, string> = {
+    "in-mum": "Mumbai, India (BOM)",
+    "in-maa": "Tamil Nadu, India (MAA)",
+    "sg-sin": "Singapore APAC (SIN)",
+    "uk-lon": "London, UK (LON)",
+  };
+
   return (
     <section id="pricing" className="relative mx-auto max-w-7xl scroll-mt-24 px-5 py-24">
       <div className="pointer-events-none absolute left-1/2 top-24 -z-10 h-72 w-[60%] -translate-x-1/2 rounded-full bg-svc/15 blur-[120px]" />
@@ -17,6 +29,14 @@ export function Pricing({ service }: { service: Service }) {
         <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
           Billed monthly in INR. Pay with SparrowCoins — <span className="font-mono text-foreground">1 Coin = ₹1</span>.
         </p>
+
+        {/* 3 Core Server Regions: UK, India (Mumbai & Tamil Nadu), and Singapore */}
+        <div className="mx-auto mt-8 max-w-2xl text-left">
+          <SparrowxLivePingProbe
+            selectedRegion={selectedRegion}
+            onSelectRegion={(reg) => setSelectedRegion(reg)}
+          />
+        </div>
       </div>
 
       <AnimatePresence mode="wait">
@@ -50,6 +70,7 @@ export function Pricing({ service }: { service: Service }) {
                 <Coins className="size-3.5" /> {planCostCoins(p)} SparrowCoins
               </p>
               <ul className="mt-6 space-y-3 text-sm">
+                <li className="flex items-center gap-3"><Globe2 className="size-4 text-svc" /> Deployed in {regionNames[selectedRegion]}</li>
                 <li className="flex items-center gap-3"><MemoryStick className="size-4 text-svc" /> {formatRam(p.ramMb)} DDR5 RAM</li>
                 <li className="flex items-center gap-3"><Cpu className="size-4 text-svc" /> {p.vcpu} vCPU</li>
                 <li className="flex items-center gap-3"><HardDrive className="size-4 text-svc" /> {p.diskGb}GB NVMe Gen4</li>

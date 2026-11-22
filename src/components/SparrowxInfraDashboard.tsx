@@ -7,6 +7,8 @@ import {
   Copy,
   Cpu,
   CreditCard,
+  Download,
+  FileCode,
   Globe,
   HardDrive,
   KeyRound,
@@ -1096,75 +1098,146 @@ export function SparrowxInfraDashboard() {
                 </div>
               )}
 
-              {/* SECTION: SNAPSHOTS */}
+              {/* SECTION: SNAPSHOTS & SPARROWX BACKUP SYSTEM */}
               {activeServer && section === "snapshots" && (
-                <div className="rounded-xl border border-white/10 bg-[#0C1018] p-5 space-y-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <h2 className="text-base font-semibold text-white">
-                        Proxmox VE Live Snapshots
-                      </h2>
-                      <p className="text-xs text-zinc-400 mt-0.5">
-                        Capture point-in-time NVMe state before kernel or database upgrades.
-                      </p>
+                <div className="space-y-5">
+                  {/* SPARROWX BACKUP SYSTEM — MASTER PORTABLE SH RESTORE */}
+                  <div className="rounded-xl border border-orange-500/30 bg-gradient-to-br from-[#0C1018] via-[#0E131E] to-[#0C1018] p-5 space-y-4 shadow-lg shadow-orange-500/5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/25 uppercase tracking-wider mb-1">
+                          SparrowX Backup System
+                        </div>
+                        <h2 className="text-base font-bold text-white tracking-tight">
+                          Autonomous Portable .sh Backup Bundle
+                        </h2>
+                        <p className="text-xs text-zinc-400 mt-0.5 max-w-2xl leading-relaxed">
+                          Export your entire VPS state into a portable backup folder with a master <code className="text-orange-400">sparrowx-restore.sh</code> script. Copy this folder to any fresh VPS and run the script — it automatically installs dependencies, configures Nginx, repairs missing SSL certs, sets up WireGuard, enforces firewall rules, and self-heals the node.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={`/api/infra/servers/backup?serverId=${encodeURIComponent(activeServer.id)}&download=script`}
+                          download={`sparrowx-restore-${activeServer.hostname.split(".")[0]}.sh`}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-[#FFA14A] hover:bg-[#FF8F26] px-3.5 py-2 text-xs font-bold text-black transition-all shadow-[0_2px_12px_rgba(255,161,74,0.3)] cursor-pointer"
+                        >
+                          <Download className="size-3.5" aria-hidden="true" />
+                          <span>Download sparrowx-restore.sh</span>
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Quick One-Line Command Box */}
+                    <div className="space-y-1.5 pt-2 border-t border-white/10">
+                      <span className="text-[11px] font-medium text-zinc-400 block">
+                        One-Line Instant Deploy &amp; Restore Command for New VPS:
+                      </span>
+                      <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-[#06080D] border border-white/10 font-mono text-xs text-zinc-300">
+                        <span className="truncate text-orange-300">
+                          curl -sSL "https://infra.sparrowx.net/api/infra/servers/backup?serverId={activeServer.id}&amp;download=script" | sudo bash
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void navigator.clipboard.writeText(
+                              `curl -sSL "https://infra.sparrowx.net/api/infra/servers/backup?serverId=${activeServer.id}&download=script" | sudo bash`,
+                            );
+                            notify("ok", "Restore command copied to clipboard!");
+                          }}
+                          className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] shrink-0 font-sans font-medium cursor-pointer"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Features Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs text-zinc-400">
+                      <div className="p-2.5 rounded-lg bg-[#06080D]/70 border border-white/5 space-y-1">
+                        <strong className="text-zinc-200 block">Nginx Auto-Fix &amp; Syntax</strong>
+                        <span>Auto-links sites, restores upstream proxies, and auto-generates fallback certs if missing.</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-[#06080D]/70 border border-white/5 space-y-1">
+                        <strong className="text-zinc-200 block">WireGuard Private Mesh</strong>
+                        <span>Pre-wires encrypted kernel tunnel to db.sparrowx.net and Anycast scrubbing relays.</span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-[#06080D]/70 border border-white/5 space-y-1">
+                        <strong className="text-zinc-200 block">Self-Healing Diagnostic</strong>
+                        <span>Tests localhost HTTP, enforces UFW ports (22, 80, 443, 51820), and reports live status.</span>
+                      </div>
                     </div>
                   </div>
 
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void runAction("snapshot", { snapshotName: snapName }).then(() =>
-                        setSnapName(""),
-                      );
-                    }}
-                    className="flex flex-col sm:flex-row gap-2.5"
-                  >
-                    <input
-                      type="text"
-                      value={snapName}
-                      onChange={(e) => setSnapName(e.target.value)}
-                      placeholder="Snapshot name (e.g. before-postgres-17)"
-                      className="flex-1 rounded-lg border border-white/15 bg-[#06080D] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-400"
-                    />
-                    <button
-                      type="submit"
-                      disabled={Boolean(actionBusy)}
-                      className="rounded-lg bg-sky-400 hover:bg-sky-300 px-4 py-2 text-xs font-semibold text-black cursor-pointer"
-                    >
-                      Take Snapshot
-                    </button>
-                  </form>
+                  {/* PROXMOX VE LIVE SNAPSHOTS */}
+                  <div className="rounded-xl border border-white/10 bg-[#0C1018] p-5 space-y-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-semibold text-white">
+                          Proxmox VE Live Snapshots
+                        </h2>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Capture point-in-time NVMe state before kernel or database upgrades.
+                        </p>
+                      </div>
+                    </div>
 
-                  <div className="space-y-2.5">
-                    {activeServer.snapshots.length === 0 ? (
-                      <p className="text-xs text-zinc-400">
-                        No snapshots captured for this server yet.
-                      </p>
-                    ) : (
-                      activeServer.snapshots.map((snap) => (
-                        <div
-                          key={snap.id}
-                          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#06080D] px-4 py-3 text-xs tabular-nums"
-                        >
-                          <div>
-                            <div className="font-semibold text-white">{snap.name}</div>
-                            <div className="text-zinc-400 mt-0.5">
-                              {snap.createdAt.slice(0, 19).replace("T", " ")} UTC · {snap.sizeGb} GB
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              runAction("delete-snapshot", { snapshotId: snap.id })
-                            }
-                            className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-red-300 hover:bg-red-500/20 cursor-pointer"
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void runAction("snapshot", { snapshotName: snapName }).then(() =>
+                          setSnapName(""),
+                        );
+                      }}
+                      className="flex flex-col sm:flex-row gap-2.5"
+                    >
+                      <input
+                        type="text"
+                        value={snapName}
+                        onChange={(e) => setSnapName(e.target.value)}
+                        placeholder="Snapshot name (e.g. before-postgres-17)"
+                        className="flex-1 rounded-lg border border-white/15 bg-[#06080D] px-3.5 py-2 text-xs text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-400"
+                      />
+                      <button
+                        type="submit"
+                        disabled={Boolean(actionBusy)}
+                        className="rounded-lg bg-sky-400 hover:bg-sky-300 px-4 py-2 text-xs font-semibold text-black cursor-pointer"
+                      >
+                        Take Snapshot
+                      </button>
+                    </form>
+
+                    <div className="space-y-2.5">
+                      {activeServer.snapshots.length === 0 ? (
+                        <p className="text-xs text-zinc-400">
+                          No snapshots captured for this server yet.
+                        </p>
+                      ) : (
+                        activeServer.snapshots.map((snap) => (
+                          <div
+                            key={snap.id}
+                            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-[#06080D] px-4 py-3 text-xs tabular-nums"
                           >
-                            <Trash2 className="size-3.5" aria-hidden="true" />
-                            <span>Delete</span>
-                          </button>
-                        </div>
-                      ))
-                    )}
+                            <div>
+                              <div className="font-semibold text-white">{snap.name}</div>
+                              <div className="text-zinc-400 mt-0.5">
+                                {snap.createdAt.slice(0, 19).replace("T", " ")} UTC · {snap.sizeGb} GB
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                runAction("delete-snapshot", { snapshotId: snap.id })
+                              }
+                              className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-1.5 text-red-300 hover:bg-red-500/20 cursor-pointer"
+                            >
+                              <Trash2 className="size-3.5" aria-hidden="true" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
