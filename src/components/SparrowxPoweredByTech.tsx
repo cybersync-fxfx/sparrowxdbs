@@ -143,82 +143,83 @@ export interface SparrowxPoweredByTechProps {
 }
 
 export function SparrowxPoweredByTech({
-  title = "Powering SparrowX Sovereign Infrastructure",
-  subtitle = "Built on official open source engines, enterprise hypervisors, and high-frequency silicon.",
+  title = "Powered by",
   className = "",
 }: SparrowxPoweredByTechProps) {
+  const marqueeItems = [...POWERING_TECHNOLOGIES, ...POWERING_TECHNOLOGIES];
+
   return (
     <section
       aria-label="Technologies Powering SparrowX"
-      className={`rounded-2xl border border-white/10 bg-[#080B11]/90 backdrop-blur-md p-6 sm:p-8 space-y-6 ${className}`}
+      className={`relative py-6 ${className}`}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[#FFA14A]">
-            <span className="size-2 rounded-full bg-[#FFA14A] animate-pulse" />
-            <span>Official Software &bull; Open Architecture</span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-white mt-1">
-            {title}
-          </h2>
-          <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-2xl">
-            {subtitle}
-          </p>
+      <style>{`
+        @keyframes spx-logo-marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+        @keyframes spx-logo-bob {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-4px); }
+        }
+        .spx-marquee-track {
+          display: flex;
+          width: max-content;
+          animation: spx-logo-marquee 32s linear infinite;
+        }
+        .spx-marquee-wrap:hover .spx-marquee-track {
+          animation-play-state: paused;
+        }
+        .spx-float-logo {
+          animation: spx-logo-bob 4.2s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .spx-marquee-track, .spx-float-logo {
+            animation: none;
+          }
+        }
+      `}</style>
+
+      <p className="mb-4 text-center font-mono text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
+        {title}
+      </p>
+
+      <div className="spx-marquee-wrap relative overflow-hidden">
+        {/* Soft left/right fade edges */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-[#05060A] to-transparent sm:w-28"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-[#05060A] to-transparent sm:w-28"
+        />
+
+        <div className="spx-marquee-track items-center gap-10 py-2 sm:gap-14">
+          {marqueeItems.map((tech, idx) => (
+            <a
+              key={`${tech.id}-${idx}`}
+              href={tech.docsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={tech.name}
+              style={{ animationDelay: `${(idx % 5) * 0.45}s` }}
+              className="spx-float-logo group inline-flex shrink-0 items-center gap-2.5 opacity-75 transition-all duration-200 hover:opacity-100 hover:scale-105"
+            >
+              <img
+                src={tech.logoSrc}
+                alt={tech.name}
+                width={30}
+                height={30}
+                loading="lazy"
+                className="size-7 sm:size-8 object-contain drop-shadow-[0_4px_14px_rgba(255,255,255,0.12)]"
+              />
+              <span className="font-mono text-xs font-medium tracking-tight text-zinc-300 group-hover:text-white whitespace-nowrap">
+                {tech.name}
+              </span>
+            </a>
+          ))}
         </div>
-
-        <span className="px-3 py-1 rounded-full text-xs font-mono font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 shrink-0">
-          Official Software Stacks
-        </span>
-      </div>
-
-      {/* Grid of Technology Cards with Official Imported Logos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {POWERING_TECHNOLOGIES.map((tech) => (
-          <a
-            key={tech.id}
-            href={tech.docsUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group p-4 rounded-xl border border-white/10 bg-[#0C1019] hover:border-white/25 hover:bg-[#101522] transition-all duration-200 flex flex-col justify-between space-y-3 cursor-pointer"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div
-                  className="size-11 rounded-xl flex items-center justify-center shrink-0 p-2 transition-transform group-hover:scale-110 shadow-inner"
-                  style={{
-                    backgroundColor: tech.accentBg,
-                    border: `1px solid ${tech.accentBorder}`,
-                  }}
-                >
-                  <img
-                    src={tech.logoSrc}
-                    alt={`${tech.name} Official Brand Logo`}
-                    width={28}
-                    height={28}
-                    loading="lazy"
-                    className="size-7 object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
-                  />
-                </div>
-                <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-zinc-300">
-                  {tech.badge}
-                </span>
-              </div>
-
-              <h3 className="text-sm font-bold text-white group-hover:text-[#FFA14A] transition-colors flex items-center gap-1.5">
-                <span>{tech.name}</span>
-                <span className="text-zinc-500 text-xs transition-transform group-hover:translate-x-0.5">&rarr;</span>
-              </h3>
-              <p className="text-xs text-zinc-400 mt-1 leading-relaxed line-clamp-2">
-                {tech.role}
-              </p>
-            </div>
-
-            <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] font-mono text-zinc-500 group-hover:text-zinc-300 transition-colors">
-              <span className="truncate max-w-[120px]">{tech.category}</span>
-              <span className="text-[10px] uppercase tracking-wider text-emerald-400/90 font-semibold">Official</span>
-            </div>
-          </a>
-        ))}
       </div>
     </section>
   );
