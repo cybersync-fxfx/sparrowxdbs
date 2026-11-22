@@ -15,6 +15,7 @@ import { reportSparrowxError } from "../lib/sparrowx-error-reporting";
 import { useServiceFavicon } from "../lib/service-favicon";
 import { clearSessionToken } from "../lib/advanced-features";
 import { GlobalEmailVerificationHost } from "../components/EmailVerificationModal";
+import { WhatsAppPlansToaster } from "../components/WhatsAppPlansToaster";
 
 function NotFoundComponent() {
   return (
@@ -230,6 +231,7 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <GlobalEmailVerificationHost />
+      <WhatsAppPlansToaster />
     </QueryClientProvider>
   );
 }
