@@ -45,10 +45,13 @@ import socket
 import struct
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Deque, Dict, List, Optional, Set, Tuple
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
 try:
     import curses
@@ -56,12 +59,18 @@ except ImportError:
     curses = None  # Handled gracefully for --once mode on non-curses systems
 
 
-VERSION = "2.5.0"
+VERSION = "2.6.0"
 SPARK_CHARS = " ▁▂▃▄▅▆▇█"
 IS_LINUX = sys.platform.startswith("linux")
 THEMES = ("cyber", "emerald", "crimson")
 WHITELIST_FILE = Path("/opt/sparrowx/xdp/whitelist_ipv4.txt")
 BLOCKLIST_FILE = Path("/opt/sparrowx/xdp/blocked_ipv4.txt")
+GEO_CACHE_PATHS = (
+    Path("/var/cache/sparrowx/noc_geo_cache.json"),
+    Path("/tmp/sparrowx_noc_geo_cache.json"),
+)
+GEO_CACHE_TTL = 86400
+GEO_FAIL_RETRY = 300
 
 
 # ------------------------------------------------------------------------------
@@ -314,10 +323,123 @@ class RemoteTalker:
 
 
 @dataclass
+class IpGeoInfo:
+    country: str = ""
+    country_code: str = ""
+    region: str = ""
+    city: str = ""
+    isp: str = ""
+    org: str = ""
+    asn: str = ""
+    status: str = "pending"  # pending | ok | private | failed
+    fetched_at: float = 0.0
+
+    def location_str(self) -> str:
+        if self.status == "private":
+            return "Private/LAN (RFC1918)"
+        if self.status == "pending":
+            return "Resolving GeoIP..."
+        if self.status != "ok":
+            return "GeoIP unavailable"
+        parts: List[str] = []
+        if self.region and self.region.lower() != self.country.lower():
+            parts.append(self.region)
+        elif self.city and self.city.lower() != self.country.lower():
+            parts.append(self.city)
+        if self.country:
+            if self.country_code:
+                parts.append(f"{self.country} ({self.country_code})")
+            else:
+                parts.append(self.country)
+        return ", ".join(parts) if parts else "Unknown Location"
+
+    def compact_location_str(self) -> str:
+        if self.status == "private":
+            return "LAN"
+        if self.status == "pending":
+            return "Geo..."
+        if self.status != "ok":
+            return "Geo N/A"
+        cc = self.country_code or self.country[:2].upper()
+        reg = self.region or self.city
+        if cc and reg:
+            return f"{cc}/{reg}"
+        return self.country or cc or "N/A"
+
+    def isp_str(self) -> str:
+        if self.status == "private":
+            return "Internal Network"
+        if self.status == "pending":
+            return "Resolving ISP..."
+        if self.status != "ok":
+            return "ISP unavailable"
+        label = self.isp or self.org or "Unknown ISP"
+        if self.asn:
+            asn_short = self.asn.split()[0]
+            if asn_short.upper().startswith("AS") and asn_short not in label:
+                return f"{label} ({asn_short})"
+        return label
+
+
+@dataclass
 class PolicyIpEntry:
     ip: str
     source: str  # XDP | NFT | UFW | F2B | FILE
     note: str
+    reason: str = ""
+    attempted: str = ""
+    country: str = ""
+    country_code: str = ""
+    region: str = ""
+    city: str = ""
+    isp: str = ""
+    asn: str = ""
+    geo_status: str = "pending"  # pending | ok | private | failed
+
+    @property
+    def location_label(self) -> str:
+        if self.geo_status == "private":
+            return "Private/LAN (RFC1918)"
+        if self.geo_status == "pending" and not self.country:
+            return "Resolving GeoIP..."
+        if not self.country and not self.region:
+            return "GeoIP unavailable"
+        parts: List[str] = []
+        if self.region and self.region.lower() != self.country.lower():
+            parts.append(self.region)
+        elif self.city and self.city.lower() != self.country.lower():
+            parts.append(self.city)
+        if self.country:
+            parts.append(f"{self.country} ({self.country_code})" if self.country_code else self.country)
+        return ", ".join(parts)
+
+    @property
+    def compact_location(self) -> str:
+        if self.geo_status == "private":
+            return "LAN"
+        if self.geo_status == "pending" and not self.country:
+            return "Geo..."
+        if not self.country and not self.region:
+            return "Geo N/A"
+        cc = self.country_code or self.country[:2].upper()
+        reg = self.region or self.city
+        if cc and reg:
+            return f"{cc}·{reg}"
+        return self.country or cc
+
+    @property
+    def isp_label(self) -> str:
+        if self.geo_status == "private":
+            return "Internal Network"
+        if self.geo_status == "pending" and not self.isp:
+            return "Resolving ISP..."
+        if not self.isp:
+            return "ISP unavailable"
+        if self.asn:
+            asn_short = self.asn.split()[0]
+            if asn_short.upper().startswith("AS") and asn_short not in self.isp:
+                return f"{self.isp} ({asn_short})"
+        return self.isp
 
 
 @dataclass
@@ -340,6 +462,267 @@ class DashboardSnapshot:
     whitelisted_ips: List[PolicyIpEntry]
     logs: List[LogEvent]
     demo_mode: bool = False
+
+
+# ------------------------------------------------------------------------------
+# Non-Blocking IP Geolocation & ISP Intelligence Resolver (Pure Stdlib)
+# ------------------------------------------------------------------------------
+
+class IpGeoResolver:
+    """Thread-safe background IP GeoIP + ISP resolver with persistent JSON disk cache."""
+
+    def __init__(self, enabled: bool = True):
+        self.enabled = enabled
+        self._lock = threading.Lock()
+        self._cache: Dict[str, IpGeoInfo] = {}
+        self._pending: Deque[str] = collections.deque()
+        self._queued: Set[str] = set()
+        self._wakeup = threading.Event()
+        self._cache_path: Optional[Path] = None
+        self._worker_started = False
+        if self.enabled:
+            self._load_disk_cache()
+
+    def _start_worker(self) -> None:
+        if self._worker_started or not self.enabled:
+            return
+        self._worker_started = True
+        t = threading.Thread(target=self._worker_loop, name="spx-geo-resolver", daemon=True)
+        t.start()
+
+    def _select_cache_path(self) -> Optional[Path]:
+        if self._cache_path is not None:
+            return self._cache_path
+        for cand in GEO_CACHE_PATHS:
+            try:
+                cand.parent.mkdir(parents=True, exist_ok=True)
+                self._cache_path = cand
+                return cand
+            except OSError:
+                continue
+        return None
+
+    def _load_disk_cache(self) -> None:
+        now = time.time()
+        for cand in GEO_CACHE_PATHS:
+            if not cand.exists():
+                continue
+            try:
+                raw = json.loads(cand.read_text(encoding="utf-8", errors="ignore"))
+                if isinstance(raw, dict):
+                    for ip, d in raw.items():
+                        if not isinstance(d, dict):
+                            continue
+                        fetched = float(d.get("fetched_at", 0.0) or 0.0)
+                        status = str(d.get("status", "ok"))
+                        ttl = GEO_CACHE_TTL if status == "ok" else GEO_FAIL_RETRY
+                        if now - fetched < ttl:
+                            self._cache[ip] = IpGeoInfo(
+                                country=str(d.get("country", "")),
+                                country_code=str(d.get("country_code", "")),
+                                region=str(d.get("region", "")),
+                                city=str(d.get("city", "")),
+                                isp=str(d.get("isp", "")),
+                                org=str(d.get("org", "")),
+                                asn=str(d.get("asn", "")),
+                                status=status,
+                                fetched_at=fetched,
+                            )
+                self._cache_path = cand
+                break
+            except (OSError, json.JSONDecodeError, ValueError, TypeError):
+                continue
+
+    def _save_disk_cache(self) -> None:
+        p = self._select_cache_path()
+        if p is None:
+            return
+        try:
+            with self._lock:
+                items = list(self._cache.items())[-500:]
+            payload = {
+                ip: {
+                    "country": info.country,
+                    "country_code": info.country_code,
+                    "region": info.region,
+                    "city": info.city,
+                    "isp": info.isp,
+                    "org": info.org,
+                    "asn": info.asn,
+                    "status": info.status,
+                    "fetched_at": info.fetched_at,
+                }
+                for ip, info in items
+                if info.status in ("ok", "private")
+            }
+            tmp = p.with_suffix(".tmp")
+            tmp.write_text(json.dumps(payload), encoding="utf-8")
+            tmp.replace(p)
+        except OSError:
+            pass
+
+    @staticmethod
+    def _is_private_ip(ip: str) -> bool:
+        try:
+            addr = ipaddress.IPv4Address(ip.strip())
+            return (
+                addr.is_private
+                or addr.is_loopback
+                or addr.is_link_local
+                or addr.is_multicast
+                or addr.is_reserved
+            )
+        except ValueError:
+            return True
+
+    def get_cached_or_queue(self, ip: str) -> IpGeoInfo:
+        ip = ip.strip()
+        if not ip or self._is_private_ip(ip):
+            return IpGeoInfo(
+                country="Private/LAN",
+                country_code="LAN",
+                region="RFC1918",
+                isp="Internal Network",
+                status="private",
+                fetched_at=time.time(),
+            )
+        now = time.time()
+        with self._lock:
+            cached = self._cache.get(ip)
+            if cached is not None:
+                ttl = GEO_CACHE_TTL if cached.status == "ok" else GEO_FAIL_RETRY
+                if now - cached.fetched_at < ttl:
+                    return cached
+            if self.enabled and ip not in self._queued:
+                self._queued.add(ip)
+                self._pending.append(ip)
+                self._wakeup.set()
+        if self.enabled:
+            self._start_worker()
+        return IpGeoInfo(status="pending")
+
+    def resolve_batch_sync(self, ips: List[str], timeout: float = 2.5) -> None:
+        """Resolve a batch of uncached public IPs synchronously (used for --once mode)."""
+        if not self.enabled:
+            return
+        need: List[str] = []
+        now = time.time()
+        with self._lock:
+            for ip in ips:
+                ip = ip.strip()
+                if not ip or self._is_private_ip(ip):
+                    continue
+                cached = self._cache.get(ip)
+                if cached is not None and (now - cached.fetched_at) < (
+                    GEO_CACHE_TTL if cached.status == "ok" else GEO_FAIL_RETRY
+                ):
+                    continue
+                if ip not in need:
+                    need.append(ip)
+        if not need:
+            return
+        self._fetch_batch(need[:40], timeout=timeout)
+
+    def _worker_loop(self) -> None:
+        while True:
+            self._wakeup.wait(timeout=3.0)
+            self._wakeup.clear()
+            batch: List[str] = []
+            with self._lock:
+                while self._pending and len(batch) < 40:
+                    ip = self._pending.popleft()
+                    batch.append(ip)
+            if not batch:
+                continue
+            try:
+                self._fetch_batch(batch, timeout=3.0)
+            except Exception:
+                pass
+            finally:
+                with self._lock:
+                    for ip in batch:
+                        self._queued.discard(ip)
+
+    def _fetch_batch(self, ips: List[str], timeout: float = 3.0) -> None:
+        if not ips:
+            return
+        now = time.time()
+        resolved: Dict[str, IpGeoInfo] = {}
+
+        # Primary: ip-api.com batch endpoint (fast, single HTTP request for up to 100 IPs)
+        try:
+            url = "http://ip-api.com/batch?fields=status,query,country,countryCode,regionName,city,isp,org,as"
+            body = json.dumps(ips).encode("utf-8")
+            req = urllib.request.Request(
+                url,
+                data=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": f"SparrowX-NOC/{VERSION}",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            if isinstance(data, list):
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    q_ip = str(item.get("query", "")).strip()
+                    if not q_ip:
+                        continue
+                    if item.get("status") == "success":
+                        resolved[q_ip] = IpGeoInfo(
+                            country=str(item.get("country", "")),
+                            country_code=str(item.get("countryCode", "")),
+                            region=str(item.get("regionName", "")),
+                            city=str(item.get("city", "")),
+                            isp=str(item.get("isp", "") or item.get("org", "")),
+                            org=str(item.get("org", "")),
+                            asn=str(item.get("as", "")),
+                            status="ok",
+                            fetched_at=now,
+                        )
+        except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError, TimeoutError):
+            pass
+
+        # Fallback: ipwho.is for any IPs not resolved by primary (capped at 6 per batch)
+        missing = [ip for ip in ips if ip not in resolved]
+        for ip in missing[:6]:
+            try:
+                req = urllib.request.Request(
+                    f"https://ipwho.is/{ip}",
+                    headers={"User-Agent": f"SparrowX-NOC/{VERSION}"},
+                )
+                with urllib.request.urlopen(req, timeout=min(2.0, timeout)) as resp:
+                    item = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                if isinstance(item, dict) and item.get("success"):
+                    conn = item.get("connection") if isinstance(item.get("connection"), dict) else {}
+                    asn_val = conn.get("asn")
+                    asn_str = f"AS{asn_val}" if asn_val else ""
+                    resolved[ip] = IpGeoInfo(
+                        country=str(item.get("country", "")),
+                        country_code=str(item.get("country_code", "")),
+                        region=str(item.get("region", "")),
+                        city=str(item.get("city", "")),
+                        isp=str(conn.get("isp", "") or conn.get("org", "")),
+                        org=str(conn.get("org", "")),
+                        asn=asn_str,
+                        status="ok",
+                        fetched_at=now,
+                    )
+            except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError, TimeoutError):
+                continue
+
+        with self._lock:
+            for ip in ips:
+                if ip in resolved:
+                    self._cache[ip] = resolved[ip]
+                elif ip not in self._cache or self._cache[ip].status != "ok":
+                    self._cache[ip] = IpGeoInfo(status="failed", fetched_at=now)
+
+        if resolved:
+            self._save_disk_cache()
 
 
 # ------------------------------------------------------------------------------
@@ -367,14 +750,83 @@ class TelemetryCollector:
         self._log_offsets: Dict[str, int] = {}
         self._demo_tick = 0
         self._demo_strict = False
+        self.geo_resolver = IpGeoResolver(enabled=not demo)
+        self._evidence_cache: Dict[str, Dict[str, str]] = {}
+        self._evidence_last_scan: float = 0.0
+        self._evidence_ip_sig: Tuple[str, ...] = ()
 
         # Demo lists (ONLY used when --demo is explicitly enabled)
         self._demo_banned: List[PolicyIpEntry] = [
-            PolicyIpEntry("185.220.101.42", "XDP", "482.1K pkts"),
-            PolicyIpEntry("45.155.205.91", "XDP", "194.6K pkts"),
-            PolicyIpEntry("91.240.118.17", "NFT", "sparrowx_shield"),
-            PolicyIpEntry("194.26.135.88", "F2B", "sshd / syn-flood"),
-            PolicyIpEntry("103.149.28.14", "UFW", "DENY IN"),
+            PolicyIpEntry(
+                ip="185.220.101.42",
+                source="XDP",
+                note="482.1K pkts",
+                reason="XDP Wire-Speed DDoS Drop (482.1K pkts)",
+                attempted="UDP amplification flood targeting :53 & :28015 (41.2 kpps)",
+                country="Germany",
+                country_code="DE",
+                region="Hesse",
+                city="Frankfurt",
+                isp="Zwiebelfreunde e.V.",
+                asn="AS205100",
+                geo_status="ok",
+            ),
+            PolicyIpEntry(
+                ip="45.155.205.91",
+                source="XDP",
+                note="194.6K pkts",
+                reason="XDP SYN Flood Mitigation (194.6K pkts)",
+                attempted="34x half-open TCP SYN flood probes on :443 & :51820",
+                country="Russia",
+                country_code="RU",
+                region="Moscow",
+                city="Moscow",
+                isp="HOSTKEY B.V.",
+                asn="AS57043",
+                geo_status="ok",
+            ),
+            PolicyIpEntry(
+                ip="91.240.118.17",
+                source="NFT",
+                note="sparrowx_shield",
+                reason="nftables Shield Auto-Blacklist",
+                attempted="Port scan across :22, :445, :3389 & :8080 (68 blocked)",
+                country="Netherlands",
+                country_code="NL",
+                region="North Holland",
+                city="Amsterdam",
+                isp="Stark Industries Solutions Ltd",
+                asn="AS44477",
+                geo_status="ok",
+            ),
+            PolicyIpEntry(
+                ip="194.26.135.88",
+                source="F2B",
+                note="sshd",
+                reason="SSH Brute-Force (Fail2Ban: sshd)",
+                attempted="14x failed SSH login attempts (users: root, admin) on :22",
+                country="United States",
+                country_code="US",
+                region="California",
+                city="Los Angeles",
+                isp="FiberState LLC",
+                asn="AS399629",
+                geo_status="ok",
+            ),
+            PolicyIpEntry(
+                ip="103.149.28.14",
+                source="UFW",
+                note="DENY IN",
+                reason="UFW Firewall Rule (DENY IN)",
+                attempted="HTTP 429 rate-limit burst & /.env, /wp-login.php vuln scan",
+                country="Singapore",
+                country_code="SG",
+                region="Central Singapore",
+                city="Singapore",
+                isp="DigitalOcean LLC",
+                asn="AS14061",
+                geo_status="ok",
+            ),
         ]
         self._demo_whitelisted: List[PolicyIpEntry] = [
             PolicyIpEntry("51.79.142.18", "XDP", "Edge Peer #1 (trusted)"),
@@ -861,6 +1313,306 @@ class TelemetryCollector:
 
         return fs, blocked, whitelisted
 
+    # -- Ban Reason, Attempted Attack Evidence & GeoIP/ISP Enrichment ----------
+
+    @staticmethod
+    def _read_tail_lines(path: Path, max_bytes: int = 131072) -> List[str]:
+        if not path.exists():
+            return []
+        try:
+            size = path.stat().st_size
+            read_from = max(0, size - max_bytes)
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                if read_from > 0:
+                    f.seek(read_from)
+                    f.readline()
+                return f.readlines()
+        except OSError:
+            return []
+
+    @staticmethod
+    def _jail_to_reason(jail: str) -> str:
+        j = jail.strip().lower()
+        if j in ("sshd", "ssh", "sshd-ddos", "sshd-aggressive"):
+            return f"SSH Brute-Force (Fail2Ban: {jail})"
+        if "nginx" in j or "http" in j or "apache" in j or "waf" in j:
+            return f"HTTP/WAF Abuse (Fail2Ban: {jail})"
+        if "recidive" in j:
+            return "Repeat Offender (Fail2Ban: recidive)"
+        if "ddos" in j or "flood" in j or "syn" in j:
+            return f"L4 Flood Protection (Fail2Ban: {jail})"
+        if "postfix" in j or "dovecot" in j or "mail" in j:
+            return f"Mail Auth Abuse (Fail2Ban: {jail})"
+        return f"Fail2Ban Jail ({jail})" if jail else "Fail2Ban Auto-Ban"
+
+    def _scan_ban_evidence(self, target_ips: Set[str]) -> Dict[str, Dict[str, str]]:
+        """Correlate blocked IPs against system logs to explain WHY they were banned & WHAT they tried."""
+        if not target_ips:
+            return {}
+
+        now = time.monotonic()
+        ip_sig = tuple(sorted(target_ips))
+        if ip_sig == self._evidence_ip_sig and (now - self._evidence_last_scan) < 4.0:
+            return self._evidence_cache
+
+        stats: Dict[str, Dict[str, Any]] = {
+            ip: {
+                "ssh_fail": 0,
+                "ssh_invalid": 0,
+                "ssh_preauth": 0,
+                "ssh_users": [],
+                "f2b_found": 0,
+                "f2b_jail": "",
+                "ufw_hits": 0,
+                "ufw_ports": [],
+                "ufw_protos": set(),
+                "ufw_syn": 0,
+                "nginx_hits": 0,
+                "nginx_paths": [],
+                "nginx_429": 0,
+                "sbs_msg": "",
+                "manual_reason": "",
+                "manual_tried": "",
+            }
+            for ip in target_ips
+        }
+
+        # 1. Persistent manual blocklist notes (/opt/sparrowx/xdp/blocked_ipv4.txt)
+        if BLOCKLIST_FILE.exists():
+            try:
+                for raw in BLOCKLIST_FILE.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    if "#" not in raw:
+                        continue
+                    ip_part, comment = raw.split("#", 1)
+                    ip_key = ip_part.strip()
+                    if ip_key in stats and comment.strip():
+                        c_text = comment.strip()
+                        if "|" in c_text:
+                            r_part, t_part = c_text.split("|", 1)
+                            stats[ip_key]["manual_reason"] = r_part.strip()
+                            stats[ip_key]["manual_tried"] = t_part.strip()
+                        else:
+                            stats[ip_key]["manual_reason"] = c_text
+            except OSError:
+                pass
+
+        # 2. SSH authentication logs (/var/log/auth.log, /var/log/secure)
+        for auth_path in (Path("/var/log/auth.log"), Path("/var/log/secure")):
+            for line in self._read_tail_lines(auth_path, 163840):
+                matched_ip = None
+                for ip in target_ips:
+                    if ip in line:
+                        matched_ip = ip
+                        break
+                if matched_ip is None:
+                    continue
+                st = stats[matched_ip]
+                m_inv = re.search(r"Invalid user\s+(\S+)\s+from", line)
+                if m_inv:
+                    st["ssh_invalid"] += 1
+                    u = m_inv.group(1)[:18]
+                    if u not in st["ssh_users"] and len(st["ssh_users"]) < 3:
+                        st["ssh_users"].append(u)
+                    continue
+                m_fail = re.search(r"Failed\s+\S+\s+for\s+(?:invalid user\s+)?(\S+)\s+from", line)
+                if m_fail:
+                    st["ssh_fail"] += 1
+                    u = m_fail.group(1)[:18]
+                    if u not in st["ssh_users"] and len(st["ssh_users"]) < 3:
+                        st["ssh_users"].append(u)
+                    continue
+                m_pre = re.search(r"(?:Disconnected from|Connection closed by)\s+(?:authenticating|invalid)\s+user\s+(\S+)", line)
+                if m_pre:
+                    st["ssh_preauth"] += 1
+                    u = m_pre.group(1)[:18]
+                    if u not in st["ssh_users"] and len(st["ssh_users"]) < 3:
+                        st["ssh_users"].append(u)
+                elif "Did not receive identification string" in line or "banner exchange" in line or "Unable to negotiate" in line:
+                    st["ssh_preauth"] += 1
+
+        # 3. Fail2Ban log (/var/log/fail2ban.log)
+        for line in self._read_tail_lines(Path("/var/log/fail2ban.log"), 131072):
+            matched_ip = None
+            for ip in target_ips:
+                if ip in line:
+                    matched_ip = ip
+                    break
+            if matched_ip is None:
+                continue
+            st = stats[matched_ip]
+            m_j = re.search(r"\[([a-zA-Z0-9_.-]+)\]\s+(Found|Ban)\s+", line)
+            if m_j:
+                st["f2b_jail"] = m_j.group(1)
+                if m_j.group(2) == "Found":
+                    st["f2b_found"] += 1
+
+        # 4. UFW / Kernel firewall drop logs (/var/log/ufw.log, /var/log/kern.log)
+        for fw_path in (Path("/var/log/ufw.log"), Path("/var/log/kern.log")):
+            for line in self._read_tail_lines(fw_path, 131072):
+                if "SRC=" not in line:
+                    continue
+                m_src = re.search(r"SRC=((?:\d{1,3}\.){3}\d{1,3})", line)
+                if not m_src or m_src.group(1) not in stats:
+                    continue
+                st = stats[m_src.group(1)]
+                st["ufw_hits"] += 1
+                m_proto = re.search(r"PROTO=(\w+)", line)
+                if m_proto:
+                    st["ufw_protos"].add(m_proto.group(1))
+                m_dpt = re.search(r"DPT=(\d+)", line)
+                if m_dpt:
+                    p = m_dpt.group(1)
+                    if p not in st["ufw_ports"] and len(st["ufw_ports"]) < 4:
+                        st["ufw_ports"].append(p)
+                if " SYN " in line:
+                    st["ufw_syn"] += 1
+
+        # 5. Nginx WAF / rate-limit / scan logs
+        for ngx_path in (Path("/var/log/nginx/error.log"), Path("/var/log/nginx/access.log")):
+            for line in self._read_tail_lines(ngx_path, 98304):
+                matched_ip = None
+                for ip in target_ips:
+                    if ip in line:
+                        matched_ip = ip
+                        break
+                if matched_ip is None:
+                    continue
+                st = stats[matched_ip]
+                if "limiting requests" in line or "limiting connections" in line or " 429 " in line:
+                    st["nginx_429"] += 1
+                    st["nginx_hits"] += 1
+                elif " 403 " in line or " 404 " in line or " 401 " in line or "access forbidden" in line:
+                    st["nginx_hits"] += 1
+                m_req = re.search(r'"(?:GET|POST|HEAD|PUT|DELETE)\s+([^\s"?]+)', line)
+                if m_req:
+                    uri = m_req.group(1)[:28]
+                    if uri not in st["nginx_paths"] and len(st["nginx_paths"]) < 3:
+                        st["nginx_paths"].append(uri)
+
+        # 6. SparrowX NetSec / XDP attack log (/var/log/sbs/attacks.log)
+        for line in self._read_tail_lines(Path("/var/log/sbs/attacks.log"), 65536):
+            matched_ip = None
+            for ip in target_ips:
+                if ip in line:
+                    matched_ip = ip
+                    break
+            if matched_ip is None:
+                continue
+            clean = re.sub(r"\s+", " ", line.strip())
+            stats[matched_ip]["sbs_msg"] = clean[-96:]
+
+        # Synthesize crisp (reason, attempted) strings for each IP
+        result: Dict[str, Dict[str, str]] = {}
+        for ip, st in stats.items():
+            reason_hint = ""
+            attempted_parts: List[str] = []
+
+            if st["manual_reason"]:
+                reason_hint = st["manual_reason"]
+            if st["manual_tried"]:
+                attempted_parts.append(st["manual_tried"])
+
+            ssh_total = st["ssh_fail"] + st["ssh_invalid"] + st["ssh_preauth"]
+            if ssh_total > 0:
+                users_s = f" ({', '.join(st['ssh_users'])})" if st["ssh_users"] else ""
+                if st["ssh_fail"] > 0 and st["ssh_invalid"] > 0:
+                    attempted_parts.append(f"{ssh_total}x SSH brute-force & invalid user{users_s} on :22")
+                elif st["ssh_fail"] > 0:
+                    attempted_parts.append(f"{st['ssh_fail']}x failed SSH password{users_s} on :22")
+                elif st["ssh_invalid"] > 0:
+                    attempted_parts.append(f"{st['ssh_invalid']}x invalid SSH user login{users_s} on :22")
+                else:
+                    attempted_parts.append(f"{st['ssh_preauth']}x SSH pre-auth/banner probe{users_s} on :22")
+            elif st["f2b_found"] > 0:
+                jail_lbl = st["f2b_jail"] or "sshd"
+                attempted_parts.append(f"{st['f2b_found']}x auth/filter violations in {jail_lbl}")
+
+            if st["ufw_hits"] > 0:
+                protos = "/".join(sorted(st["ufw_protos"])) or "IP"
+                ports = ",".join(f":{p}" for p in st["ufw_ports"]) if st["ufw_ports"] else "host"
+                if st["ufw_syn"] >= 5:
+                    attempted_parts.append(f"{st['ufw_syn']}x TCP SYN probes on {ports}")
+                else:
+                    attempted_parts.append(f"{st['ufw_hits']}x blocked {protos} probes on {ports}")
+
+            if st["nginx_hits"] > 0:
+                paths_s = f" ({', '.join(st['nginx_paths'][:2])})" if st["nginx_paths"] else ""
+                if st["nginx_429"] > 0:
+                    attempted_parts.append(f"{st['nginx_429']}x HTTP rate-limit/429 burst{paths_s}")
+                else:
+                    attempted_parts.append(f"{st['nginx_hits']}x HTTP/WAF probe{paths_s}")
+
+            if st["sbs_msg"]:
+                attempted_parts.append(st["sbs_msg"])
+
+            result[ip] = {
+                "reason": reason_hint,
+                "attempted": " ; ".join(attempted_parts[:2]),
+            }
+
+        self._evidence_cache = result
+        self._evidence_last_scan = now
+        self._evidence_ip_sig = ip_sig
+        return result
+
+    def _enrich_blocked_entries(self, blocked: List[PolicyIpEntry], sync_geo: bool = False) -> None:
+        if not blocked:
+            return
+        ips = [b.ip for b in blocked]
+        evidence = self._scan_ban_evidence(set(ips)) if IS_LINUX else {}
+
+        if sync_geo:
+            self.geo_resolver.resolve_batch_sync(ips, timeout=2.5)
+
+        for b in blocked:
+            ev = evidence.get(b.ip, {})
+
+            # 1. Human-readable Reason why it was banned
+            if not b.reason:
+                if ev.get("reason"):
+                    b.reason = ev["reason"]
+                elif b.source == "F2B":
+                    b.reason = self._jail_to_reason(b.note)
+                elif b.source == "XDP":
+                    b.reason = f"XDP Wire-Speed Drop ({b.note})" if b.note else "XDP Wire-Speed Drop"
+                elif b.source == "NFT":
+                    b.reason = f"nftables Shield Blacklist ({b.note})" if b.note else "nftables Shield Blacklist"
+                elif b.source == "UFW":
+                    b.reason = f"UFW Firewall Block ({b.note})" if b.note else "UFW Firewall Block"
+                else:
+                    b.reason = b.note or "Security Policy Ban"
+
+            # 2. What that IP tried to do
+            if not b.attempted:
+                if ev.get("attempted"):
+                    b.attempted = ev["attempted"]
+                elif b.source == "F2B":
+                    j = b.note.strip().lower()
+                    if "ssh" in j:
+                        b.attempted = "Repeated failed SSH login / brute-force attempts on :22"
+                    elif "nginx" in j or "http" in j:
+                        b.attempted = "HTTP flood, scanner, or auth brute-force on :80/:443"
+                    else:
+                        b.attempted = f"Triggered Fail2Ban threshold in jail '{b.note}'"
+                elif b.source == "XDP":
+                    b.attempted = f"High-rate L3/L4 packet flood dropped at NIC ({b.note})"
+                elif b.source == "NFT":
+                    b.attempted = "Flagged by SparrowX Shield firewall blacklist"
+                elif b.source == "UFW":
+                    b.attempted = "Blocked inbound connection attempt via UFW DENY"
+                else:
+                    b.attempted = "Matched active SparrowX blocklist policy"
+
+            # 3. IP Location (Country & Region) + ISP Info
+            geo = self.geo_resolver.get_cached_or_queue(b.ip)
+            b.country = geo.country
+            b.country_code = geo.country_code
+            b.region = geo.region
+            b.city = geo.city
+            b.isp = geo.isp
+            b.asn = geo.asn
+            b.geo_status = geo.status
+
     # -- Protected Downstream Servers, WireGuard Tunnels & Open Ports ----------
 
     def _collect_backends_and_ports(self) -> Tuple[List[ProtectedBackend], List[str]]:
@@ -1218,17 +1970,34 @@ class TelemetryCollector:
             pass
         return False
 
-    def ban_ip(self, ip: str) -> str:
+    def ban_ip(self, ip: str, reason: str = "", attempted: str = "") -> str:
         ip = ip.strip()
         if not is_valid_ipv4(ip):
             msg = f"Invalid IPv4 address: {ip}"
             self.push_event("SYS", msg)
             return msg
 
+        ban_reason = reason.strip() or "Manual NOC Operator Ban"
+        ban_tried = attempted.strip() or "Manually blocked via SparrowX Master NOC"
+
         if self.demo:
             self._demo_whitelisted = [w for w in self._demo_whitelisted if w.ip != ip]
             if not any(b.ip == ip for b in self._demo_banned):
-                self._demo_banned.insert(0, PolicyIpEntry(ip, "XDP", "manual ban"))
+                self._demo_banned.insert(
+                    0,
+                    PolicyIpEntry(
+                        ip=ip,
+                        source="XDP",
+                        note="manual ban",
+                        reason=ban_reason,
+                        attempted=ban_tried,
+                        country="Unknown",
+                        country_code="??",
+                        region="Operator Action",
+                        isp="Manual Block",
+                        geo_status="ok",
+                    ),
+                )
             msg = f"[DEMO] Banned {ip} across XDP + nftables + UFW"
             self.push_event("BAN", msg)
             return msg
@@ -1262,8 +2031,10 @@ class TelemetryCollector:
             if rc == 0:
                 applied.append("iptables")
 
-        if self._persist_ip_line(BLOCKLIST_FILE, ip):
+        if self._persist_ip_line(BLOCKLIST_FILE, ip, f"{ban_reason} | {ban_tried}"):
             applied.append("file")
+
+        self._evidence_last_scan = 0.0
 
         if applied:
             msg = f"BANNED {ip} -> [{', '.join(applied)}]"
@@ -1608,7 +2379,7 @@ class TelemetryCollector:
 
     # -- Master Collect Tick ---------------------------------------------------
 
-    def collect(self) -> DashboardSnapshot:
+    def collect(self, sync_geo: bool = False) -> DashboardSnapshot:
         if self.demo:
             return self._collect_demo()
 
@@ -1621,6 +2392,9 @@ class TelemetryCollector:
             established=established,
             total_sockets=total_sockets,
         )
+        # Enrich every blocklisted IP with ban reason, attempted activity, and GeoIP/ISP
+        self._enrich_blocked_entries(blocked, sync_geo=sync_geo)
+
         # Cross-tag remote talkers with live WHITELIST / BLOCKED policy status
         wl_set = {w.ip for w in whitelisted}
         bl_set = {b.ip for b in blocked}
@@ -1678,6 +2452,7 @@ class SparrowxCursesApp:
         self.paused = False
         self.filter_text = ""
         self.selected_talker_idx = 0
+        self.selected_block_idx = 0
         self.status_banner = ""
         self.status_banner_until = 0.0
         self.snapshot: Optional[DashboardSnapshot] = None
@@ -2012,44 +2787,140 @@ class SparrowxCursesApp:
 
     # -- Pane 4: Dedicated Blocklist & Whitelist Manager -----------------------
 
+    def _filtered_blocked(self, snap: DashboardSnapshot) -> List[PolicyIpEntry]:
+        if not self.filter_text:
+            return snap.blocked_ips
+        q = self.filter_text.lower()
+        return [
+            b for b in snap.blocked_ips
+            if q in b.ip.lower()
+            or q in b.source.lower()
+            or q in b.note.lower()
+            or q in b.reason.lower()
+            or q in b.attempted.lower()
+            or q in b.country.lower()
+            or q in b.region.lower()
+            or q in b.city.lower()
+            or q in b.isp.lower()
+        ]
+
+    def _render_blocked_entries(
+        self,
+        win,
+        blocked: List[PolicyIpEntry],
+        start_row: int,
+        max_row: int,
+        allow_select: bool = False,
+    ) -> int:
+        """Render rich blocklist entries with Ban Reason, Attempted Action, Country/Region, and ISP."""
+        row = start_row
+        if not blocked:
+            if row < max_row:
+                self._safe_addstr(win, row, 2, "  0 IPs currently blocklisted", curses.color_pair(self.P_MUTED))
+                row += 1
+            return row
+
+        avail_rows = max(1, max_row - row)
+        # Use 3-line full cards when zoomed or when all entries fit at 3 lines; otherwise compact 2-line cards
+        lines_per_item = 3 if (self.focused_pane == 4 or avail_rows >= len(blocked) * 3) else 2
+        if avail_rows < 2:
+            lines_per_item = 1
+
+        max_visible = max(1, avail_rows // lines_per_item)
+        if allow_select:
+            self.selected_block_idx = max(0, min(self.selected_block_idx, len(blocked) - 1))
+            start_idx = max(0, self.selected_block_idx - max_visible + 1)
+        else:
+            start_idx = 0
+
+        shown = 0
+        for idx in range(start_idx, len(blocked)):
+            if row + lines_per_item > max_row:
+                break
+            b = blocked[idx]
+            is_sel = allow_select and idx == self.selected_block_idx
+            base_pair = self.P_XDP if b.source == "XDP" else self.P_DANGER
+            head_attr = curses.color_pair(base_pair) | curses.A_BOLD | (curses.A_REVERSE if is_sel else 0)
+            reason_txt = b.reason or b.note or "Security Policy Ban"
+            tried_txt = b.attempted or "Blocked by active firewall policy"
+            loc_full = b.location_label
+            loc_short = b.compact_location
+            isp_txt = b.isp_label
+
+            if lines_per_item >= 3:
+                self._safe_addstr(win, row, 2, f"  {b.ip:<15} [{b.source:<4}] Reason: {reason_txt}", head_attr)
+                row += 1
+                self._safe_addstr(
+                    win, row, 2,
+                    f"    ↳ Tried: {tried_txt}",
+                    curses.color_pair(self.P_WARN),
+                )
+                row += 1
+                self._safe_addstr(
+                    win, row, 2,
+                    f"    ↳ Geo  : {loc_full} │ ISP: {isp_txt}",
+                    curses.color_pair(self.P_ACCENT),
+                )
+                row += 1
+            elif lines_per_item == 2:
+                self._safe_addstr(win, row, 2, f"  {b.ip:<15} [{b.source:<4}] {reason_txt}", head_attr)
+                row += 1
+                self._safe_addstr(
+                    win, row, 2,
+                    f"    ↳ {loc_short} · {isp_txt} │ {tried_txt}",
+                    curses.color_pair(self.P_WARN),
+                )
+                row += 1
+            else:
+                self._safe_addstr(
+                    win, row, 2,
+                    f"  {b.ip:<15} [{b.source:<4}] {reason_txt} ({loc_short} · {isp_txt})",
+                    head_attr,
+                )
+                row += 1
+            shown += 1
+
+        remaining = len(blocked) - (start_idx + shown)
+        if remaining > 0 and row < max_row:
+            hint = "use [↑/↓] to scroll" if allow_select else "press [4] to zoom / [t] Blocklist view"
+            self._safe_addstr(
+                win, row, 2,
+                f"  … +{remaining} more blocked IP(s) ({hint})",
+                curses.color_pair(self.P_MUTED),
+            )
+            row += 1
+        return row
+
     def _render_pane_policies(self, win, snap: DashboardSnapshot) -> None:
         if win is None:
             return
         h, w = win.getmaxyx()
         inner_w = max(10, w - 4)
 
-        blocked = snap.blocked_ips
+        blocked = self._filtered_blocked(snap)
         whitelisted = snap.whitelisted_ips
         if self.filter_text:
             q = self.filter_text.lower()
-            blocked = [b for b in blocked if q in b.ip.lower() or q in b.source.lower() or q in b.note.lower()]
             whitelisted = [x for x in whitelisted if q in x.ip.lower() or q in x.source.lower() or q in x.note.lower()]
 
         row = 1
-        if self.policy_view == 0:
-            # SPLIT VIEW: Both current BLOCKLISTED and WHITELISTED visible simultaneously
-            avail = max(2, h - 2)
-            bl_budget = max(2, avail // 2)
+        allow_bl_select = self.focused_pane == 4 or self.policy_view == 1
 
+        if self.policy_view == 0:
+            # SPLIT VIEW: Dynamic height allocation so empty Whitelist gives full room to rich Blocklist cards
+            avail = max(2, h - 2)
+            wl_needed = 2 if not whitelisted else min(max(3, avail // 3), len(whitelisted) + 1)
+            # Reserve 1 line for divider + wl_needed for Whitelist section
+            bl_max_row = max(row + 2, h - 1 - (wl_needed + 1))
+
+            hdr_hint = "[b] Ban  [u] Unban  [4] Zoom" if self.focused_pane != 4 else "[b] Ban  [u] Unban  [↑/↓] Select"
             self._safe_addstr(
                 win, row, 2,
-                f"⛔ BLOCKLISTED ({len(blocked)})  [b] Ban  [u] Unban",
+                f"⛔ BLOCKLISTED ({len(blocked)})  {hdr_hint}",
                 curses.color_pair(self.P_DANGER) | curses.A_BOLD,
             )
             row += 1
-            if not blocked:
-                if row < h - 1:
-                    self._safe_addstr(win, row, 2, "  0 IPs currently blocklisted", curses.color_pair(self.P_MUTED))
-                    row += 1
-            else:
-                shown = 0
-                for b in blocked:
-                    if row >= min(h - 3, 1 + bl_budget):
-                        break
-                    attr = curses.color_pair(self.P_XDP if b.source == "XDP" else self.P_DANGER)
-                    self._safe_addstr(win, row, 2, f"  {b.ip:<16} [{b.source:<4}] {b.note}", attr)
-                    row += 1
-                    shown += 1
+            row = self._render_blocked_entries(win, blocked, row, bl_max_row, allow_select=allow_bl_select)
 
             if row < h - 2:
                 self._safe_addstr(win, row, 2, "╌" * inner_w, curses.color_pair(self.P_MUTED))
@@ -2080,18 +2951,11 @@ class SparrowxCursesApp:
             # BLOCKLIST ONLY VIEW
             self._safe_addstr(
                 win, row, 2,
-                f"⛔ BLOCKLISTED ({len(blocked)}) — [t] Toggle Split/Whitelist",
+                f"⛔ BLOCKLISTED ({len(blocked)}) — Reason · Attempted Action · Country/Region · ISP  [t] View",
                 curses.color_pair(self.P_DANGER) | curses.A_BOLD,
             )
             row += 1
-            if not blocked:
-                self._safe_addstr(win, row + 1, 2, "0 IPs currently blocklisted.", curses.color_pair(self.P_GOOD))
-            for b in blocked:
-                if row >= h - 1:
-                    break
-                attr = curses.color_pair(self.P_XDP if b.source == "XDP" else self.P_DANGER)
-                self._safe_addstr(win, row, 2, f"  {b.ip:<16} [{b.source:<4}] {b.note}", attr)
-                row += 1
+            self._render_blocked_entries(win, blocked, row, h - 1, allow_select=True)
         else:
             # WHITELIST ONLY VIEW
             self._safe_addstr(
@@ -2324,19 +3188,37 @@ class SparrowxCursesApp:
                 self.snapshot = self.collector.collect()
                 self.set_banner(msg)
             elif ch == curses.KEY_UP:
-                self.selected_talker_idx = max(0, self.selected_talker_idx - 1)
+                if self.focused_pane == 4 or self.policy_view == 1:
+                    self.selected_block_idx = max(0, self.selected_block_idx - 1)
+                else:
+                    self.selected_talker_idx = max(0, self.selected_talker_idx - 1)
             elif ch == curses.KEY_DOWN:
-                self.selected_talker_idx += 1
+                if self.focused_pane == 4 or self.policy_view == 1:
+                    self.selected_block_idx += 1
+                else:
+                    self.selected_talker_idx += 1
             elif ch in (ord("b"), ord("B")):
                 talkers = self._filtered_talkers(snap)
-                prefill = talkers[self.selected_talker_idx].ip if talkers and self.selected_talker_idx < len(talkers) else ""
+                sel_tk = talkers[self.selected_talker_idx] if talkers and self.selected_talker_idx < len(talkers) else None
+                prefill = sel_tk.ip if sel_tk else ""
                 target = self._prompt_input(stdscr, "BAN IPv4 (XDP+nft+UFW): ", prefill=prefill)
                 if target:
-                    msg = self.collector.ban_ip(target)
+                    tried_ctx = ""
+                    if sel_tk and sel_tk.ip == target:
+                        tried_ctx = (
+                            f"Active {sel_tk.risk} traffic: {sel_tk.total_conns} conn "
+                            f"(SYN:{sel_tk.syn_recv}, UDP:{sel_tk.udp_conns}) on :{sel_tk.ports} ({sel_tk.process})"
+                        )
+                    msg = self.collector.ban_ip(target, attempted=tried_ctx)
                     self.snapshot = self.collector.collect()
                     self.set_banner(msg)
             elif ch in (ord("u"), ord("U")):
-                prefill = snap.blocked_ips[0].ip if snap.blocked_ips else ""
+                bl_list = self._filtered_blocked(snap)
+                if bl_list:
+                    idx = max(0, min(self.selected_block_idx, len(bl_list) - 1))
+                    prefill = bl_list[idx].ip
+                else:
+                    prefill = ""
                 target = self._prompt_input(stdscr, "UNBAN IPv4: ", prefill=prefill)
                 if target:
                     msg = self.collector.unban_ip(target)
@@ -2444,8 +3326,18 @@ def render_ansi_snapshot(snap: DashboardSnapshot, use_color: bool = True, theme:
     lines.append(f"{C['accent']}{C['bold']}╭─ ◆ [4] BLOCKLIST ({len(snap.blocked_ips)}) & WHITELIST ({len(snap.whitelisted_ips)}) POLICY MANAGER{C['rst']}")
     lines.append(f"│  {C['danger']}{C['bold']}⛔ BLOCKLISTED ({len(snap.blocked_ips)}):{C['rst']}")
     if snap.blocked_ips:
-        for b in snap.blocked_ips[:8]:
-            lines.append(f"│    {C['danger']}{b.ip:<17}{C['rst']} [{b.source:<4}]  {b.note}")
+        for b in snap.blocked_ips[:12]:
+            reason_txt = b.reason or b.note or "Security Policy Ban"
+            tried_txt = b.attempted or "Blocked by active firewall policy"
+            lines.append(
+                f"│    {C['danger']}{C['bold']}{b.ip:<17}{C['rst']} [{b.source:<4}]  Reason: {reason_txt}"
+            )
+            lines.append(
+                f"│      {C['warn']}↳ Tried  :{C['rst']} {tried_txt}"
+            )
+            lines.append(
+                f"│      {C['accent']}↳ Geo/ISP:{C['rst']} {b.location_label} │ ISP: {b.isp_label}"
+            )
     else:
         lines.append(f"│    {C['dim']}0 IPs currently blocklisted.{C['rst']}")
 
@@ -2489,9 +3381,9 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     if args.once or curses is None or not sys.stdout.isatty():
         if not args.demo and IS_LINUX:
-            collector.collect()
+            collector.collect(sync_geo=False)
             time.sleep(0.35)
-        snap = collector.collect()
+        snap = collector.collect(sync_geo=not args.demo)
         print(render_ansi_snapshot(snap, use_color=not args.no_color, theme=args.theme))
         return 0
 
