@@ -28,18 +28,40 @@ async function app<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (text ? JSON.parse(text) : null) as T;
 }
 
-type PUser = { attributes: { id: number; username: string; email: string; first_name: string; last_name: string } };
+type PUser = {
+  attributes: {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    language?: string;
+    root_admin?: boolean;
+  };
+};
+
+export async function getUserById(userId: number) {
+  try {
+    const r = await app<PUser>(`/users/${userId}`);
+    return r.attributes ?? null;
+  } catch (err) {
+    if (err instanceof PteroError && err.status === 404) return null;
+    throw err;
+  }
+}
 
 export async function findUserByEmail(email: string) {
-  const r = await app<{ data: PUser[] }>(`/users?filter[email]=${encodeURIComponent(email)}`);
-  return r.data[0]?.attributes ?? null;
+  const clean = email.trim().toLowerCase();
+  const r = await app<{ data: PUser[] }>(`/users?filter[email]=${encodeURIComponent(clean)}`);
+  const exact = r.data.find((u) => u.attributes.email.trim().toLowerCase() === clean);
+  return exact?.attributes ?? null;
 }
 
 export async function createUser(input: { email: string; username: string; firstName: string; password: string }) {
   const r = await app<PUser>(`/users`, {
     method: "POST",
     body: JSON.stringify({
-      email: input.email,
+      email: input.email.trim().toLowerCase(),
       username: input.username,
       first_name: input.firstName.slice(0, 50) || "Sparrow",
       last_name: "Client",
@@ -51,17 +73,19 @@ export async function createUser(input: { email: string; username: string; first
 
 export async function setUserPassword(userId: number, password: string) {
   const u = (await app<PUser>(`/users/${userId}`)).attributes;
-  await app(`/users/${userId}`, {
+  const updated = await app<PUser>(`/users/${userId}`, {
     method: "PATCH",
     body: JSON.stringify({
       email: u.email,
       username: u.username,
-      first_name: u.first_name,
-      last_name: u.last_name,
+      first_name: u.first_name?.trim() || "Sparrow",
+      last_name: u.last_name?.trim() || "Client",
+      language: u.language || "en",
+      root_admin: Boolean(u.root_admin),
       password,
     }),
   });
-  return u;
+  return updated?.attributes ?? u;
 }
 
 export async function unsuspendServer(serverId: number): Promise<void> {

@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { getPanelLaunchContext, revealPanelPassword } from "@/lib/portal.functions";
+import { getPanelLaunchContext, resetPanelPassword, revealPanelPassword } from "@/lib/portal.functions";
 
 const searchSchema = z.object({
   next: z.string().optional(),
@@ -41,6 +41,7 @@ function PanelLaunchPage() {
   const safeNext = sanitizeNext(next);
   const navigate = useNavigate();
   const [revealedPass, setRevealedPass] = useState<string | null>(null);
+  const [syncedUsername, setSyncedUsername] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const infoQ = useQuery({
@@ -61,7 +62,20 @@ function PanelLaunchPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message.replace(/^[A-Z_]+:\s*/, "") : "Unable to reveal password"),
   });
 
+  const resetMut = useMutation({
+    mutationFn: () => resetPanelPassword({ data: {} }),
+    onSuccess: (res) => {
+      const nextPassword = typeof res === "string" ? res : res.password;
+      const nextUsername = typeof res === "string" ? null : res.username;
+      setRevealedPass(nextPassword);
+      if (nextUsername) setSyncedUsername(nextUsername);
+      toast.success("Panel password reset & synced live");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message.replace(/^[A-Z_]+:\s*/, "") : "Unable to reset password"),
+  });
+
   const info = infoQ.data;
+  const displayUsername = syncedUsername ?? info?.username ?? info?.email ?? "";
   const targetPanelUrl = info ? `${info.panelUrl}${safeNext === "/" ? "" : safeNext}` : "https://game.panel.sparrowx.net";
 
   const copyValue = async (key: string, value: string, label: string) => {
@@ -129,17 +143,17 @@ function PanelLaunchPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-white/55">Panel Username / Email</span>
+                  <span className="text-xs text-white/55">Panel Username</span>
                   <div className="flex items-center gap-2">
-                    <code className="rounded bg-white/[0.06] px-2.5 py-1 font-mono text-xs text-white">
-                      {info.username ?? info.email}
+                    <code className="rounded bg-white/[0.06] px-2.5 py-1 font-mono text-xs text-white select-all">
+                      {displayUsername}
                     </code>
                     <Button
                       type="button"
                       size="sm"
                       variant="ghost"
                       className="h-7 px-2 text-white/65 hover:text-white"
-                      onClick={() => copyValue("user", info.username ?? info.email, "Username")}
+                      onClick={() => copyValue("user", displayUsername, "Username")}
                     >
                       {copiedKey === "user" ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
                     </Button>
@@ -151,7 +165,7 @@ function PanelLaunchPage() {
                     <KeyRound className="size-3.5" /> Panel Password
                   </span>
                   <div className="flex items-center gap-2">
-                    <code className="rounded bg-white/[0.06] px-2.5 py-1 font-mono text-xs text-white">
+                    <code className="rounded bg-white/[0.06] px-2.5 py-1 font-mono text-xs text-white break-all select-all">
                       {revealedPass ?? "••••••••••••••••"}
                     </code>
                     <Button
@@ -161,6 +175,7 @@ function PanelLaunchPage() {
                       className="h-7 px-2 text-white/65 hover:text-white"
                       onClick={() => (revealedPass ? setRevealedPass(null) : revealMut.mutate())}
                       disabled={revealMut.isPending}
+                      aria-label={revealedPass ? "Hide password" : "Reveal password"}
                     >
                       {revealMut.isPending ? (
                         <Loader2 className="size-3.5 animate-spin" />
@@ -169,6 +184,17 @@ function PanelLaunchPage() {
                       ) : (
                         <Eye className="size-3.5" />
                       )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-white/65 hover:text-white"
+                      onClick={() => resetMut.mutate()}
+                      disabled={resetMut.isPending}
+                      title="Reset & sync new password"
+                    >
+                      {resetMut.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                     </Button>
                     {revealedPass && (
                       <Button

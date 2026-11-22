@@ -95,6 +95,102 @@ async function requireGoogleUser(): Promise<MasterSsoClaims> {
   return claims;
 }
 
+async function tryDecrypt(stored: string | null | undefined): Promise<string | null> {
+  if (!stored) return null;
+  try {
+    return await decryptText(stored);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ensures the signed-in Google user is matched to the exact live Pterodactyl user
+ * (by verified ID or exact email), fixing any stale/mismatched username or ID in DB.
+ */
+async function syncLivePteroUser(
+  claims: MasterSsoClaims,
+  client: db.ClientRow | null,
+): Promise<{
+  client: db.ClientRow | null;
+  pteroUserId: number;
+  pteroUsername: string;
+  email: string;
+  passwordEnc: string | null;
+} | null> {
+  if (!integrations().pterodactyl) return null;
+
+  const email = claims.email.trim().toLowerCase();
+  const displayName = claims.fullName || email.split("@")[0] || "player";
+  const cached = directPteroCache.get(email);
+
+  try {
+    let liveUser: Awaited<ReturnType<typeof ptero.getUserById>> = null;
+    const candidateId = client?.ptero_user_id ?? cached?.pteroUserId ?? null;
+
+    if (candidateId) {
+      const byId = await ptero.getUserById(candidateId).catch(() => null);
+      if (byId && byId.email.trim().toLowerCase() === email) {
+        liveUser = byId;
+      }
+    }
+
+    if (!liveUser) {
+      liveUser = await ptero.findUserByEmail(email);
+    }
+
+    let passwordEnc: string | null = cached?.passwordEnc ?? client?.ptero_password_enc ?? null;
+    if (passwordEnc && !(await tryDecrypt(passwordEnc))) {
+      passwordEnc = null;
+    }
+
+    if (!liveUser) {
+      const freshPassword = generatePassword();
+      liveUser = await ptero.createUser({
+        email,
+        username: sanitizeUsername(displayName, claims.sub),
+        firstName: displayName,
+        password: freshPassword,
+      });
+      passwordEnc = await encryptText(freshPassword);
+    }
+
+    let updatedClient = client;
+    if (
+      updatedClient &&
+      (updatedClient.ptero_user_id !== liveUser.id ||
+        updatedClient.ptero_username !== liveUser.username ||
+        (passwordEnc && updatedClient.ptero_password_enc !== passwordEnc))
+    ) {
+      updatedClient = await db
+        .updateClient(updatedClient.id, {
+          ptero_user_id: liveUser.id,
+          ptero_username: liveUser.username,
+          ...(passwordEnc ? { ptero_password_enc: passwordEnc } : {}),
+        })
+        .catch(() => updatedClient);
+    }
+
+    directPteroCache.set(email, {
+      pteroUserId: liveUser.id,
+      pteroUsername: liveUser.username,
+      email: liveUser.email,
+      passwordEnc,
+    });
+
+    return {
+      client: updatedClient,
+      pteroUserId: liveUser.id,
+      pteroUsername: liveUser.username,
+      email: liveUser.email,
+      passwordEnc,
+    };
+  } catch (err) {
+    console.warn("[SparrowX Game Portal] Live Pterodactyl user sync failed:", err);
+    return null;
+  }
+}
+
 /**
  * Ensures the signed-in Google user has a real `public.clients` record (and Pterodactyl
  * panel user when Pterodactyl API is configured). Never fabricates mock records.
@@ -129,25 +225,10 @@ export async function resolveLiveClient(claims: MasterSsoClaims): Promise<db.Cli
       });
     }
 
-    if (!client.ptero_user_id && ints.pterodactyl) {
-      try {
-        const password = generatePassword();
-        const existing = await ptero.findUserByEmail(email);
-        const pteroUser = existing
-          ? await ptero.setUserPassword(existing.id, password).then(() => existing)
-          : await ptero.createUser({
-              email,
-              username: sanitizeUsername(displayName, claims.sub),
-              firstName: displayName,
-              password,
-            });
-        client = await db.updateClient(client.id, {
-          ptero_user_id: pteroUser.id,
-          ptero_username: pteroUser.username,
-          ptero_password_enc: await encryptText(password),
-        });
-      } catch (err) {
-        console.warn("[SparrowX Game Portal] Pterodactyl user auto-sync deferred:", err);
+    if (ints.pterodactyl) {
+      const synced = await syncLivePteroUser(claims, client);
+      if (synced?.client) {
+        client = synced.client;
       }
     }
 
@@ -174,43 +255,14 @@ export async function sessionSummary() {
  * Google email ID even if PostgREST is offline.
  */
 async function ensureDirectPteroAccount(claims: MasterSsoClaims): Promise<DirectPteroCacheEntry | null> {
-  if (!integrations().pterodactyl) return null;
-  const email = claims.email.trim().toLowerCase();
-  const cached = directPteroCache.get(email);
-  if (cached) return cached;
-
-  const displayName = claims.fullName || email.split("@")[0] || "player";
-  try {
-    const existing = await ptero.findUserByEmail(email);
-    if (existing) {
-      const entry: DirectPteroCacheEntry = {
-        pteroUserId: existing.id,
-        pteroUsername: existing.username,
-        email: existing.email,
-        passwordEnc: null,
-      };
-      directPteroCache.set(email, entry);
-      return entry;
-    }
-    const password = generatePassword();
-    const created = await ptero.createUser({
-      email,
-      username: sanitizeUsername(displayName, claims.sub),
-      firstName: displayName,
-      password,
-    });
-    const entry: DirectPteroCacheEntry = {
-      pteroUserId: created.id,
-      pteroUsername: created.username,
-      email: created.email,
-      passwordEnc: await encryptText(password),
-    };
-    directPteroCache.set(email, entry);
-    return entry;
-  } catch (err) {
-    console.warn("[SparrowX Game Portal] Direct Pterodactyl user sync failed:", err);
-    return null;
-  }
+  const synced = await syncLivePteroUser(claims, null);
+  if (!synced) return null;
+  return {
+    pteroUserId: synced.pteroUserId,
+    pteroUsername: synced.pteroUsername,
+    email: synced.email,
+    passwordEnc: synced.passwordEnc,
+  };
 }
 
 export async function dashboard(): Promise<DashboardData> {
@@ -218,7 +270,12 @@ export async function dashboard(): Promise<DashboardData> {
   const ints = integrations();
   const client = await resolveLiveClient(claims);
   const directPtero = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
+  const cachedDirect = directPteroCache.get(claims.email.trim().toLowerCase()) ?? directPtero;
   const username = claims.email.split("@")[0] || "player";
+
+  const hasValidPassword = Boolean(
+    (await tryDecrypt(cachedDirect?.passwordEnc)) || (await tryDecrypt(client?.ptero_password_enc)),
+  );
 
   return {
     mode: "live",
@@ -232,9 +289,9 @@ export async function dashboard(): Promise<DashboardData> {
     coins: client?.coins ?? 0,
     panel: {
       url: panelUrl(),
-      username: client?.ptero_username ?? directPtero?.pteroUsername ?? null,
-      hasPassword: Boolean(client?.ptero_password_enc || directPtero?.passwordEnc),
-      email: client?.email ?? directPtero?.email ?? claims.email,
+      username: cachedDirect?.pteroUsername ?? client?.ptero_username ?? null,
+      hasPassword: hasValidPassword,
+      email: cachedDirect?.email ?? client?.email ?? claims.email,
     },
     integrations: ints,
   };
@@ -242,46 +299,75 @@ export async function dashboard(): Promise<DashboardData> {
 
 export async function revealPassword(): Promise<string> {
   const claims = await requireGoogleUser();
+  const email = claims.email.trim().toLowerCase();
+
+  // Check freshest in-memory cache first (guaranteed up-to-date right after a password reset)
+  const cached = directPteroCache.get(email);
+  const fromCache = await tryDecrypt(cached?.passwordEnc);
+  if (fromCache) return fromCache;
+
   const client = await resolveLiveClient(claims);
-  if (client?.ptero_password_enc) {
-    return decryptText(client.ptero_password_enc);
-  }
+  const fromDb = await tryDecrypt(client?.ptero_password_enc);
+  if (fromDb) return fromDb;
+
   const direct = await ensureDirectPteroAccount(claims);
-  if (direct?.passwordEnc) {
-    return decryptText(direct.passwordEnc);
-  }
+  const fromDirect = await tryDecrypt(direct?.passwordEnc);
+  if (fromDirect) return fromDirect;
+
   throw new PortalError(
     "NOT_FOUND",
-    "No panel password cached yet for this existing account — click Reset Password to sync a fresh password to Pterodactyl.",
+    "No panel password saved yet for this account — click Reset Password to generate and view a synced password.",
   );
 }
 
-export async function resetPassword(customPassword?: string): Promise<string> {
+export async function resetPassword(
+  customPassword?: string,
+): Promise<{ password: string; username: string; email: string }> {
   const claims = await requireGoogleUser();
   const email = claims.email.trim().toLowerCase();
   const client = await resolveLiveClient(claims);
-  const direct = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
-  const pteroUserId = client?.ptero_user_id ?? direct?.pteroUserId ?? null;
+  const synced = await syncLivePteroUser(claims, client);
+
+  const pteroUserId = synced?.pteroUserId ?? client?.ptero_user_id ?? null;
   if (!pteroUserId) {
-    throw new PortalError("NOT_FOUND", "Pterodactyl panel account is not linked yet");
+    throw new PortalError(
+      "NOT_FOUND",
+      "Pterodactyl panel account is not linked yet (check PTERO_URL and PTERO_APPLICATION_API_KEY).",
+    );
   }
+
   const pw = customPassword?.trim() || generatePassword();
   if (pw.length < 8 || pw.length > 64) {
     throw new PortalError("BAD_REQUEST", "Password must be between 8 and 64 characters");
   }
-  await ptero.setUserPassword(pteroUserId, pw);
+
+  const updatedUser = await ptero.setUserPassword(pteroUserId, pw);
   const enc = await encryptText(pw);
+
   if (client) {
-    await db.updateClient(client.id, { ptero_password_enc: enc }).catch(() => {});
+    await db
+      .updateClient(client.id, {
+        ptero_user_id: updatedUser.id,
+        ptero_username: updatedUser.username,
+        ptero_password_enc: enc,
+      })
+      .catch((err) => {
+        console.warn("[SparrowX Game Portal] Failed to persist updated panel password to DB:", err);
+      });
   }
-  const existingDirect = directPteroCache.get(email);
+
   directPteroCache.set(email, {
-    pteroUserId,
-    pteroUsername: client?.ptero_username ?? existingDirect?.pteroUsername ?? email.split("@")[0] ?? "player",
-    email,
+    pteroUserId: updatedUser.id,
+    pteroUsername: updatedUser.username,
+    email: updatedUser.email,
     passwordEnc: enc,
   });
-  return pw;
+
+  return {
+    password: pw,
+    username: updatedUser.username,
+    email: updatedUser.email,
+  };
 }
 
 export async function subscriptions(): Promise<Subscription[]> {

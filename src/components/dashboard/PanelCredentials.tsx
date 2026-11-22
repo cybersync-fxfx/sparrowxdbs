@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, Copy, Eye, EyeOff, ExternalLink, KeyRound, Loader2, RefreshCw, Settings2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,20 @@ function copy(text: string, label: string) {
 }
 
 export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
+  const qc = useQueryClient();
+  const [liveUsername, setLiveUsername] = useState<string | null>(panel.username);
+  const [liveEmail, setLiveEmail] = useState<string | null>(panel.email ?? null);
   const [password, setPassword] = useState<string | null>(null);
   const [shown, setShown] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [showCustomReset, setShowCustomReset] = useState(false);
   const [customPassword, setCustomPassword] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
+  useEffect(() => {
+    if (panel.username) setLiveUsername(panel.username);
+    if (panel.email) setLiveEmail(panel.email);
+  }, [panel.username, panel.email]);
 
   const reveal = useMutation({
     mutationFn: () => revealPanelPassword(),
@@ -33,13 +42,19 @@ export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
   const reset = useMutation({
     mutationFn: (newPassword?: string) =>
       resetPanelPassword({ data: newPassword ? { newPassword } : {} }),
-    onSuccess: (pw) => {
-      setPassword(pw);
+    onSuccess: (res) => {
+      const nextPassword = typeof res === "string" ? res : res.password;
+      const nextUsername = typeof res === "string" ? liveUsername : res.username;
+      const nextEmail = typeof res === "string" ? liveEmail : res.email;
+      setPassword(nextPassword);
       setShown(true);
+      if (nextUsername) setLiveUsername(nextUsername);
+      if (nextEmail) setLiveEmail(nextEmail);
       setCustomPassword("");
       setShowCustomReset(false);
-      toast.success("Panel password updated", {
-        description: "Synced live to game.panel.sparrowx.net with your Google email.",
+      void qc.invalidateQueries({ queryKey: ["dashboard"] });
+      toast.success("Panel password reset & synced", {
+        description: `Synced live to ${panel.url.replace(/^https?:\/\//, "")} for ${nextUsername ?? nextEmail ?? "your account"}.`,
       });
     },
     onError: (e) => toast.error(errorText(e)),
@@ -51,7 +66,13 @@ export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
     setTimeout(() => setCopiedField((cur) => (cur === key ? null : cur)), 1500);
   };
 
-  const toggle = () => (password ? setShown((s) => !s) : reveal.mutate());
+  const toggle = () => {
+    if (password) {
+      setShown((s) => !s);
+      return;
+    }
+    reveal.mutate();
+  };
   const copyPw = async () => {
     if (password) return handleCopy("pw", password, "Password");
     try {
@@ -84,12 +105,12 @@ export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
           <div className="rounded-2xl border border-border bg-background/40 p-3">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Panel Username</p>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="truncate font-mono text-sm">{panel.username ?? "Syncing on next login…"}</span>
-              {panel.username && (
+              <span className="truncate font-mono text-sm select-all">{liveUsername ?? "Syncing on next reset…"}</span>
+              {liveUsername && (
                 <button
                   type="button"
-                  onClick={() => handleCopy("user", panel.username!, "Username")}
-                  className="text-muted-foreground hover:text-sheen"
+                  onClick={() => handleCopy("user", liveUsername, "Username")}
+                  className="text-muted-foreground hover:text-sheen shrink-0"
                   aria-label="Copy username"
                 >
                   {copiedField === "user" ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
@@ -97,15 +118,15 @@ export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
               )}
             </div>
           </div>
-          {panel.email && (
+          {liveEmail && (
             <div className="rounded-2xl border border-border bg-background/40 p-3">
-              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Synced Google Email</p>
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Synced Panel Email</p>
               <div className="mt-1 flex items-center justify-between gap-2">
-                <span className="truncate font-mono text-xs text-secondary-foreground">{panel.email}</span>
+                <span className="truncate font-mono text-xs text-secondary-foreground select-all">{liveEmail}</span>
                 <button
                   type="button"
-                  onClick={() => handleCopy("email", panel.email!, "Email")}
-                  className="text-muted-foreground hover:text-sheen"
+                  onClick={() => handleCopy("email", liveEmail, "Email")}
+                  className="text-muted-foreground hover:text-sheen shrink-0"
                   aria-label="Copy email"
                 >
                   {copiedField === "email" ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
@@ -125,8 +146,14 @@ export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
               </button>
             </div>
             <div className="mt-1 flex items-center justify-between gap-2">
-              <span className="truncate font-mono text-sm">{shown && password ? password : "••••••••••••••••"}</span>
-              <span className="flex items-center gap-3">
+              <span className="font-mono text-sm break-all select-all">
+                {shown && password
+                  ? password
+                  : !panel.hasPassword && !password
+                    ? "Not synced yet — click Reset Password"
+                    : "••••••••••••••••"}
+              </span>
+              <span className="flex items-center gap-3 shrink-0">
                 <button type="button" onClick={toggle} className="text-muted-foreground hover:text-sheen" aria-label={shown ? "Hide password" : "Reveal password"}>
                   {reveal.isPending ? <Loader2 className="size-4 animate-spin" /> : shown ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
@@ -146,15 +173,25 @@ export function PanelCredentials({ panel }: { panel: DashboardData["panel"] }) {
                 }}
                 className="mt-3 flex items-center gap-2 border-t border-border/60 pt-2.5"
               >
-                <Input
-                  type="password"
-                  placeholder="New password (min 8 chars)"
-                  value={customPassword}
-                  onChange={(e) => setCustomPassword(e.target.value)}
-                  minLength={8}
-                  maxLength={64}
-                  className="h-8 bg-background/70 font-mono text-xs"
-                />
+                <div className="relative flex-1">
+                  <Input
+                    type={showCustomInput ? "text" : "password"}
+                    placeholder="New password (min 8 chars)"
+                    value={customPassword}
+                    onChange={(e) => setCustomPassword(e.target.value)}
+                    minLength={8}
+                    maxLength={64}
+                    className="h-8 bg-background/70 pr-8 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomInput((v) => !v)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-sheen"
+                    aria-label={showCustomInput ? "Hide custom password" : "Show custom password"}
+                  >
+                    {showCustomInput ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
                 <Button
                   type="submit"
                   size="sm"
