@@ -123,59 +123,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "SparrowX — Simple Cloud Tools, Fast Databases & Free Secure Utilities" },
-      {
-        name: "description",
-        content:
-          "SparrowX is an independent developer startup offering fast PostgreSQL cloud databases, instant zero-login ephemeral file sharing, offline hardware-grade password generation, and live DDoS defense.",
-      },
-      {
-        name: "keywords",
-        content:
-          "sparrowx, cloud database, postgresql cloud, pgvector, free file transfer no login, offline password generator, website ddos protection, shadowshield, threat map, developer tools, indie startup",
-      },
       { name: "author", content: "SparrowX Technologies" },
-      { name: "robots", content: "index, follow, max-image-preview:large" },
       { name: "theme-color", content: "#090B0E" },
-      { property: "og:site_name", content: "SparrowX" },
-      {
-        property: "og:title",
-        content: "SparrowX — Simple Cloud Tools, Fast Databases & Free Secure Utilities",
-      },
-      {
-        property: "og:description",
-        content:
-          "Independent startup offering instant zero-login file sharing, offline password generation, fast cloud PostgreSQL, and automated website security without corporate bloat.",
-      },
-      { property: "og:type", content: "website" },
-      { property: "og:locale", content: "en_US" },
-      { property: "og:url", content: "https://sparrowx.net" },
-      { property: "og:image", content: "https://sparrowx.net/logos/sparrowx-main.jpg" },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      { property: "og:image:alt", content: "SparrowX Autonomous Security and Sovereign Developer Cloud" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: "https://sparrowx.net/logos/sparrowx-main.jpg" },
-      { name: "twitter:image:alt", content: "SparrowX Autonomous Security and Sovereign Developer Cloud" },
-      { name: "twitter:title", content: "SparrowX — Simple, Honest Cloud Tools for Developers" },
-      {
-        name: "twitter:description",
-        content:
-          "Free, instant file sharing and password generation with zero sign-up required, engineered by SparrowX Autonomous Security.",
-      },
-      { name: "twitter:site", content: "@sparrowx" },
     ],
     links: [
-      {
-        rel: "canonical",
-        href: "https://sparrowx.net",
-      },
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", href: "/sparrowx-logo.png", type: "image/png" },
-      { rel: "shortcut icon", href: "/sparrowx-logo.png" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -193,79 +148,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        "@id": "https://sparrowx.net/#organization",
-        name: "SparrowX Technologies",
-        alternateName: "SparrowX Autonomous Security",
-        url: "https://sparrowx.net",
-        logo: {
-          "@type": "ImageObject",
-          url: "https://sparrowx.net/logos/sparrowx-main.jpg",
-          width: 512,
-          height: 512,
-          caption: "SparrowX Autonomous Security Logo",
-        },
-        image: "https://sparrowx.net/logos/sparrowx-main.jpg",
-        description:
-          "SparrowX is an autonomous security operations platform and developer cloud delivering instant zero-login file sharing, offline cryptographic tools, high-performance PostgreSQL, and automated edge WAF.",
-        email: "support@sparrowx.net",
-        sameAs: ["https://x.com/sparrowx", "https://github.com/sparrowxdbs"],
-        contactPoint: {
-          "@type": "ContactPoint",
-          email: "support@sparrowx.net",
-          contactType: "customer service",
-          availableLanguage: ["English"],
-        },
-        knowsAbout: [
-          "Cybersecurity",
-          "Autonomous Security Operations",
-          "Web Application Firewall (WAF)",
-          "DDoS Mitigation",
-          "PostgreSQL",
-          "pgvector",
-          "Encrypted File Transfer",
-          "Client-Side Cryptography",
-          "Game Server Hosting",
-        ],
-      },
-      {
-        "@type": "WebSite",
-        "@id": "https://sparrowx.net/#website",
-        url: "https://sparrowx.net",
-        name: "SparrowX",
-        description: "Autonomous Security Operations & Sovereign Developer Cloud",
-        publisher: { "@id": "https://sparrowx.net/#organization" },
-        potentialAction: {
-          "@type": "SearchAction",
-          target: {
-            "@type": "EntryPoint",
-            urlTemplate: "https://sparrowx.net/?scan={search_term_string}",
-          },
-          "query-input": "required name=search_term_string",
-        },
-      },
-      {
-        "@type": "SoftwareApplication",
-        "@id": "https://sparrowx.net/#software",
-        name: "SparrowX Sovereign Cloud & Security Suite",
-        applicationCategory: "SecurityApplication, DeveloperApplication",
-        operatingSystem: "Web",
-        url: "https://sparrowx.net",
-        author: { "@id": "https://sparrowx.net/#organization" },
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-        },
-      },
-    ],
-  };
-
   return (
     <html lang="en" className="dark">
       <head>
@@ -275,10 +157,6 @@ function RootShell({ children }: { children: ReactNode }) {
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5926090831336748"
           crossOrigin="anonymous"
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <script
           src="/sparrowx-shield.js"

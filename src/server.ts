@@ -22,6 +22,11 @@ import {
   processUpiAutoWebhook,
   verifyUpiUtr,
 } from "./lib/server/upi-payments.server";
+import {
+  buildHostRobotsTxt,
+  buildHostSitemapXml,
+  resolveCanonicalSubdomainRedirect,
+} from "./lib/seo-profiles";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -841,6 +846,54 @@ function isH3SwallowedErrorBody(body: string): boolean {
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      const reqHost =
+        request.headers.get("x-forwarded-host") ||
+        request.headers.get("host") ||
+        url.hostname;
+
+      // 0a. Host-isolated dynamic robots.txt & sitemap.xml (zero cross-subdomain SEO collision)
+      if (url.pathname === "/robots.txt" && (request.method === "GET" || request.method === "HEAD")) {
+        return new Response(buildHostRobotsTxt(reqHost), {
+          status: 200,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            Vary: "Host",
+          },
+        });
+      }
+
+      if (url.pathname === "/sitemap.xml" && (request.method === "GET" || request.method === "HEAD")) {
+        return new Response(buildHostSitemapXml(reqHost), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/xml; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            Vary: "Host",
+          },
+        });
+      }
+
+      // 0b. HTTP 301 canonical redirects on sparrowx.net / www.sparrowx.net for dedicated subdomain routes
+      if (request.method === "GET" || request.method === "HEAD") {
+        const canonicalRedirect = resolveCanonicalSubdomainRedirect(
+          reqHost,
+          url.pathname,
+          url.search,
+        );
+        if (canonicalRedirect) {
+          return new Response(null, {
+            status: 301,
+            headers: {
+              Location: canonicalRedirect,
+              "Cache-Control": "public, max-age=86400",
+              Vary: "Host",
+            },
+          });
+        }
+      }
+
       // 1. Check if this is an external client telemetry or diagnostic request
       const apiResponse = await handleSparrowxApi(request);
       if (apiResponse) {

@@ -184,6 +184,13 @@ import {
 } from "@/lib/supabase";
 
 import { resolveRootRedirectTarget } from "@/lib/routing";
+import {
+  buildRouteHeadFromProfile,
+  resolveSeoProfileKeyForHost,
+  SEO_PROFILES,
+  type SeoProfileKey,
+} from "@/lib/seo-profiles";
+import { getRequestSeoProfileKey } from "@/lib/seo.functions";
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): Record<string, unknown> => search,
@@ -204,102 +211,19 @@ export const Route = createFileRoute("/")({
       });
     }
   },
-  head: () => ({
-    meta: [
-      { title: "SparrowX | Here for you — Autonomous SOC & Real-Time Cyber Threat Defense" },
-      {
-        name: "description",
-        content:
-          "SparrowX is an autonomous cybersecurity platform with live perimeter scanning, zero-day threat interception, AI prompt injection defense, edge WAF, and sovereign cloud infrastructure.",
-      },
-      {
-        name: "keywords",
-        content:
-          "cybersecurity, autonomous soc, threat intelligence, website security scanner, ddos protection, edge waf, ai guardrails, prompt injection defense, sparrowx",
-      },
-      { property: "og:title", content: "SparrowX | Here for you — Autonomous SOC & Cyber Threat Defense" },
-      {
-        property: "og:description",
-        content:
-          "Autonomous Security Operations Platform, Real-Time Threat Interception, Edge WAF, AI Guardrails, and Sovereign Cloud Infrastructure.",
-      },
-      { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://sparrowx.net" },
-      { property: "og:image", content: "https://sparrowx.net/logos/sparrowx-main.jpg" },
-      { property: "og:image:alt", content: "SparrowX Autonomous Cybersecurity Platform" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "SparrowX — Autonomous Cyber Defense & Sovereign Cloud" },
-      {
-        name: "twitter:description",
-        content:
-          "Autonomous Security Operations Platform, Real-Time Threat Interception, Edge WAF, AI Guardrails, and Sovereign Cloud Infrastructure.",
-      },
-      { name: "twitter:image", content: "https://sparrowx.net/logos/sparrowx-main.jpg" },
-      { name: "twitter:image:alt", content: "SparrowX Autonomous Cybersecurity Platform" },
-    ],
-    links: [
-      { rel: "canonical", href: "https://sparrowx.net" },
-      { rel: "icon", href: "/sparrowx-logo.png", type: "image/png" },
-      { rel: "shortcut icon", href: "/sparrowx-logo.png" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
-    ],
-    scripts: [
-      {
-        type: "application/ld+json",
-        children: JSON.stringify({
-          "@context": "https://schema.org",
-          "@graph": [
-            {
-              "@type": "WebApplication",
-              "name": "SparrowX Autonomous Security Platform",
-              "applicationCategory": "SecurityApplication",
-              "operatingSystem": "All",
-              "url": "https://sparrowx.net",
-              "description":
-                "Real-time threat interception, edge WAF, autonomous SOC, AI guardrails, and automated attack containment.",
-              "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "USD",
-              },
-            },
-            {
-              "@type": "FAQPage",
-              "mainEntity": [
-                {
-                  "@type": "Question",
-                  "name": "What is SparrowX Autonomous Security?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "SparrowX is an autonomous security operations and edge defense platform that monitors traffic, mitigates layer-7 DDoS floods, stops SQL injection and XSS attacks, protects AI endpoints against prompt injection, and isolates threats in real time.",
-                  },
-                },
-                {
-                  "@type": "Question",
-                  "name": "How does the free 15-second perimeter scanner work?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "The free live security scanner performs non-intrusive checks on HTTPS/TLS configuration, DNS records, CORS security headers, and AI API exposures with SSRF and DNS-rebinding protection.",
-                  },
-                },
-                {
-                  "@type": "Question",
-                  "name": "Does SparrowX provide cloud databases and private file transfer?",
-                  "acceptedAnswer": {
-                    "@type": "Answer",
-                    "text":
-                      "Yes, SparrowX includes high-performance PostgreSQL with pgvector AI search, zero-login ephemeral file sharing with 10 GB free encrypted vault, and 100% offline cryptographic key generation.",
-                  },
-                },
-              ],
-            },
-          ],
-        }),
-      },
-    ],
-  }),
+  loader: async (): Promise<{ seoKey: SeoProfileKey }> => {
+    if (typeof window !== "undefined") {
+      return { seoKey: resolveSeoProfileKeyForHost(window.location.hostname) };
+    }
+    try {
+      const seoKey = await getRequestSeoProfileKey();
+      return { seoKey };
+    } catch {
+      return { seoKey: "master" };
+    }
+  },
+  head: ({ loaderData }) =>
+    buildRouteHeadFromProfile(SEO_PROFILES[loaderData?.seoKey ?? "master"]),
   component: Dashboard,
 });
 

@@ -9,6 +9,7 @@ export const Route = createFileRoute("/infra/dashboard")({
         title:
           "SparrowX Cloud Panel (hPanel) — Proxmox VE Server, IP & SSH Management",
       },
+      { name: "robots", content: "noindex, nofollow" },
       {
         name: "description",
         content:

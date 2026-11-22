@@ -19,6 +19,12 @@ import { errorText, useDashboard, useRefreshAll, useServers } from "@/components
 
 export const Route = createFileRoute("/game/dashboard")({
   ssr: false,
+  head: () => ({
+    meta: [
+      { title: "SparrowX Game Hosting — Client Dashboard" },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
   validateSearch: (s: Record<string, unknown>): { deploy?: string | undefined } => ({
     deploy: typeof s.deploy === "string" && /^[a-z0-9-]{1,40}$/.test(s.deploy) ? s.deploy : undefined,
   }),
