@@ -1,10 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Coins, CreditCard, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { CalendarClock, Coins, CreditCard, Loader2, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { renewSubscription } from "@/lib/portal.functions";
 import { SERVICES } from "@/lib/services";
+import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { errorText, useRefreshAll, useSubscriptions } from "./hooks";
 
 const COIN_PACKS = [
@@ -77,8 +78,19 @@ export function SubscriptionManager({
           {isLoading && [0, 1].map((i) => <Skeleton key={i} className="h-20 rounded-2xl bg-background/40" />)}
           {error && <p className="text-sm text-destructive">{errorText(error)}</p>}
           {!isLoading && subs?.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-              No active server subscriptions yet. Deploy a game server below to start a 30-day SparrowCoins subscription.
+            <div className="rounded-2xl border border-dashed border-border p-6 text-center space-y-3">
+              <p className="text-sm text-muted-foreground">
+                No active server subscriptions yet. Deploy a game server below to start a 30-day SparrowCoins subscription, or message us directly on WhatsApp for instant setup.
+              </p>
+              <a
+                href={buildWhatsAppSupportUrl("Hi SparrowX, I want to start a new server subscription and need assistance.")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+              >
+                <MessageCircle className="size-3.5" />
+                <span>Start Subscription on WhatsApp ({WHATSAPP_SUPPORT_DISPLAY})</span>
+              </a>
             </div>
           )}
           {subs?.map((sub) => {
@@ -188,14 +200,25 @@ export function SubscriptionManager({
           </div>
         </div>
 
-        <Button
-          type="button"
-          variant="ivory"
-          className="mt-4 w-full rounded-xl"
-          onClick={onOpenCoinStore}
-        >
-          <Sparkles className="size-4" /> Open SparrowCoins Top-Up Store
-        </Button>
+        <div className="mt-4 space-y-2">
+          <Button
+            type="button"
+            variant="ivory"
+            className="w-full rounded-xl"
+            onClick={onOpenCoinStore}
+          >
+            <Sparkles className="size-4" /> Open SparrowCoins Top-Up Store
+          </Button>
+          <a
+            href={buildWhatsAppSupportUrl("Hi SparrowX Support, I want to buy SparrowCoins or start a subscription.")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/10 px-4 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+          >
+            <MessageCircle className="size-4" />
+            <span>Contact on WhatsApp · {WHATSAPP_SUPPORT_DISPLAY}</span>
+          </a>
+        </div>
       </div>
     </section>
   );

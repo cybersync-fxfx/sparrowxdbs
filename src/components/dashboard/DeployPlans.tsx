@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Coins, Loader2, Rocket } from "lucide-react";
+import { Coins, Loader2, MessageCircle, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ServiceSwitcher } from "@/components/site/ServiceSwitcher";
 import { deployPlan } from "@/lib/portal.functions";
 import { findPlan, formatRam, planCostCoins, SERVICES, type Plan, type ServiceId } from "@/lib/services";
+import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { cn } from "@/lib/utils";
 import { errorText, useRefreshAll } from "./hooks";
 
@@ -92,7 +93,7 @@ export function DeployPlans({ coins, initialPlanId, onNeedCoins }: { coins: numb
                   <span className={cn("font-mono", short > 0 ? "text-destructive" : "text-success")}>{coins - planCostCoins(selected)} coins</span>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex-col gap-2 sm:flex-col">
                 {short > 0 ? (
                   <Button variant="discord" className="w-full rounded-xl" onClick={() => { setSelected(null); onNeedCoins(); }}>
                     Top up {short} coins to continue
@@ -102,6 +103,17 @@ export function DeployPlans({ coins, initialPlanId, onNeedCoins }: { coins: numb
                     {deploy.isPending ? <Loader2 className="animate-spin" /> : <Rocket />} Confirm & deploy
                   </Button>
                 )}
+                <a
+                  href={buildWhatsAppSupportUrl(
+                    `Hi SparrowX, I want to start a subscription for ${SERVICES[service].name} - ${selected.name} (${planCostCoins(selected)} Coins / 30d, Server: ${name || selected.name}).`,
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+                >
+                  <MessageCircle className="size-4" />
+                  <span>Contact on WhatsApp ({WHATSAPP_SUPPORT_DISPLAY})</span>
+                </a>
               </DialogFooter>
             </>
           )}

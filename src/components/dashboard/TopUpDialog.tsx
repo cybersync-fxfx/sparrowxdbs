@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Coins, Gift, Loader2, Plus, Smartphone } from "lucide-react";
+import { Coins, Gift, Loader2, MessageCircle, Plus, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { confirmTopup, redeemPromo, startTopup } from "@/lib/portal.functions";
+import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { cn } from "@/lib/utils";
 import { errorText, useRefreshAll } from "./hooks";
 
@@ -111,8 +112,19 @@ export function TopUpDialog({ open, onOpenChange, demo, razorpay }: { open: bool
               {pay.isPending ? <Loader2 className="animate-spin" /> : <Plus />} Pay ₹{amount.toLocaleString("en-IN")}
             </Button>
             <p className="text-center text-[11px] text-muted-foreground">
-              {payDisabled ? "Configure Razorpay keys on server to enable online payments — or redeem a promo code." : "Secured by Razorpay · UPI, cards, netbanking"}
+              {payDisabled ? "Pay directly via WhatsApp Support or redeem a promo code." : "Secured by Razorpay · UPI, cards, netbanking"}
             </p>
+            <a
+              href={buildWhatsAppSupportUrl(
+                `Hi SparrowX, I want to add ${amount} SparrowCoins (₹${amount.toLocaleString("en-IN")}) to my account.`,
+              )}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-500/15 px-4 py-2.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+            >
+              <MessageCircle className="size-4" />
+              <span>Pay / Connect on WhatsApp ({WHATSAPP_SUPPORT_DISPLAY})</span>
+            </a>
           </TabsContent>
           <TabsContent value="promo" className="mt-4 space-y-4">
             <Input placeholder="Enter promo code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="bg-background/50 font-mono uppercase" />

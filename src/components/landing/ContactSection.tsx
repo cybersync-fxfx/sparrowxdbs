@@ -10,6 +10,7 @@ import {
   Send,
 } from "lucide-react";
 import { CONTACT_TOPICS } from "@/lib/contact-inquiry";
+import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 
 type Status = "idle" | "submitting" | "success" | "error";
 type FieldErrors = Partial<Record<"name" | "email" | "topic" | "message", string>>;
@@ -148,6 +149,27 @@ export function ContactSection() {
               <div className="space-y-3 font-mono text-xs">
                 <CopyRow label="Founding team" email={FOUNDER_EMAIL} />
                 <CopyRow label="Security & disclosures" email={SECURITY_EMAIL} />
+                <div className="p-3 rounded bg-[#090B10] border border-emerald-500/35 flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-[10px] text-emerald-400 block uppercase">WhatsApp Support (India)</span>
+                    <a
+                      href={buildWhatsAppSupportUrl("Hi SparrowX Support, I need help with SparrowX services.")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white hover:text-emerald-300 font-semibold truncate block"
+                    >
+                      {WHATSAPP_SUPPORT_DISPLAY}
+                    </a>
+                  </div>
+                  <a
+                    href={buildWhatsAppSupportUrl("Hi SparrowX Support, I need help with SparrowX services.")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-semibold text-[11px] shrink-0 transition-colors"
+                  >
+                    Chat
+                  </a>
+                </div>
                 <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                   <div className="flex items-center gap-2 text-white font-semibold">
                     <span className="size-2 rounded-full bg-white shrink-0" aria-hidden="true" />

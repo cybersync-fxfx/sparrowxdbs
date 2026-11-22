@@ -1,4 +1,5 @@
 import React from "react";
+import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 
 export type SparrowxServiceKey = "db" | "sec" | "file" | "password" | "api" | "infra";
 
@@ -178,7 +179,7 @@ export function SparrowxFooter({
               </h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 <li className="min-w-0">
-                  <a href={`${anchorPrefix}vps`} className={LINK_CLASSES}>
+                  <a href="/infra" className={LINK_CLASSES}>
                     Dedicated NVMe VPS
                   </a>
                 </li>
@@ -220,6 +221,19 @@ export function SparrowxFooter({
                 <li className="min-w-0">
                   <a href={`${anchorPrefix}contact`} className={LINK_CLASSES}>
                     Contact Engineering
+                  </a>
+                </li>
+                <li className="min-w-0">
+                  <a
+                    href={buildWhatsAppSupportUrl("Hi SparrowX Support, I need assistance with my account or subscription.")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${LINK_CLASSES} text-emerald-300/90 hover:text-emerald-200`}
+                  >
+                    <span>WhatsApp Support</span>
+                    <span className="text-xs text-[#F4F6FA]/45 font-mono">
+                      {WHATSAPP_SUPPORT_DISPLAY}
+                    </span>
                   </a>
                 </li>
                 <li className="min-w-0">
@@ -266,16 +280,28 @@ export function SparrowxFooter({
           </p>
           <div className="flex flex-wrap items-center gap-6 min-w-0">
             <a
-              href="/story"
+              href="/terms"
               className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
-              Privacy Policy
+              Terms of Service
+            </a>
+            <a
+              href="/refund"
+              className="min-h-6 inline-flex items-center text-[#FFA14A] hover:text-[#FFA14A]/80 font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
+            >
+              Refund Policy
+            </a>
+            <a
+              href="/security"
+              className="min-h-6 inline-flex items-center text-emerald-400 hover:text-emerald-300 font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
+            >
+              Data Security
             </a>
             <a
               href="/story"
               className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
-              Terms of Service
+              Our Story
             </a>
             <a
               href="https://sparrowx.net"
