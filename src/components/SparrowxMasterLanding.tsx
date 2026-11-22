@@ -31,7 +31,6 @@ import {
   Building2,
   Copy,
 } from "lucide-react";
-import { ComparisonSection } from "./landing/ComparisonSection";
 import { ContactSection } from "./landing/ContactSection";
 import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
 import {
@@ -1138,36 +1137,6 @@ export function SparrowxMasterLanding({
               We&apos;re a small, independent developer team building fast cloud databases, instant encrypted file sharing, hardware-grade offline passwords, and automated DDoS defense.
               No surprise bills, no shady telemetry, and no forced logins for simple utilities.
             </p>
-
-            {/* Core Action Buttons (Mobile-friendly stacked row) */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => handleLaunch("file", "https://file.sparrowx.net", "file")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(255,255,255,0.2)] font-mono"
-              >
-                <FileUp className="size-4" aria-hidden="true" />
-                <span>Instant File Drop (No Login)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleLaunch("password", "https://password.sparrowx.net", "password")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-[#090B10]/90 backdrop-blur-md border border-white/30 hover:border-white/60 text-white font-mono text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <KeyRound className="size-4 text-white" aria-hidden="true" />
-                <span>Offline Keys (No Login)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                className="w-full sm:w-auto min-h-[44px] px-5 py-2.5 rounded bg-transparent border border-white/25 hover:border-white/50 text-zinc-300 hover:text-white font-mono text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer backdrop-blur-sm"
-              >
-                <Database className="size-4 text-white" aria-hidden="true" />
-                <span>Postgres Studio</span>
-              </button>
-            </div>
           </div>
 
           {/* Right Column: Why Developers Love Us Card */}
@@ -1357,10 +1326,6 @@ export function SparrowxMasterLanding({
           ))}
         </div>
       </section>
-
-      <div className="relative z-10">
-        <ComparisonSection />
-      </div>
 
       {/* SECTION 5: SHORT EMOTIONAL STORY TEASER -> FULL /story PAGE */}
       <section id="story" className="scroll-mt-24 border-t border-white/15 bg-[#05060A]/80 backdrop-blur-sm px-4 sm:px-6 py-14 relative z-10">
