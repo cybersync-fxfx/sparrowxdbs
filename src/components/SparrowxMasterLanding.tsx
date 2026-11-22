@@ -812,24 +812,13 @@ export function SparrowxMasterLanding({
                 </button>
               </>
             ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setOperatorModalOpen(true)}
-                  className="hidden sm:inline-flex px-3 py-1.5 rounded-md text-xs font-medium text-zinc-300 hover:text-white transition-colors cursor-pointer"
-                >
-                  Sign In
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleLaunch("db", "https://db.sparrowx.net", "db")}
-                  className="px-3.5 py-1.5 rounded-md bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-all inline-flex items-center gap-1.5 cursor-pointer min-h-[34px] sm:min-h-0"
-                >
-                  <span>Get Started</span>
-                  <ArrowUpRight className="size-3.5" aria-hidden="true" />
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => setOperatorModalOpen(true)}
+                className="inline-flex px-3.5 py-1.5 rounded-md border border-white/20 bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-200 hover:text-white transition-colors cursor-pointer min-h-[34px] sm:min-h-0 items-center"
+              >
+                Sign In
+              </button>
             )}
 
             {/* Mobile Hamburger Menu Button */}
