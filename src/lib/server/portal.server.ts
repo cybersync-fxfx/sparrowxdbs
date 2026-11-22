@@ -11,7 +11,18 @@ import {
   type MasterSsoClaims,
 } from "./master-sso.server";
 import { findPlan, planCostCoins, RENEWAL_DAYS, type ServiceId } from "../services";
-import type { DashboardData, ServerView, Transaction, TxType } from "../portal-types";
+import type { DashboardData, ServerView, Subscription, Transaction, TxType } from "../portal-types";
+
+type DirectPteroCacheEntry = {
+  pteroUserId: number;
+  pteroUsername: string;
+  email: string;
+  passwordEnc: string | null;
+};
+
+// Process-level fallback cache so Pterodactyl auto-sync, reveal & password reset
+// keep working seamlessly even when PostgREST is offline or unconfigured.
+const directPteroCache = new Map<string, DirectPteroCacheEntry>();
 
 export class PortalError extends Error {
   constructor(
@@ -158,10 +169,55 @@ export async function sessionSummary() {
   };
 }
 
+/**
+ * Ensures the signed-in Google user has a live Pterodactyl account under their exact
+ * Google email ID even if PostgREST is offline.
+ */
+async function ensureDirectPteroAccount(claims: MasterSsoClaims): Promise<DirectPteroCacheEntry | null> {
+  if (!integrations().pterodactyl) return null;
+  const email = claims.email.trim().toLowerCase();
+  const cached = directPteroCache.get(email);
+  if (cached) return cached;
+
+  const displayName = claims.fullName || email.split("@")[0] || "player";
+  try {
+    const existing = await ptero.findUserByEmail(email);
+    if (existing) {
+      const entry: DirectPteroCacheEntry = {
+        pteroUserId: existing.id,
+        pteroUsername: existing.username,
+        email: existing.email,
+        passwordEnc: null,
+      };
+      directPteroCache.set(email, entry);
+      return entry;
+    }
+    const password = generatePassword();
+    const created = await ptero.createUser({
+      email,
+      username: sanitizeUsername(displayName, claims.sub),
+      firstName: displayName,
+      password,
+    });
+    const entry: DirectPteroCacheEntry = {
+      pteroUserId: created.id,
+      pteroUsername: created.username,
+      email: created.email,
+      passwordEnc: await encryptText(password),
+    };
+    directPteroCache.set(email, entry);
+    return entry;
+  } catch (err) {
+    console.warn("[SparrowX Game Portal] Direct Pterodactyl user sync failed:", err);
+    return null;
+  }
+}
+
 export async function dashboard(): Promise<DashboardData> {
   const claims = await requireGoogleUser();
   const ints = integrations();
   const client = await resolveLiveClient(claims);
+  const directPtero = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
   const username = claims.email.split("@")[0] || "player";
 
   return {
@@ -176,9 +232,9 @@ export async function dashboard(): Promise<DashboardData> {
     coins: client?.coins ?? 0,
     panel: {
       url: panelUrl(),
-      username: client?.ptero_username ?? null,
-      hasPassword: Boolean(client?.ptero_password_enc),
-      email: client?.email ?? claims.email,
+      username: client?.ptero_username ?? directPtero?.pteroUsername ?? null,
+      hasPassword: Boolean(client?.ptero_password_enc || directPtero?.passwordEnc),
+      email: client?.email ?? directPtero?.email ?? claims.email,
     },
     integrations: ints,
   };
@@ -187,22 +243,92 @@ export async function dashboard(): Promise<DashboardData> {
 export async function revealPassword(): Promise<string> {
   const claims = await requireGoogleUser();
   const client = await resolveLiveClient(claims);
-  if (!client?.ptero_password_enc) {
-    throw new PortalError("NOT_FOUND", "No panel password stored yet — connect Pterodactyl and click Sync / Reset");
+  if (client?.ptero_password_enc) {
+    return decryptText(client.ptero_password_enc);
   }
-  return decryptText(client.ptero_password_enc);
+  const direct = await ensureDirectPteroAccount(claims);
+  if (direct?.passwordEnc) {
+    return decryptText(direct.passwordEnc);
+  }
+  throw new PortalError(
+    "NOT_FOUND",
+    "No panel password cached yet for this existing account — click Reset Password to sync a fresh password to Pterodactyl.",
+  );
 }
 
-export async function resetPassword(): Promise<string> {
+export async function resetPassword(customPassword?: string): Promise<string> {
   const claims = await requireGoogleUser();
+  const email = claims.email.trim().toLowerCase();
   const client = await resolveLiveClient(claims);
-  if (!client?.ptero_user_id) {
+  const direct = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
+  const pteroUserId = client?.ptero_user_id ?? direct?.pteroUserId ?? null;
+  if (!pteroUserId) {
     throw new PortalError("NOT_FOUND", "Pterodactyl panel account is not linked yet");
   }
-  const pw = generatePassword();
-  await ptero.setUserPassword(client.ptero_user_id, pw);
-  await db.updateClient(client.id, { ptero_password_enc: await encryptText(pw) });
+  const pw = customPassword?.trim() || generatePassword();
+  if (pw.length < 8 || pw.length > 64) {
+    throw new PortalError("BAD_REQUEST", "Password must be between 8 and 64 characters");
+  }
+  await ptero.setUserPassword(pteroUserId, pw);
+  const enc = await encryptText(pw);
+  if (client) {
+    await db.updateClient(client.id, { ptero_password_enc: enc }).catch(() => {});
+  }
+  const existingDirect = directPteroCache.get(email);
+  directPteroCache.set(email, {
+    pteroUserId,
+    pteroUsername: client?.ptero_username ?? existingDirect?.pteroUsername ?? email.split("@")[0] ?? "player",
+    email,
+    passwordEnc: enc,
+  });
   return pw;
+}
+
+export async function subscriptions(): Promise<Subscription[]> {
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client) return [];
+  return db.listSubscriptions(client.id);
+}
+
+export async function renewSubscription(subscriptionId: string, days = RENEWAL_DAYS) {
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  if (!client) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required to renew subscriptions.");
+  }
+  const subs = await db.listSubscriptions(client.id);
+  const sub = subs.find((s) => s.id === subscriptionId);
+  if (!sub) {
+    throw new PortalError("NOT_FOUND", "Subscription not found on your account.");
+  }
+  const cost = Math.max(1, Math.round((sub.priceCoins * days) / RENEWAL_DAYS));
+  let balance: number;
+  try {
+    balance = await db.spendCoins(
+      client.id,
+      cost,
+      `Renewed ${sub.planName} (${sub.serviceType}) for +${days} days`,
+    );
+  } catch (e) {
+    if (e instanceof db.DbError && e.body.includes("insufficient_coins")) {
+      throw new PortalError("INSUFFICIENT_COINS", `You need ${Math.max(1, cost - client.coins)} more SparrowCoins to renew`);
+    }
+    throw e;
+  }
+
+  const baseTime = Math.max(Date.now(), new Date(sub.expiresAt).getTime());
+  const nextExpiry = new Date(baseTime + days * 86400000).toISOString();
+  const updated = await db.updateSubscription(sub.id, {
+    status: "active",
+    expires_at: nextExpiry,
+  });
+
+  if (sub.pteroServerId && integrations().pterodactyl) {
+    await ptero.unsuspendServer(sub.pteroServerId).catch(() => {});
+  }
+
+  return { coins: balance, subscription: updated };
 }
 
 export async function transactions(): Promise<Transaction[]> {
@@ -215,12 +341,14 @@ export async function transactions(): Promise<Transaction[]> {
 export async function servers(): Promise<ServerView[]> {
   const claims = await requireGoogleUser();
   const client = await resolveLiveClient(claims);
-  if (!client?.ptero_user_id || !integrations().pterodactyl) return [];
+  const direct = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
+  const pteroUserId = client?.ptero_user_id ?? direct?.pteroUserId ?? null;
+  if (!pteroUserId || !integrations().pterodactyl) return [];
 
   const base = panelUrl();
   const [live, subs] = await Promise.all([
-    ptero.listUserServers(client.ptero_user_id),
-    db.listSubscriptions(client.id),
+    ptero.listUserServers(pteroUserId),
+    client ? db.listSubscriptions(client.id).catch(() => []) : Promise.resolve([]),
   ]);
   return live.map((s) => {
     const sub = subs.find((x) => x.pteroServerId === s.id);

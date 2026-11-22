@@ -148,6 +148,20 @@ export async function insertSubscription(row: Omit<SubRow, "id" | "created_at">)
   return subFromRow(first);
 }
 
+export async function updateSubscription(
+  id: string,
+  patch: Partial<Pick<SubRow, "status" | "expires_at" | "price_coins" | "plan_name">>,
+): Promise<Subscription> {
+  const rows = await pg<SubRow[]>(`/subscriptions?id=eq.${q(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+    prefer: "return=representation",
+  });
+  const first = rows[0];
+  if (!first) throw new Error("Failed to update subscription row");
+  return subFromRow(first);
+}
+
 export async function findPromo(code: string): Promise<{ code: string; coins: number } | null> {
   const rows = await pg<{ code: string; coins: number }[]>(
     `/promo_codes?code=eq.${q(code)}&active=is.true&select=code,coins&limit=1`,

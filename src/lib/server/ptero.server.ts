@@ -64,6 +64,10 @@ export async function setUserPassword(userId: number, password: string) {
   return u;
 }
 
+export async function unsuspendServer(serverId: number): Promise<void> {
+  await app(`/servers/${serverId}/unsuspend`, { method: "POST" });
+}
+
 /** Egg per service, from env "PTERO_EGG_FIVEM" etc. formatted as "nestId:eggId". */
 function eggFor(service: ServiceId): { nest: number; egg: number } {
   const raw = env(`PTERO_EGG_${service.toUpperCase()}`);

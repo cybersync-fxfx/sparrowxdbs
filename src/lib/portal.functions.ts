@@ -29,13 +29,32 @@ export const getTransactions = createServerFn({ method: "GET" }).handler(async (
   run(async () => (await import("./server/portal.server")).transactions()),
 );
 
+export const getSubscriptions = createServerFn({ method: "GET" }).handler(async () =>
+  run(async () => (await import("./server/portal.server")).subscriptions()),
+);
+
+export const renewSubscription = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z.object({
+      subscriptionId: z.string().min(1).max(80),
+      days: z.number().int().min(7).max(365).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).renewSubscription(data.subscriptionId, data.days)),
+  );
+
 export const revealPanelPassword = createServerFn({ method: "POST" }).handler(async () =>
   run(async () => (await import("./server/portal.server")).revealPassword()),
 );
 
-export const resetPanelPassword = createServerFn({ method: "POST" }).handler(async () =>
-  run(async () => (await import("./server/portal.server")).resetPassword()),
-);
+export const resetPanelPassword = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z.object({ newPassword: z.string().min(8).max(64).optional() }).optional().parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).resetPassword(data?.newPassword)),
+  );
 
 export const deployPlan = createServerFn({ method: "POST" })
   .validator((d) =>

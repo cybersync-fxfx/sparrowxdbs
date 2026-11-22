@@ -14,17 +14,12 @@ import { PanelCredentials } from "@/components/dashboard/PanelCredentials";
 import { TopUpDialog } from "@/components/dashboard/TopUpDialog";
 import { DeployPlans } from "@/components/dashboard/DeployPlans";
 import { ServerList } from "@/components/dashboard/ServerList";
+import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { Transactions } from "@/components/dashboard/Transactions";
 import { errorText, useDashboard, useRefreshAll, useServers } from "@/components/dashboard/hooks";
 
 export const Route = createFileRoute("/game/dashboard")({
   ssr: false,
-  head: () => ({
-    meta: [
-      { title: "SparrowX Game Hosting — Client Dashboard" },
-      { name: "robots", content: "noindex, nofollow" },
-    ],
-  }),
   validateSearch: (s: Record<string, unknown>): { deploy?: string | undefined } => ({
     deploy: typeof s.deploy === "string" && /^[a-z0-9-]{1,40}$/.test(s.deploy) ? s.deploy : undefined,
   }),
@@ -56,12 +51,8 @@ export const Route = createFileRoute("/game/dashboard")({
   head: () => ({
     meta: [
       { title: "Client Area — SparrowX Game Hosting" },
-      { name: "description", content: "Manage your SparrowX game servers, SparrowCoins wallet and game panel credentials." },
-      { property: "og:title", content: "SparrowX Client Area" },
-      { property: "og:description", content: "Deploy and manage FiveM, SA-MP, Minecraft and Discord bot servers." },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "robots", content: "noindex" },
+      { name: "description", content: "Manage your SparrowX game servers, subscriptions, SparrowCoins wallet, and Pterodactyl panel credentials." },
+      { name: "robots", content: "noindex, nofollow" },
     ],
     links: [
       { rel: "icon", href: "/logos/sparrowx-main.png", type: "image/png" },
@@ -220,6 +211,12 @@ function GameDashboard() {
 
         <ServerList />
         {data && (
+          <SubscriptionManager
+            coins={data.coins}
+            onOpenCoinStore={() => setTopUp(true)}
+          />
+        )}
+        {data && (
           <DeployPlans
             coins={data.coins}
             {...(deploy ? { initialPlanId: deploy } : {})}
@@ -238,16 +235,16 @@ function GameDashboard() {
                 Connected SparrowX Ecosystem
               </p>
               <h2 className="text-lg font-bold">
-                Need Anycast L3/L4 DDoS Protection or Managed Cloud Databases?
+                Need Edge WAF DDoS Protection or Managed Cloud Databases?
               </h2>
               <p className="text-xs text-muted-foreground max-w-2xl">
-                Protect external dedicated/VPS game nodes against UDP, RakNet, and SYN floods on GameSec, manage Linux firewall agents on NetSec, or provision low-latency PostgreSQL databases on SparrowX Cloud.
+                Protect external dedicated/VPS game nodes on SparrowX Shield, manage Linux firewall agents on NetSec, or provision low-latency PostgreSQL databases on SparrowX Cloud DB.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2.5">
               <Button asChild variant="secondary" size="sm" className="rounded-xl">
-                <a href="https://gamesec.sparrowx.net" target="_blank" rel="noreferrer">
-                  <ShieldCheck className="size-4 text-emerald-400" /> GameSec L4 DDoS <ExternalLink className="size-3.5" />
+                <a href="https://sec.sparrowx.net" target="_blank" rel="noreferrer">
+                  <ShieldCheck className="size-4 text-emerald-400" /> SparrowX Shield <ExternalLink className="size-3.5" />
                 </a>
               </Button>
               <Button asChild variant="secondary" size="sm" className="rounded-xl">
