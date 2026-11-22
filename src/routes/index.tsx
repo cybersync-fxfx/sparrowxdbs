@@ -2180,17 +2180,33 @@ function Dashboard() {
             onUserAuthenticated={handleUserAuthenticated}
             onDirectNav={(target) => {
               if (typeof window === "undefined") return;
-              const directRoutes: Record<string, string> = {
-                db: "/db",
-                file: "/drop",
-                drop: "/drop",
-                password: "/keys",
-                keys: "/keys",
-                sec: "/shield",
-                shield: "/shield",
-                game: "/game",
-                api: "/gateway",
-              };
+              const isProd = window.location.hostname.toLowerCase().includes("sparrowx.net");
+              const directRoutes: Record<string, string> = isProd
+                ? {
+                    db: "https://db.sparrowx.net",
+                    file: "https://file.sparrowx.net",
+                    drop: "https://file.sparrowx.net",
+                    password: "https://password.sparrowx.net",
+                    keys: "https://password.sparrowx.net",
+                    sec: "https://sec.sparrowx.net",
+                    shield: "https://sec.sparrowx.net",
+                    infra: "https://infra.sparrowx.net",
+                    netsec: "https://netsec.sparrowx.net",
+                    game: "/game",
+                    api: "/gateway",
+                  }
+                : {
+                    db: "/db",
+                    file: "/drop",
+                    drop: "/drop",
+                    password: "/keys",
+                    keys: "/keys",
+                    sec: "/shield",
+                    shield: "/shield",
+                    infra: "/infra",
+                    game: "/game",
+                    api: "/gateway",
+                  };
               const dest = directRoutes[target] || "/";
               window.location.href = dest;
             }}
