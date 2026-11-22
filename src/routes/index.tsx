@@ -1608,6 +1608,20 @@ function Dashboard() {
       setActiveNav("System Status");
       return;
     }
+    if (navLabel === "SparrowX DB" || navLabel === "Database Studio") {
+      if (typeof window !== "undefined") {
+        const isProd = window.location.hostname.toLowerCase().includes("sparrowx.net");
+        window.location.href = isProd ? "https://db.sparrowx.net" : "/db";
+        return;
+      }
+    }
+    if (navLabel === "SparrowX Shield" || navLabel === "Shield Edge Defense") {
+      if (typeof window !== "undefined") {
+        const isProd = window.location.hostname.toLowerCase().includes("sparrowx.net");
+        window.location.href = isProd ? "https://sec.sparrowx.net" : "/shield";
+        return;
+      }
+    }
     if (navLabel === "SIEM Rules") {
       setPortalMode(authSession.role === "admin" ? "soc" : "client");
       setActiveNav("SIEM & Detection Rules");

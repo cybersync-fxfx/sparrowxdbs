@@ -186,6 +186,7 @@ export interface SparrowxCatalogService {
   name: string;
   tagline: string;
   domain: string;
+  prodUrl: string;
   url: string;
   external?: boolean;
   badge: string;
@@ -197,6 +198,7 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX Cloud DB",
     tagline: "Managed PostgreSQL 16, pgvector AI embeddings, instant REST API & PgBouncer pooler.",
     domain: "db.sparrowx.net",
+    prodUrl: "https://db.sparrowx.net",
     url: "/db",
     badge: "Database",
   },
@@ -205,6 +207,7 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX NetSec (DDoS & Edge Protection)",
     tagline: "Autonomous L3/L4/L7 XDP/eBPF packet scrubbing, live threat radar & VPS protection.",
     domain: "netsec.sparrowx.net",
+    prodUrl: "https://netsec.sparrowx.net",
     url: "https://netsec.sparrowx.net",
     external: true,
     badge: "Protection",
@@ -213,7 +216,8 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     id: "game-hosting",
     name: "SparrowX Game Hosting",
     tagline: "NVMe Gen4 FiveM, SA-MP, Minecraft & Discord Bot servers with Pterodactyl panel.",
-    domain: "game.sparrowx.net",
+    domain: "sparrowx.net/game",
+    prodUrl: "https://sparrowx.net/game/dashboard",
     url: "/game/dashboard",
     badge: "Game Cloud",
   },
@@ -222,6 +226,7 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX Shield (Web Scanner & WAF)",
     tagline: "8-tool deep domain security scanner, header auditing & SparrowX AI threat advisory.",
     domain: "sec.sparrowx.net",
+    prodUrl: "https://sec.sparrowx.net",
     url: "/shield",
     badge: "WAF & Audit",
   },
@@ -230,6 +235,7 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX Drop (Encrypted Vault)",
     tagline: "Zero-knowledge AES-256-GCM persistent file vault & burn-after-reading transfers.",
     domain: "file.sparrowx.net",
+    prodUrl: "https://file.sparrowx.net",
     url: "/drop",
     badge: "Storage",
   },
@@ -238,6 +244,7 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX Keys (Crypto Suite)",
     tagline: "Air-gapped CSPRNG master password, JWT secret & cryptographic key generator.",
     domain: "password.sparrowx.net",
+    prodUrl: "https://password.sparrowx.net",
     url: "/keys",
     badge: "Crypto",
   },
@@ -246,20 +253,43 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX Cloud Infra (VPS)",
     tagline: "Dedicated bare-metal NVMe compute nodes & instant Linux cloud provisioning.",
     domain: "infra.sparrowx.net",
+    prodUrl: "https://infra.sparrowx.net",
     url: "/infra",
     badge: "Compute",
   },
 ];
 
+function isProductionSparrowxHost(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.location.hostname.toLowerCase().includes("sparrowx.net")
+  );
+}
+
+function resolveCatalogUrl(svc: SparrowxCatalogService): string {
+  return isProductionSparrowxHost() ? svc.prodUrl : svc.url;
+}
+
 function resolveServiceDashboardUrl(srv: ClientTenant): string {
+  const prod = isProductionSparrowxHost();
   const hay = `${srv.name} ${srv.primaryDomain} ${srv.enabledModules.join(" ")}`.toLowerCase();
   if (hay.includes("netsec") || hay.includes("ddos")) return "https://netsec.sparrowx.net";
-  if (hay.includes("game") || hay.includes("fivem") || hay.includes("minecraft")) return "/game/dashboard";
-  if (hay.includes("db") || hay.includes("postgres") || hay.includes("database")) return "/db";
-  if (hay.includes("drop") || hay.includes("file") || hay.includes("vault")) return "/drop";
-  if (hay.includes("key") || hay.includes("password")) return "/keys";
-  if (hay.includes("infra") || hay.includes("vps")) return "/infra";
-  return "/shield";
+  if (hay.includes("game") || hay.includes("fivem") || hay.includes("minecraft")) {
+    return prod ? "https://sparrowx.net/game/dashboard" : "/game/dashboard";
+  }
+  if (hay.includes("db") || hay.includes("postgres") || hay.includes("database")) {
+    return prod ? "https://db.sparrowx.net" : "/db";
+  }
+  if (hay.includes("drop") || hay.includes("file") || hay.includes("vault")) {
+    return prod ? "https://file.sparrowx.net" : "/drop";
+  }
+  if (hay.includes("key") || hay.includes("password")) {
+    return prod ? "https://password.sparrowx.net" : "/keys";
+  }
+  if (hay.includes("infra") || hay.includes("vps")) {
+    return prod ? "https://infra.sparrowx.net" : "/infra";
+  }
+  return prod ? "https://sec.sparrowx.net" : "/shield";
 }
 
 export function ClientPortalView({
@@ -722,7 +752,7 @@ export function ClientPortalView({
                       </Button>
                       <Button
                         size="sm"
-                        onClick={() => launchServiceDestination(chosen.url, chosen.name)}
+                        onClick={() => launchServiceDestination(resolveCatalogUrl(chosen), chosen.name)}
                       >
                         Continue to {chosen.name} <ArrowRight className="size-3.5" />
                       </Button>
@@ -849,7 +879,7 @@ export function ClientPortalView({
                         size="sm"
                         variant="outline"
                         className="h-7 px-2.5 text-xs"
-                        onClick={() => launchServiceDestination(svc.url, svc.name)}
+                        onClick={() => launchServiceDestination(resolveCatalogUrl(svc), svc.name)}
                       >
                         Continue <ArrowRight className="ml-1 size-3" />
                       </Button>
@@ -4344,39 +4374,39 @@ export function PortalLoginScreen({
                 <div className="h-4 w-px bg-white/20 mx-1" />
 
                 <a
-                  href="/db"
+                  href={isProductionSparrowxHost() ? "https://db.sparrowx.net" : "/db"}
                   className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-[#3ECF8E] hover:bg-[#3ECF8E]/10 border border-[#3ECF8E]/20 transition-all"
-                  title="SparrowX DB - Sovereign BaaS Console"
+                  title="SparrowX DB - Sovereign BaaS Console (db.sparrowx.net)"
                 >
                   <Database className="size-3" />
-                  <span>/db</span>
+                  <span>db.sparrowx.net</span>
                 </a>
 
                 <a
-                  href="/shield"
+                  href={isProductionSparrowxHost() ? "https://sec.sparrowx.net" : "/shield"}
                   className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-cyan-400 hover:bg-cyan-500/10 border border-cyan-500/20 transition-all"
-                  title="SparrowX Shield - Edge WAF & Threat Cache"
+                  title="SparrowX Shield - Edge WAF & Threat Cache (sec.sparrowx.net)"
                 >
                   <Shield className="size-3" />
-                  <span>/shield</span>
+                  <span>sec.sparrowx.net</span>
                 </a>
 
                 <a
-                  href="/drop"
+                  href={isProductionSparrowxHost() ? "https://file.sparrowx.net" : "/drop"}
                   className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-amber-300 hover:bg-amber-500/10 border border-amber-500/20 transition-all"
-                  title="SparrowX Drop - Ephemeral Zero-Disk Share"
+                  title="SparrowX Drop - Ephemeral Zero-Disk Share (file.sparrowx.net)"
                 >
                   <LockKeyhole className="size-3" />
-                  <span>/drop</span>
+                  <span>file.sparrowx.net</span>
                 </a>
 
                 <a
-                  href="/keys"
+                  href={isProductionSparrowxHost() ? "https://password.sparrowx.net" : "/keys"}
                   className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-mono text-purple-400 hover:bg-purple-500/10 border border-purple-500/20 transition-all"
-                  title="SparrowX Keys - 100% Offline Cryptographic Engine"
+                  title="SparrowX Keys - 100% Offline Cryptographic Engine (password.sparrowx.net)"
                 >
                   <KeyRound className="size-3" />
-                  <span>/keys</span>
+                  <span>password.sparrowx.net</span>
                 </a>
               </nav>
             )}
