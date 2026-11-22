@@ -581,8 +581,7 @@ export function ClientPortalView({
               Welcome, {currentUser?.fullName || "Client Account"}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              Manage your security services, subscription plans, billing due dates, and account
-              profile. Click any service below to launch its dedicated dashboard or manage it.
+              Unified account hub &amp; service router. View active services, renewal due dates, and SparrowX Coins — click any service to launch its dedicated dashboard.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -590,23 +589,11 @@ export function ClientPortalView({
               onClick={() => onNavigate("Billing & Credits")}
               className="flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition-all shadow-sm cursor-pointer"
               type="button"
-              title="Click to view all 6 plans or switch subscriptions"
+              title="View SparrowX Coins wallet & plans"
             >
-              <ShieldCheck className="size-3.5 text-emerald-400" />
-              <span>Plan: {activeSubscription.planName}</span>
-              <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary font-mono font-bold">
-                ${activeSubscription.priceUsd}/mo
-              </span>
+              <Coins className="size-3.5 text-amber-400" />
+              <span>SparrowX Coins: {creditBalance.toLocaleString()}</span>
             </button>
-            <Button
-              onClick={() => onNavigate("Settings")}
-              size="sm"
-              variant="outline"
-              className="gap-1.5 border-primary/40 text-foreground hover:bg-primary/10"
-            >
-              <KeyRound className="size-3.5 text-primary" />
-              <span>Dashboard API & Connectors</span>
-            </Button>
             <Button
               onClick={() => {
                 onNavigate("My Services");
@@ -614,7 +601,7 @@ export function ClientPortalView({
               }}
               size="sm"
             >
-              <Plus className="size-4" /> Add New Service
+              <Plus className="size-4" /> Add Service
             </Button>
             <Button onClick={onSignOut} size="sm" variant="outline">
               <LockKeyhole className="size-3.5" /> Log Out
@@ -626,23 +613,21 @@ export function ClientPortalView({
         <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto no-scrollbar sm:flex-wrap">
           {[
             { label: "My Services", icon: Boxes, count: tenants.length },
-            { label: "Dashboard API & Connectors", icon: KeyRound, targetNav: "Settings" },
             { label: "Subscriptions & Due Dates", icon: Activity },
             {
-              label: "Plans & Subscriptions",
-              icon: ShieldCheck,
+              label: "Billing & SparrowX Coins",
+              icon: Coins,
               targetNav: "Billing & Credits",
-              count: "6 Plans",
             },
             { label: "Profile Management", icon: Users },
           ].map((tab) => {
             const Icon = tab.icon;
             const active =
               currentAreaTab === tab.label ||
-              (currentAreaTab === "Billing & Credits" && tab.label === "Plans & Subscriptions");
+              (currentAreaTab === "Billing & Credits" && tab.label === "Billing & SparrowX Coins");
             return (
               <button
-                className={`flex items-center gap-2 rounded-md border px-3.5 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-colors ${
+                className={`flex items-center gap-2 rounded-md border px-3.5 py-2 text-xs font-semibold whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
                   active
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-card text-muted-foreground hover:text-foreground"
@@ -663,53 +648,89 @@ export function ClientPortalView({
           })}
         </div>
 
-        {/* TAB 1: MY SERVICES (Add Service + Click Service -> Go to Dashboard OR Manage/Rename/Delete) */}
+        {/* TAB 1: MY SERVICES (Clean Service Routing Pipeline & Product Catalog) */}
         {currentAreaTab === "My Services" && (
           <>
-            {activeTenant && (
-              <ClientOnboardingWizard
-                tenant={activeTenant}
-                onVerifyTenantSdk={onVerifyTenantSdk}
-                onOpenSdkModal={(t) => setIntegrationTenant(t)}
-                showToast={showToast}
-              />
-            )}
+            {showAddServiceForm && (() => {
+              const chosen =
+                SPARROWX_ROUTING_SERVICES.find((s) => s.id === selectedCatalogServiceId) ??
+                SPARROWX_ROUTING_SERVICES[0]!;
+              return (
+                <section className="rounded-xl border border-primary/40 bg-card p-5 space-y-4 shadow-xl">
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <div>
+                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-primary">
+                        SparrowX Service Directory
+                      </span>
+                      <h2 className="text-base font-semibold text-foreground">
+                        Choose a Service to Launch &amp; Provision
+                      </h2>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Select any SparrowX product below and click Continue to go directly to its dedicated website &amp; dashboard.
+                      </p>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-8"
+                      onClick={() => setShowAddServiceForm(false)}
+                    >
+                      ✕
+                    </Button>
+                  </div>
 
-            {showAddServiceForm && (
-              <ServiceOnboardingWizard
-                onClose={() => {
-                  setShowAddServiceForm(false);
-                  setOnboardingWizardTenant(null);
-                }}
-                onComplete={async (data) => {
-                  const plan = getPlanById(activeSubscription.planId);
-                  if (plan.maxDomains !== -1 && tenants.length >= plan.maxDomains) {
-                    showToast(
-                      `Plan domain limit reached (${tenants.length}/${plan.maxDomains}). Upgrade your plan to protect additional domains.`,
-                    );
-                    onNavigate("Billing & Credits");
-                    setShowAddServiceForm(false);
-                    return;
-                  }
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {SPARROWX_ROUTING_SERVICES.map((svc) => {
+                      const isSelected = svc.id === chosen.id;
+                      return (
+                        <button
+                          key={svc.id}
+                          type="button"
+                          onClick={() => setSelectedCatalogServiceId(svc.id)}
+                          className={`rounded-lg border p-3.5 text-left transition-all cursor-pointer ${
+                            isSelected
+                              ? "border-primary bg-primary/10 ring-1 ring-primary/40"
+                              : "border-border bg-background/60 hover:border-primary/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-foreground">{svc.name}</span>
+                            <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[10px] text-primary">
+                              {svc.badge}
+                            </span>
+                          </div>
+                          <p className="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">
+                            {svc.tagline}
+                          </p>
+                          <p className="mt-2 font-mono text-[10px] text-primary/90">{svc.domain}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                  await onCreateTenant({
-                    name: data.name,
-                    contactEmail: currentUser?.email ?? "client@company.com",
-                    primaryDomain: data.domain,
-                    planTier: data.planTier,
-                    enabledModules: data.enabledModules,
-                  });
-
-                  showToast(
-                    `Successfully provisioned ${data.name} under your ${plan.name} subscription! Autonomous shield active.`,
-                  );
-                  setShowAddServiceForm(false);
-                  setOnboardingWizardTenant(null);
-                }}
-                showToast={showToast}
-                existingTenant={onboardingWizardTenant ?? undefined}
-              />
-            )}
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+                    <span className="text-xs text-muted-foreground">
+                      Selected: <strong className="text-foreground">{chosen.name}</strong> ({chosen.domain})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShowAddServiceForm(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => launchServiceDestination(chosen.url, chosen.name)}
+                      >
+                        Continue to {chosen.name} <ArrowRight className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </section>
+              );
+            })()}
 
             {tenants.length > 0 ? (
               <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -717,17 +738,11 @@ export function ClientPortalView({
                   const srvModules = SERVICE_MODULES.filter((m) =>
                     srv.enabledModules.includes(m.id),
                   );
+                  const destUrl = resolveServiceDashboardUrl(srv);
                   return (
                     <article
-                      className="group flex cursor-pointer flex-col justify-between border border-border bg-card p-5 transition-all hover:border-primary hover:shadow-md"
+                      className="group flex flex-col justify-between border border-border bg-card p-5 transition-all hover:border-primary hover:shadow-md"
                       key={srv.id}
-                      onClick={() => {
-                        setClickedServiceId(srv.id);
-                        setManageSubView("choose");
-                        setRenameValue(srv.name);
-                        setDomainValue(srv.primaryDomain);
-                        setPlanValue(srv.planTier);
-                      }}
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2">
@@ -772,34 +787,14 @@ export function ClientPortalView({
                           </span>
                           <span>Due: {getDueDateLabel(idx)}</span>
                         </div>
-                        <div className="mt-2.5 flex items-center justify-between font-semibold text-primary">
-                          <span>Click to Open Dashboard or Manage</span>
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              className="h-6 px-2 text-[10px]"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOnboardingWizardTenant(srv);
-                                setShowAddServiceForm(true);
-                              }}
-                              size="sm"
-                              variant="outline"
-                            >
-                              <Sliders className="mr-1 size-2.5" /> Setup Guide &amp; DNS
-                            </Button>
-                            <Button
-                              className="h-6 px-2 text-[10px]"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setIntegrationTenant(srv);
-                              }}
-                              size="sm"
-                              variant="secondary"
-                            >
-                              <Terminal className="mr-1 size-2.5" /> SDK / Key
-                            </Button>
-                            <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
-                          </div>
+                        <div className="mt-3 flex items-center justify-between gap-2">
+                          <Button
+                            className="h-7 px-3 text-xs"
+                            onClick={() => launchServiceDestination(destUrl, srv.name)}
+                            size="sm"
+                          >
+                            Renew / Open Dashboard <ArrowRight className="ml-1 size-3.5" />
+                          </Button>
                         </div>
                       </div>
                     </article>
@@ -807,18 +802,62 @@ export function ClientPortalView({
                 })}
               </section>
             ) : (
-              <section className="border border-border bg-card px-6 py-12 text-center">
+              <section className="border border-border bg-card px-6 py-8 text-center">
                 <Boxes className="mx-auto size-7 text-primary" />
-                <h2 className="mt-3 text-base font-semibold">No active security services yet</h2>
+                <h2 className="mt-3 text-base font-semibold">No active services yet</h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Add your first service (Web Security, AI Shield, Cloud & Endpoints, or Compliance)
-                  to launch your custom security dashboard.
+                  Choose any SparrowX service below and click Continue to go directly to its dedicated website &amp; dashboard.
                 </p>
                 <Button className="mt-4" onClick={() => setShowAddServiceForm(true)} size="sm">
                   <Plus className="size-4" /> Add Your First Service
                 </Button>
               </section>
             )}
+
+            {/* Always-Visible SparrowX Services Routing Catalog */}
+            <section className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-foreground">
+                    All SparrowX Services We Provide
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Each product runs its own independent dashboard &amp; API keys. Click any service to continue directly to its website.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {SPARROWX_ROUTING_SERVICES.map((svc) => (
+                  <div
+                    key={svc.id}
+                    className="flex flex-col justify-between rounded-lg border border-border bg-card p-4 hover:border-primary/50 transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-foreground">{svc.name}</span>
+                        <span className="rounded bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-primary">
+                          {svc.badge}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                        {svc.tagline}
+                      </p>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <span className="font-mono text-[11px] text-muted-foreground">{svc.domain}</span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2.5 text-xs"
+                        onClick={() => launchServiceDestination(svc.url, svc.name)}
+                      >
+                        Continue <ArrowRight className="ml-1 size-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             {/* 2-OPTION SERVICE ACTION MODAL: 1) Go to Dashboard  2) Manage Service (Rename / Delete) */}
             {clickedService && (
@@ -1091,44 +1130,14 @@ export function ClientPortalView({
                         </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <select
-                          aria-label={`Change plan for ${srv.name}`}
-                          className="h-8 rounded-md border border-border bg-background px-2.5 text-xs text-foreground outline-none"
-                          onChange={(e) =>
-                            onRenameOrUpdateTenant(srv.id, {
-                              planTier: e.target.value as PlanTier,
-                            })
-                          }
-                          value={srv.planTier}
-                        >
-                          <option value="Developer Starter">Developer Starter ($29/mo)</option>
-                          <option value="Startup Shield">Startup Shield ($79/mo)</option>
-                          <option value="Business Pro">Business Pro ($199/mo)</option>
-                          <option value="AI Agent & LLM Shield">AI Agent & LLM Shield ($399/mo)</option>
-                          <option value="Enterprise Sovereign SOC">Enterprise Sovereign SOC ($799/mo)</option>
-                          <option value="Hyperscale Defense & Custom Mesh">Hyperscale Defense ($1,499/mo)</option>
-                        </select>
                         <Button
                           className="h-8 px-3 text-xs"
-                          onClick={() => {
-                            onSelectTenant(srv.id);
-                            onNavigate("Client Overview");
-                          }}
+                          onClick={() =>
+                            launchServiceDestination(resolveServiceDashboardUrl(srv), srv.name)
+                          }
                           size="sm"
-                          variant="outline"
                         >
-                          Go to Dashboard <ArrowRight className="size-3.5" />
-                        </Button>
-                        <Button
-                          className="h-8 px-2.5 text-xs text-destructive hover:text-destructive"
-                          onClick={async () => {
-                            await onDeleteTenant(srv.id);
-                            showToast(`Cancelled subscription for ${srv.name}`);
-                          }}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Cancel Plan
+                          Renew / Open Dashboard <ArrowRight className="ml-1 size-3.5" />
                         </Button>
                       </div>
                     </div>
