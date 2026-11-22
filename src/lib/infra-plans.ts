@@ -1,14 +1,18 @@
-export type InfraCategory = "bare-metal" | "dedicated" | "vps";
+export type InfraCategory = "bare-metal" | "dedicated" | "vds" | "vps";
 
-export type InfraRegionId = "in-mum" | "sg-sin" | "de-fra" | "fr-gra";
+export type InfraRegionId = "in-mum" | "in-maa" | "sg-sin" | "uk-lon" | "de-fra" | "fr-gra";
 
 export interface InfraRegion {
   id: InfraRegionId;
   name: string;
   country: string;
+  city: string;
   code: string;
+  flag: string;
+  hub: "India" | "Singapore" | "United Kingdom" | "Europe";
   latencyHint: string;
   uplink: string;
+  coordinates: { lat: number; lon: number };
 }
 
 export const INFRA_REGIONS: InfraRegion[] = [
@@ -16,33 +20,49 @@ export const INFRA_REGIONS: InfraRegion[] = [
     id: "in-mum",
     name: "Mumbai IN-1",
     country: "India",
+    city: "Mumbai, Maharashtra",
     code: "BOM",
-    latencyHint: "8 ms Asia-IN",
-    uplink: "10 Gbps + Anycast",
+    flag: "🇮🇳",
+    hub: "India",
+    latencyHint: "8 ms Asia-IN (West/North)",
+    uplink: "10 Gbps + Anycast / NIXI",
+    coordinates: { lat: 19.076, lon: 72.8777 },
+  },
+  {
+    id: "in-maa",
+    name: "Tamil Nadu IN-2",
+    country: "India",
+    city: "Chennai, Tamil Nadu",
+    code: "MAA",
+    flag: "🇮🇳",
+    hub: "India",
+    latencyHint: "4 ms Asia-IN (South / Cable Landing)",
+    uplink: "10 Gbps Subsea Direct / NIXI",
+    coordinates: { lat: 13.0827, lon: 80.2707 },
   },
   {
     id: "sg-sin",
     name: "Singapore SG-1",
     country: "Singapore",
+    city: "Singapore",
     code: "SIN",
-    latencyHint: "18 ms APAC",
-    uplink: "25 Gbps Redundant",
+    flag: "🇸🇬",
+    hub: "Singapore",
+    latencyHint: "18 ms APAC Gateway",
+    uplink: "25 Gbps Equinix Redundant",
+    coordinates: { lat: 1.3521, lon: 103.8198 },
   },
   {
-    id: "de-fra",
-    name: "Frankfurt DE-1",
-    country: "Germany",
-    code: "FRA",
-    latencyHint: "14 ms EU-Central",
-    uplink: "25 Gbps DE-CIX",
-  },
-  {
-    id: "fr-gra",
-    name: "Gravelines FR-OVH",
-    country: "France",
-    code: "GRA",
-    latencyHint: "11 ms EU-West",
-    uplink: "25 Gbps L3/L4 XDP",
+    id: "uk-lon",
+    name: "London UK-1",
+    country: "United Kingdom",
+    city: "London",
+    code: "LON",
+    flag: "🇬🇧",
+    hub: "United Kingdom",
+    latencyHint: "14 ms UK & Transatlantic",
+    uplink: "25 Gbps LINX / Telehouse",
+    coordinates: { lat: 51.5074, lon: -0.1278 },
   },
 ];
 
@@ -80,9 +100,287 @@ export interface InfraServerPlan {
   regions: InfraRegionId[];
   visual3d: string;
   specsHighlights: string[];
+  nodeLocation?: string;
+  inStock?: boolean;
+  isVds?: boolean;
+  badge?: string;
 }
 
 export const INFRA_PLANS: InfraServerPlan[] = [
+  // ==========================================
+  // 1. CLOUD VPS (AMD RYZEN 9 9950X - MUMBAI)
+  // ==========================================
+  {
+    id: "vps-ryzen-9950x-4gb",
+    category: "vps",
+    name: "Ryzen 9 9950X — 4GB",
+    tagline: "High-performance Cloud VPS powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, and Enterprise DDoS protection.",
+    cpuModel: "AMD Ryzen 9 9950X @ 5.7GHz",
+    coresThreads: "2 vCPU",
+    clockGhz: "4.3 - 5.7 GHz",
+    ram: "4 GB DDR5 ECC",
+    storage: "60 GB NVMe Gen5",
+    network: "1 Gbps Uplink · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + Anycast",
+    deployTime: "45 secs",
+    priceMonthlyUsd: 12,
+    priceMonthlyInr: 999, // Base ₹799 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/vps-kvm-cubes.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    specsHighlights: [
+      "Tier IV Mumbai Node with ultra-low latency",
+      "AMD Ryzen 9 9950X Zen 5 single-thread monster",
+      "DDR5 ECC On-Die memory with zero noisy neighbours",
+      "Instant 45-second provisioning & automated backups",
+    ],
+  },
+  {
+    id: "vps-ryzen-9950x-8gb",
+    category: "vps",
+    name: "Ryzen 9 9950X — 8GB",
+    tagline: "High-performance Cloud VPS powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, and Enterprise DDoS protection.",
+    cpuModel: "AMD Ryzen 9 9950X @ 5.7GHz",
+    coresThreads: "4 vCPU",
+    clockGhz: "4.3 - 5.7 GHz",
+    ram: "8 GB DDR5 ECC",
+    storage: "120 GB NVMe Gen5",
+    network: "2.5 Gbps Uplink · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + Anycast",
+    deployTime: "45 secs",
+    priceMonthlyUsd: 18,
+    priceMonthlyInr: 1499, // Base ₹1,299 + ₹200
+    featured: true,
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/vps-kvm-cubes.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    specsHighlights: [
+      "Tier IV Mumbai Node with sub-8ms Asia-IN peering",
+      "4 Zen 5 compute threads @ up to 5.7 GHz boost",
+      "120 GB high-IOPS NVMe Gen5 enterprise storage",
+      "Always-on eBPF/XDP volumetric attack filtering",
+    ],
+  },
+  {
+    id: "vps-ryzen-9950x-12gb",
+    category: "vps",
+    name: "Ryzen 9 9950X — 12GB",
+    tagline: "High-performance Cloud VPS powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, and Enterprise DDoS protection.",
+    cpuModel: "AMD Ryzen 9 9950X @ 5.7GHz",
+    coresThreads: "6 vCPU",
+    clockGhz: "4.3 - 5.7 GHz",
+    ram: "12 GB DDR5 ECC",
+    storage: "180 GB NVMe Gen5",
+    network: "5 Gbps Uplink · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + Anycast",
+    deployTime: "45 secs",
+    priceMonthlyUsd: 24,
+    priceMonthlyInr: 1999, // Base ₹1,799 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/vps-kvm-cubes.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    specsHighlights: [
+      "Tier IV Mumbai Node with dedicated fiber path",
+      "6 Zen 5 high-speed virtual execution cores",
+      "DDR5 ECC On-Die memory for mission-critical apps",
+      "SparrowXNet WireGuard private mesh pre-installed",
+    ],
+  },
+  {
+    id: "vps-ryzen-9950x-16gb",
+    category: "vps",
+    name: "Ryzen 9 9950X — 16GB",
+    tagline: "High-performance Cloud VPS powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, and Enterprise DDoS protection.",
+    cpuModel: "AMD Ryzen 9 9950X @ 5.7GHz",
+    coresThreads: "8 vCPU",
+    clockGhz: "4.3 - 5.7 GHz",
+    ram: "16 GB DDR5 ECC",
+    storage: "250 GB NVMe Gen5",
+    network: "10 Gbps Uplink · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + Anycast",
+    deployTime: "45 secs",
+    priceMonthlyUsd: 31,
+    priceMonthlyInr: 2599, // Base ₹2,399 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/vps-kvm-cubes.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    specsHighlights: [
+      "Tier IV Mumbai Node with redundant power & cooling",
+      "8 high-throughput Zen 5 compute threads",
+      "10 Gbps burst network interface with DDoS filter",
+      "Dedicated IPv4 + /64 IPv6 included",
+    ],
+  },
+  {
+    id: "vps-ryzen-9950x-24gb",
+    category: "vps",
+    name: "Ryzen 9 9950X — 24GB",
+    tagline: "High-performance Cloud VPS powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, and Enterprise DDoS protection.",
+    cpuModel: "AMD Ryzen 9 9950X @ 5.7GHz",
+    coresThreads: "10 vCPU",
+    clockGhz: "4.3 - 5.7 GHz",
+    ram: "24 GB DDR5 ECC",
+    storage: "360 GB NVMe Gen5",
+    network: "10 Gbps Uplink · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + Anycast",
+    deployTime: "45 secs",
+    priceMonthlyUsd: 38,
+    priceMonthlyInr: 3199, // Base ₹2,999 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/vps-kvm-cubes.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    specsHighlights: [
+      "Tier IV Mumbai Node enterprise infrastructure",
+      "10 Zen 5 cores for heavy databases and multi-containers",
+      "360 GB blistering Gen5 NVMe read/write speeds",
+      "Flat rate billing with zero hidden egress traps",
+    ],
+  },
+
+  // ====================================================
+  // 2. DEDICATED VDS (100% DEDICATED BARE-METAL CORES)
+  // ====================================================
+  {
+    id: "vds-ryzen-9950x-4gb",
+    category: "vds",
+    name: "Ryzen 9 VDS — 4GB (2 Cores)",
+    tagline: "100% Dedicated Compute Resources powered by AMD Ryzen 9 9950X. Processor: 2 Dedicated Bare-Metal Cores (5.7GHz), DDR5 ECC, and Enterprise DDoS.",
+    cpuModel: "AMD Ryzen 9 9950X (Dedicated)",
+    coresThreads: "2 Dedicated Cores / 4T",
+    clockGhz: "5.7 GHz Locked",
+    ram: "4 GB DDR5 ECC",
+    storage: "100 GB NVMe Gen5",
+    network: "10 Gbps Unmetered · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + GameSec L4",
+    deployTime: "2 mins",
+    priceMonthlyUsd: 32,
+    priceMonthlyInr: 2700, // Base ₹2,500 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/game-server-node.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    isVds: true,
+    specsHighlights: [
+      "100% Dedicated Bare-Metal physical silicon allocation",
+      "Locked 5.7 GHz single-thread clocks without CPU throttling",
+      "Tier IV Mumbai Node with direct IXP Indian peering",
+      "GameSec UDP/RakNet/ENet & TCP flood mitigation",
+    ],
+  },
+  {
+    id: "vds-ryzen-9950x-8gb",
+    category: "vds",
+    name: "Ryzen 9 VDS — 8GB (4 Cores)",
+    tagline: "100% Dedicated Compute Resources powered by AMD Ryzen 9 9950X. Processor: 4 Dedicated Bare-Metal Cores (5.7GHz), DDR5 ECC, and Enterprise DDoS.",
+    cpuModel: "AMD Ryzen 9 9950X (Dedicated)",
+    coresThreads: "4 Dedicated Cores / 8T",
+    clockGhz: "5.7 GHz Locked",
+    ram: "8 GB DDR5 ECC",
+    storage: "200 GB NVMe Gen5",
+    network: "10 Gbps Unmetered · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + GameSec L4",
+    deployTime: "2 mins",
+    priceMonthlyUsd: 48,
+    priceMonthlyInr: 3999, // Base ₹3,799 + ₹200
+    featured: true,
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/game-server-node.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    isVds: true,
+    specsHighlights: [
+      "4 100% dedicated physical Zen 5 cores (no hypervisor steal)",
+      "Tier IV Mumbai Node with ultra-low ping across India",
+      "DDR5 ECC On-Die memory for zero memory corruption",
+      "Unmetered 10 Gbps uplink with zero egress costs",
+    ],
+  },
+  {
+    id: "vds-ryzen-9950x-12gb",
+    category: "vds",
+    name: "Ryzen 9 VDS — 12GB (4 Cores)",
+    tagline: "100% Dedicated Compute Resources powered by AMD Ryzen 9 9950X. Processor: 4 Dedicated Bare-Metal Cores (5.7GHz), DDR5 ECC, and Enterprise DDoS.",
+    cpuModel: "AMD Ryzen 9 9950X (Dedicated)",
+    coresThreads: "4 Dedicated Cores / 8T",
+    clockGhz: "5.7 GHz Locked",
+    ram: "12 GB DDR5 ECC",
+    storage: "300 GB NVMe Gen5",
+    network: "10 Gbps Unmetered · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + GameSec L4",
+    deployTime: "2 mins",
+    priceMonthlyUsd: 54,
+    priceMonthlyInr: 4499, // Base ₹4,299 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/game-server-node.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    isVds: true,
+    specsHighlights: [
+      "4 Dedicated bare-metal cores with 12 GB DDR5 ECC",
+      "Tier IV Mumbai Node enterprise security infrastructure",
+      "300 GB enterprise Gen5 NVMe with high IOPS",
+      "1-click Pterodactyl, Docker, and WireGuard mesh pairing",
+    ],
+  },
+  {
+    id: "vds-ryzen-9950x-16gb",
+    category: "vds",
+    name: "Ryzen 9 VDS — 16GB (6 Cores)",
+    tagline: "100% Dedicated Compute Resources powered by AMD Ryzen 9 9950X. Processor: 6 Dedicated Bare-Metal Cores (5.7GHz), DDR5 ECC, and Enterprise DDoS.",
+    cpuModel: "AMD Ryzen 9 9950X (Dedicated)",
+    coresThreads: "6 Dedicated Cores / 12T",
+    clockGhz: "5.7 GHz Locked",
+    ram: "16 GB DDR5 ECC",
+    storage: "450 GB NVMe Gen5",
+    network: "10 Gbps Unmetered · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + GameSec L4",
+    deployTime: "2 mins",
+    priceMonthlyUsd: 61,
+    priceMonthlyInr: 5099, // Base ₹4,899 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/game-server-node.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    isVds: true,
+    specsHighlights: [
+      "6 Dedicated Bare-Metal cores with 12 execution threads",
+      "Tier IV Mumbai Node with redundant BGP routing",
+      "Pre-tuned Linux kernel for 20 TPS lock in game servers",
+      "Nightly automated snapshot backups included",
+    ],
+  },
+  {
+    id: "vds-ryzen-9950x-24gb",
+    category: "vds",
+    name: "Ryzen 9 VDS — 24GB (8 Cores)",
+    tagline: "100% Dedicated Compute Resources powered by AMD Ryzen 9 9950X. Processor: 8 Dedicated Bare-Metal Cores (5.7GHz), DDR5 ECC, and Enterprise DDoS.",
+    cpuModel: "AMD Ryzen 9 9950X (Dedicated)",
+    coresThreads: "8 Dedicated Cores / 16T",
+    clockGhz: "5.7 GHz Locked",
+    ram: "24 GB DDR5 ECC",
+    storage: "600 GB NVMe Gen5",
+    network: "10 Gbps Unmetered · Enterprise DDoS",
+    ddosProtection: "Enterprise DDoS + GameSec L4",
+    deployTime: "2 mins",
+    priceMonthlyUsd: 68,
+    priceMonthlyInr: 5699, // Base ₹5,499 + ₹200
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
+    visual3d: "/3d/game-server-node.svg",
+    nodeLocation: "Tier IV Mumbai",
+    inStock: true,
+    isVds: true,
+    specsHighlights: [
+      "8 Dedicated Bare-Metal Zen 5 cores (half of physical 9950X)",
+      "Tier IV Mumbai Node with enterprise SLA guarantee",
+      "600 GB enterprise Gen5 storage for heavy persistent state",
+      "Priority Discord & 24/7 senior NOC engineer hotline",
+    ],
+  },
   // ========================
   // 1. BARE METAL SERVERS
   // ========================
@@ -101,7 +399,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "15 mins",
     priceMonthlyUsd: 149,
     priceMonthlyInr: 12490,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/cloud-infra-server.jpg",
     specsHighlights: [
       "Full IPMI / KVM-over-IP console",
@@ -126,7 +424,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyUsd: 199,
     priceMonthlyInr: 16690,
     featured: true,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/cloud-infra-server.jpg",
     specsHighlights: [
       "Zero hypervisor noise or CPU steal",
@@ -150,7 +448,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "30 mins",
     priceMonthlyUsd: 289,
     priceMonthlyInr: 24290,
-    regions: ["sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/cloud-infra-server.jpg",
     specsHighlights: [
       "Dual redundant 25 Gbps LACP uplinks",
@@ -174,7 +472,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "2 hours",
     priceMonthlyUsd: 699,
     priceMonthlyInr: 58900,
-    regions: ["de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/cloud-infra-server.jpg",
     specsHighlights: [
       "Dual-socket Genoa 96-core processors",
@@ -202,7 +500,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "20 mins",
     priceMonthlyUsd: 79,
     priceMonthlyInr: 6690,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
     specsHighlights: [
       "Pre-configured SparrowX NetSec agent",
@@ -227,7 +525,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyUsd: 139,
     priceMonthlyInr: 11690,
     featured: true,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
     specsHighlights: [
       "Pre-tuned Linux kernel for 20 TPS lock",
@@ -251,7 +549,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "45 mins",
     priceMonthlyUsd: 229,
     priceMonthlyInr: 19290,
-    regions: ["de-fra", "fr-gra", "sg-sin"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/cloud-infra-server.jpg",
     specsHighlights: [
       "ZFS / Ceph / MinIO S3 ready out of box",
@@ -279,7 +577,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "45 secs",
     priceMonthlyUsd: 4,
     priceMonthlyInr: 349,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
     specsHighlights: [
       "Full root SSH + browser VNC console",
@@ -304,7 +602,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyUsd: 10,
     priceMonthlyInr: 849,
     featured: true,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
     specsHighlights: [
       "Dedicated NVMe IOPS with zero throttling",
@@ -328,7 +626,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "45 secs",
     priceMonthlyUsd: 22,
     priceMonthlyInr: 1849,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
     specsHighlights: [
       "Pinned high-frequency compute threads",
@@ -352,7 +650,7 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     deployTime: "45 secs",
     priceMonthlyUsd: 42,
     priceMonthlyInr: 3549,
-    regions: ["in-mum", "sg-sin", "de-fra", "fr-gra"],
+    regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
     specsHighlights: [
       "Dedicated physical core reservation",

@@ -67,6 +67,40 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     expect(screen.queryByText("BM-Edge 7950X")).toBeNull();
   });
 
+  it("verifies Ryzen 9 9950X VPS & VDS plans with +₹200 added to all base reference prices", () => {
+    // Cloud VPS plans: 4GB(799+200), 8GB(1299+200), 12GB(1799+200), 16GB(2399+200), 24GB(2999+200)
+    const vps4 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-4gb")!;
+    const vps8 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-8gb")!;
+    const vps12 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-12gb")!;
+    const vps16 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-16gb")!;
+    const vps24 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-24gb")!;
+
+    expect(vps4.priceMonthlyInr).toBe(999);
+    expect(vps8.priceMonthlyInr).toBe(1499);
+    expect(vps12.priceMonthlyInr).toBe(1999);
+    expect(vps16.priceMonthlyInr).toBe(2599);
+    expect(vps24.priceMonthlyInr).toBe(3199);
+
+    // Dedicated VDS plans: 4GB(2500+200), 8GB(3799+200), 12GB(4299+200), 16GB(4899+200), 24GB(5499+200)
+    const vds4 = INFRA_PLANS.find((p) => p.id === "vds-ryzen-9950x-4gb")!;
+    const vds8 = INFRA_PLANS.find((p) => p.id === "vds-ryzen-9950x-8gb")!;
+    const vds12 = INFRA_PLANS.find((p) => p.id === "vds-ryzen-9950x-12gb")!;
+    const vds16 = INFRA_PLANS.find((p) => p.id === "vds-ryzen-9950x-16gb")!;
+    const vds24 = INFRA_PLANS.find((p) => p.id === "vds-ryzen-9950x-24gb")!;
+
+    expect(vds4.priceMonthlyInr).toBe(2700);
+    expect(vds8.priceMonthlyInr).toBe(3999);
+    expect(vds12.priceMonthlyInr).toBe(4499);
+    expect(vds16.priceMonthlyInr).toBe(5099);
+    expect(vds24.priceMonthlyInr).toBe(5699);
+
+    // Render engine and verify Mumbai Node & In Stock indicators
+    render(<SparrowxInfraEngine />);
+    expect(screen.getByRole("heading", { name: /Ryzen 9 9950X VPS & Dedicated VDS Plans/i })).toBeTruthy();
+    expect(screen.getAllByText("Mumbai Node").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("In Stock").length).toBeGreaterThan(0);
+  });
+
   it("starts with an empty server list (zero mock data), then provisions on UPI webhook auto-confirmation", async () => {
     clearInfraServerStoreForTests();
     const initialFleet = await listManagedInfraServers();

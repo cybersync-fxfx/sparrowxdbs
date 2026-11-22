@@ -7,19 +7,24 @@ import {
   Cpu,
   Globe,
   HardDrive,
+  LayoutGrid,
+  List,
   Lock,
   Menu,
   Network,
   Server,
   Shield,
+  ShieldCheck,
   SlidersHorizontal,
   Terminal,
   X,
   Zap,
 } from "lucide-react";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { IntelXeonGoldPricingSection } from "@/components/infra/IntelXeonGoldPricingSection";
 import { UpiAutoPayModal } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
 import {
   computePlanPrice,
   INFRA_OS_IMAGES,
@@ -37,9 +42,10 @@ type CategoryFilter = "all" | InfraCategory;
 
 const CATEGORY_OPTIONS: Array<{ id: CategoryFilter; label: string }> = [
   { id: "all", label: "All hardware" },
+  { id: "vps", label: "Cloud KVM VPS" },
+  { id: "vds", label: "Dedicated VDS" },
   { id: "bare-metal", label: "Bare metal" },
   { id: "dedicated", label: "Dedicated servers" },
-  { id: "vps", label: "Cloud KVM VPS" },
 ];
 
 const BILLING_OPTIONS: Array<{ id: BillingCycle; label: string }> = [
@@ -59,6 +65,38 @@ const CATEGORY_PILLARS: Array<{
   accent: "cyan" | "orange" | "emerald";
   specs: string[];
 }> = [
+  {
+    id: "vps",
+    title: "Cloud KVM VPS",
+    benefit: "AMD Ryzen 9 9950X @ 5.7GHz with DDR5 ECC On-Die Memory",
+    summary:
+      "Instant high-performance virtual machines deployed on Tier IV Mumbai node with zero surprise egress bandwidth penalties.",
+    startingUsd: 12,
+    startingInr: 999,
+    image: "/3d/vps-kvm-cubes.svg",
+    accent: "orange",
+    specs: [
+      "Deploys in under 45 seconds",
+      "AMD Ryzen 9 9950X @ 5.7GHz + DDR5 ECC",
+      "Tier IV Mumbai Node with Enterprise DDoS",
+    ],
+  },
+  {
+    id: "vds",
+    title: "Dedicated VDS",
+    benefit: "100% Dedicated Bare-Metal Cores powered by Ryzen 9 9950X",
+    summary:
+      "Exclusive bare-metal compute resources with zero noisy neighbours and locked 5.7GHz clock speeds for high-intensity workloads.",
+    startingUsd: 32,
+    startingInr: 2700,
+    image: "/3d/game-server-node.svg",
+    accent: "orange",
+    specs: [
+      "100% Dedicated Bare-Metal Cores (5.7GHz)",
+      "Tier IV Mumbai Node with ultra-low latency",
+      "DDR5 ECC On-Die Memory & NVMe Gen5",
+    ],
+  },
   {
     id: "bare-metal",
     title: "Bare Metal Servers",
@@ -91,23 +129,116 @@ const CATEGORY_PILLARS: Array<{
       "Nightly off-node snapshots included",
     ],
   },
-  {
-    id: "vps",
-    title: "Cloud KVM VPS",
-    benefit: "Instant NVMe Gen4 virtual machines on flat monthly billing",
-    summary:
-      "Spin up isolated KVM instances with dedicated IPv4, /64 IPv6, and zero surprise egress bandwidth penalties.",
-    startingUsd: 4,
-    startingInr: 349,
-    image: "/3d/vps-kvm-cubes.svg",
-    accent: "emerald",
-    specs: [
-      "Deploys in under 45 seconds",
-      "DDR5 ECC memory & NVMe Gen4 RAID10",
-      "Private VPC link to db.sparrowx.net",
-    ],
-  },
 ];
+
+export interface InfraPriceCardProps {
+  plan: InfraServerPlan;
+  currency: "INR" | "USD";
+  billingCycle: BillingCycle;
+  onConfigure: (plan: InfraServerPlan) => void;
+}
+
+export function InfraPriceCard({
+  plan,
+  currency,
+  billingCycle,
+  onConfigure,
+}: InfraPriceCardProps) {
+  const price = computePlanPrice(plan, currency, billingCycle);
+  const formattedMonthlyPrice =
+    currency === "INR"
+      ? `₹${price.unitMonthly.toLocaleString("en-IN")}.00`
+      : `$${price.unitMonthly}.00`;
+
+  return (
+    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-5 sm:p-6 hover:border-orange-500/40 hover:shadow-[0_12px_36px_rgba(249,115,22,0.14)] transition-all duration-200 flex flex-col justify-between">
+      <div>
+        {/* Top Node & Stock Badge row */}
+        <div className="flex items-center justify-between gap-2 mb-5">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/25 tracking-wide">
+            {plan.nodeLocation || "Mumbai Node"}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
+            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+            In Stock
+          </span>
+        </div>
+
+        {/* Server Icon & Title */}
+        <div className="flex items-center gap-3.5 mb-4">
+          <div className="size-11 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
+            <Server className="size-5 text-orange-400" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-orange-400 transition-colors">
+              {plan.name}
+            </h3>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {plan.nodeLocation || "Tier IV Mumbai"}
+            </p>
+          </div>
+        </div>
+
+        {/* Price Row */}
+        <div className="mb-4 tabular-nums">
+          <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+            {formattedMonthlyPrice}
+          </span>
+          <span className="text-xs text-zinc-400 ml-1.5 font-normal">/month</span>
+        </div>
+
+        {/* Description */}
+        <p className="text-xs text-zinc-400 leading-relaxed mb-5 line-clamp-3">
+          {plan.tagline}
+        </p>
+
+        {/* Specs Grid */}
+        <div className="grid grid-cols-2 gap-2.5 py-3 mb-5 border-y border-white/[0.08] text-xs">
+          <div>
+            <span className="text-zinc-500 block text-[11px]">Processor</span>
+            <span className="text-zinc-200 font-medium truncate block">{plan.cpuModel}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500 block text-[11px]">
+              {plan.category === "vds" ? "Dedicated Cores" : "vCPU Cores"}
+            </span>
+            <span className="text-zinc-200 font-medium truncate block">{plan.coresThreads}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500 block text-[11px]">Memory</span>
+            <span className="text-zinc-200 font-medium truncate block">{plan.ram}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500 block text-[11px]">Storage</span>
+            <span className="text-zinc-200 font-medium truncate block">{plan.storage}</span>
+          </div>
+        </div>
+
+        {/* Key Features Bullet List */}
+        <ul className="space-y-1.5 text-xs text-zinc-300 mb-6">
+          <li className="flex items-center gap-2">
+            <Check className="size-3.5 text-orange-400 shrink-0" />
+            <span className="truncate">{plan.network}</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Check className="size-3.5 text-orange-400 shrink-0" />
+            <span className="truncate">{plan.ddosProtection}</span>
+          </li>
+        </ul>
+      </div>
+
+      {/* Button */}
+      <button
+        type="button"
+        onClick={() => onConfigure(plan)}
+        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFA14A] hover:bg-[#FF8F26] text-black font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_16px_rgba(255,161,74,0.2)] hover:shadow-[0_6px_24px_rgba(255,161,74,0.35)] cursor-pointer"
+      >
+        <span>Configure &amp; Order</span>
+        <ArrowRight className="size-4" />
+      </button>
+    </article>
+  );
+}
 
 export function SparrowxInfraEngine() {
   const [category, setCategory] = useState<CategoryFilter>("all");
@@ -117,6 +248,8 @@ export function SparrowxInfraEngine() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sessionEmail, setSessionEmail] = useState<string>("");
+  const [ryzenTab, setRyzenTab] = useState<"vps" | "vds">("vps");
+  const [catalogView, setCatalogView] = useState<"cards" | "table">("cards");
 
   // Native <dialog> configurator state
   const dialogRef = useRef<HTMLDialogElement | null>(null);
@@ -234,6 +367,22 @@ export function SparrowxInfraEngine() {
 
   const featuredPlans = useMemo(
     () => INFRA_PLANS.filter((p) => p.featured),
+    [],
+  );
+
+  const ryzenVpsPlans = useMemo(
+    () =>
+      INFRA_PLANS.filter(
+        (p) => p.category === "vps" && p.id.startsWith("vps-ryzen-9950x"),
+      ),
+    [],
+  );
+
+  const ryzenVdsPlans = useMemo(
+    () =>
+      INFRA_PLANS.filter(
+        (p) => p.category === "vds" && p.id.startsWith("vds-ryzen-9950x"),
+      ),
     [],
   );
 
@@ -355,6 +504,12 @@ export function SparrowxInfraEngine() {
               Offerings
             </a>
             <a
+              href="#ryzen-plans"
+              className="text-orange-400 font-semibold hover:text-orange-300 transition-colors duration-150"
+            >
+              VPS &amp; VDS Plans
+            </a>
+            <a
               href="#catalog"
               className="hover:text-white transition-colors duration-150"
             >
@@ -422,6 +577,13 @@ export function SparrowxInfraEngine() {
               Offerings
             </a>
             <a
+              href="#ryzen-plans"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block rounded-lg px-3 py-2.5 text-orange-400 font-semibold hover:bg-white/10"
+            >
+              VPS &amp; VDS Plans
+            </a>
+            <a
               href="#catalog"
               onClick={() => setMobileMenuOpen(false)}
               className="block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10"
@@ -454,52 +616,129 @@ export function SparrowxInfraEngine() {
       </header>
 
       <main id="top" className="flex-1">
-        {/* HERO: Centered monumental headline + wide interactive 3D hardware stage bleeding to y = 0 */}
-        <section className="relative overflow-hidden pt-24 pb-16 sm:pt-28 sm:pb-24 border-b border-white/10">
+        {/* HERO: Side-by-side emotional connection copy + 3D server hardware on the side */}
+        <section className="relative overflow-hidden pt-20 pb-16 sm:pt-24 sm:pb-20 border-b border-white/10">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse 75% 55% at 50% 0%, rgba(56, 189, 248, 0.16), rgba(245, 158, 11, 0.04) 48%, transparent 78%)",
+                "radial-gradient(ellipse 80% 60% at 70% 30%, rgba(255, 161, 74, 0.12), rgba(56, 189, 248, 0.08) 40%, transparent 75%)",
             }}
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 grid-fade opacity-60"
+            className="pointer-events-none absolute inset-0 grid-fade opacity-50"
           />
 
-          <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 text-center">
-            <h1 className="mx-auto max-w-5xl text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-[-0.04em] leading-[0.98] text-white text-balance">
-              Raw silicon. Zero hypervisor tax.
-            </h1>
+          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
+              {/* Left Column: Emotionally Connecting Copy & Value Pillars */}
+              <div className="lg:col-span-7 space-y-6 text-left">
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/25 text-orange-400 text-xs font-mono font-medium">
+                  <ShieldCheck className="size-3.5 text-emerald-400" />
+                  <span>Built with engineering solidarity &bull; Zero surprise bills</span>
+                </div>
 
-            <p className="mx-auto mt-5 max-w-xl text-base sm:text-lg text-zinc-300 leading-relaxed">
-              Deploy single-tenant bare metal, dedicated servers, and NVMe KVM VPS across India, Singapore, and Europe with unmetered fiber and always-on DDoS defense.
-            </p>
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.08] text-balance">
+                  Your life&apos;s work deserves infrastructure that actually has your back.
+                  <span className="block text-xl sm:text-2xl lg:text-3xl font-bold text-zinc-400 mt-2">
+                    Raw silicon. Zero hypervisor tax.
+                  </span>
+                </h1>
 
-            <div className="mt-8 flex justify-center">
-              <a
-                href="#catalog"
-                className="inline-flex items-center gap-2 rounded-xl bg-white hover:bg-zinc-200 px-6 py-3.5 text-sm font-semibold text-black transition-colors duration-150 shadow-[0_12px_40px_rgba(56,189,248,0.22)]"
-              >
-                <span>Configure your server</span>
-                <ArrowRight className="size-4" aria-hidden="true" />
-              </a>
-            </div>
+                <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
+                  You poured your late nights, your savings, and your passion into building your product.
+                  Stop living in fear of unexpected $1,000 cloud egress bills, cold support tickets, and noisy neighbors who slow down your users at 3 AM.
+                </p>
 
-            {/* Borderless Floating 3D Bare-Metal Hardware Object */}
-            <div className="mt-8 sm:mt-10 mx-auto max-w-3xl">
-              <Floating3DVisual
-                src="/3d/cloud-infra-server.jpg"
-                alt="3D floating SparrowX bare-metal server rack cluster with anodized titanium blades and cyan fiber uplinks"
-                accent="cyan"
-                size="hero"
-                priority="lcp"
-                className="w-full"
-                width={768}
-                height={768}
-              />
+                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-2xl">
+                  SparrowX delivers raw AMD Ryzen 9 9950X Zen 5 physical compute, unmetered multi-gigabit fiber, and bank-grade data sovereignty across Tier IV Mumbai and European hubs. When your users count on you, you can count on us.
+                </p>
+
+                {/* 3 Emotional Value Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                      <Zap className="size-3.5 text-amber-400" />
+                      <span>Zero 3 AM Panics</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-normal">Kernel eBPF &amp; XDP shield your nodes before attacks touch you.</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                      <Lock className="size-3.5 text-emerald-400" />
+                      <span>Sovereign &amp; Private</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-normal">Your customer data is 100% yours. Never inspected or sold.</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+                      <Cpu className="size-3.5 text-orange-400" />
+                      <span>Real Pinned Silicon</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-normal">Zen 5 cores pinned to your VM. Zero stolen CPU cycles.</p>
+                  </div>
+                </div>
+
+                {/* CTA Row */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
+                  <a
+                    href="#catalog"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFA14A] hover:bg-[#FF8F26] text-black font-bold px-6 py-3.5 text-sm transition-all shadow-[0_4px_20px_rgba(255,161,74,0.3)] cursor-pointer"
+                  >
+                    <span>Configure your server</span>
+                    <ArrowRight className="size-4" aria-hidden="true" />
+                  </a>
+                  <a
+                    href="#pillars"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 px-5 py-3.5 text-sm font-semibold text-zinc-200 hover:text-white transition-colors"
+                  >
+                    <span>Why Builders Trust SparrowX</span>
+                  </a>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 pt-1 font-mono">
+                  <span className="flex items-center gap-1.5 text-emerald-400">
+                    <CheckCircle2 className="size-3.5" />
+                    Instant 45-second provisioning
+                  </span>
+                  <span>&bull;</span>
+                  <span>Tier IV Mumbai Node</span>
+                  <span>&bull;</span>
+                  <span>Flat predictable billing</span>
+                </div>
+              </div>
+
+              {/* Right Column: 3D Server Blade Hardware Render on the side */}
+              <div className="lg:col-span-5 relative flex flex-col items-center justify-center">
+                <div className="relative w-full max-w-md lg:max-w-none">
+                  {/* Subtle Background Glow behind the hardware */}
+                  <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-orange-500/15 via-cyan-500/10 to-transparent blur-2xl rounded-3xl" />
+                  
+                  <Floating3DVisual
+                    src="/3d/cloud-infra-server.jpg"
+                    alt="3D floating SparrowX bare-metal server rack cluster with anodized titanium blades and cyan fiber uplinks"
+                    accent="cyan"
+                    size="lg"
+                    priority="lcp"
+                    className="w-full relative z-10"
+                    width={560}
+                    height={560}
+                  />
+
+                  {/* Hardware Telemetry Badge Below Image */}
+                  <div className="mt-3 p-3 rounded-xl bg-[#0B0E15]/90 border border-white/10 backdrop-blur-md flex items-center justify-between text-xs font-mono shadow-xl relative z-10">
+                    <div className="flex items-center gap-2">
+                      <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-white font-semibold">Tier IV Mumbai BOM-1</span>
+                    </div>
+                    <span className="text-zinc-400">AMD Ryzen 9 9950X &bull; 10 Gbps</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -589,6 +828,108 @@ export function SparrowxInfraEngine() {
             ))}
           </div>
         </section>
+
+        {/* SECTION: AMD RYZEN 9 9950X VPS & DEDICATED VDS PRICE CARDS */}
+        <section
+          id="ryzen-plans"
+          className="scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/10"
+        >
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
+            <div className="space-y-3 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/25">
+                <Cpu className="size-3.5 text-orange-400" />
+                <span>Zen 5 High-Frequency Silicon · Tier IV Mumbai Node</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                Ryzen 9 9950X VPS &amp; Dedicated VDS Plans
+              </h2>
+              <p className="text-base text-zinc-400 leading-relaxed">
+                Flagship single-thread performance powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, NVMe Gen5 storage, and Enterprise DDoS protection at our Tier IV Mumbai Node.
+              </p>
+            </div>
+
+            {/* Sub-Tabs: Cloud VPS vs Dedicated VDS + Currency Selector */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                role="tablist"
+                aria-label="Select Ryzen 9 plan category"
+                className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={ryzenTab === "vps"}
+                  onClick={() => setRyzenTab("vps")}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                    ryzenTab === "vps"
+                      ? "bg-[#FFA14A] text-black shadow-md font-bold"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Server className="size-4" />
+                  <span>Cloud VPS (5.7GHz)</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={ryzenTab === "vds"}
+                  onClick={() => setRyzenTab("vds")}
+                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                    ryzenTab === "vds"
+                      ? "bg-[#FFA14A] text-black shadow-md font-bold"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Cpu className="size-4" />
+                  <span>Dedicated VDS (Bare-Metal Cores)</span>
+                </button>
+              </div>
+
+              {/* Currency toggle */}
+              <div
+                role="radiogroup"
+                aria-label="Currency"
+                className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
+              >
+                {(["INR", "USD"] as const).map((cur) => (
+                  <button
+                    key={`ryzen-cur-${cur}`}
+                    type="button"
+                    role="radio"
+                    aria-checked={currency === cur}
+                    onClick={() => setCurrency(cur)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                      currency === cur
+                        ? "bg-sky-400 text-black"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {cur === "INR" ? "INR (₹)" : "USD ($)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 5 Price Cards in Responsive Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+            {(ryzenTab === "vps" ? ryzenVpsPlans : ryzenVdsPlans).map((plan) => (
+              <InfraPriceCard
+                key={plan.id}
+                plan={plan}
+                currency={currency}
+                billingCycle={billingCycle}
+                onConfigure={openConfigurator}
+              />
+            ))}
+          </div>
+        </section>
+
+        {/* SECTION: INTEL XEON GOLD DUAL PROCESSOR — VPS & VDS */}
+        <IntelXeonGoldPricingSection
+          currency={currency}
+          onConfigurePlan={openConfigurator}
+        />
 
         {/* SECTION 3: INTERACTIVE SERVER INVENTORY & RESPONSIVE HARDWARE TABLE */}
         <section
@@ -681,138 +1022,200 @@ export function SparrowxInfraEngine() {
                 ))}
               </div>
 
-              <div className="flex items-center gap-2.5">
-                <label
-                  htmlFor="infra-region-select"
-                  className="text-sm text-zinc-400 shrink-0"
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor="infra-region-select"
+                    className="text-sm text-zinc-400 shrink-0"
+                  >
+                    Datacenter
+                  </label>
+                  <select
+                    id="infra-region-select"
+                    value={region}
+                    onChange={(e) => setRegion(e.target.value as InfraRegionId)}
+                    className="rounded-lg border border-white/15 bg-[#0B0E15] px-3.5 py-2 text-sm font-medium text-white focus:outline-none focus:border-sky-400"
+                  >
+                    {INFRA_REGIONS.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} ({r.latencyHint})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cards / Table View Toggle */}
+                <div
+                  role="radiogroup"
+                  aria-label="Catalog view style"
+                  className="inline-flex rounded-lg border border-white/15 bg-[#0B0E15] p-1"
                 >
-                  Datacenter
-                </label>
-                <select
-                  id="infra-region-select"
-                  value={region}
-                  onChange={(e) => setRegion(e.target.value as InfraRegionId)}
-                  className="rounded-lg border border-white/15 bg-[#0B0E15] px-3.5 py-2 text-sm font-medium text-white focus:outline-none focus:border-sky-400"
-                >
-                  {INFRA_REGIONS.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name} ({r.latencyHint})
-                    </option>
-                  ))}
-                </select>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={catalogView === "cards"}
+                    onClick={() => setCatalogView("cards")}
+                    className={`rounded-md p-1.5 transition-colors duration-150 cursor-pointer ${
+                      catalogView === "cards"
+                        ? "bg-white text-black"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                    aria-label="Grid Cards View"
+                    title="Grid Cards View"
+                  >
+                    <LayoutGrid className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={catalogView === "table"}
+                    onClick={() => setCatalogView("table")}
+                    className={`rounded-md p-1.5 transition-colors duration-150 cursor-pointer ${
+                      catalogView === "table"
+                        ? "bg-white text-black"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                    aria-label="Table View"
+                    title="Table View"
+                  >
+                    <List className="size-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* Accessible Responsive Container-Query Hardware Table */}
-            <div
-              tabIndex={0}
-              role="region"
-              aria-labelledby={tableCaptionId}
-              className="spx-infra-table-wrap rounded-xl border border-white/12 bg-[#0B0E15] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
-            >
-              <table className="spx-infra-table text-left text-sm">
-                <caption id={tableCaptionId} className="sr-only">
-                  SparrowX Cloud Infra bare metal, dedicated server, and KVM VPS catalog in {activeRegionObj.name}
-                </caption>
-                <thead className="bg-[#101520] text-zinc-300 border-b border-white/10">
-                  <tr>
-                    <th scope="col" className="px-5 py-3.5 font-semibold">
-                      Server model
-                    </th>
-                    <th scope="col" className="px-4 py-3.5 font-semibold">
-                      Processor
-                    </th>
-                    <th scope="col" className="px-4 py-3.5 font-semibold">
-                      Memory
-                    </th>
-                    <th scope="col" className="px-4 py-3.5 font-semibold">
-                      Storage
-                    </th>
-                    <th scope="col" className="px-4 py-3.5 font-semibold">
-                      Network
-                    </th>
-                    <th scope="col" className="px-4 py-3.5 font-semibold text-right">
-                      Monthly price
-                    </th>
-                    <th scope="col" className="px-5 py-3.5 font-semibold text-right">
-                      Action
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.07]">
-                  {filteredPlans.length === 0 ? (
+            {/* Catalog Content: Cards Grid or Responsive Table */}
+            {catalogView === "cards" ? (
+              filteredPlans.length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-[#0B0E15] p-12 text-center text-zinc-400">
+                  No configurations available in {activeRegionObj.name} for this filter. Switch to Frankfurt DE-1 or Singapore SG-1 for dual-socket bare metal inventory.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredPlans.map((plan) => (
+                    <InfraPriceCard
+                      key={`cat-card-${plan.id}`}
+                      plan={plan}
+                      currency={currency}
+                      billingCycle={billingCycle}
+                      onConfigure={openConfigurator}
+                    />
+                  ))}
+                </div>
+              )
+            ) : (
+              <div
+                tabIndex={0}
+                role="region"
+                aria-labelledby={tableCaptionId}
+                className="spx-infra-table-wrap rounded-xl border border-white/12 bg-[#0B0E15] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
+              >
+                <table className="spx-infra-table text-left text-sm">
+                  <caption id={tableCaptionId} className="sr-only">
+                    SparrowX Cloud Infra bare metal, dedicated server, and KVM VPS catalog in {activeRegionObj.name}
+                  </caption>
+                  <thead className="bg-[#101520] text-zinc-300 border-b border-white/10">
                     <tr>
-                      <td
-                        colSpan={7}
-                        className="px-5 py-10 text-center text-zinc-400"
-                      >
-                        No configurations available in {activeRegionObj.name} for this filter. Switch to Frankfurt DE-1 or Singapore SG-1 for dual-socket bare metal inventory.
-                      </td>
+                      <th scope="col" className="px-5 py-3.5 font-semibold">
+                        Server model
+                      </th>
+                      <th scope="col" className="px-4 py-3.5 font-semibold">
+                        Processor
+                      </th>
+                      <th scope="col" className="px-4 py-3.5 font-semibold">
+                        Memory
+                      </th>
+                      <th scope="col" className="px-4 py-3.5 font-semibold">
+                        Storage
+                      </th>
+                      <th scope="col" className="px-4 py-3.5 font-semibold">
+                        Network
+                      </th>
+                      <th scope="col" className="px-4 py-3.5 font-semibold text-right">
+                        Monthly price
+                      </th>
+                      <th scope="col" className="px-5 py-3.5 font-semibold text-right">
+                        Action
+                      </th>
                     </tr>
-                  ) : (
-                    filteredPlans.map((plan) => {
-                      const price = computePlanPrice(plan, currency, billingCycle);
-                      return (
-                        <tr
-                          key={plan.id}
-                          className="hover:bg-white/[0.03] transition-colors duration-150"
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.07]">
+                    {filteredPlans.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={7}
+                          className="px-5 py-10 text-center text-zinc-400"
                         >
-                          <th scope="row" className="px-5 py-4 font-normal align-middle">
-                            <div className="font-semibold text-white">
-                              {plan.name}
-                            </div>
-                            <div className="text-xs text-zinc-400 mt-0.5">
-                              {plan.category === "bare-metal"
-                                ? "Bare metal"
-                                : plan.category === "dedicated"
-                                  ? "Dedicated server"
-                                  : "Cloud KVM VPS"}{" "}
-                              · Deploys in {plan.deployTime}
-                            </div>
-                          </th>
-                          <td className="px-4 py-4 align-middle text-zinc-200 tabular-nums">
-                            <div className="font-medium text-white">
-                              {plan.cpuModel}
-                            </div>
-                            <div className="text-xs text-zinc-400">
-                              {plan.coresThreads} · {plan.clockGhz}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 align-middle text-zinc-200 tabular-nums whitespace-nowrap">
-                            {plan.ram}
-                          </td>
-                          <td className="px-4 py-4 align-middle text-zinc-200 tabular-nums">
-                            {plan.storage}
-                          </td>
-                          <td className="px-4 py-4 align-middle text-zinc-200">
-                            <div className="whitespace-nowrap">{plan.network}</div>
-                            <div className="text-xs text-sky-400">
-                              {plan.ddosProtection}
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 align-middle text-right tabular-nums whitespace-nowrap">
-                            <span className="text-base font-bold text-white">
-                              {price.formattedMonthly}
-                            </span>
-                            <span className="text-xs text-zinc-400">/mo</span>
-                          </td>
-                          <td className="px-5 py-4 align-middle text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={() => openConfigurator(plan)}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-white hover:bg-sky-300 px-3.5 py-2 text-xs font-semibold text-black transition-colors duration-150 cursor-pointer"
-                            >
-                              <span>Configure</span>
-                              <ArrowRight className="size-3.5" aria-hidden="true" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          No configurations available in {activeRegionObj.name} for this filter. Switch to Frankfurt DE-1 or Singapore SG-1 for dual-socket bare metal inventory.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPlans.map((plan) => {
+                        const price = computePlanPrice(plan, currency, billingCycle);
+                        return (
+                          <tr
+                            key={plan.id}
+                            className="hover:bg-white/[0.03] transition-colors duration-150"
+                          >
+                            <th scope="row" className="px-5 py-4 font-normal align-middle">
+                              <div className="font-semibold text-white">
+                                {plan.name}
+                              </div>
+                              <div className="text-xs text-zinc-400 mt-0.5">
+                                {plan.category === "bare-metal"
+                                  ? "Bare metal"
+                                  : plan.category === "dedicated"
+                                    ? "Dedicated server"
+                                    : plan.category === "vds"
+                                      ? "Dedicated VDS"
+                                      : "Cloud KVM VPS"}{" "}
+                                · Deploys in {plan.deployTime}
+                              </div>
+                            </th>
+                            <td className="px-4 py-4 align-middle text-zinc-200 tabular-nums">
+                              <div className="font-medium text-white">
+                                {plan.cpuModel}
+                              </div>
+                              <div className="text-xs text-zinc-400">
+                                {plan.coresThreads} · {plan.clockGhz}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 align-middle text-zinc-200 tabular-nums whitespace-nowrap">
+                              {plan.ram}
+                            </td>
+                            <td className="px-4 py-4 align-middle text-zinc-200 tabular-nums">
+                              {plan.storage}
+                            </td>
+                            <td className="px-4 py-4 align-middle text-zinc-200">
+                              <div className="whitespace-nowrap">{plan.network}</div>
+                              <div className="text-xs text-sky-400">
+                                {plan.ddosProtection}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 align-middle text-right tabular-nums whitespace-nowrap">
+                              <span className="text-base font-bold text-white">
+                                {price.formattedMonthly}
+                              </span>
+                              <span className="text-xs text-zinc-400">/mo</span>
+                            </td>
+                            <td className="px-5 py-4 align-middle text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => openConfigurator(plan)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-white hover:bg-sky-300 px-3.5 py-2 text-xs font-semibold text-black transition-colors duration-150 cursor-pointer"
+                              >
+                                <span>Configure</span>
+                                <ArrowRight className="size-3.5" aria-hidden="true" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {/* Flagship Spotlight Cards */}
             <div className="pt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -951,6 +1354,9 @@ export function SparrowxInfraEngine() {
             </div>
           </div>
         </section>
+
+        {/* Core Technologies & Infrastructure Logos */}
+        <SparrowxPoweredByTech />
       </main>
 
       {/* Native <dialog> Hardware Configurator & Checkout Modal */}
@@ -1174,6 +1580,25 @@ export function SparrowxInfraEngine() {
                       {orderError}
                     </p>
                   )}
+
+                  {/* Legal & No-Refund Notice */}
+                  <div className="w-full text-xs text-zinc-400 bg-white/[0.03] border border-white/10 rounded-lg p-3 space-y-1 mt-2">
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#FFA14A]">
+                      <ShieldCheck className="size-3.5 text-emerald-400" />
+                      <span>Sovereign Data Security &amp; Strict No-Refund Notice</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-snug">
+                      By proceeding, you agree to our{" "}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-white underline hover:text-[#FFA14A]">
+                        Terms of Service
+                      </a>{" "}
+                      and{" "}
+                      <a href="/refund" target="_blank" rel="noopener noreferrer" className="text-[#FFA14A] font-medium underline">
+                        Refund Policy
+                      </a>
+                      . Once physical compute threads, NVMe Gen5 blocks, and public IPs are provisioned to your account, there is strictly no refund. Your data is 100% sovereign and encrypted.
+                    </p>
+                  </div>
 
                   {/* Order Summary Footer */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-white/10">
