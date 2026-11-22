@@ -534,64 +534,6 @@ export function ClientPortalView({
           </div>
         </section>
 
-        {/* Developer Connection & Cross-Subdomain SSO Card */}
-        <section className="rounded-xl border border-emerald-500/30 bg-card/80 p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-              <Database className="size-4 text-emerald-400" aria-hidden="true" />
-              <span>Developer Database &amp; NetSec Connection</span>
-              <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-300">
-                {devDbConnection ? "POSTGRES CONNECTED" : syncingDevDb ? "CONNECTING..." : "READY"}
-              </span>
-            </div>
-            {devDbConnection ? (
-              <p className="text-xs font-mono text-muted-foreground break-all">
-                {devDbConnection.dbName} · {devDbConnection.dbHost}:{devDbConnection.dbPort} · User:{" "}
-                {devDbConnection.dbUser} ({devDbConnection.planName || "PostgreSQL Cluster"})
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Your SparrowX Master login links automatically to your sovereign PostgreSQL workspace and{" "}
-                <span className="font-mono text-foreground">netsec.sparrowx.net</span> defense panel.
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {devDbConnection && (
-              <Button type="button" size="sm" variant="outline" onClick={handleCopyDevUri} className="gap-1.5 font-mono text-xs">
-                {copiedDevUri ? <Check className="size-3.5 text-emerald-400" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
-                <span>{copiedDevUri ? "Copied URI" : "Copy Postgres URI"}</span>
-              </Button>
-            )}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (typeof window !== "undefined") window.location.href = "/db";
-              }}
-              className="gap-1.5 text-xs"
-            >
-              <Database className="size-3.5" aria-hidden="true" />
-              <span>Open DB Studio</span>
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => {
-                if (typeof window !== "undefined") {
-                  window.open(getNetsecSsoUrl({ autoSso: true }), "_blank", "noopener,noreferrer");
-                }
-              }}
-              className="gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs"
-            >
-              <Shield className="size-3.5" aria-hidden="true" />
-              <span>Launch NetSec DDoS Panel</span>
-              <ArrowUpRight className="size-3.5" aria-hidden="true" />
-            </Button>
-          </div>
-        </section>
-
         {/* Client Area Sub-Navigation Tabs */}
         <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto no-scrollbar sm:flex-wrap">
           {[

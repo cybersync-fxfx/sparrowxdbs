@@ -95,6 +95,7 @@ function readInitialShieldUser(propUser?: AppUser | null): AppUser | null {
 export function SparrowxShieldEngine({
   currentUser,
   onUserAuthenticated,
+  onOpenClientArea,
   onSignOut,
   initialStage,
 }: SparrowxShieldEngineProps = {}) {
@@ -278,7 +279,13 @@ export function SparrowxShieldEngine({
           onIncidentsUpdated={setIncidents}
           onResolveIncident={handleResolveIncident}
           onToggleAssetIsolation={handleToggleAssetIsolation}
-          onBackToClientArea={() => setViewStage("client-area")}
+          onBackToClientArea={() => {
+            if (onOpenClientArea) {
+              onOpenClientArea();
+            } else {
+              setViewStage("client-area");
+            }
+          }}
           onSignOut={handleShieldSignOut}
         />
       ) : viewStage === "client-area" && activeUser ? (
@@ -290,7 +297,13 @@ export function SparrowxShieldEngine({
           onTenantsUpdated={setTenants}
           onServicesUpdated={setServices}
           onOpenDashboard={() => setViewStage("dashboard")}
-          onBackToLanding={() => setViewStage("landing")}
+          onBackToLanding={() => {
+            if (onOpenClientArea) {
+              onOpenClientArea();
+            } else {
+              setViewStage("landing");
+            }
+          }}
           onSignOut={handleShieldSignOut}
         />
       ) : (

@@ -1677,8 +1677,36 @@ function Dashboard() {
         setPortalMode("client");
       }
     }
-    setActiveNav(navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel);
+    const resolvedNav = navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel;
+    setActiveNav(resolvedNav);
+    if (typeof window !== "undefined") {
+      try {
+        window.history.pushState(
+          { spxNav: resolvedNav, spxPortalMode: portalMode },
+          "",
+          window.location.href,
+        );
+      } catch {
+        // ignore history state errors in sandboxed iframes
+      }
+    }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onPopState = (event: PopStateEvent) => {
+      const state = event.state as { spxNav?: string; spxPortalMode?: "client" | "soc" | "admin" } | null;
+      if (state?.spxNav) {
+        setActiveNav(state.spxNav);
+        if (state.spxPortalMode) setPortalMode(state.spxPortalMode);
+      } else {
+        setActiveNav("My Services");
+        setPortalMode("client");
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   // Unified Session Authenticator for all Subdomains & Master Landing
   const handleUserAuthenticated = (user: AppUser) => {
@@ -2439,58 +2467,18 @@ function Dashboard() {
                   <span className="hidden sm:inline">Admin Master</span>
                   <span className="sm:hidden text-[11px]">Admin</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveNav("SparrowX DB")}
-                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    activeNav === "SparrowX DB" || activeNav === "Database Studio"
-                      ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
-                      : "text-[#3ECF8E] hover:bg-[#3ECF8E]/15"
-                  }`}
-                  title="Open Sovereign SparrowX DB (DBaaS) Studio"
-                >
-                  <Database className="size-3.5 shrink-0" />
-                  <span className="hidden sm:inline">SparrowX DB</span>
-                  <span className="sm:hidden text-[11px]">DB</span>
-                </button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg border border-border bg-card/90 px-2 sm:px-3 py-1 text-xs shadow-sm shrink-0">
                   <Boxes className="size-3.5 text-primary shrink-0" />
                   <span className="font-semibold text-foreground truncate max-w-[85px] xs:max-w-[140px] sm:max-w-none">
-                    {activeClientTenant?.name || "Client"} Dashboard
+                    {activeClientTenant?.name || "SparrowX"} Client Area
                   </span>
-                  <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold shrink-0">
+                  <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-mono text-primary font-bold shrink-0">
                     {activeClientTenant?.planTier || "Active"}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveNav("SparrowX DB")}
-                  className={`hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                    activeNav === "SparrowX DB" || activeNav === "Database Studio"
-                      ? "bg-[#3ECF8E] text-[#11181C] shadow-sm"
-                      : "text-[#3ECF8E] border border-[#3ECF8E]/30 hover:bg-[#3ECF8E]/15"
-                  }`}
-                  title="Open SparrowX DB Studio"
-                >
-                  <Database className="size-3.5 shrink-0" />
-                  <span>SparrowX DB</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveNav("SparrowX Shield")}
-                  className={`hidden sm:flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all ${
-                    activeNav === "SparrowX Shield"
-                      ? "bg-[#FF6B00] text-black shadow-sm"
-                      : "text-[#FF6B00] border border-[#FF6B00]/30 hover:bg-[#FF6B00]/15"
-                  }`}
-                  title="Open SparrowX Shield WAF"
-                >
-                  <Shield className="size-3.5 shrink-0" />
-                  <span>Shield</span>
-                </button>
               </div>
             )}
 
@@ -5540,7 +5528,7 @@ function AppSidebar({
     { label: "Platform Settings & MFA", navKey: "Settings", icon: Wrench },
   ];
 
-  // Client Area Hub Navigation
+  // Client Area Hub Navigation (clean, focused on Client Area services without DB/Mesh clutter)
   const clientAreaNavItems: Array<{
     label: string;
     icon: typeof Activity;
@@ -5552,19 +5540,9 @@ function AppSidebar({
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
     {
-      label: "SparrowX DB",
-      icon: Database,
-      count: "v16",
-    },
-    {
       label: "SparrowX Shield",
       icon: Shield,
       count: "WAF",
-    },
-    {
-      label: "Global Traffic Mesh",
-      icon: Globe2,
-      count: "LIVE",
     },
     ...(isAdminSession
       ? [
@@ -5579,7 +5557,6 @@ function AppSidebar({
       label: "Protection Status & Verification",
       icon: ShieldCheck,
     },
-    { label: "Defense Updates & Intel", icon: Globe2 },
     { label: "Subscriptions & Due Dates", icon: Activity },
     { label: "Billing & Credits", icon: Coins },
     { label: "Profile Management", icon: Users },
@@ -5596,7 +5573,7 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
-    { label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
+    ...(tenantCount > 0 ? [{ label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" }] : []),
     ...(isAdminSession ? [{ label: "SparrowX AI Brain", icon: Brain, count: "AI" }] : []),
     { label: "Protection Status & Verification", icon: ShieldCheck },
     { label: "Defense Updates & Intel", icon: Globe2 },

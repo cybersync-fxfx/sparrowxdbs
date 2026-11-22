@@ -276,44 +276,54 @@ export function ShieldSocDashboardView({
     saveWebhooks(next);
   };
 
+  const openIncidentsCount = incidents.filter((inc) => inc.status !== "Contained").length;
+  const protectedAssetsCount = assets.filter((a) => a.status !== "Isolated").length;
+
   return (
-    <div className="font-soc min-h-screen bg-[#090B11] text-[#F4F6FA] flex flex-col selection:bg-[#F9103A] selection:text-[#F4F6FA]">
-      {/* Sticky SOC Dashboard Header */}
-      <header className="sticky top-0 z-40 border-b border-[#F4F6FA]/[0.08] bg-[#090B11]/95 px-4 sm:px-6 py-3 backdrop-blur-xl">
+    <div className="font-soc min-h-screen bg-[#05070D] text-[#F4F6FA] flex flex-col selection:bg-[#E2E7F0] selection:text-[#05070D]">
+      {/* Sticky Silver & Midnight Black SOC Dashboard Header */}
+      <header className="sticky top-0 z-40 border-b border-[#C0C7D6]/15 bg-[#05070D]/95 px-4 sm:px-6 py-3 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.7)]">
         <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onBackToClientArea}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#F4F6FA]/14 bg-[#121620] px-3 py-1.5 text-xs font-medium text-[#F4F6FA] hover:border-[#F96246]/55 cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#C0C7D6]/25 bg-[#0E131F] px-3 py-1.5 text-xs font-semibold text-[#F4F6FA] hover:bg-[#E2E7F0] hover:text-[#05070D] transition-colors cursor-pointer"
             >
               <ArrowLeft className="size-3.5" />
-              <span>Client Area</span>
+              <span>Back to Client Area</span>
             </button>
-            <div className="flex items-center gap-2">
-              <img src="/logos/sparrowx-shield.png" alt="SparrowX Shield" width={28} height={28} className="size-7 object-contain" />
-              <span className="text-sm sm:text-base font-semibold text-[#F4F6FA]">Security + SOC Dashboard</span>
+            <div className="flex items-center gap-2.5">
+              <img src="/logos/sparrowx-silver.png" alt="SparrowX Shield" width={28} height={28} className="size-7 object-contain" />
+              <div>
+                <span className="text-sm sm:text-base font-semibold tracking-tight text-[#F4F6FA] block leading-tight">
+                  Autonomous SOC Workbench
+                </span>
+                <span className="text-[10px] font-mono uppercase tracking-[0.16em] text-[#9EA7B8]">
+                  SparrowX Shield · Midnight Silver Edition
+                </span>
+              </div>
             </div>
           </div>
 
-          <nav aria-label="SOC Dashboard Sections" className="hidden md:flex items-center gap-5 text-xs text-[#F4F6FA]/65">
-            <a href="#shield-soc-workbench" className="hover:text-[#F4F6FA]">SOC Triage</a>
-            <a href="#shield-threat-map" className="hover:text-[#F4F6FA]">Origin Audit &amp; Map</a>
-            <a href="#shield-defense-tools" className="hover:text-[#F4F6FA]">AI Guardrail &amp; Firewall</a>
-            <a href={GAMESEC_URL} target="_blank" rel="noopener noreferrer" className="text-[#F96246] hover:text-[#F9103A] flex items-center gap-1">
+          <nav aria-label="SOC Dashboard Sections" className="hidden md:flex items-center gap-5 text-xs text-[#9EA7B8]">
+            <a href="#shield-soc-workbench" className="hover:text-[#F4F6FA] transition-colors">SOC Triage</a>
+            <a href="#shield-threat-map" className="hover:text-[#F4F6FA] transition-colors">Origin Audit &amp; Map</a>
+            <a href="#shield-defense-tools" className="hover:text-[#F4F6FA] transition-colors">AI Guardrail &amp; Firewall</a>
+            <a href={GAMESEC_URL} target="_blank" rel="noopener noreferrer" className="text-[#E2E7F0] hover:text-white flex items-center gap-1 font-medium">
               <Gamepad2 className="size-3.5" /> Game DDoS
             </a>
           </nav>
 
           <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[#10B981]/35 bg-[#10B981]/10 px-3 py-1 text-xs text-[#10B981]">
-              <User className="size-3" />
+            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[#C0C7D6]/25 bg-[#121826] px-3 py-1 text-xs text-[#E2E7F0]">
+              <User className="size-3 text-[#C0C7D6]" />
               <span>{activeUser.email}</span>
             </span>
             <button
               type="button"
               onClick={onSignOut}
-              className="rounded-lg border border-[#F4F6FA]/12 bg-[#121620] px-3 py-1.5 text-xs text-[#F4F6FA]/75 hover:text-[#F4F6FA] cursor-pointer"
+              className="rounded-lg border border-[#C0C7D6]/20 bg-[#0E131F] px-3 py-1.5 text-xs text-[#C0C7D6] hover:text-[#F4F6FA] hover:border-[#C0C7D6]/45 transition-colors cursor-pointer"
             >
               Sign Out
             </button>
@@ -321,16 +331,65 @@ export function ShieldSocDashboardView({
         </div>
       </header>
 
-      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 space-y-8">
+      <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Executive Midnight & Silver Security Posture Strip */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="rounded-xl border border-[#C0C7D6]/16 bg-gradient-to-b from-[#101522] to-[#0A0E17] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#9EA7B8]">
+              <span>Protected Domains</span>
+              <Globe className="size-3.5 text-[#E2E7F0]" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-[#F4F6FA]">{tenants.length}</div>
+            <p className="mt-1 text-[11px] text-[#9EA7B8]">
+              {tenants.length > 0 ? tenants[0]?.primaryDomain : "Add a domain in Client Area to activate WAF"}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-[#C0C7D6]/16 bg-gradient-to-b from-[#101522] to-[#0A0E17] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#9EA7B8]">
+              <span>Open SOC Incidents</span>
+              <ShieldAlert className="size-3.5 text-[#E2E7F0]" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-[#F4F6FA]">{openIncidentsCount}</div>
+            <p className="mt-1 text-[11px] text-[#9EA7B8]">
+              {openIncidentsCount === 0 ? "Zero active escalations · perimeter clear" : `${incidents.length} total logged events`}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-[#C0C7D6]/16 bg-gradient-to-b from-[#101522] to-[#0A0E17] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#9EA7B8]">
+              <span>Monitored Assets</span>
+              <Server className="size-3.5 text-[#E2E7F0]" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-[#F4F6FA]">{protectedAssetsCount}</div>
+            <p className="mt-1 text-[11px] text-[#9EA7B8]">
+              Real-time host &amp; edge sensor inventory
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-[#C0C7D6]/25 bg-gradient-to-b from-[#151C2C] to-[#0A0E17] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
+            <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#C0C7D6]">
+              <span>Autonomous Defense</span>
+              <Shield className="size-3.5 text-[#F4F6FA]" />
+            </div>
+            <div className="mt-2 text-2xl font-bold text-[#F4F6FA]">
+              {tenants.length > 0 ? "ARMED" : "STANDBY"}
+            </div>
+            <p className="mt-1 text-[11px] text-[#9EA7B8]">
+              Edge WAF · AI Prompt Guardrails · Origin Audit
+            </p>
+          </div>
+        </section>
+
         {/* Live Event Ingest Bar + Sentra SOC Workbench */}
         <section className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#C0C7D6]/16 bg-[#0B0F19] p-4">
             <div className="space-y-0.5">
               <h1 className="text-base sm:text-lg font-semibold text-[#F4F6FA] flex items-center gap-2">
-                <ShieldAlert className="size-4 text-[#F9103A]" />
+                <ShieldAlert className="size-4 text-[#E2E7F0]" />
                 <span>Autonomous SOC Workbench</span>
               </h1>
-              <p className="text-xs text-[#F4F6FA]/55">
+              <p className="text-xs text-[#9EA7B8]">
                 Shows verified telemetry events &amp; registered tenant assets ({tenants.length} domains · {incidents.length} incidents).
               </p>
             </div>
@@ -341,7 +400,7 @@ export function ShieldSocDashboardView({
                 value={eventTitle}
                 onChange={(e) => setEventTitle(e.target.value)}
                 placeholder="Log security alert title..."
-                className="h-9 w-52 rounded-lg border border-[#F4F6FA]/12 bg-[#07090E] px-3 text-xs text-[#F4F6FA] placeholder-[#F4F6FA]/40 outline-none focus:border-[#F9103A]"
+                className="h-9 w-52 rounded-lg border border-[#C0C7D6]/20 bg-[#05070D] px-3 text-xs text-[#F4F6FA] placeholder-[#9EA7B8]/60 outline-none focus:border-[#E2E7F0]"
               />
               <input
                 type="text"
