@@ -3,7 +3,6 @@ import { renderToString } from "react-dom/server";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Route } from "@/routes/index";
-import { CyberThreatGlobe } from "@/components/CyberThreatGlobe";
 import { SovereignDatabaseStudio } from "@/components/SovereignDatabaseStudio";
 import { SparrowxShieldEngine } from "@/components/SparrowxShieldEngine";
 import { SparrowxDropEngine } from "@/components/SparrowxDropEngine";
@@ -23,11 +22,6 @@ describe("Test Full Index Rendering", () => {
     window.localStorage.clear();
     window.history.pushState({}, "", "/");
     vi.restoreAllMocks();
-  });
-
-  it("renders CyberThreatGlobe without crashing", () => {
-    const { container } = render(<CyberThreatGlobe />);
-    expect(container).toBeDefined();
   });
 
   it("renders Route component without crashing", () => {

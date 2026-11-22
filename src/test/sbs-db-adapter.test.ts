@@ -108,7 +108,10 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
       }
       if (sql.includes('FROM sbs_users u') && sql.includes('LEFT JOIN user_profiles p')) {
         const target = String(params[0] ?? '').toLowerCase();
-        const u = [...users.values()].find((x) => x.email === target);
+        const u = [...users.values()].find((x) => {
+          const p = profiles.get(x.id);
+          return x.email === target || String(p?.username ?? '').toLowerCase() === target;
+        });
         if (!u) return { rows: [] };
         const p = profiles.get(u.id);
         return { rows: [{ ...u, role: p?.role, status: p?.status }] };
@@ -153,6 +156,13 @@ describe('SparrowX SBS PostgreSQL DB Adapter', () => {
     });
     expect(goodLogin.error).toBeNull();
     expect(goodLogin.data.session?.access_token).toBeTruthy();
+
+    const usernameLogin = await db.auth.signInWithPassword({
+      email: 'operator',
+      password: 'StrongPassword123!',
+    });
+    expect(usernameLogin.error).toBeNull();
+    expect(usernameLogin.data.session?.access_token).toBeTruthy();
 
     const verified = await db.auth.getUser(goodLogin.data.session?.access_token ?? '');
     expect(verified.error).toBeNull();

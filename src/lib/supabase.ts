@@ -1358,6 +1358,53 @@ export async function authenticateAppUserFromBackend(
   password: string,
 ): Promise<{ user: AppUser | null; error?: string }> {
   const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !password) {
+    return { user: null, error: "Email and password are required." };
+  }
+
+  // 0. Primary Sovereign Master SSO authentication endpoint (/api/auth/master-sso)
+  if (typeof window !== "undefined") {
+    try {
+      const ssoResponse = await fetch("/api/auth/master-sso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: normalizedEmail, password, mode: "signin" }),
+        signal: AbortSignal.timeout(2500),
+      });
+      if (ssoResponse.ok) {
+        const ssoData = (await ssoResponse.json()) as {
+          ok?: boolean;
+          user?: {
+            id: string;
+            email: string;
+            fullName?: string;
+            role?: string;
+            tenantId?: string | null;
+          };
+        };
+        if (ssoData.ok && ssoData.user) {
+          const authUser: AppUser = {
+            id: ssoData.user.id,
+            email: ssoData.user.email.toLowerCase(),
+            password: "",
+            fullName: ssoData.user.fullName || ssoData.user.email.split("@")[0] || "Operator",
+            admin: ssoData.user.role === "admin" ? "yes" : "no",
+            tenantId: ssoData.user.tenantId || null,
+          };
+          const currentCached = readLocalCache<AppUser>(STORAGE_KEYS.users);
+          writeLocalCache(STORAGE_KEYS.users, [
+            authUser,
+            ...currentCached.filter((u) => u.email.toLowerCase() !== authUser.email.toLowerCase()),
+          ]);
+          return { user: authUser };
+        }
+      }
+    } catch {
+      // Offline / network fallback to PostgREST and local caches
+    }
+  }
+
   const candidates: Array<{ user: AppUser; storedPassword: string }> = [];
 
   const matchesIdentifier = (rawEmail: unknown, rawName?: unknown) => {

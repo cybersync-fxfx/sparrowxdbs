@@ -12,19 +12,26 @@ export const Route = createFileRoute("/api/client-protect/heartbeat")({
           return Response.json({ ok: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        const all = await readClientVpsRegistry();
-        const visible =
-          claims.role === "admin"
-            ? all
-            : all.filter((item) => item.email.toLowerCase() === claims.email.toLowerCase());
+        try {
+          const all = await readClientVpsRegistry();
+          const visible =
+            claims.role === "admin"
+              ? all
+              : all.filter((item) => item.email.toLowerCase() === claims.email.toLowerCase());
 
-        return Response.json(
-          {
-            ok: true,
-            clients: visible.map(({ tokenHash: _hidden, ...safe }) => safe),
-          },
-          { headers: { "Cache-Control": "no-store" } },
-        );
+          return Response.json(
+            {
+              ok: true,
+              clients: visible.map(({ tokenHash: _hidden, ...safe }) => safe),
+            },
+            { headers: { "Cache-Control": "no-store" } },
+          );
+        } catch (err) {
+          return Response.json(
+            { ok: false, error: err instanceof Error ? err.message : "Failed to load client registry" },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
+          );
+        }
       },
 
       POST: async ({ request }) => {
@@ -58,25 +65,32 @@ export const Route = createFileRoute("/api/client-protect/heartbeat")({
           return Response.json({ ok: false, error: "Invalid JSON payload" }, { status: 400 });
         }
 
-        const updated = await recordClientVpsHeartbeat({
-          token,
-          agentId: String(body.agentId || "").trim(),
-          hostname: body.hostname,
-          publicIp: body.publicIp,
-          load1m: body.load1m,
-          synRecv: typeof body.synRecv === "number" ? body.synRecv : undefined,
-        });
+        try {
+          const updated = await recordClientVpsHeartbeat({
+            token,
+            agentId: String(body.agentId || "").trim(),
+            hostname: body.hostname,
+            publicIp: body.publicIp,
+            load1m: body.load1m,
+            synRecv: typeof body.synRecv === "number" ? body.synRecv : undefined,
+          });
 
-        if (!updated) {
-          return Response.json({ ok: false, error: "Invalid client agent token or agentId" }, { status: 403 });
+          if (!updated) {
+            return Response.json({ ok: false, error: "Invalid client agent token or agentId" }, { status: 403 });
+          }
+
+          return Response.json({
+            ok: true,
+            agentId: updated.agentId,
+            status: updated.status,
+            lastSeen: updated.lastSeen,
+          });
+        } catch (err) {
+          return Response.json(
+            { ok: false, error: err instanceof Error ? err.message : "Heartbeat update failed" },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
+          );
         }
-
-        return Response.json({
-          ok: true,
-          agentId: updated.agentId,
-          status: updated.status,
-          lastSeen: updated.lastSeen,
-        });
       },
     },
   },

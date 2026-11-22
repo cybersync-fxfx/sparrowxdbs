@@ -5528,7 +5528,7 @@ function AppSidebar({
     { label: "Platform Settings & MFA", navKey: "Settings", icon: Wrench },
   ];
 
-  // Client Area Hub Navigation (clean, focused on Client Area services without DB/Mesh clutter)
+  // Client Area Hub Navigation (clean routing pipeline — each product manages its own dashboard & API keys)
   const clientAreaNavItems: Array<{
     label: string;
     icon: typeof Activity;
@@ -5539,11 +5539,6 @@ function AppSidebar({
       icon: Boxes,
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
-    {
-      label: "SparrowX Shield",
-      icon: Shield,
-      count: "WAF",
-    },
     ...(isAdminSession
       ? [
           {
@@ -5553,12 +5548,8 @@ function AppSidebar({
           },
         ]
       : []),
-    {
-      label: "Protection Status & Verification",
-      icon: ShieldCheck,
-    },
     { label: "Subscriptions & Due Dates", icon: Activity },
-    { label: "Billing & Credits", icon: Coins },
+    { label: "Billing & Credits", icon: Coins, count: "COINS" },
     { label: "Profile Management", icon: Users },
     { label: "Activity History", icon: Clock3 },
     { label: "System Status", icon: Activity },
@@ -5575,7 +5566,6 @@ function AppSidebar({
     { label: "Client Overview", icon: Sparkles },
     ...(tenantCount > 0 ? [{ label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" }] : []),
     ...(isAdminSession ? [{ label: "SparrowX AI Brain", icon: Brain, count: "AI" }] : []),
-    { label: "Protection Status & Verification", icon: ShieldCheck },
     { label: "Defense Updates & Intel", icon: Globe2 },
     ...(clientEnabledModules.includes("web_security")
       ? [{ label: "Web & WAF Security", icon: Globe2 }]

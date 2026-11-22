@@ -3,7 +3,7 @@
     {
       "id": "USR-SPX-MASTER",
       "email": "master-db@sparrowx.net",
-      "password": "spx_digest",
+      "password": "spx_digest$4e07457530ebfd7b",
       "full_name": "SparrowX Master DB Owner",
       "admin": "yes",
       "tenant_id": "TNT-SPARROWX-CORE",
@@ -12,7 +12,7 @@
     {
       "id": "USR-7163",
       "email": "cybersync790@gmail.com",
-      "password": "spx_digest",
+      "password": "spx_digest$4e07457530ebfd7b",
       "full_name": "sam",
       "admin": "yes",
       "tenant_id": "TNT-5638",

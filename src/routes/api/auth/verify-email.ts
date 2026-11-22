@@ -9,47 +9,66 @@ export const Route = createFileRoute("/api/auth/verify-email")({
         const token = (url.searchParams.get("token") || "").trim();
         const statusOnly = url.searchParams.get("status") === "1";
 
+        const { resolveRequestOrigin } = await import("@/lib/server/http.server");
         const { isEmailVerifiedInDb, verifyEmailCodeOrToken } = await import(
           "@/lib/server/email-verification.server"
         );
         const { getSmtpConfig } = await import("@/lib/server/email.server");
+        const origin = resolveRequestOrigin(request);
 
-        if (statusOnly) {
-          const verified = email ? await isEmailVerifiedInDb(email) : false;
+        try {
+          if (statusOnly) {
+            const verified = email ? await isEmailVerifiedInDb(email) : false;
+            return Response.json(
+              {
+                ok: true,
+                email,
+                verified,
+                smtpConfigured: getSmtpConfig().configured,
+              },
+              { headers: { "Cache-Control": "no-store" } },
+            );
+          }
+
+          if (email && token) {
+            const res = await verifyEmailCodeOrToken({ email, token });
+            const target = res.verified
+              ? `${origin}/?email_verified=1&email=${encodeURIComponent(email)}`
+              : `${origin}/?email_verified=0&error=${encodeURIComponent(res.error || "Invalid or expired verification link")}`;
+            return new Response(null, {
+              status: 302,
+              headers: {
+                Location: target,
+                "Cache-Control": "no-store",
+              },
+            });
+          }
+
           return Response.json(
-            {
-              ok: true,
-              email,
-              verified,
-              smtpConfigured: getSmtpConfig().configured,
-            },
-            { headers: { "Cache-Control": "no-store" } },
+            { ok: false, error: "Provide ?status=1&email=... or ?email=...&token=..." },
+            { status: 400 },
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "Verification service temporarily unavailable.";
+          if (email && token) {
+            return new Response(null, {
+              status: 302,
+              headers: {
+                Location: `${origin}/?email_verified=0&error=${encodeURIComponent(message)}`,
+                "Cache-Control": "no-store",
+              },
+            });
+          }
+          return Response.json(
+            { ok: false, error: message },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
           );
         }
-
-        if (email && token) {
-          const res = await verifyEmailCodeOrToken({ email, token });
-          const origin = `${url.protocol}//${url.host}`;
-          const target = res.verified
-            ? `${origin}/?email_verified=1&email=${encodeURIComponent(email)}`
-            : `${origin}/?email_verified=0&error=${encodeURIComponent(res.error || "Invalid or expired verification link")}`;
-          return new Response(null, {
-            status: 302,
-            headers: {
-              Location: target,
-              "Cache-Control": "no-store",
-            },
-          });
-        }
-
-        return Response.json(
-          { ok: false, error: "Provide ?status=1&email=... or ?email=...&token=..." },
-          { status: 400 },
-        );
       },
 
       POST: async ({ request }) => {
         const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
+        const { resolveRequestOrigin } = await import("@/lib/server/http.server");
         const { issueAndSendEmailVerification, verifyEmailCodeOrToken } = await import(
           "@/lib/server/email-verification.server"
         );
@@ -84,32 +103,41 @@ export const Route = createFileRoute("/api/auth/verify-email")({
           return Response.json({ ok: false, error: "Email address is required." }, { status: 400 });
         }
 
-        if (action === "verify") {
-          const result = await verifyEmailCodeOrToken({
+        try {
+          if (action === "verify") {
+            const result = await verifyEmailCodeOrToken({
+              email,
+              ...(body.code ? { code: String(body.code) } : {}),
+              ...(body.token ? { token: String(body.token) } : {}),
+            });
+            return Response.json(result, {
+              status: result.verified ? 200 : 400,
+              headers: { "Cache-Control": "no-store" },
+            });
+          }
+
+          const origin = resolveRequestOrigin(request);
+          const sendResult = await issueAndSendEmailVerification({
             email,
-            ...(body.code ? { code: String(body.code) } : {}),
-            ...(body.token ? { token: String(body.token) } : {}),
+            fullName: body.fullName,
+            userId: body.userId ?? null,
+            serviceName: body.serviceName,
+            origin,
           });
-          return Response.json(result, {
-            status: result.verified ? 200 : 400,
+
+          return Response.json(sendResult, {
+            status: sendResult.ok ? 200 : sendResult.retryAfterSeconds ? 429 : 400,
             headers: { "Cache-Control": "no-store" },
           });
+        } catch (err) {
+          return Response.json(
+            {
+              ok: false,
+              error: err instanceof Error ? err.message : "Email verification request failed.",
+            },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
+          );
         }
-
-        const reqUrl = new URL(request.url);
-        const origin = `${reqUrl.protocol}//${reqUrl.host}`;
-        const sendResult = await issueAndSendEmailVerification({
-          email,
-          fullName: body.fullName,
-          userId: body.userId ?? null,
-          serviceName: body.serviceName,
-          origin,
-        });
-
-        return Response.json(sendResult, {
-          status: sendResult.ok ? 200 : sendResult.retryAfterSeconds ? 429 : 400,
-          headers: { "Cache-Control": "no-store" },
-        });
       },
     },
   },

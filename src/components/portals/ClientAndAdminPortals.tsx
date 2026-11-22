@@ -45,8 +45,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { CyberThreatGlobe } from "@/components/CyberThreatGlobe";
-import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import { CyberEmblem, CyberPill, type CyberEmblemVariant } from "@/components/ui/CyberBadge";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
@@ -183,6 +181,87 @@ export const SERVICE_MODULES: Array<{
   },
 ];
 
+export interface SparrowxCatalogService {
+  id: string;
+  name: string;
+  tagline: string;
+  domain: string;
+  url: string;
+  external?: boolean;
+  badge: string;
+}
+
+export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
+  {
+    id: "cloud-db",
+    name: "SparrowX Cloud DB",
+    tagline: "Managed PostgreSQL 16, pgvector AI embeddings, instant REST API & PgBouncer pooler.",
+    domain: "db.sparrowx.net",
+    url: "/db",
+    badge: "Database",
+  },
+  {
+    id: "netsec",
+    name: "SparrowX NetSec (DDoS & Edge Protection)",
+    tagline: "Autonomous L3/L4/L7 XDP/eBPF packet scrubbing, live threat radar & VPS protection.",
+    domain: "netsec.sparrowx.net",
+    url: "https://netsec.sparrowx.net",
+    external: true,
+    badge: "Protection",
+  },
+  {
+    id: "game-hosting",
+    name: "SparrowX Game Hosting",
+    tagline: "NVMe Gen4 FiveM, SA-MP, Minecraft & Discord Bot servers with Pterodactyl panel.",
+    domain: "game.sparrowx.net",
+    url: "/game/dashboard",
+    badge: "Game Cloud",
+  },
+  {
+    id: "shield",
+    name: "SparrowX Shield (Web Scanner & WAF)",
+    tagline: "8-tool deep domain security scanner, header auditing & SparrowX AI threat advisory.",
+    domain: "sec.sparrowx.net",
+    url: "/shield",
+    badge: "WAF & Audit",
+  },
+  {
+    id: "drop",
+    name: "SparrowX Drop (Encrypted Vault)",
+    tagline: "Zero-knowledge AES-256-GCM persistent file vault & burn-after-reading transfers.",
+    domain: "file.sparrowx.net",
+    url: "/drop",
+    badge: "Storage",
+  },
+  {
+    id: "keys",
+    name: "SparrowX Keys (Crypto Suite)",
+    tagline: "Air-gapped CSPRNG master password, JWT secret & cryptographic key generator.",
+    domain: "password.sparrowx.net",
+    url: "/keys",
+    badge: "Crypto",
+  },
+  {
+    id: "infra",
+    name: "SparrowX Cloud Infra (VPS)",
+    tagline: "Dedicated bare-metal NVMe compute nodes & instant Linux cloud provisioning.",
+    domain: "infra.sparrowx.net",
+    url: "/infra",
+    badge: "Compute",
+  },
+];
+
+function resolveServiceDashboardUrl(srv: ClientTenant): string {
+  const hay = `${srv.name} ${srv.primaryDomain} ${srv.enabledModules.join(" ")}`.toLowerCase();
+  if (hay.includes("netsec") || hay.includes("ddos")) return "https://netsec.sparrowx.net";
+  if (hay.includes("game") || hay.includes("fivem") || hay.includes("minecraft")) return "/game/dashboard";
+  if (hay.includes("db") || hay.includes("postgres") || hay.includes("database")) return "/db";
+  if (hay.includes("drop") || hay.includes("file") || hay.includes("vault")) return "/drop";
+  if (hay.includes("key") || hay.includes("password")) return "/keys";
+  if (hay.includes("infra") || hay.includes("vps")) return "/infra";
+  return "/shield";
+}
+
 export function ClientPortalView({
   activeNav,
   onNavigate,
@@ -245,7 +324,16 @@ export function ClientPortalView({
 }) {
   // Add Service Modal / Form state in Client Area
   const [showAddServiceForm, setShowAddServiceForm] = useState(false);
+  const [selectedCatalogServiceId, setSelectedCatalogServiceId] = useState<string>(
+    SPARROWX_ROUTING_SERVICES[0]?.id ?? "cloud-db",
+  );
   const [onboardingWizardTenant, setOnboardingWizardTenant] = useState<ClientTenant | null>(null);
+
+  const launchServiceDestination = (url: string, label?: string) => {
+    if (typeof window === "undefined") return;
+    if (label) showToast(`Routing to ${label}...`);
+    window.location.href = url;
+  };
   const [serviceName, setServiceName] = useState("");
   const [primaryDomain, setPrimaryDomain] = useState("");
   const [planTier, setPlanTier] = useState<PlanTier>("Growth");
@@ -1694,8 +1782,10 @@ export function ClientPortalView({
             showToast={showToast}
             onOpenAttackSimulator={() => {
               setIntegrationTenant(null);
-              onNavigate("Protection Status & Verification");
-              showToast("Opened Protection Status & Verification for threat simulation.");
+              if (typeof window !== "undefined") {
+                window.open("https://netsec.sparrowx.net", "_blank", "noopener,noreferrer");
+              }
+              showToast("Opened SparrowX NetSec Protection System (netsec.sparrowx.net).");
             }}
           />
         )}
@@ -2439,8 +2529,10 @@ export async function emitSecurityTelemetry(event: {
           showToast={showToast}
           onOpenAttackSimulator={() => {
             setIntegrationTenant(null);
-            onNavigate("Protection Status & Verification");
-            showToast("Opened Protection Status & Verification for threat simulation.");
+            if (typeof window !== "undefined") {
+              window.open("https://netsec.sparrowx.net", "_blank", "noopener,noreferrer");
+            }
+            showToast("Opened SparrowX NetSec Protection System (netsec.sparrowx.net).");
           }}
         />
       )}
@@ -4610,16 +4702,6 @@ export function PortalLoginScreen({
                 <Search className="size-3.5" />
                 <span>Scan Your Domain</span>
               </a>
-            </div>
-
-            {/* Live Interactive 2D Dot-Matrix Threat Map Interception Engine */}
-            <div className="mt-6">
-              <CyberThreatMatrixMap
-                height={620}
-                showControls={true}
-                showFeed={true}
-                showStats={true}
-              />
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

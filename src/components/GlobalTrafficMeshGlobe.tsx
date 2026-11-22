@@ -30,8 +30,23 @@ import { Button } from "@/components/ui/button";
 import { CountryFlag } from "@/components/ui/CountryFlag";
 import type { ClientTenant, ProtectedService } from "@/lib/supabase";
 import { getStoredProspects } from "@/components/GrowthAndMonetizationHub";
-import { CyberThreatGlobe, type ThreatCity, DEFAULT_CITIES } from "@/components/CyberThreatGlobe";
-import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
+
+interface ThreatCity {
+  name: string;
+  lat: number;
+  lon: number;
+  isOrigin?: boolean;
+  country?: string;
+  hostingHub?: string;
+  threatLevel?: "nominal" | "elevated" | "critical";
+  activeThreats?: number;
+}
+
+const DEFAULT_CITIES: ThreatCity[] = [
+  { name: "Roubaix (OVH Host)", lat: 50.69, lon: 3.17, isOrigin: true, country: "France", hostingHub: "OVHcloud EU-West Host", threatLevel: "nominal", activeThreats: 0 },
+  { name: "Frankfurt", lat: 50.11, lon: 8.68, isOrigin: true, country: "Germany", hostingHub: "EU-Central Origin Host", threatLevel: "nominal", activeThreats: 0 },
+  { name: "Singapore", lat: 1.35, lon: 103.82, isOrigin: true, country: "Singapore", hostingHub: "AP-South Origin Host", threatLevel: "nominal", activeThreats: 0 },
+];
 
 // ==========================================
 // Types & Telemetry Models
@@ -1601,64 +1616,28 @@ export default sparrowxShield;
         </div>
       </div>
 
-      {/* 4. The 2D Dot-Matrix Threat Map & Infrastructure Mesh View */}
+      {/* 4. Global Threat Map Link (Managed on netsec.sparrowx.net) */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-xs">
-            <button
-              type="button"
-              onClick={() => setGlobeVisualEngine("threat_matrix")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                globeVisualEngine === "threat_matrix"
-                  ? "bg-amber-500 text-black shadow-md shadow-amber-500/20 font-bold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Zap className="size-3.5" />
-              <span>Cyber Threat Matrix (Dot-Matrix Map)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setGlobeVisualEngine("infrastructure")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
-                globeVisualEngine === "infrastructure"
-                  ? "bg-primary text-primary-foreground shadow-md"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Globe2 className="size-3.5" />
-              <span>Origin Infrastructure Mesh</span>
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card/90 p-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Globe2 className="size-4 text-primary" />
+              <span>Global Threat Map &amp; XDP Telemetry</span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Live geographic attack visualization and kernel-level XDP packet scrubbing are hosted on your dedicated NetSec console.
+            </p>
           </div>
-
-          <div className="text-xs text-muted-foreground font-mono">
-            {globeVisualEngine === "threat_matrix" ? (
-              <span className="text-amber-400 font-semibold flex items-center gap-1.5">
-                <span className="size-2 rounded-full bg-amber-400 animate-ping" />
-                <span>Active Engine: 2D Dot-Matrix Equirectangular Grid</span>
-              </span>
-            ) : (
-              <span>Active Engine: Multi-Datacenter Routing Mesh</span>
-            )}
-          </div>
+          <a
+            href="https://netsec.sparrowx.net/map"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:opacity-90 transition-opacity"
+          >
+            <Globe2 className="size-3.5" />
+            <span>Open NetSec Threat Map</span>
+          </a>
         </div>
-
-        <CyberThreatMatrixMap
-          customCities={threatCities.map((c) => ({
-            name: c.name,
-            lat: c.lat,
-            lon: c.lon,
-            country: c.country || c.name,
-            isOrigin: c.isOrigin,
-            hostingHub: c.hostingHub,
-            threatLevel: c.threatLevel,
-            ip: c.isOrigin ? (activeOrigin ? activeOrigin.ip : "51.68.21.44") : undefined,
-          }))}
-          height={660}
-          showControls={true}
-          showFeed={true}
-          showStats={true}
-        />
 
             {/* Bottom Ticker Strip */}
             <div className="flex flex-wrap items-center justify-between gap-3 border border-border/80 rounded-xl bg-card/90 px-4 py-2.5 text-xs font-mono">

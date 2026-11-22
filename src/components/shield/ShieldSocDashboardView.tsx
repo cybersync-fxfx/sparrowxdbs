@@ -21,7 +21,6 @@ import {
   User,
   Webhook,
 } from "lucide-react";
-import { CyberThreatMatrixMap } from "@/components/CyberThreatMatrixMap";
 import { SparrowxSentraSocWorkbench, type SocViewMode } from "@/components/SparrowxSentraSocWorkbench";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
@@ -558,16 +557,6 @@ export function ShieldSocDashboardView({
                 )}
               </div>
             )}
-          </div>
-
-          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-3 sm:p-4">
-            <CyberThreatMatrixMap
-              height={typeof window !== "undefined" && window.innerWidth < 640 ? 300 : 420}
-              enableSimulation={false}
-              showControls={true}
-              showFeed={true}
-              showStats={true}
-            />
           </div>
         </section>
 

@@ -17,14 +17,28 @@ export const Route = createFileRoute("/api/public/razorpay/webhook")({
           return new Response("bad json", { status: 400 });
         }
         const p = evt.payload?.payment?.entity;
-        if (evt.event !== "payment.captured" || !p?.id || !p.amount || !p.notes?.client_id) {
+        if (
+          evt.event !== "payment.captured" ||
+          !p?.id ||
+          typeof p.amount !== "number" ||
+          !Number.isFinite(p.amount) ||
+          p.amount < 100 ||
+          !p.notes?.client_id
+        ) {
           return Response.json({ ignored: true });
         }
         const clientId = p.notes.client_id;
         if (!/^[0-9a-f-]{36}$/i.test(clientId)) return new Response("bad client", { status: 400 });
-        const { creditTopup } = await import("@/lib/server/portal.server");
-        const r = await creditTopup(clientId, Math.floor(p.amount / 100), p.id);
-        return Response.json({ ok: true, applied: r.applied });
+        try {
+          const { creditTopup } = await import("@/lib/server/portal.server");
+          const r = await creditTopup(clientId, Math.floor(p.amount / 100), p.id);
+          return Response.json({ ok: true, applied: r.applied });
+        } catch (err) {
+          return Response.json(
+            { ok: false, error: err instanceof Error ? err.message : "Failed to apply topup" },
+            { status: 500 },
+          );
+        }
       },
     },
   },

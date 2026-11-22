@@ -993,7 +993,7 @@ export function SparrowxMasterLanding({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Shield</div>
-                  <div className="text-[10px] text-zinc-400 truncate">2D Dot-Matrix Threat Map &amp; DDoS Defense</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Autonomous Edge WAF &amp; DDoS Defense</div>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">sec.sparrowx.net</span>
               </button>
@@ -1435,7 +1435,7 @@ export function SparrowxMasterLanding({
               </div>
               <h3 className="font-bold text-white text-base font-sans">SparrowX Shield</h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Shadowshield defense engine with our iconic 2D Dot-Matrix Threat Map. Sub-second DDoS deflection and complete origin IP cloaking.
+                Shadowshield defense engine with autonomous edge WAF and real-time DDoS telemetry on NetSec. Sub-second deflection and complete origin IP cloaking.
               </p>
             </div>
             <button

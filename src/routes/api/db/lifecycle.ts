@@ -55,6 +55,13 @@ export const Route = createFileRoute("/api/db/lifecycle")({
           );
         }
 
+        if (action !== "list_audit" && !dbName) {
+          return Response.json(
+            { ok: false, error: `dbName is required for action "${action}"` },
+            { status: 400 },
+          );
+        }
+
         const auth = await authorizeDbRequest(request, {
           requireAdmin: action === "list_audit" && !dbName,
           ...(email ? { targetEmail: email } : {}),
