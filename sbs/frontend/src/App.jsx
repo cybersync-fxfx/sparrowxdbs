@@ -19,7 +19,10 @@ import Plans       from './pages/Plans';
 
 function hasPendingMasterSsoAttempt() {
   const params = new URLSearchParams(window.location.search);
-  const wantsMasterSso = params.get('sso') === 'master' || Boolean(params.get('ssoToken'));
+  const wantsMasterSso =
+    params.get('sso') === 'master' ||
+    params.get('google_auth') === '1' ||
+    Boolean(params.get('ssoToken'));
   let optedOut = false;
   try {
     optedOut = sessionStorage.getItem('sparrowx_netsec_logged_out') === '1';
@@ -86,7 +89,16 @@ function App() {
         if (data?.token) {
           localStorage.setItem('sparrowx_token', data.token);
           localStorage.removeItem('sbs_token');
+          if (data.user) {
+            setUser(data.user);
+          }
           setToken(data.token);
+          setLoading(false);
+          try {
+            window.history.replaceState({}, '', '/dashboard');
+          } catch {
+            // ignore history API errors
+          }
           return;
         }
         setLoading(false);

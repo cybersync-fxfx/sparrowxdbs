@@ -134,7 +134,7 @@ export default function Auth({ setToken, initialTab = 'login' }) {
         } catch {
           optedOut = false;
         }
-        if ((ssoMode === 'master' || urlToken) && (data.authenticated || urlToken) && !optedOut) {
+        if ((ssoMode === 'master' || params.get('google_auth') === '1' || urlToken) && (data.authenticated || urlToken) && !optedOut) {
           await handleMasterSsoLogin(urlToken);
         }
       })

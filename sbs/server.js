@@ -1201,11 +1201,52 @@ app.get('/api/auth/google/login', (req, res) => {
   return res.redirect(302, target);
 });
 
+async function verifyMasterSsoCookieOrRemote(req, rawToken) {
+  if (!rawToken) return null;
+  const localClaims = pgCompat.verifyMasterSsoCookieValue(rawToken);
+  if (localClaims) return localClaims;
+
+  // Fallback: verify `spx_master_sso` directly against the Master Portal in case container secrets were rotated
+  const candidates = [
+    process.env.SPARROWX_INTERNAL_URL || 'http://sparrowx:3000',
+    MASTER_PORTAL_URL,
+  ].filter(Boolean);
+
+  for (const base of candidates) {
+    try {
+      const verifyUrl = `${String(base).replace(/\/+$/, '')}/api/auth/master-sso`;
+      const resp = await fetch(verifyUrl, {
+        method: 'GET',
+        headers: {
+          Cookie: `${pgCompat.MASTER_SSO_COOKIE_NAME}=${encodeURIComponent(rawToken)}`,
+          'x-sparrowx-master-sso': rawToken,
+        },
+        signal: AbortSignal.timeout(3500),
+      });
+      if (!resp.ok) continue;
+      const body = await resp.json().catch(() => null);
+      if (body && body.authenticated && body.user && body.user.email) {
+        return {
+          sub: String(body.user.id || `usr_${body.user.email}`),
+          email: String(body.user.email).trim().toLowerCase(),
+          fullName: String(body.user.fullName || body.user.email.split('@')[0] || 'Operator'),
+          role: body.user.role === 'admin' ? 'admin' : 'client',
+          tenantId: body.user.tenantId ? String(body.user.tenantId) : null,
+          exp: typeof body.user.exp === 'number' ? body.user.exp : Math.floor(Date.now() / 1000) + 3600,
+        };
+      }
+    } catch {
+      // Try next candidate
+    }
+  }
+  return null;
+}
+
 app.get('/api/auth/master-sso', async (req, res) => {
   const peek = req.query.peek === '1' || req.query.peek === 'true';
   const cookies = pgCompat.parseCookies(req.headers.cookie || '');
   const rawToken = String(req.query.token || cookies[pgCompat.MASTER_SSO_COOKIE_NAME] || '').trim();
-  const claims = pgCompat.verifyMasterSsoCookieValue(rawToken);
+  const claims = await verifyMasterSsoCookieOrRemote(req, rawToken);
 
   if (!claims) {
     if (peek) {
@@ -1279,7 +1320,7 @@ app.post('/api/auth/master-sso', async (req, res) => {
   const rawToken = String(
     req.body?.ssoToken || req.query?.token || cookies[pgCompat.MASTER_SSO_COOKIE_NAME] || ''
   ).trim();
-  const claims = pgCompat.verifyMasterSsoCookieValue(rawToken);
+  const claims = await verifyMasterSsoCookieOrRemote(req, rawToken);
   if (!claims) {
     return res.status(401).json({ error: 'Invalid or expired SparrowX Master session.' });
   }
