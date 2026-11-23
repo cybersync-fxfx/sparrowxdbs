@@ -21,6 +21,10 @@ import {
   Zap,
 } from "lucide-react";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import {
+  RyzenChipPinIcon,
+  HardwarePinGridWatermark,
+} from "@/components/ui/ProcessorChipPinIcons";
 import { IntelXeonGoldPricingSection } from "@/components/infra/IntelXeonGoldPricingSection";
 import { UpiAutoPayModal } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
@@ -145,18 +149,21 @@ export function InfraPriceCard({
   onConfigure,
 }: InfraPriceCardProps) {
   const price = computePlanPrice(plan, currency, billingCycle);
-  const formattedMonthlyPrice =
-    currency === "INR"
-      ? `₹${price.unitMonthly.toLocaleString("en-IN")}.00`
-      : `$${price.unitMonthly}.00`;
+  const formattedMonthlyPrice = price.formattedMonthly;
 
   return (
-    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-5 sm:p-6 hover:border-red-500/40 hover:shadow-[0_12px_36px_rgba(237,28,36,0.18)] transition-all duration-200 flex flex-col justify-between">
-      <div>
+    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-5 sm:p-6 hover:border-red-500/50 hover:shadow-[0_12px_40px_rgba(237,28,36,0.22)] transition-all duration-200 flex flex-col justify-between overflow-hidden">
+      {/* Background AM5 Circuit & Pin Watermark */}
+      <HardwarePinGridWatermark accent="red" />
+
+      <div className="relative z-10">
         {/* Top Node & Stock Badge row */}
-        <div className="flex items-center justify-between gap-2 mb-5">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/30 tracking-wide">
-            {plan.nodeLocation || "Mumbai Node"}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 font-mono tracking-wide">
+            <span className="size-1.5 rounded-full bg-red-400" />
+            <span className="text-amber-300 font-bold">AM5</span>
+            <span>•</span>
+            <span>Mumbai Node</span>
           </span>
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
             <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -164,53 +171,58 @@ export function InfraPriceCard({
           </span>
         </div>
 
-        {/* Server Icon & Title */}
+        {/* Ryzen Chip with Pins Icon & Plan Title */}
         <div className="flex items-center gap-3.5 mb-4">
-          <div className="size-11 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
-            <Server className="size-5 text-red-400" />
+          <div className="relative size-12 rounded-xl bg-gradient-to-br from-red-950/70 via-[#120508] to-[#0A0D14] border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_18px_rgba(237,28,36,0.25)] group-hover:border-red-500/70 group-hover:shadow-[0_0_24px_rgba(237,28,36,0.45)] transition-all">
+            <RyzenChipPinIcon className="size-10" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-red-400 transition-colors">
+            <h3 className="text-base font-bold text-white tracking-tight group-hover:text-red-400 transition-colors">
               {plan.name}
             </h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              {plan.nodeLocation || "Tier IV Mumbai"}
+            <p className="text-[11px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1">
+              <span className="text-red-400 font-semibold">Zen 5</span>
+              <span>• 5.7 GHz Boost</span>
             </p>
           </div>
         </div>
 
         {/* Price Row */}
-        <div className="mb-4 tabular-nums">
+        <div className="mb-4 tabular-nums flex items-baseline gap-1">
           <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             {formattedMonthlyPrice}
           </span>
-          <span className="text-xs text-zinc-400 ml-1.5 font-normal">/month</span>
+          <span className="text-xs text-zinc-400 ml-1 font-normal">/month</span>
         </div>
 
         {/* Description */}
-        <p className="text-xs text-zinc-400 leading-relaxed mb-5 line-clamp-3">
+        <p className="text-xs text-zinc-400 leading-relaxed mb-5 line-clamp-2">
           {plan.tagline}
         </p>
 
-        {/* Specs Grid */}
+        {/* Specs Grid with Structured Non-Truncating Pills */}
         <div className="grid grid-cols-2 gap-2.5 py-3 mb-5 border-y border-white/[0.08] text-xs">
-          <div>
-            <span className="text-zinc-500 block text-[11px]">Processor</span>
-            <span className="text-zinc-200 font-medium truncate block">{plan.cpuModel}</span>
+          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Processor</span>
+            <span className="text-white font-semibold block text-xs">Ryzen 9 9950X</span>
+            <span className="text-zinc-400 text-[11px]">16C / 32T Zen 5</span>
           </div>
-          <div>
-            <span className="text-zinc-500 block text-[11px]">
+          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">
               {plan.category === "vds" ? "Dedicated Cores" : "vCPU Cores"}
             </span>
-            <span className="text-zinc-200 font-medium truncate block">{plan.coresThreads}</span>
+            <span className="text-white font-semibold block text-xs">{plan.coresThreads}</span>
+            <span className="text-red-400 text-[11px] font-mono">5.7 GHz Max</span>
           </div>
-          <div>
-            <span className="text-zinc-500 block text-[11px]">Memory</span>
-            <span className="text-zinc-200 font-medium truncate block">{plan.ram}</span>
+          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Memory</span>
+            <span className="text-white font-semibold block text-xs">{plan.ram}</span>
+            <span className="text-zinc-400 text-[11px]">DDR5 ECC</span>
           </div>
-          <div>
-            <span className="text-zinc-500 block text-[11px]">Storage</span>
-            <span className="text-zinc-200 font-medium truncate block">{plan.storage}</span>
+          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Storage</span>
+            <span className="text-white font-semibold block text-xs">{plan.storage}</span>
+            <span className="text-zinc-400 text-[11px]">NVMe Gen5</span>
           </div>
         </div>
 
@@ -231,9 +243,9 @@ export function InfraPriceCard({
       <button
         type="button"
         onClick={() => onConfigure(plan)}
-        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#ED1C24] hover:bg-red-600 text-white font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_16px_rgba(237,28,36,0.25)] hover:shadow-[0_6px_24px_rgba(237,28,36,0.4)] cursor-pointer"
+        className="relative z-10 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ED1C24] to-[#B91C1C] hover:from-red-600 hover:to-red-700 text-white font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_18px_rgba(237,28,36,0.3)] hover:shadow-[0_6px_28px_rgba(237,28,36,0.5)] cursor-pointer"
       >
-        <span>Configure server</span>
+        <span>Configure &amp; Order</span>
         <ArrowRight className="size-4" />
       </button>
     </article>

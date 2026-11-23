@@ -16,6 +16,10 @@ import {
 import type { InfraServerPlan } from "@/lib/infra-plans";
 import { buildWhatsAppSupportUrl } from "@/lib/whatsapp-support";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import {
+  IntelXeonChipPinIcon,
+  HardwarePinGridWatermark,
+} from "@/components/ui/ProcessorChipPinIcons";
 
 export interface XeonPlanItem {
   id: string;
@@ -315,25 +319,28 @@ export function IntelXeonGoldPricingSection({
             return (
               <article
                 key={plan.id}
-                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#08101C]/90 p-5 backdrop-blur-xl transition-all duration-200 ${
+                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#08101C]/90 p-5 backdrop-blur-xl transition-all duration-200 overflow-hidden ${
                   isHighlighted
                     ? "border-[#0284C7]/70 shadow-[0_0_40px_rgba(2,132,199,0.22)]"
                     : "border-white/10 hover:border-[#38BDF8]/45 hover:shadow-[0_12px_36px_rgba(56,189,248,0.14)]"
                 }`}
               >
+                {/* Background LGA Circuit & Pin Matrix Watermark */}
+                <HardwarePinGridWatermark accent="blue" />
+
                 {/* Highlight Ribbon */}
                 {plan.highlight && (
-                  <div className="absolute -top-3 right-4 inline-flex items-center gap-1 rounded-full bg-[#0071C5] px-3 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-lg shadow-sky-600/30">
+                  <div className="absolute -top-3 right-4 inline-flex items-center gap-1 rounded-full bg-[#0071C5] px-3 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-lg shadow-sky-600/30 z-20">
                     <Sparkles className="size-3" aria-hidden="true" />
                     <span>{plan.highlight}</span>
                   </div>
                 )}
 
-                <div>
+                <div className="relative z-10">
                   {/* Plan Header */}
                   <div className="mb-4 flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-md border border-[#38BDF8]/25 bg-[#38BDF8]/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#38BDF8]">
-                      Dual Xeon Gold
+                      Dual Xeon Gold • LGA
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
                       <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -341,14 +348,22 @@ export function IntelXeonGoldPricingSection({
                     </span>
                   </div>
 
-                  <h3 className="text-xl font-bold tracking-tight text-[#F4F6FA]">
-                    {plan.name}
-                  </h3>
-                  <p className="mt-0.5 text-xs text-[#F4F6FA]/65">
-                    {plan.tier === "vds"
-                      ? "Dedicated Physical Cores · Dual Socket"
-                      : "KVM Shared vCPU · Dual Socket"}
-                  </p>
+                  {/* Intel Chip Pin Icon & Title */}
+                  <div className="flex items-center gap-3.5 mb-4">
+                    <div className="relative size-12 rounded-xl bg-gradient-to-br from-sky-950/70 via-[#071324] to-[#08101C] border border-[#38BDF8]/35 flex items-center justify-center text-sky-400 shrink-0 shadow-[0_0_18px_rgba(56,189,248,0.2)] group-hover:border-[#38BDF8]/70 group-hover:shadow-[0_0_24px_rgba(56,189,248,0.4)] transition-all">
+                      <IntelXeonChipPinIcon className="size-10" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-bold tracking-tight text-[#F4F6FA]">
+                        {plan.name}
+                      </h3>
+                      <p className="mt-0.5 text-xs text-[#38BDF8]/80 font-mono">
+                        {plan.tier === "vds"
+                          ? "Dedicated Cores · Dual Socket"
+                          : "KVM Shared vCPU · Dual Socket"}
+                      </p>
+                    </div>
+                  </div>
 
                   {/* Price */}
                   <div className="mt-5 flex items-baseline gap-1 border-b border-white/10 pb-5 tabular-nums">
