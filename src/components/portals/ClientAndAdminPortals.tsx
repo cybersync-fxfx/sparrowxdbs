@@ -469,46 +469,11 @@ export function ClientPortalView({
   const [activeSubscription, setActiveSubscription] = useState<ClientSubscriptionRecord>(() =>
     getClientActiveSubscription(activeTenant?.id),
   );
-  const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<SparrowxPlan | null>(null);
-  const [checkoutBillingCycle, setCheckoutBillingCycle] = useState<"monthly" | "annual">("monthly");
-  const [checkoutPaymentMethod, setCheckoutPaymentMethod] = useState<"card" | "wire" | "upi" | "binance">("card");
-  const [billingCycleToggle, setBillingCycleToggle] = useState<"monthly" | "annual">("monthly");
   const [showCostArchitectureBreakdown, setShowCostArchitectureBreakdown] = useState(false);
 
   useEffect(() => {
     setActiveSubscription(getClientActiveSubscription(activeTenant?.id));
   }, [activeTenant?.id]);
-
-  const handleSubscribeToPlan = (
-    plan: SparrowxPlan,
-    cycle: "monthly" | "annual" = "monthly",
-    method = "Credit Card / Auto-Pay",
-  ) => {
-    const sub = subscribeToPlan(plan.id, cycle, method, activeTenant?.id);
-    setActiveSubscription(sub);
-
-    const price = cycle === "annual" ? plan.annualPriceMonthly * 12 : plan.monthlyPrice;
-    const newTx = recordBillingTransaction(
-      {
-        type: "service_purchase",
-        credits: 0,
-        costUsd: price,
-        title: `Subscription Activated: ${plan.name} (${cycle.toUpperCase()})`,
-        description: `Plan activated with ${plan.maxDomains === -1 ? "unlimited" : plan.maxDomains} domain(s), ${plan.requestQuotaMonthly.toLocaleString()} req/mo quota, ${plan.sla}.`,
-        paymentMethod: method,
-      },
-      activeTenant?.id,
-      currentUser?.email,
-    );
-    setBillingTransactions((prev) => [newTx, ...prev]);
-
-    if (activeTenant) {
-      void onRenameOrUpdateTenant(activeTenant.id, { planTier: plan.name as PlanTier });
-    }
-
-    showToast(`Subscribed to ${plan.name} (${cycle})! Protection is active.`);
-    setSelectedPlanForCheckout(null);
-  };
 
   const clickedService = tenants.find((t) => t.id === clickedServiceId) ?? null;
 
@@ -547,16 +512,6 @@ export function ClientPortalView({
     e.preventDefault();
     if (!serviceName.trim() || !primaryDomain.trim()) return;
 
-    // Check active plan domain quota
-    const plan = getPlanById(activeSubscription.planId);
-    if (plan.maxDomains !== -1 && tenants.length >= plan.maxDomains) {
-      showToast(
-        `Plan domain limit reached (${tenants.length}/${plan.maxDomains}). Upgrade your plan to protect additional domains.`,
-      );
-      onNavigate("Billing & Credits");
-      return;
-    }
-
     await onCreateTenant({
       name: serviceName.trim(),
       contactEmail: currentUser?.email ?? "client@company.com",
@@ -566,7 +521,7 @@ export function ClientPortalView({
     });
 
     showToast(
-      `Successfully provisioned ${serviceName.trim()} under your ${plan.name} subscription!`,
+      `Successfully provisioned ${serviceName.trim()} under your SparrowX account!`,
     );
     setServiceName("");
     setPrimaryDomain("");
@@ -812,10 +767,9 @@ export function ClientPortalView({
                       <div className="mt-5 border-t border-border pt-3 text-xs">
                         <div className="flex items-center justify-between text-muted-foreground">
                           <span>
-                            Plan: <strong className="text-foreground">{srv.planTier}</strong> ($
-                            {getPlanPrice(srv.planTier)}/mo)
+                            Department: <strong className="text-foreground">SparrowX Shield</strong> · Active
                           </span>
-                          <span>Due: {getDueDateLabel(idx)}</span>
+                          <span>Renewal: {getDueDateLabel(idx)}</span>
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-2">
                           <Button
@@ -900,7 +854,7 @@ export function ClientPortalView({
                   <div className="flex items-start justify-between border-b border-border pb-3">
                     <div>
                       <span className="text-[10px] font-semibold uppercase text-primary">
-                        {clickedService.id} · {clickedService.planTier} Plan
+                        {clickedService.id} · SparrowX Shield Protection
                       </span>
                       <h2 className="mt-0.5 text-lg font-semibold">{clickedService.name}</h2>
                       <p className="font-mono text-xs text-muted-foreground">
@@ -1100,12 +1054,13 @@ export function ClientPortalView({
                 </span>
               </div>
               <div className="border border-border bg-card p-4">
-                <span className="text-xs text-muted-foreground">Monthly Commitment</span>
-                <div className="mt-2 font-display text-2xl font-semibold">
-                  ${tenants.reduce((sum, t) => sum + getPlanPrice(t.planTier), 0)}/mo
+                <span className="text-xs text-muted-foreground">SparrowX Central Wallet</span>
+                <div className="mt-2 font-display text-2xl font-semibold flex items-center gap-1.5 text-amber-400">
+                  <Coins className="size-5" />
+                  {creditBalance.toLocaleString()} Coins
                 </div>
                 <span className="mt-1 block text-[11px] text-muted-foreground">
-                  Next Consolidated Due Date: {getDueDateLabel(0)}
+                  1 Coin = ₹1.00 INR · Universal department balance
                 </span>
               </div>
               <div className="border border-border bg-card p-4">
@@ -1124,7 +1079,7 @@ export function ClientPortalView({
                   </Button>
                 </div>
                 <p className="mt-2 text-[11px] text-muted-foreground">
-                  Ensures uninterrupted WAF & AI Guardrail protection on your renewal due dates.
+                  Ensures continuous WAF, NVMe Gen5 compute &amp; DDoS scrubbing across all departments.
                 </p>
               </div>
             </div>
@@ -1132,11 +1087,10 @@ export function ClientPortalView({
             <div className="border border-border bg-card">
               <div className="border-b border-border px-5 py-4">
                 <h2 className="text-base font-semibold">
-                  Service Subscriptions, Plans & Renewal Due Dates
+                  Active Department Services &amp; Renewal Status
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Upgrade or change plans, customize subscribed modules, and track upcoming due
-                  dates per service.
+                  Monitor active SparrowX Shield, Sovereign DB, and Cloud Infra deployments funded by your central wallet.
                 </p>
               </div>
               <div className="divide-y divide-border">
@@ -1150,7 +1104,7 @@ export function ClientPortalView({
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold">{srv.name}</span>
                           <span className="rounded-sm bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            {srv.planTier} (${getPlanPrice(srv.planTier)}/mo)
+                            SparrowX Shield · Active
                           </span>
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">
@@ -1182,339 +1136,221 @@ export function ClientPortalView({
           </section>
         )}
 
-        {/* TAB: PLANS & SUBSCRIPTIONS (REPLACED CREDIT COINS WITH 6 OFFICIAL BUSINESS PLANS) */}
+        {/* TAB: BILLING & SPARROWX COINS (UNIFIED PLATFORM WALLET) */}
         {currentAreaTab === "Billing & Credits" && (() => {
-          const currentPlan = getPlanById(activeSubscription.planId);
-          const domainsUsed = tenants.length;
-          const isAtLimit = currentPlan.maxDomains !== -1 && domainsUsed >= currentPlan.maxDomains;
-
           return (
             <section className="space-y-6">
-              {/* 1. Hero Active Plan & Resource Utilization HUD */}
+              {/* 1. Hero SparrowX Coins Central Wallet HUD */}
               <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-card via-primary/[0.04] to-card p-6 shadow-xl">
                 <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-primary/10 blur-3xl" />
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                   <div>
                     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-                      <ShieldCheck className="size-4 text-emerald-400" />
-                      <span>Active Sovereign Subscription</span>
+                      <Coins className="size-4 text-amber-400" />
+                      <span>SparrowX Central Wallet</span>
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-400">
                         <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        Autonomous Shield Live
+                        Universal Auto-Debit Active
                       </span>
-                      {currentPlan.badge && (
-                        <span className="rounded-md bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
-                          {currentPlan.badge}
-                        </span>
-                      )}
+                      <span className="rounded-md bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-400">
+                        1 Coin = ₹1.00 INR
+                      </span>
                     </div>
-                    <div className="mt-2 flex items-baseline gap-3">
-                      <span className="font-display text-3xl font-extrabold tracking-tight text-foreground">
-                        {currentPlan.name}
+                    <div className="mt-3 flex items-baseline gap-3">
+                      <span className="font-display text-4xl font-extrabold tracking-tight text-foreground">
+                        {creditBalance.toLocaleString()}
                       </span>
                       <span className="font-mono text-lg font-bold text-primary">
-                        ${activeSubscription.priceUsd} USD
-                        <span className="text-xs font-normal text-muted-foreground">
-                          /{activeSubscription.billingCycle === "annual" ? "yr" : "mo"}
-                        </span>
+                        SparrowX Coins
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        (≈ ₹{creditBalance.toLocaleString()} INR)
                       </span>
                     </div>
-                    <p className="mt-1.5 text-xs text-muted-foreground max-w-xl">
-                      {currentPlan.tagline} Next automated renewal due on{" "}
-                      <strong className="text-foreground">{activeSubscription.nextRenewalDate}</strong> via{" "}
-                      <span className="text-foreground">{activeSubscription.paymentMethod}</span>.
+                    <p className="mt-2 text-xs text-muted-foreground max-w-xl leading-relaxed">
+                      Unified platform currency powering all <strong>SparrowX departments</strong>: Autonomous Shield Defense, Sovereign PostgreSQL Databases, Cloud NVMe VPS/VDS, and Game Hosting.
                     </p>
                   </div>
 
-                  {/* Plan Quota Badges */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
-                    <div className="rounded-xl border border-border/70 bg-background/60 p-3 text-center">
-                      <div className="text-[10px] uppercase font-semibold text-muted-foreground">Protected Domains</div>
-                      <div className={`mt-1 font-mono text-sm font-bold ${isAtLimit ? "text-amber-400" : "text-emerald-400"}`}>
-                        {domainsUsed} / {currentPlan.maxDomains === -1 ? "Unlimited" : currentPlan.maxDomains}
-                      </div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">
-                        {isAtLimit ? "Quota Reached" : "Available"}
-                      </div>
-                    </div>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                    <Button
+                      onClick={() => {
+                        setNeededCreditsForService(undefined);
+                        setShowPaymentModal(true);
+                      }}
+                      size="lg"
+                      className="bg-primary font-bold text-black hover:opacity-95 shadow-lg shadow-primary/25 cursor-pointer"
+                    >
+                      <Plus className="size-4 mr-2" /> Top-Up Coins
+                    </Button>
+                  </div>
+                </div>
 
-                    <div className="rounded-xl border border-border/70 bg-background/60 p-3 text-center">
-                      <div className="text-[10px] uppercase font-semibold text-muted-foreground">Monthly Quota</div>
-                      <div className="mt-1 font-mono text-sm font-bold text-foreground">
-                        {(currentPlan.requestQuotaMonthly / 1_000_000).toFixed(currentPlan.requestQuotaMonthly >= 1_000_000 ? 1 : 2)}M
-                      </div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">Requests/mo</div>
-                    </div>
-
-                    <div className="rounded-xl border border-border/70 bg-background/60 p-3 text-center">
-                      <div className="text-[10px] uppercase font-semibold text-muted-foreground">Vault Retention</div>
-                      <div className="mt-1 font-mono text-sm font-bold text-foreground">
-                        {currentPlan.retentionDays} Days
-                      </div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">Audit Trail</div>
-                    </div>
-
-                    <div className="rounded-xl border border-border/70 bg-background/60 p-3 text-center">
-                      <div className="text-[10px] uppercase font-semibold text-muted-foreground">Response SLA</div>
-                      <div className="mt-1 font-mono text-xs font-bold text-primary truncate">
-                        {currentPlan.sla.split("(")[0]}
-                      </div>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">Guaranteed</div>
-                    </div>
+                {/* Department Auto-Debit Integration Bar */}
+                <div className="mt-6 pt-4 border-t border-border/70 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                  <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+                    <div className="text-[10px] uppercase font-semibold text-muted-foreground">SparrowX Shield</div>
+                    <div className="mt-1 font-mono text-xs font-bold text-emerald-400">Pay-as-you-go WAF</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">DDoS &amp; L7 Auto-debit</div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+                    <div className="text-[10px] uppercase font-semibold text-muted-foreground">Cloud Database</div>
+                    <div className="mt-1 font-mono text-xs font-bold text-sky-400">Storage &amp; PgBouncer</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">0% Egress tax</div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+                    <div className="text-[10px] uppercase font-semibold text-muted-foreground">Cloud Infra</div>
+                    <div className="mt-1 font-mono text-xs font-bold text-orange-400">Ryzen 9 VPS / VDS</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">Monthly billing via Coins</div>
+                  </div>
+                  <div className="rounded-xl border border-border/60 bg-background/50 p-3">
+                    <div className="text-[10px] uppercase font-semibold text-muted-foreground">Game Hosting</div>
+                    <div className="mt-1 font-mono text-xs font-bold text-purple-400">FiveM / SA-MP / MC</div>
+                    <div className="text-[9px] text-muted-foreground mt-0.5">Pterodactyl panel nodes</div>
                   </div>
                 </div>
               </div>
 
-              {/* 2. Billing Cycle Toggle Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/70 pb-4">
-                <div>
-                  <h3 className="text-base font-bold text-foreground">Choose Your SparrowX Defense Plan</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Select from 6 production-grade subscription tiers designed for your exact workload and scale.
-                  </p>
+              {/* 2. SparrowX Coins Purchase Packages */}
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                      <Coins className="size-4 text-primary" />
+                      <span>Purchase SparrowX Coins</span>
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Fund your wallet instantly using UPI AutoPay / QR, Binance Pay (USDT), or Cards. Zero subscription lock-in.
+                    </p>
+                  </div>
+                  <div className="text-xs font-mono text-primary font-semibold">
+                    1 Coin = ₹1 INR • Instant Delivery
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-auto rounded-xl border border-border bg-card p-1">
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycleToggle("monthly")}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                      billingCycleToggle === "monthly"
-                        ? "bg-primary text-black shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    Monthly Billing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBillingCycleToggle("annual")}
-                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                      billingCycleToggle === "annual"
-                        ? "bg-primary text-black shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span>Annual Billing</span>
-                    <span className="rounded bg-emerald-500/20 px-1.5 py-0.2 text-[10px] font-bold text-emerald-400">
-                      Save up to 20%
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 3. The 6 Official SparrowX Subscription Plans Grid */}
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {SPARROWX_PLANS.map((plan) => {
-                  const isCurrent = activeSubscription.planId === plan.id;
-                  const priceToDisplay =
-                    billingCycleToggle === "annual" ? plan.annualPriceMonthly : plan.monthlyPrice;
-
-                  return (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    {
+                      id: "starter",
+                      name: "Starter Pack",
+                      coins: 500,
+                      priceInr: 500,
+                      priceUsd: 6,
+                      bonus: "0 Bonus",
+                      desc: "Ideal for prototype APIs, single databases & basic WAF.",
+                    },
+                    {
+                      id: "builder",
+                      name: "Builder Pack",
+                      coins: 1500,
+                      priceInr: 1500,
+                      priceUsd: 18,
+                      bonus: "+100 Bonus Coins",
+                      popular: true,
+                      desc: "Powers production Shield WAF, databases, and Discord bots.",
+                    },
+                    {
+                      id: "scale",
+                      name: "Scale Pack",
+                      coins: 3000,
+                      priceInr: 3000,
+                      priceUsd: 36,
+                      bonus: "+300 Bonus Coins",
+                      desc: "High-traffic game servers, VPS compute, and multi-tenant DB.",
+                    },
+                    {
+                      id: "enterprise",
+                      name: "Enterprise Pack",
+                      coins: 10000,
+                      priceInr: 10000,
+                      priceUsd: 120,
+                      bonus: "+1,500 Bonus Coins",
+                      desc: "Dedicated Ryzen VDS, hyperscale defense & full cluster mesh.",
+                    },
+                  ].map((pkg) => (
                     <div
-                      key={plan.id}
+                      key={pkg.id}
                       className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all shadow-md ${
-                        isCurrent
-                          ? "border-emerald-500/70 bg-gradient-to-b from-emerald-950/20 via-card to-card ring-1 ring-emerald-500/40"
-                          : plan.popular
-                          ? "border-primary/60 bg-gradient-to-b from-primary/[0.07] via-card to-card hover:border-primary hover:shadow-xl"
+                        pkg.popular
+                          ? "border-primary/60 bg-gradient-to-b from-primary/[0.07] via-card to-card hover:border-primary hover:shadow-xl ring-1 ring-primary/30"
                           : "border-border bg-card hover:border-primary/40 hover:shadow-lg"
                       }`}
                     >
-                      {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="rounded-md border border-border bg-secondary/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground">
-                          {plan.tier}
+                      {pkg.popular && (
+                        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-black">
+                          Most Popular
                         </span>
-                        {isCurrent ? (
-                          <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-400 flex items-center gap-1">
-                            <CheckCircle2 className="size-3" /> Active Plan
-                          </span>
-                        ) : plan.badge ? (
-                          <span className="rounded-full bg-primary/20 border border-primary/40 px-2.5 py-0.5 text-[10px] font-bold uppercase text-primary">
-                            {plan.badge}
-                          </span>
-                        ) : null}
-                      </div>
+                      )}
 
-                      {/* Header Info */}
                       <div>
-                        <h4 className="text-lg font-bold text-foreground">{plan.name}</h4>
-                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                          {plan.tagline}
-                        </p>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                          <span className="font-semibold">{pkg.name}</span>
+                          <span className="rounded bg-emerald-500/15 text-emerald-400 font-mono text-[10px] px-2 py-0.5 font-bold">
+                            {pkg.bonus}
+                          </span>
+                        </div>
 
-                        {/* Price */}
-                        <div className="mt-4 flex items-baseline gap-1.5 border-y border-border/60 py-3">
+                        <div className="flex items-baseline gap-1.5 mt-2">
                           <span className="font-display text-3xl font-extrabold text-foreground">
-                            ${priceToDisplay}
+                            {pkg.coins.toLocaleString()}
                           </span>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            USD / month
+                          <span className="text-xs font-semibold text-primary font-mono">
+                            Coins
                           </span>
-                          {billingCycleToggle === "annual" && (
-                            <span className="ml-auto text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                              Billed ${plan.annualPriceMonthly * 12}/yr
-                            </span>
-                          )}
                         </div>
 
-                        {/* Quota Highlights */}
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px]">
-                          <div className="rounded-lg bg-background/50 border border-border/50 p-2">
-                            <span className="text-muted-foreground block text-[10px]">Domains</span>
-                            <strong className="text-foreground font-mono">
-                              {plan.maxDomains === -1 ? "Unlimited" : `${plan.maxDomains} Domain${plan.maxDomains > 1 ? "s" : ""}`}
-                            </strong>
-                          </div>
-                          <div className="rounded-lg bg-background/50 border border-border/50 p-2">
-                            <span className="text-muted-foreground block text-[10px]">Monthly Requests</span>
-                            <strong className="text-foreground font-mono">
-                              {plan.requestQuotaMonthly.toLocaleString()}
-                            </strong>
-                          </div>
-                          <div className="rounded-lg bg-background/50 border border-border/50 p-2">
-                            <span className="text-muted-foreground block text-[10px]">Audit Retention</span>
-                            <strong className="text-foreground font-mono">{plan.retentionDays} Days</strong>
-                          </div>
-                          <div className="rounded-lg bg-background/50 border border-border/50 p-2">
-                            <span className="text-muted-foreground block text-[10px]">Response SLA</span>
-                            <strong className="text-primary font-mono text-[10px] truncate block">
-                              {plan.sla.split("(")[0]}
-                            </strong>
-                          </div>
+                        <div className="mt-1 text-xs text-muted-foreground font-mono">
+                          ₹{pkg.priceInr.toLocaleString()} INR · (${pkg.priceUsd} USD)
                         </div>
 
-                        {/* Feature Checklist */}
-                        <div className="mt-4 space-y-1.5">
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">
-                            Included Capabilities
-                          </div>
-                          {plan.features.slice(0, 5).map((feat, i) => (
-                            <div key={i} className="flex items-start gap-2 text-xs text-zinc-300">
-                              <Check className="size-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                              <span className="leading-tight text-[11px]">{feat}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Cost Measurement / Unit Economics Pill */}
-                        <div className="mt-4 rounded-lg border border-primary/20 bg-primary/[0.04] p-2.5 text-[10px] text-muted-foreground">
-                          <div className="flex items-center justify-between font-mono font-semibold text-foreground">
-                            <span>Cost to Serve:</span>
-                            <span className="text-primary">${plan.costAnalysis.totalMonthlyCost.toFixed(2)}/mo</span>
-                          </div>
-                          <div className="mt-1 flex items-center justify-between text-[10px]">
-                            <span>Gross Margin:</span>
-                            <span className="font-bold text-emerald-400">{plan.costAnalysis.grossMarginPct}%</span>
-                          </div>
-                          <div className="mt-1 text-[9px] text-zinc-400">
-                            Target: {plan.targetAudience}
-                          </div>
-                        </div>
+                        <p className="mt-3 text-xs text-zinc-400 leading-relaxed">
+                          {pkg.desc}
+                        </p>
                       </div>
 
-                      {/* Action Button */}
                       <div className="mt-5 pt-3 border-t border-border/70">
-                        {isCurrent ? (
-                          <Button
-                            disabled
-                            size="sm"
-                            className="w-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold cursor-default"
-                          >
-                            <CheckCircle2 className="size-4 mr-1.5" /> Current Active Subscription
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={() => {
-                              setSelectedPlanForCheckout(plan);
-                              setCheckoutBillingCycle(billingCycleToggle);
-                            }}
-                            size="sm"
-                            className="w-full bg-primary font-bold text-black hover:opacity-95 shadow-md shadow-primary/20 cursor-pointer"
-                          >
-                            <Sparkles className="size-3.5 mr-1.5" />
-                            {plan.monthlyPrice > currentPlan.monthlyPrice ? "Upgrade to " : "Switch to "}
-                            {plan.name}
-                          </Button>
-                        )}
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setNeededCreditsForService(pkg.coins);
+                            setShowPaymentModal(true);
+                          }}
+                          size="sm"
+                          className="w-full bg-primary font-bold text-black hover:opacity-95 shadow-md shadow-primary/20 cursor-pointer"
+                        >
+                          <Coins className="size-3.5 mr-1.5" />
+                          Buy {pkg.coins.toLocaleString()} Coins
+                        </Button>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
 
-              {/* 4. Unit Economics & Measured Cost Architecture Section */}
-              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <Database className="size-4 text-primary" />
-                      <span>SparrowX Unit Economics & Measured Cost Architecture</span>
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Complete visibility into our edge infrastructure expenses, bandwidth allocations, and sustainable ~85% gross margins.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCostArchitectureBreakdown(!showCostArchitectureBreakdown)}
-                    className="text-xs shrink-0"
-                  >
-                    {showCostArchitectureBreakdown ? "Hide Economics Table" : "View Cost Breakdown Table"}
-                  </Button>
+              {/* 3. SparrowX Ecosystem Architecture Clarification Card */}
+              <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-card via-[#0A0E18] to-card p-5 shadow-sm space-y-3">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="size-5 text-primary" />
+                  <h3 className="text-sm font-bold text-foreground">
+                    Unified Platform Architecture: Zero Fragmented Subscriptions
+                  </h3>
                 </div>
-
-                {showCostArchitectureBreakdown && (
-                  <div className="overflow-x-auto no-scrollbar rounded-xl border border-border/80">
-                    <table className="w-full text-left text-xs font-mono">
-                      <thead className="border-b border-border bg-muted/30 text-[10px] text-muted-foreground uppercase font-sans">
-                        <tr>
-                          <th className="py-2.5 px-3">Plan Tier</th>
-                          <th className="py-2.5 px-3">Monthly Price</th>
-                          <th className="py-2.5 px-3">Edge DNS & Bandwidth</th>
-                          <th className="py-2.5 px-3">WAF Pattern Compute</th>
-                          <th className="py-2.5 px-3">AI Neural Engine</th>
-                          <th className="py-2.5 px-3">Sovereign Vault Storage</th>
-                          <th className="py-2.5 px-3">24/7 SecOps SLA</th>
-                          <th className="py-2.5 px-3 text-primary">Total Cost/mo</th>
-                          <th className="py-2.5 px-3 text-emerald-400">Net Profit/mo</th>
-                          <th className="py-2.5 px-3 text-emerald-400">Gross Margin</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {SPARROWX_PLANS.map((p) => (
-                          <tr key={p.id} className="hover:bg-muted/10 transition-colors">
-                            <td className="py-2.5 px-3 font-semibold text-foreground font-sans">{p.name}</td>
-                            <td className="py-2.5 px-3 font-bold">${p.monthlyPrice}</td>
-                            <td className="py-2.5 px-3 text-muted-foreground">${p.costAnalysis.edgeDnsBandwidth.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 text-muted-foreground">${p.costAnalysis.wafCompute.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 text-muted-foreground">${p.costAnalysis.aiNeuralEngine.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 text-muted-foreground">${p.costAnalysis.storageAndVault.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 text-muted-foreground">${p.costAnalysis.secOpsOverhead.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 font-bold text-primary">${p.costAnalysis.totalMonthlyCost.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 font-bold text-emerald-400">${p.costAnalysis.grossProfitMonthly.toFixed(2)}</td>
-                            <td className="py-2.5 px-3 font-bold text-emerald-400">{p.costAnalysis.grossMarginPct}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  <strong>SparrowX Shield</strong>, <strong>Cloud DB</strong>, <strong>Cloud Infra</strong>, and <strong>Game Hosting</strong> are integrated departments of SparrowX. Instead of forcing you into rigid, siloed monthly subscription tiers (such as legacy single-domain or request caps), the entire platform runs on a unified <strong>SparrowX Coins wallet</strong>.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-[11px] text-zinc-300">
+                  <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                    <strong className="text-white block mb-0.5">1. Universal Wallet</strong>
+                    One coin balance pays for your edge protection, PostgreSQL queries, VPS compute, and game server slots.
                   </div>
-                )}
-
-                <div className="rounded-xl border border-primary/20 bg-primary/[0.03] p-3.5 text-xs text-muted-foreground space-y-1">
-                  <div className="font-semibold text-foreground flex items-center gap-1.5">
-                    <ShieldCheck className="size-4 text-primary" />
-                    Why SparrowX Maintains Sustainable Unit Economics
+                  <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                    <strong className="text-white block mb-0.5">2. No Forced Lock-in</strong>
+                    Stop or pause services at any time. Unused SparrowX Coins never expire and remain safe in your sovereign account.
                   </div>
-                  <p className="text-[11px] leading-relaxed">
-                    By operating high-throughput edge inspection with zero unneeded third-party SaaS middle layers,
-                    SparrowX achieves an average <strong>85.5% gross profit margin</strong>. This structure completely protects client
-                    workloads from service cutoffs, guarantees 99.99% sovereign edge uptime, and funds continuous autonomous
-                    AI threat memory research.
-                  </p>
+                  <div className="rounded-xl border border-border/60 bg-background/60 p-3">
+                    <strong className="text-white block mb-0.5">3. Bank-Grade Security</strong>
+                    Encrypted at rest, zero-knowledge keys, and automated UPI AutoPay or Binance USDT instant verification.
+                  </div>
                 </div>
               </div>
 
@@ -1558,7 +1394,7 @@ export function ClientPortalView({
                         <div className="flex items-center gap-3">
                           <div className="text-right">
                             <div className="font-mono font-bold text-sm text-foreground">
-                              ${(tx.costUsd || currentPlan.monthlyPrice).toFixed(2)} USD
+                              ${(tx.costUsd ?? 0).toFixed(2)} USD
                             </div>
                             <div className="text-[10px] text-emerald-400 font-semibold uppercase">
                               {(tx.status ?? "completed")}
@@ -1590,112 +1426,11 @@ export function ClientPortalView({
                     ))
                   ) : (
                     <div className="py-8 text-center text-xs text-muted-foreground">
-                      No subscription invoices recorded yet. Active plan: {currentPlan.name}.
+                      No wallet transactions or coin purchases recorded yet.
                     </div>
                   )}
                 </div>
               </div>
-
-              {/* 6. Checkout & Plan Switch Confirmation Modal */}
-              {selectedPlanForCheckout && (
-                <div
-                  role="dialog"
-                  aria-modal="true"
-                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200"
-                >
-                  <div className="relative w-full max-w-lg rounded-2xl border border-primary/40 bg-card p-6 shadow-2xl space-y-5">
-                    <div className="flex items-center justify-between border-b border-border pb-3">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="size-4 text-primary" />
-                        <h3 className="text-base font-bold text-foreground">
-                          Confirm Subscription: {selectedPlanForCheckout.name}
-                        </h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPlanForCheckout(null)}
-                        className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
-
-                    {/* Pricing summary */}
-                    <div className="rounded-xl border border-primary/30 bg-primary/[0.04] p-4 flex items-center justify-between">
-                      <div>
-                        <div className="text-xs uppercase font-semibold text-muted-foreground">
-                          {checkoutBillingCycle === "annual" ? "Annual Plan (Discounted)" : "Monthly Subscription"}
-                        </div>
-                        <div className="text-xl font-extrabold text-foreground font-display mt-0.5">
-                          ${checkoutBillingCycle === "annual"
-                            ? selectedPlanForCheckout.annualPriceMonthly * 12
-                            : selectedPlanForCheckout.monthlyPrice}{" "}
-                          USD
-                          <span className="text-xs font-normal text-muted-foreground font-mono">
-                            /{checkoutBillingCycle === "annual" ? "year" : "month"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex rounded-lg border border-border bg-background p-1 text-xs">
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutBillingCycle("monthly")}
-                          className={`px-2.5 py-1 rounded font-semibold transition-all ${
-                            checkoutBillingCycle === "monthly" ? "bg-primary text-black font-bold" : "text-muted-foreground"
-                          }`}
-                        >
-                          Monthly
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setCheckoutBillingCycle("annual")}
-                          className={`px-2.5 py-1 rounded font-semibold transition-all ${
-                            checkoutBillingCycle === "annual" ? "bg-primary text-black font-bold" : "text-muted-foreground"
-                          }`}
-                        >
-                          Annual (-20%)
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* What happens next */}
-                    <div className="text-[11px] text-muted-foreground bg-muted/20 border border-border/60 rounded-xl p-3 space-y-1">
-                      <div className="font-semibold text-foreground">Immediate Activation SLA:</div>
-                      <div>• Domain quota upgrades to {selectedPlanForCheckout.maxDomains === -1 ? "Unlimited" : selectedPlanForCheckout.maxDomains} domains immediately.</div>
-                      <div>• Guaranteed {selectedPlanForCheckout.sla} incident response takes effect upon confirmation.</div>
-                      <div>• Provisioned directly on your sovereign server for {currentUser?.email || "your workspace"}.</div>
-                    </div>
-
-                    {/* Modal Actions */}
-                    <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedPlanForCheckout(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => {
-                          handleSubscribeToPlan(
-                            selectedPlanForCheckout,
-                            checkoutBillingCycle,
-                            "Sovereign Self-Hosted Provisioning",
-                          );
-                        }}
-                        className="bg-primary font-bold text-black hover:opacity-95 shadow-md shadow-primary/25"
-                      >
-                        <ShieldCheck className="size-4 mr-1.5" />
-                        Confirm & Activate {selectedPlanForCheckout.name}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </section>
           );
         })()}

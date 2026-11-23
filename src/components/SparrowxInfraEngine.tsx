@@ -623,23 +623,14 @@ export function SparrowxInfraEngine() {
             className="pointer-events-none absolute inset-0"
             style={{
               background:
-                "radial-gradient(ellipse 80% 60% at 70% 30%, rgba(255, 161, 74, 0.12), rgba(56, 189, 248, 0.08) 40%, transparent 75%)",
+                "radial-gradient(ellipse 75% 55% at 70% 35%, rgba(255, 161, 74, 0.07), rgba(56, 189, 248, 0.05) 40%, transparent 72%)",
             }}
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 grid-fade opacity-50"
           />
 
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
               {/* Left Column: Emotionally Connecting Copy & Value Pillars */}
               <div className="lg:col-span-7 space-y-6 text-left">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/25 text-orange-400 text-xs font-mono font-medium">
-                  <ShieldCheck className="size-3.5 text-emerald-400" />
-                  <span>Built with engineering solidarity &bull; Zero surprise bills</span>
-                </div>
-
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.08] text-balance">
                   Your life&apos;s work deserves infrastructure that actually has your back.
                   <span className="block text-xl sm:text-2xl lg:text-3xl font-bold text-zinc-400 mt-2">
