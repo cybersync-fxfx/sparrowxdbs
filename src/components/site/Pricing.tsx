@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { GoogleGIcon, useSessionSummary } from "./Navbar";
-import { SparrowxLivePingProbe } from "@/components/SparrowxLivePingProbe";
 import type { InfraRegionId } from "@/lib/infra-plans";
 
 export function Pricing({ service }: { service: Service }) {
@@ -30,12 +29,30 @@ export function Pricing({ service }: { service: Service }) {
           Billed monthly in INR. Pay with SparrowCoins — <span className="font-mono text-foreground">1 Coin = ₹1</span>.
         </p>
 
-        {/* 3 Core Server Regions: UK, India (Mumbai & Tamil Nadu), and Singapore */}
-        <div className="mx-auto mt-8 max-w-2xl text-left">
-          <SparrowxLivePingProbe
-            selectedRegion={selectedRegion}
-            onSelectRegion={(reg) => setSelectedRegion(reg)}
-          />
+        {/* Core Server Regions */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          {(
+            [
+              { id: "in-mum", label: "Mumbai, IN" },
+              { id: "in-maa", label: "Tamil Nadu, IN" },
+              { id: "sg-sin", label: "Singapore" },
+              { id: "uk-lon", label: "London, UK" },
+            ] as const
+          ).map((r) => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setSelectedRegion(r.id)}
+              className={cn(
+                "rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors",
+                selectedRegion === r.id
+                  ? "border-svc bg-svc/15 text-foreground"
+                  : "border-border bg-background/40 text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {r.label}
+            </button>
+          ))}
         </div>
       </div>
 

@@ -25,7 +25,6 @@ import { IntelXeonGoldPricingSection } from "@/components/infra/IntelXeonGoldPri
 import { UpiAutoPayModal } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
-import { SparrowxLivePingProbe } from "@/components/SparrowxLivePingProbe";
 import {
   computePlanPrice,
   INFRA_OS_IMAGES,
@@ -1085,14 +1084,6 @@ export function SparrowxInfraEngine() {
               </div>
             </div>
 
-            {/* Live Edge Latency & Client IP Telemetry Probe HUD */}
-            <div className="mb-6">
-              <SparrowxLivePingProbe
-                selectedRegion={region}
-                onSelectRegion={(reg) => setRegion(reg)}
-              />
-            </div>
-
             {/* Catalog Content: Cards Grid or Responsive Table */}
             {catalogView === "cards" ? (
               filteredPlans.length === 0 ? (
@@ -1442,10 +1433,6 @@ export function SparrowxInfraEngine() {
                         >
                           Datacenter region
                         </label>
-                        <SparrowxLivePingProbe
-                          selectedRegion={configRegion}
-                          compact
-                        />
                       </div>
                       <select
                         id="cfg-region"
