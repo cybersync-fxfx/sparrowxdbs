@@ -124,15 +124,15 @@
 
     <!-- Spec Badging -->
     <text x="300" y="420" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="600" fill="#8F9CAE" letter-spacing="2.5" text-anchor="middle">
-      ZEN 5 &bull; 16C / 32T &bull; 5.7GHz &bull; AM5
+      ZEN 5 &#8226; 16C / 32T &#8226; 5.7GHz &#8226; AM5
     </text>
 
     <!-- Laser Etched Serial Top -->
     <text x="165" y="172" font-family="'JetBrains Mono', monospace" font-size="8" fill="#5F6B7D" letter-spacing="1.5">
-      DIFFUSED IN TAIWAN &bull; MADE IN MALAYSIA
+      DIFFUSED IN TAIWAN &#8226; MADE IN MALAYSIA
     </text>
     <text x="165" y="184" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#4B5666">
-      100-000001234 &bull; 2435PXY &bull; SPARROWX-NODE-01
+      100-000001234 &#8226; 2435PXY &#8226; SPARROWX-NODE-01
     </text>
   </g>
 </svg>

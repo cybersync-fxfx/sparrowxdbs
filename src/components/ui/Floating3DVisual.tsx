@@ -101,7 +101,18 @@ export function Floating3DVisual({
   const imgFetchPriority = priority === "lcp" ? "high" : undefined;
   const imgLoading = priority === "lazy" ? "lazy" : undefined;
   const isRasterDarkBackdrop = /\.(jpe?g)$/i.test(src);
-  const resolvedSrc = src.startsWith("/3d/") && !src.includes("?") ? `${src}?v=2` : src;
+  const initialSrc = src.startsWith("/3d/") && !src.includes("?") ? `${src}?v=2` : src;
+  const [currentSrc, setCurrentSrc] = useState(initialSrc);
+  const [hasError, setHasError] = useState(false);
+
+  const handleImageError = useCallback(() => {
+    // If the image failed with query param (?v=2), retry once without query param
+    if (currentSrc.includes("?")) {
+      setCurrentSrc(currentSrc.replace(/\?.*$/, ""));
+    } else {
+      setHasError(true);
+    }
+  }, [currentSrc]);
 
   return (
     <div
@@ -151,18 +162,43 @@ export function Floating3DVisual({
         }`}
       >
         <div className="spx-3d-float relative flex size-full items-center justify-center">
-          <img
-            src={resolvedSrc}
-            alt={alt}
-            width={width}
-            height={height}
-            decoding={priority === "lcp" ? "sync" : "async"}
-            {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
-            {...(imgLoading ? { loading: imgLoading } : {})}
-            className={`size-full object-contain pointer-events-none ${
-              isRasterDarkBackdrop ? "spx-3d-img-raster scale-110" : "spx-3d-img-vector"
-            }`}
-          />
+          {!hasError ? (
+            <img
+              src={currentSrc}
+              alt={alt}
+              width={width}
+              height={height}
+              decoding={priority === "lcp" ? "sync" : "async"}
+              onError={handleImageError}
+              {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
+              {...(imgLoading ? { loading: imgLoading } : {})}
+              className={`size-full object-contain pointer-events-none ${
+                isRasterDarkBackdrop ? "spx-3d-img-raster scale-110" : "spx-3d-img-vector"
+              }`}
+            />
+          ) : (
+            <svg
+              viewBox="0 0 400 400"
+              className="size-full max-w-[280px] object-contain drop-shadow-[0_10px_25px_rgba(0,0,0,0.5)]"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-label={alt}
+              role="img"
+            >
+              <rect x="50" y="50" width="300" height="300" rx="20" fill="#0B0E14" stroke={accent === "crimson" ? "#EF4444" : "#38BDF8"} strokeWidth="2.5" />
+              <rect x="75" y="75" width="250" height="250" rx="14" fill="#151A23" stroke="#334155" strokeWidth="2" />
+              <circle cx="200" cy="180" r="45" stroke={accent === "crimson" ? "#EF4444" : "#0284C7"} strokeWidth="6" strokeDasharray="60 20" />
+              <text x="200" y="186" textAnchor="middle" fill="#FFFFFF" fontSize="18" fontWeight="800" fontFamily="system-ui">
+                {accent === "crimson" ? "RYZEN" : "XEON"}
+              </text>
+              <text x="200" y="250" textAnchor="middle" fill={accent === "crimson" ? "#FCA5A5" : "#7DD3FC"} fontSize="12" fontWeight="700" fontFamily="monospace" letterSpacing="2">
+                {accent === "crimson" ? "ZEN 5 ENTERPRISE" : "INTEL GOLD ENTERPRISE"}
+              </text>
+              <text x="200" y="275" textAnchor="middle" fill="#64748B" fontSize="9" fontFamily="monospace">
+                HIGH PERFORMANCE CLOUD COMPUTE
+              </text>
+            </svg>
+          )}
         </div>
       </div>
 

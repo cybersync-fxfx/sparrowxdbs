@@ -119,15 +119,15 @@
 
     <!-- Architecture & Hardware Specs -->
     <text x="300" y="388" font-family="'JetBrains Mono', monospace" font-size="10.5" font-weight="600" fill="#94A3B8" letter-spacing="2" text-anchor="middle">
-      DUAL-SOCKET &bull; DDR4 ECC &bull; 99.99% SLA
+      DUAL-SOCKET &#8226; DDR4 ECC &#8226; 99.99% SLA
     </text>
 
     <!-- Laser Etched Serial Numbers -->
     <text x="156" y="174" font-family="'JetBrains Mono', monospace" font-size="8" fill="#64748B" letter-spacing="1.2">
-      INTEL &reg; XEON &reg; GOLD &bull; SPARROWX ENTERPRISE CLOUD
+      INTEL &#174; XEON &#174; GOLD &#8226; SPARROWX ENTERPRISE CLOUD
     </text>
     <text x="156" y="186" font-family="'JetBrains Mono', monospace" font-size="7.5" fill="#475569">
-      SRL9Z 2.80GHZ &bull; L428H902 &bull; MADE IN COSTA RICA
+      SRL9Z 2.80GHZ &#8226; L428H902 &#8226; MADE IN COSTA RICA
     </text>
   </g>
 </svg>
