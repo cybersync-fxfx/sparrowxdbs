@@ -7,6 +7,7 @@ import {
   Cpu,
   Globe,
   HardDrive,
+  Headphones,
   LayoutGrid,
   List,
   Lock,
@@ -72,32 +73,32 @@ const CATEGORY_PILLARS: Array<{
   {
     id: "vps",
     title: "Cloud KVM VPS",
-    benefit: "AMD Ryzen 9 9950X @ 5.7GHz with DDR5 ECC On-Die Memory",
+    benefit: "AMD Ryzen 9 9950X @ 5.7GHz & Dual Intel Xeon Gold",
     summary:
-      "Instant high-performance virtual machines deployed on Tier IV Mumbai node with zero surprise egress bandwidth penalties.",
+      "Instant high-performance Proxmox KVM virtual machines with DDR5 ECC memory and zero surprise egress penalties.",
     startingUsd: 12,
     startingInr: 999,
     image: "/3d/vps-kvm-cubes.svg",
     accent: "orange",
     specs: [
-      "Deploys in under 45 seconds",
-      "AMD Ryzen 9 9950X @ 5.7GHz + DDR5 ECC",
-      "Tier IV Mumbai Node with Enterprise DDoS",
+      "Proxmox VE KVM hypervisor isolation",
+      "AMD Ryzen 9 9950X & Dual Intel Xeon Gold",
+      "Enterprise DDoS protection & 1 Dedicated Static IP",
     ],
   },
   {
     id: "vds",
     title: "Dedicated VDS",
-    benefit: "100% Dedicated Bare-Metal Cores powered by Ryzen 9 9950X",
+    benefit: "100% Dedicated Bare-Metal Cores powered by Ryzen 9 & Xeon Gold",
     summary:
-      "Exclusive bare-metal compute resources with zero noisy neighbours and locked 5.7GHz clock speeds for high-intensity workloads.",
+      "Exclusive bare-metal compute resources with zero noisy neighbours and locked clock speeds for heavy workloads.",
     startingUsd: 32,
     startingInr: 2700,
     image: "/3d/game-server-node.svg",
     accent: "orange",
     specs: [
-      "100% Dedicated Bare-Metal Cores (5.7GHz)",
-      "Tier IV Mumbai Node with ultra-low latency",
+      "100% Dedicated Bare-Metal Cores",
+      "Ultra-low latency across India & Singapore",
       "DDR5 ECC On-Die Memory & NVMe Gen5",
     ],
   },
@@ -152,27 +153,29 @@ export function InfraPriceCard({
   const formattedMonthlyPrice = price.formattedMonthly;
 
   return (
-    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-5 sm:p-6 hover:border-red-500/50 hover:shadow-[0_12px_40px_rgba(237,28,36,0.22)] transition-all duration-200 flex flex-col justify-between overflow-hidden">
+    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-6 hover:border-red-500/50 hover:shadow-[0_12px_40px_rgba(237,28,36,0.22)] transition-all duration-200 flex flex-col justify-between overflow-visible">
       {/* Background AM5 Circuit & Pin Watermark */}
       <HardwarePinGridWatermark accent="red" />
 
-      <div className="relative z-10">
-        {/* Top Node & Stock Badge row */}
-        <div className="flex items-center justify-between gap-2 mb-4">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/10 text-red-400 border border-red-500/30 font-mono tracking-wide">
-            <span className="size-1.5 rounded-full bg-red-400" />
-            <span className="text-amber-300 font-bold">AM5</span>
-            <span>•</span>
-            <span>Mumbai Node</span>
+      {/* Pinned Upper-Edge "In Stock" Sticker (outside card body) */}
+      <div className="absolute -top-3 right-4 z-20 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-[#071014] px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 shadow-md">
+        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span>In Stock</span>
+      </div>
+
+      <div className="relative z-10 pt-1">
+        {/* Top Processor Badge (matches Dual Xeon Gold style) */}
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-red-400">
+            Ryzen 9
           </span>
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
-            <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-            In Stock
+          <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300/80">
+            AM5 · Zen 5
           </span>
         </div>
 
         {/* Ryzen Chip with Pins Icon & Plan Title */}
-        <div className="flex items-center gap-3.5 mb-4">
+        <div className="flex items-center gap-3.5 mb-5">
           <div className="relative size-12 rounded-xl bg-gradient-to-br from-red-950/70 via-[#120508] to-[#0A0D14] border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_18px_rgba(237,28,36,0.25)] group-hover:border-red-500/70 group-hover:shadow-[0_0_24px_rgba(237,28,36,0.45)] transition-all">
             <RyzenChipPinIcon className="size-10" />
           </div>
@@ -180,61 +183,55 @@ export function InfraPriceCard({
             <h3 className="text-base font-bold text-white tracking-tight group-hover:text-red-400 transition-colors">
               {plan.name}
             </h3>
-            <p className="text-[11px] text-zinc-400 font-mono mt-0.5 flex items-center gap-1">
-              <span className="text-red-400 font-semibold">Zen 5</span>
-              <span>• 5.7 GHz Boost</span>
+            <p className="text-xs text-zinc-400 font-mono mt-0.5">
+              5.7 GHz Boost · DDR5 ECC
             </p>
           </div>
         </div>
 
         {/* Price Row */}
-        <div className="mb-4 tabular-nums flex items-baseline gap-1">
-          <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+        <div className="mb-5 pb-4 border-b border-white/10 tabular-nums flex items-baseline gap-1">
+          <span className="text-3xl font-extrabold text-white tracking-tight">
             {formattedMonthlyPrice}
           </span>
           <span className="text-xs text-zinc-400 ml-1 font-normal">/month</span>
         </div>
 
-        {/* Description */}
-        <p className="text-xs text-zinc-400 leading-relaxed mb-5 line-clamp-2">
-          {plan.tagline}
-        </p>
-
-        {/* Specs Grid with Structured Non-Truncating Pills */}
-        <div className="grid grid-cols-2 gap-2.5 py-3 mb-5 border-y border-white/[0.08] text-xs">
-          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
-            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Processor</span>
-            <span className="text-white font-semibold block text-xs">Ryzen 9 9950X</span>
-            <span className="text-zinc-400 text-[11px]">16C / 32T Zen 5</span>
-          </div>
-          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+        {/* Spacious Specs Grid */}
+        <div className="grid grid-cols-2 gap-3 mb-5 text-xs">
+          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
             <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">
-              {plan.category === "vds" ? "Dedicated Cores" : "vCPU Cores"}
+              {plan.category === "vds" ? "Dedicated" : "Compute"}
             </span>
-            <span className="text-white font-semibold block text-xs">{plan.coresThreads}</span>
-            <span className="text-red-400 text-[11px] font-mono">5.7 GHz Max</span>
+            <span className="text-white font-semibold block mt-0.5">{plan.coresThreads}</span>
           </div>
-          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
             <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Memory</span>
-            <span className="text-white font-semibold block text-xs">{plan.ram}</span>
-            <span className="text-zinc-400 text-[11px]">DDR5 ECC</span>
+            <span className="text-white font-semibold block mt-0.5">{plan.ram}</span>
           </div>
-          <div className="bg-white/[0.03] p-2 rounded-lg border border-white/5">
+          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
             <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Storage</span>
-            <span className="text-white font-semibold block text-xs">{plan.storage}</span>
-            <span className="text-zinc-400 text-[11px]">NVMe Gen5</span>
+            <span className="text-white font-semibold block mt-0.5">{plan.storage}</span>
+          </div>
+          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
+            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Network</span>
+            <span className="text-white font-semibold block mt-0.5">{plan.network.split("·")[0]?.trim() || "10 Gbps"}</span>
           </div>
         </div>
 
-        {/* Key Features Bullet List */}
-        <ul className="space-y-1.5 text-xs text-zinc-300 mb-6">
+        {/* AMD Ryzen Included Guarantees (DDoS, 24/7 Support, 99.9% SLA, 1 Static IP) */}
+        <ul className="space-y-2 text-xs text-zinc-300 mb-6">
           <li className="flex items-center gap-2">
             <Check className="size-3.5 text-red-400 shrink-0" />
-            <span className="truncate">{plan.network}</span>
+            <span>DDoS Protection</span>
           </li>
           <li className="flex items-center gap-2">
             <Check className="size-3.5 text-red-400 shrink-0" />
-            <span className="truncate">{plan.ddosProtection}</span>
+            <span>24/7 Support &amp; 99.9% SLA</span>
+          </li>
+          <li className="flex items-center gap-2">
+            <Check className="size-3.5 text-red-400 shrink-0" />
+            <span>1 Dedicated Static IP</span>
           </li>
         </ul>
       </div>
@@ -243,7 +240,7 @@ export function InfraPriceCard({
       <button
         type="button"
         onClick={() => onConfigure(plan)}
-        className="relative z-10 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ED1C24] to-[#B91C1C] hover:from-red-600 hover:to-red-700 text-white font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_18px_rgba(237,28,36,0.3)] hover:shadow-[0_6px_28px_rgba(237,28,36,0.5)] cursor-pointer"
+        className="relative z-10 w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ED1C24] to-[#B91C1C] hover:from-red-600 hover:to-red-700 text-white font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_18px_rgba(237,28,36,0.3)] hover:shadow-[0_6px_28px_rgba(237,28,36,0.5)] cursor-pointer"
       >
         <span>Configure &amp; Order</span>
         <ArrowRight className="size-4" />
@@ -253,6 +250,7 @@ export function InfraPriceCard({
 }
 
 export function SparrowxInfraEngine() {
+  const [selectedIsolation, setSelectedIsolation] = useState<InfraCategory | null>(null);
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [region, setRegion] = useState<InfraRegionId>("in-mum");
   const [currency, setCurrency] = useState<"INR" | "USD">("INR");
@@ -513,20 +511,35 @@ export function SparrowxInfraEngine() {
               href="#pillars"
               className="hover:text-white transition-colors duration-150"
             >
-              Offerings
+              Workloads
             </a>
-            <a
-              href="#ryzen-plans"
-              className="text-orange-400 font-semibold hover:text-orange-300 transition-colors duration-150"
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedIsolation("vps");
+                setCategory("vps");
+                setRyzenTab("vps");
+                setTimeout(() => {
+                  document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
+                }, 60);
+              }}
+              className="text-red-400 font-semibold hover:text-red-300 transition-colors duration-150 cursor-pointer"
             >
               VPS &amp; VDS Plans
-            </a>
-            <a
-              href="#catalog"
-              className="hover:text-white transition-colors duration-150"
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedIsolation("bare-metal");
+                setCategory("bare-metal");
+                setTimeout(() => {
+                  document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
+                }, 60);
+              }}
+              className="hover:text-white transition-colors duration-150 cursor-pointer"
             >
-              Server catalog
-            </a>
+              Bare Metal
+            </button>
             <a
               href="#architecture"
               className="hover:text-white transition-colors duration-150"
@@ -641,77 +654,25 @@ export function SparrowxInfraEngine() {
 
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-8 items-center">
-              {/* Left Column: Emotionally Connecting Copy & Value Pillars */}
+              {/* Left Column: Clean, Simple Web Copy */}
               <div className="lg:col-span-7 space-y-6 text-left">
                 <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.08] text-balance">
                   Your life&apos;s work deserves infrastructure that actually has your back.
-                  <span className="block text-xl sm:text-2xl lg:text-3xl font-bold text-zinc-400 mt-2">
-                    Raw silicon. Zero hypervisor tax.
-                  </span>
                 </h1>
 
                 <p className="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
-                  You poured your late nights, your savings, and your passion into building your product.
-                  Stop living in fear of unexpected $1,000 cloud egress bills, cold support tickets, and noisy neighbors who slow down your users at 3 AM.
+                  High-frequency AMD Ryzen 9 9950X and Dual Intel Xeon Gold cloud compute powered by Proxmox VE, NVMe Gen5 storage, and always-on SparrowX NetSec DDoS protection.
                 </p>
-
-                <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                  SparrowX delivers raw AMD Ryzen 9 9950X Zen 5 physical compute, unmetered multi-gigabit fiber, and bank-grade data sovereignty across Tier IV Mumbai and European hubs. When your users count on you, you can count on us.
-                </p>
-
-                {/* 3 Emotional Value Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                      <Zap className="size-3.5 text-amber-400" />
-                      <span>Zero 3 AM Panics</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-normal">Kernel eBPF &amp; XDP shield your nodes before attacks touch you.</p>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                      <Lock className="size-3.5 text-emerald-400" />
-                      <span>Sovereign &amp; Private</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-normal">Your customer data is 100% yours. Never inspected or sold.</p>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 space-y-1">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-white">
-                      <Cpu className="size-3.5 text-orange-400" />
-                      <span>Real Pinned Silicon</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-normal">Zen 5 cores pinned to your VM. Zero stolen CPU cycles.</p>
-                  </div>
-                </div>
 
                 {/* CTA Row */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                   <a
-                    href="#catalog"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFA14A] hover:bg-[#FF8F26] text-black font-bold px-6 py-3.5 text-sm transition-all shadow-[0_4px_20px_rgba(255,161,74,0.3)] cursor-pointer"
+                    href="#pillars"
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-[#FFA14A] hover:bg-[#FF8F26] text-black font-bold px-6 py-3.5 text-sm transition-all shadow-[0_4px_20px_rgba(255,161,74,0.3)] cursor-pointer"
                   >
-                    <span>Configure your server</span>
+                    <span>Choose your workload</span>
                     <ArrowRight className="size-4" aria-hidden="true" />
                   </a>
-                  <a
-                    href="#pillars"
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 px-5 py-3.5 text-sm font-semibold text-zinc-200 hover:text-white transition-colors"
-                  >
-                    <span>Why Builders Trust SparrowX</span>
-                  </a>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-400 pt-1 font-mono">
-                  <span className="flex items-center gap-1.5 text-emerald-400">
-                    <CheckCircle2 className="size-3.5" />
-                    Instant 45-second provisioning
-                  </span>
-                  <span>&bull;</span>
-                  <span>Tier IV Mumbai Node</span>
-                  <span>&bull;</span>
-                  <span>Flat predictable billing</span>
                 </div>
               </div>
 
@@ -722,7 +683,7 @@ export function SparrowxInfraEngine() {
                     src="/3d/cloud-infra-server.jpg"
                     alt="3D floating SparrowX bare-metal server rack cluster with anodized titanium blades and cyan fiber uplinks"
                     accent="cyan"
-                    size="xl"
+                    size="hero"
                     priority="lcp"
                     className="w-full relative z-10"
                     width={640}
@@ -730,12 +691,12 @@ export function SparrowxInfraEngine() {
                   />
 
                   {/* Hardware Telemetry Badge Below Image */}
-                  <div className="mt-3 p-3 rounded-xl bg-[#0B0E15]/90 border border-white/10 backdrop-blur-md flex items-center justify-between text-xs font-mono shadow-xl relative z-10">
+                  <div className="mt-3 p-3 rounded-xl bg-[#0B0E15]/90 border border-white/10 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 text-xs font-mono shadow-xl relative z-10">
                     <div className="flex items-center gap-2">
                       <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-white font-semibold">Tier IV Mumbai BOM-1</span>
+                      <span className="text-white font-semibold">Proxmox VE Cluster</span>
                     </div>
-                    <span className="text-zinc-400">AMD Ryzen 9 9950X &bull; 10 Gbps</span>
+                    <span className="text-zinc-400">Ryzen 9 9950X &amp; Xeon Gold &bull; 10 Gbps</span>
                   </div>
                 </div>
               </div>
@@ -757,207 +718,285 @@ export function SparrowxInfraEngine() {
             </p>
           </div>
 
-          <div className="mt-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {CATEGORY_PILLARS.map((pillar) => (
-              <article
-                key={pillar.id}
-                className="group rounded-2xl border border-white/12 bg-[#0B0E15] p-6 flex flex-col justify-between gap-6 hover:border-white/25 transition-colors duration-200"
-              >
-                <div className="space-y-5">
-                  <Floating3DVisual
-                    src={pillar.image}
-                    alt={`${pillar.title} 3D hardware illustration`}
-                    accent={pillar.accent}
-                    size="md"
-                    priority="lazy"
-                    width={420}
-                    height={420}
-                  />
-
-                  <div className="space-y-2">
-                    <h3 className="text-xl font-semibold tracking-tight text-white">
-                      {pillar.title}
-                    </h3>
-                    <p className="text-sm font-medium text-sky-300">
-                      {pillar.benefit}
-                    </p>
-                    <p className="text-sm text-zinc-400 leading-relaxed">
-                      {pillar.summary}
-                    </p>
-                  </div>
-
-                  <ul className="space-y-2 text-sm text-zinc-300 pt-2 border-t border-white/10">
-                    {pillar.specs.map((spec) => (
-                      <li key={spec} className="flex items-start gap-2.5">
-                        <Check
-                          className="size-4 text-sky-400 shrink-0 mt-0.5"
-                          aria-hidden="true"
-                        />
-                        <span>{spec}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="pt-4 border-t border-white/10 flex items-center justify-between gap-4">
-                  <div className="tabular-nums">
-                    <span className="block text-xs text-zinc-400">Starting at</span>
-                    <span className="text-xl font-bold text-white">
-                      {currency === "INR"
-                        ? `₹${pillar.startingInr.toLocaleString("en-IN")}`
-                        : `$${pillar.startingUsd}`}
-                    </span>
-                    <span className="text-sm text-zinc-400">/mo</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCategory(pillar.id);
+          <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {CATEGORY_PILLARS.map((pillar) => {
+              const isSelected = selectedIsolation === pillar.id;
+              return (
+                <article
+                  key={pillar.id}
+                  onClick={() => {
+                    setSelectedIsolation(pillar.id);
+                    setCategory(pillar.id);
+                    if (pillar.id === "vps" || pillar.id === "vds") {
+                      setRyzenTab(pillar.id);
+                    }
+                    setTimeout(() => {
                       document
-                        .getElementById("catalog")
+                        .getElementById("workload-plans-panel")
                         ?.scrollIntoView({ behavior: "smooth" });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/5 hover:bg-white hover:text-black px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 cursor-pointer"
-                  >
-                    <span>Browse {pillar.title.split(" ")[0]}</span>
-                    <ArrowRight className="size-4" aria-hidden="true" />
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* SECTION: AMD RYZEN 9 9950X VPS & DEDICATED VDS PRICE CARDS (RED THEME + FLOATING 3D PROCESSOR) */}
-        <section
-          id="ryzen-plans"
-          className="relative scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-red-500/20"
-        >
-          {/* Ambient AMD Crimson Red Glow */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(237,28,36,0.14),transparent_70%)]"
-          />
-
-          <div className="relative mb-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left Column: Heading, Specs & Controls */}
-            <div className="lg:col-span-8 space-y-4">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/30">
-                <Cpu className="size-3.5 text-red-400" />
-                <span>Zen 5 High-Frequency Silicon · Tier IV Mumbai Node</span>
-                <span className="text-white/30">·</span>
-                <span className="text-red-300">AMD Red Edition</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
-                Ryzen 9 9950X VPS &amp; Dedicated VDS Plans
-              </h2>
-              <p className="text-base text-zinc-300 leading-relaxed max-w-2xl">
-                Flagship single-thread performance powered by <strong className="text-white">AMD Ryzen 9 9950X @ 5.7GHz</strong>, on-die ECC DDR5 memory, NVMe Gen5 storage, and Enterprise DDoS protection at our Tier IV Mumbai Node.
-              </p>
-
-              {/* Sub-Tabs: Cloud VPS vs Dedicated VDS + Currency Selector */}
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <div
-                  role="tablist"
-                  aria-label="Select Ryzen 9 plan category"
-                  className="inline-flex rounded-xl border border-red-500/30 bg-[#12080A] p-1.5"
+                    }, 60);
+                  }}
+                  className={`group rounded-2xl border p-6 flex flex-col justify-between gap-6 transition-all duration-200 cursor-pointer ${
+                    isSelected
+                      ? "border-sky-400 bg-[#0F1624] shadow-[0_0_32px_rgba(56,189,248,0.2)]"
+                      : "border-white/12 bg-[#0B0E15] hover:border-white/30"
+                  }`}
                 >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={ryzenTab === "vps"}
-                    onClick={() => setRyzenTab("vps")}
-                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                      ryzenTab === "vps"
-                        ? "bg-[#ED1C24] text-white shadow-lg shadow-red-600/35 font-bold"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    <Server className="size-4" />
-                    <span>Cloud VPS (5.7GHz)</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={ryzenTab === "vds"}
-                    onClick={() => setRyzenTab("vds")}
-                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                      ryzenTab === "vds"
-                        ? "bg-[#ED1C24] text-white shadow-lg shadow-red-600/35 font-bold"
-                        : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    <Cpu className="size-4" />
-                    <span>Dedicated VDS (Bare-Metal Cores)</span>
-                  </button>
-                </div>
+                  <div className="space-y-5">
+                    <Floating3DVisual
+                      src={pillar.image}
+                      alt={`${pillar.title} 3D hardware illustration`}
+                      accent={pillar.accent}
+                      size="md"
+                      priority="lazy"
+                      width={420}
+                      height={420}
+                    />
 
-                {/* Currency toggle */}
-                <div
-                  role="radiogroup"
-                  aria-label="Currency"
-                  className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
-                >
-                  {(["INR", "USD"] as const).map((cur) => (
+                    <div className="space-y-2">
+                      <h3 className="text-xl font-semibold tracking-tight text-white">
+                        {pillar.title}
+                      </h3>
+                      <p className="text-sm font-medium text-sky-300">
+                        {pillar.benefit}
+                      </p>
+                      <p className="text-sm text-zinc-400 leading-relaxed">
+                        {pillar.summary}
+                      </p>
+                    </div>
+
+                    <ul className="space-y-2 text-sm text-zinc-300 pt-2 border-t border-white/10">
+                      {pillar.specs.map((spec) => (
+                        <li key={spec} className="flex items-start gap-2.5">
+                          <Check
+                            className="size-4 text-sky-400 shrink-0 mt-0.5"
+                            aria-hidden="true"
+                          />
+                          <span>{spec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="pt-4 border-t border-white/10 flex items-center justify-between gap-4">
+                    <div className="tabular-nums">
+                      <span className="block text-xs text-zinc-400">Starting at</span>
+                      <span className="text-xl font-bold text-white">
+                        {currency === "INR"
+                          ? `₹${pillar.startingInr.toLocaleString("en-IN")}`
+                          : `$${pillar.startingUsd}`}
+                      </span>
+                      <span className="text-sm text-zinc-400">/mo</span>
+                    </div>
+
                     <button
-                      key={`ryzen-cur-${cur}`}
                       type="button"
-                      role="radio"
-                      aria-checked={currency === cur}
-                      onClick={() => setCurrency(cur)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
-                        currency === cur
-                          ? "bg-red-500 text-white font-bold"
-                          : "text-zinc-400 hover:text-white"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedIsolation(pillar.id);
+                        setCategory(pillar.id);
+                        if (pillar.id === "vps" || pillar.id === "vds") {
+                          setRyzenTab(pillar.id);
+                        }
+                        setTimeout(() => {
+                          document
+                            .getElementById("workload-plans-panel")
+                            ?.scrollIntoView({ behavior: "smooth" });
+                        }, 60);
+                      }}
+                      className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors duration-150 cursor-pointer ${
+                        isSelected
+                          ? "border-sky-400 bg-sky-400 text-black"
+                          : "border-white/20 bg-white/5 hover:bg-white hover:text-black text-white"
                       }`}
                     >
-                      {cur === "INR" ? "INR (₹)" : "USD ($)"}
+                      <span>{isSelected ? "Viewing Plans" : "View Plans"}</span>
+                      <ArrowRight className="size-4" aria-hidden="true" />
                     </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: 3D Floating AMD Ryzen Processor */}
-            <div className="lg:col-span-4 flex justify-center lg:justify-end">
-              <div className="relative w-full max-w-[280px] sm:max-w-[320px]">
-                <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-red-600/25 via-red-500/15 to-transparent blur-2xl rounded-3xl" />
-                <Floating3DVisual
-                  src="/3d/amd-ryzen-processor.svg"
-                  alt="3D floating AMD Ryzen 9 9950X Zen 5 Processor"
-                  accent="crimson"
-                  size="md"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 5 Price Cards in Responsive Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
-            {(ryzenTab === "vps" ? ryzenVpsPlans : ryzenVdsPlans).map((plan) => (
-              <InfraPriceCard
-                key={plan.id}
-                plan={plan}
-                currency={currency}
-                billingCycle={billingCycle}
-                onConfigure={openConfigurator}
-              />
-            ))}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </section>
 
-        {/* SECTION: INTEL XEON GOLD DUAL PROCESSOR — VPS & VDS */}
-        <IntelXeonGoldPricingSection
-          currency={currency}
-          onConfigurePlan={openConfigurator}
-        />
+        {/* WORKLOAD PLANS DRAWER — ONLY RENDERED WHEN A WORKLOAD IS SELECTED IN #pillars */}
+        {selectedIsolation && (
+          <div id="workload-plans-panel" className="scroll-mt-20 border-t border-white/10">
+            {/* Active Workload Switcher Bar (Mobile-friendly) */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {CATEGORY_PILLARS.map((p) => (
+                  <button
+                    key={`switch-${p.id}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedIsolation(p.id);
+                      setCategory(p.id);
+                      if (p.id === "vps" || p.id === "vds") {
+                        setRyzenTab(p.id);
+                      }
+                    }}
+                    className={`min-h-[44px] rounded-xl px-4 py-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer ${
+                      selectedIsolation === p.id
+                        ? "bg-white text-black"
+                        : "bg-white/5 text-zinc-300 border border-white/10 hover:text-white"
+                    }`}
+                  >
+                    {p.title}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedIsolation(null)}
+                className="min-h-[44px] inline-flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white cursor-pointer"
+              >
+                <X className="size-3.5" aria-hidden="true" />
+                <span>Hide Plans</span>
+              </button>
+            </div>
 
-        {/* SECTION 3: INTERACTIVE SERVER INVENTORY & RESPONSIVE HARDWARE TABLE */}
-        <section
-          id="catalog"
-          className="scroll-mt-20 border-y border-white/10 bg-[#07090F] py-16 sm:py-24 px-4 sm:px-6"
-        >
+            {(selectedIsolation === "vps" || selectedIsolation === "vds") && (
+              <>
+                {/* SECTION: AMD RYZEN 9 9950X VPS & DEDICATED VDS PRICE CARDS (RED THEME + FLOATING 3D PROCESSOR) */}
+                <section
+                  id="ryzen-plans"
+                  className="relative scroll-mt-20 py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto"
+                >
+                  {/* Ambient AMD Crimson Red Glow */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(237,28,36,0.14),transparent_70%)]"
+                  />
+
+                  <div className="relative mb-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    {/* Left Column: Heading, Specs & Controls */}
+                    <div className="lg:col-span-8 space-y-4">
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
+                        Ryzen 9 9950X {selectedIsolation === "vds" ? "Dedicated VDS" : "Cloud VPS"} Plans
+                      </h2>
+                      <p className="text-base text-zinc-300 leading-relaxed max-w-2xl">
+                        High-frequency single-thread performance powered by <strong className="text-white">AMD Ryzen 9 9950X @ 5.7GHz</strong>, on-die ECC DDR5 memory, NVMe Gen5 storage, and SparrowX NetSec DDoS protection.
+                      </p>
+
+                      {/* Currency toggle */}
+                      <div className="flex flex-wrap items-center gap-3 pt-2">
+                        <div
+                          role="radiogroup"
+                          aria-label="Currency"
+                          className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
+                        >
+                          {(["INR", "USD"] as const).map((cur) => (
+                            <button
+                              key={`ryzen-cur-${cur}`}
+                              type="button"
+                              role="radio"
+                              aria-checked={currency === cur}
+                              onClick={() => setCurrency(cur)}
+                              className={`min-h-[40px] rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                                currency === cur
+                                  ? "bg-red-500 text-white font-bold"
+                                  : "text-zinc-400 hover:text-white"
+                              }`}
+                            >
+                              {cur === "INR" ? "INR (₹)" : "USD ($)"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right Column: 3D Floating AMD Ryzen Processor */}
+                    <div className="lg:col-span-4 flex justify-center lg:justify-end">
+                      <div className="relative w-full max-w-[260px] sm:max-w-[300px]">
+                        <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-red-600/25 via-red-500/15 to-transparent blur-2xl rounded-3xl" />
+                        <Floating3DVisual
+                          src="/3d/amd-ryzen-processor.svg"
+                          alt="3D floating AMD Ryzen 9 9950X Zen 5 Processor"
+                          accent="crimson"
+                          size="md"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Spacious Responsive Grid of Ryzen Price Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-3">
+                    {(selectedIsolation === "vds" ? ryzenVdsPlans : ryzenVpsPlans).map((plan) => (
+                      <InfraPriceCard
+                        key={plan.id}
+                        plan={plan}
+                        currency={currency}
+                        billingCycle={billingCycle}
+                        onConfigure={openConfigurator}
+                      />
+                    ))}
+                  </div>
+
+                  {/* 4-Column AMD Ryzen Included Guarantees Bar (DDoS, 24/7 Support, 99.9% SLA, 1 Static IP) */}
+                  <div className="mt-12 rounded-2xl border border-red-500/25 bg-[#12080A]/90 p-6 backdrop-blur-xl">
+                    <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                      <div>
+                        <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-red-400">
+                          AMD Ryzen 9 Standard
+                        </p>
+                        <h3 className="mt-1 text-lg font-bold text-white">
+                          Included With Every AMD Ryzen Server
+                        </h3>
+                      </div>
+                      <span className="font-mono text-xs text-zinc-400">
+                        Protected by SparrowX Sec &amp; NetSec
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-[#090507] p-4">
+                        <ShieldCheck className="size-5 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">DDoS Protection</h4>
+                          <p className="mt-0.5 text-xs text-zinc-400">Always-on L3/L4/L7 XDP scrubbing</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-[#090507] p-4">
+                        <Headphones className="size-5 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">24/7 Support</h4>
+                          <p className="mt-0.5 text-xs text-zinc-400">Round-the-clock engineering desk</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-[#090507] p-4">
+                        <Zap className="size-5 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">99.9% SLA</h4>
+                          <p className="mt-0.5 text-xs text-zinc-400">Guaranteed core compute uptime</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 rounded-xl border border-white/[0.08] bg-[#090507] p-4">
+                        <Globe className="size-5 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">1 Dedicated Static IP</h4>
+                          <p className="mt-0.5 text-xs text-zinc-400">Clean routed IPv4 + custom rDNS</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                {/* SECTION: INTEL XEON GOLD DUAL PROCESSOR — VPS & VDS (INCLUDES 1 FREE BACKUP) */}
+                <IntelXeonGoldPricingSection
+                  currency={currency}
+                  forcedTier={selectedIsolation}
+                  onConfigurePlan={openConfigurator}
+                />
+              </>
+            )}
+
+            {(selectedIsolation === "bare-metal" || selectedIsolation === "dedicated") && (
+              <section
+                id="catalog"
+                className="scroll-mt-20 border-y border-white/10 bg-[#07090F] py-12 sm:py-16 px-4 sm:px-6"
+              >
           <div className="max-w-7xl mx-auto space-y-8">
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
               <div className="space-y-2 max-w-2xl">
@@ -1293,6 +1332,9 @@ export function SparrowxInfraEngine() {
             </div>
           </div>
         </section>
+            )}
+          </div>
+        )}
 
         {/* SECTION 4: NETWORK & HARDWARE ARCHITECTURE */}
         <section
@@ -1377,8 +1419,8 @@ export function SparrowxInfraEngine() {
           </div>
         </section>
 
-        {/* Core Technologies & Infrastructure Logos */}
-        <SparrowxPoweredByTech />
+        {/* Core Technologies & Infrastructure Logos (Proxmox VE, SparrowX Sec, NetSec — No Pterodactyl) */}
+        <SparrowxPoweredByTech service="infra" title="Powered & Protected by" />
       </main>
 
       {/* Native <dialog> Hardware Configurator & Checkout Modal */}

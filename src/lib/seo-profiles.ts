@@ -5,7 +5,9 @@ export type SeoProfileKey =
   | "infra"
   | "db"
   | "drop"
-  | "keys";
+  | "keys"
+  | "gateway"
+  | "netsec";
 
 export interface SeoProfile {
   key: SeoProfileKey;
@@ -21,11 +23,12 @@ export interface SeoProfile {
   twitterTitle: string;
   twitterDescription: string;
   iconHref: string;
+  themeColor?: string;
   robots: string;
   jsonLd: Record<string, unknown>;
 }
 
-const LASTMOD = "2026-11-22";
+const LASTMOD = "2026-11-23";
 
 export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
   /**
@@ -45,12 +48,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX — Official Sovereign Cloud & Security Ecosystem",
     ogDescription:
       "Access the complete SparrowX Technologies product suite from one official portal — dedicated subdomains for security, game hosting, cloud infrastructure, databases, encrypted file transfer, and offline cryptography.",
-    ogImage: "https://sparrowx.net/logos/sparrowx-main.jpg",
+    ogImage: "https://sparrowx.net/logos/sparrowx-main.png",
     ogImageAlt: "SparrowX Technologies Official Platform Logo",
     twitterTitle: "SparrowX — Official Cloud & Security Ecosystem",
     twitterDescription:
       "Official hub for SparrowX Technologies products and the unified SparrowX Client Area.",
-    iconHref: "/sparrowx-logo.png",
+    iconHref: "/logos/sparrowx-main.png",
+    themeColor: "#090B0E",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -168,12 +172,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX Shield — Website Security Scanner, Edge WAF & DDoS Defense",
     ogDescription:
       "Run a free 8-tool deep website security audit and deploy automated Layer-7 WAF, DDoS mitigation, and AI prompt-injection protection at sec.sparrowx.net.",
-    ogImage: "https://sec.sparrowx.net/logos/sparrowx-shield.jpg",
+    ogImage: "https://sec.sparrowx.net/logos/sparrowx-shield.png",
     ogImageAlt: "SparrowX Shield — Website Security Scanner, Edge WAF & DDoS Protection",
     twitterTitle: "SparrowX Shield — Website Security, Edge WAF & DDoS Protection",
     twitterDescription:
       "Free deep website security scanner, Layer-7 WAF, DDoS mitigation, and real-time threat interception at sec.sparrowx.net.",
-    iconHref: "/sparrowx-shield-logo.svg",
+    iconHref: "/logos/sparrowx-shield.png",
+    themeColor: "#F9103A",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -256,12 +261,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX Game Hosting — Low-Ping FiveM, Minecraft, SA-MP & Discord Bot Servers",
     ogDescription:
       "Launch lag-free FiveM, Minecraft, SA-MP, and Discord bot servers in seconds on Ryzen NVMe Gen4 hardware with 12–15ms Asia-IN ping and instant Pterodactyl panel access.",
-    ogImage: "https://sparrowx.net/assets/logo-game-A5Nnak65.png",
+    ogImage: "https://sparrowx.net/logos/sparrowx-main.png",
     ogImageAlt: "SparrowX Game Hosting — FiveM, Minecraft, SA-MP & Discord Bot Servers",
     twitterTitle: "SparrowX Game Hosting — FiveM, Minecraft, SA-MP & Bot Hosting",
     twitterDescription:
       "12ms Asia-IN NVMe Gen4 game server hosting with DDoS protection and instant Pterodactyl panel from ₹49/mo.",
     iconHref: "/logos/sparrowx-main.png",
+    themeColor: "#FF6B00",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -272,7 +278,7 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
           name: "SparrowX Game Hosting",
           serviceType: "Game Server Hosting",
           url: "https://sparrowx.net/game",
-          image: "https://sparrowx.net/assets/logo-game-A5Nnak65.png",
+          image: "https://sparrowx.net/logos/sparrowx-main.png",
           description:
             "Low-ping NVMe Gen4 game server hosting for FiveM (GTA V RP), Minecraft, SA-MP, and 24/7 Discord bots with instant Pterodactyl panel provisioning and L4/L7 DDoS protection.",
           provider: {
@@ -337,12 +343,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX Cloud Infra — Bare Metal, Dedicated Servers & KVM NVMe VPS",
     ogDescription:
       "Single-tenant bare metal silicon, dedicated nodes, and instant NVMe KVM VPS on transparent INR/USD pricing with zero egress traps at infra.sparrowx.net.",
-    ogImage: "https://infra.sparrowx.net/3d/cloud-infra-server.jpg",
+    ogImage: "https://infra.sparrowx.net/logos/sparrowx-silver.png",
     ogImageAlt: "SparrowX Cloud Infra — Bare Metal and KVM NVMe VPS Infrastructure",
     twitterTitle: "SparrowX Cloud Infra — Bare Metal & KVM NVMe VPS",
     twitterDescription:
       "Instant KVM NVMe VPS and AMD Ryzen/EPYC bare metal servers with XDP DDoS defense and zero egress fees.",
-    iconHref: "/sparrowx-logo.png",
+    iconHref: "/logos/sparrowx-silver.png",
+    themeColor: "#0EA5E9",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -408,12 +415,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX Cloud DB — Managed PostgreSQL 16 & pgvector AI Studio",
     ogDescription:
       "High-performance managed PostgreSQL with visual table editor, pgvector AI search, instant PostgREST API, and zero bandwidth egress fees.",
-    ogImage: "https://db.sparrowx.net/logos/sparrowx-db.jpg",
+    ogImage: "https://db.sparrowx.net/logos/sparrowx-db.png",
     ogImageAlt: "SparrowX Cloud DB — Managed PostgreSQL 16 and pgvector",
     twitterTitle: "SparrowX Cloud DB — Managed PostgreSQL & pgvector",
     twitterDescription:
       "Fast managed PostgreSQL 16+ with pgvector AI search, instant REST API, and zero egress fees at db.sparrowx.net.",
-    iconHref: "/sparrowx-db-logo.svg",
+    iconHref: "/logos/sparrowx-db.png",
+    themeColor: "#A3E635",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -481,12 +489,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX Drop — Zero-Knowledge Encrypted File Transfer & Free 10 GB Vault",
     ogDescription:
       "Browser-side AES-256 encrypted file sharing with zero login required, auto-expiring links, and a 10 GB free encrypted vault at file.sparrowx.net.",
-    ogImage: "https://file.sparrowx.net/logos/sparrowx-drop.jpg",
+    ogImage: "https://file.sparrowx.net/logos/sparrowx-drop.png",
     ogImageAlt: "SparrowX Drop — Zero-Knowledge Encrypted File Transfer",
     twitterTitle: "SparrowX Drop — Free Encrypted File Transfer & 10 GB Vault",
     twitterDescription:
       "Zero-login AES-256 encrypted file sharing up to 2.5 GB and a 10 GB free private vault at file.sparrowx.net.",
-    iconHref: "/sparrowx-drop-logo.svg",
+    iconHref: "/logos/sparrowx-drop.png",
+    themeColor: "#A855F7",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -554,12 +563,13 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     ogTitle: "SparrowX Keys — 100% Offline Password, Diceware & Cryptographic Key Generator",
     ogDescription:
       "Zero-telemetry client-side password, Diceware passphrase, and cryptographic secret generator powered by Web Crypto CSPRNG at password.sparrowx.net.",
-    ogImage: "https://password.sparrowx.net/logos/sparrowx-keys.jpg",
+    ogImage: "https://password.sparrowx.net/logos/sparrowx-keys.png",
     ogImageAlt: "SparrowX Keys — 100% Offline Cryptographic Password Generator",
     twitterTitle: "SparrowX Keys — 100% Offline Password & Key Generator",
     twitterDescription:
       "Generate hardware-grade passwords, Diceware passphrases, and API secrets 100% offline in your browser.",
-    iconHref: "/sparrowx-keys-logo.svg",
+    iconHref: "/logos/sparrowx-keys.png",
+    themeColor: "#F59E0B",
     robots: "index, follow, max-image-preview:large, max-snippet:-1",
     jsonLd: {
       "@context": "https://schema.org",
@@ -610,6 +620,90 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
       ],
     },
   },
+
+  /**
+   * API GATEWAY OWNER — Instant hosted PostgreSQL REST API & developer SDKs.
+   */
+  gateway: {
+    key: "gateway",
+    siteName: "SparrowX API Gateway",
+    canonicalUrl: "https://api.sparrowx.net/",
+    title: "SparrowX API Gateway — Instant Hosted PostgreSQL REST API & SDKs",
+    description:
+      "Query sovereign PostgreSQL databases over HTTPS with sub-millisecond PostgREST latency, scoped spx_db API keys, and ready-to-run TypeScript, Python, and cURL SDKs at api.sparrowx.net.",
+    keywords:
+      "postgresql rest api, postgrest hosting, hosted api gateway, database rest api, sparrowx api gateway, api.sparrowx.net, developer api keys, typescript sql sdk",
+    ogTitle: "SparrowX API Gateway — Instant Hosted PostgreSQL REST API",
+    ogDescription:
+      "Sub-millisecond REST API over your sovereign PostgreSQL tables with scoped keys, automatic OpenAPI docs, and instant SDK snippets.",
+    ogImage: "https://api.sparrowx.net/logos/sparrowx-network.png",
+    ogImageAlt: "SparrowX API Gateway — Hosted PostgreSQL REST API & SDKs",
+    twitterTitle: "SparrowX API Gateway — Instant PostgreSQL REST API",
+    twitterDescription:
+      "Query sovereign PostgreSQL tables over HTTPS with scoped API keys and instant TypeScript, Python & cURL SDKs.",
+    iconHref: "/logos/sparrowx-network.png",
+    themeColor: "#38BDF8",
+    robots: "index, follow, max-image-preview:large, max-snippet:-1",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://api.sparrowx.net/#software",
+      name: "SparrowX API Gateway",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web, Linux, REST, HTTPS",
+      url: "https://api.sparrowx.net/",
+      image: "https://api.sparrowx.net/logos/sparrowx-network.png",
+      description:
+        "Instant RESTful PostgreSQL API gateway with scoped spx_db keys, row-level security, and ready-to-run cURL, TypeScript, and Python SDKs.",
+      provider: {
+        "@type": "Organization",
+        name: "SparrowX Technologies",
+        url: "https://sparrowx.net/",
+      },
+    },
+  },
+
+  /**
+   * NETSEC GUARD OWNER — Autonomous Linux DDoS defense, WireGuard tunnels & eBPF/XDP radar.
+   */
+  netsec: {
+    key: "netsec",
+    siteName: "SparrowX NetSec Guard",
+    canonicalUrl: "https://netsec.sparrowx.net/",
+    title: "SparrowX NetSec Guard — Autonomous Linux DDoS Radar, XDP & WireGuard Tunnels",
+    description:
+      "Protect Linux servers with SparrowX NetSec Guard (netsec.sparrowx.net): kernel-level eBPF/XDP packet dropping, nftables automation, WireGuard origin cloaking, and real-time threat radar.",
+    keywords:
+      "linux ddos protection, xdp firewall, ebpf ddos mitigation, wireguard tunnel protection, nftables automation, threat radar, sparrowx netsec, netsec.sparrowx.net",
+    ogTitle: "SparrowX NetSec Guard — Autonomous Linux XDP & WireGuard DDoS Defense",
+    ogDescription:
+      "Real-time threat radar, kernel eBPF/XDP packet filtering, and encrypted WireGuard origin cloaking for Linux servers.",
+    ogImage: "https://netsec.sparrowx.net/logos/sparrowx-netsec-3d.png",
+    ogImageAlt: "SparrowX NetSec Guard — Autonomous Linux DDoS Defense Logo",
+    twitterTitle: "SparrowX NetSec Guard — Linux XDP & WireGuard DDoS Defense",
+    twitterDescription:
+      "Kernel-level eBPF/XDP packet dropping, WireGuard tunnels, and autonomous threat radar for Linux infrastructure.",
+    iconHref: "/logos/sparrowx-netsec-3d.png",
+    themeColor: "#FF223A",
+    robots: "index, follow, max-image-preview:large, max-snippet:-1",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://netsec.sparrowx.net/#software",
+      name: "SparrowX NetSec Guard",
+      applicationCategory: "SecurityApplication",
+      operatingSystem: "Linux, Ubuntu, Debian",
+      url: "https://netsec.sparrowx.net/",
+      image: "https://netsec.sparrowx.net/logos/sparrowx-netsec-3d.png",
+      description:
+        "Autonomous Linux infrastructure security panel with eBPF/XDP DDoS mitigation, nftables firewall orchestration, WireGuard tunnels, and live threat radar.",
+      provider: {
+        "@type": "Organization",
+        name: "SparrowX Technologies",
+        url: "https://sparrowx.net/",
+      },
+    },
+  },
 };
 
 export function normalizeSeoHostname(rawHost: string | null | undefined): string {
@@ -625,6 +719,8 @@ export function resolveSeoProfileKeyForHost(rawHost: string | null | undefined):
   if (host.startsWith("file.") || host.startsWith("drop.") || host.startsWith("share.")) return "drop";
   if (host.startsWith("password.") || host.startsWith("passwd.") || host.startsWith("keys.")) return "keys";
   if (host.startsWith("infra.") || host.startsWith("metal.") || host.startsWith("vps.")) return "infra";
+  if (host.startsWith("api.")) return "gateway";
+  if (host.startsWith("netsec.")) return "netsec";
   if (host.startsWith("game.")) return "game";
   return "master";
 }
@@ -634,12 +730,18 @@ export function resolveSeoProfileForHost(rawHost: string | null | undefined): Se
 }
 
 export function buildRouteHeadFromProfile(profile: SeoProfile) {
+  const ogImageType = profile.ogImage.endsWith(".png")
+    ? "image/png"
+    : profile.ogImage.endsWith(".webp")
+      ? "image/webp"
+      : "image/jpeg";
   return {
     meta: [
       { title: profile.title },
       { name: "description", content: profile.description },
       { name: "keywords", content: profile.keywords },
       { name: "robots", content: profile.robots },
+      ...(profile.themeColor ? [{ name: "theme-color", content: profile.themeColor }] : []),
       { property: "og:site_name", content: profile.siteName },
       { property: "og:title", content: profile.ogTitle },
       { property: "og:description", content: profile.ogDescription },
@@ -647,11 +749,14 @@ export function buildRouteHeadFromProfile(profile: SeoProfile) {
       { property: "og:locale", content: "en_US" },
       { property: "og:url", content: profile.canonicalUrl },
       { property: "og:image", content: profile.ogImage },
+      { property: "og:image:secure_url", content: profile.ogImage },
+      { property: "og:image:type", content: ogImageType },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
       { property: "og:image:alt", content: profile.ogImageAlt },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:site", content: "@sparrowx" },
+      { name: "twitter:creator", content: "@sparrowx" },
       { name: "twitter:title", content: profile.twitterTitle },
       { name: "twitter:description", content: profile.twitterDescription },
       { name: "twitter:image", content: profile.ogImage },
@@ -659,8 +764,9 @@ export function buildRouteHeadFromProfile(profile: SeoProfile) {
     ],
     links: [
       { rel: "canonical", href: profile.canonicalUrl },
-      { rel: "icon", href: profile.iconHref },
+      { rel: "icon", href: profile.iconHref, type: profile.iconHref.endsWith(".svg") ? "image/svg+xml" : "image/png" },
       { rel: "shortcut icon", href: profile.iconHref },
+      { rel: "apple-touch-icon", href: profile.iconHref },
     ],
     scripts: [
       {
@@ -767,7 +873,7 @@ export function buildHostSitemapXml(rawHost: string | null | undefined): string 
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://sparrowx.net/logos/sparrowx-main.jpg</image:loc>
+      <image:loc>https://sparrowx.net/logos/sparrowx-main.png</image:loc>
       <image:title>SparrowX Technologies Official Platform</image:title>
     </image:image>
   </url>
@@ -777,7 +883,7 @@ export function buildHostSitemapXml(rawHost: string | null | undefined): string 
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
     <image:image>
-      <image:loc>https://sparrowx.net/assets/logo-game-A5Nnak65.png</image:loc>
+      <image:loc>https://sparrowx.net/logos/sparrowx-main.png</image:loc>
       <image:title>SparrowX Game Hosting — FiveM, Minecraft, SA-MP and Discord Bot Servers</image:title>
     </image:image>
   </url>
@@ -786,6 +892,24 @@ export function buildHostSitemapXml(rawHost: string | null | undefined): string 
     <lastmod>${LASTMOD}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://sparrowx.net/security</loc>
+    <lastmod>${LASTMOD}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://sparrowx.net/terms</loc>
+    <lastmod>${LASTMOD}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://sparrowx.net/refund</loc>
+    <lastmod>${LASTMOD}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
   </url>
   <url>
     <loc>https://sparrowx.net/docs</loc>
