@@ -109,6 +109,9 @@ export interface DbClusterHealth {
   clusterSizePretty: string;
   latencyMs: number;
   sslMode: string;
+  originRegion: string;
+  originLocation: string;
+  originDatacenter: string;
   checkedAt: string;
 }
 
@@ -1013,6 +1016,10 @@ export async function getDbClusterHealth(): Promise<DbClusterHealth> {
       clusterSizePretty: statsRes.rows[0]?.cluster_size || "0 bytes",
       latencyMs: Date.now() - started,
       sslMode: process.env.NODE_ENV === "production" ? "prefer" : "local",
+      originRegion: process.env.SPARROWX_ORIGIN_REGION || "ap-southeast-2",
+      originLocation: process.env.SPARROWX_ORIGIN_LOCATION || "Sydney, Australia",
+      originDatacenter:
+        process.env.SPARROWX_ORIGIN_DATACENTER || "SparrowX SYD-1 · OVH Australia Origin Node",
       checkedAt: new Date().toISOString(),
     };
   } finally {
