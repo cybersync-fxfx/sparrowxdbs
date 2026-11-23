@@ -922,7 +922,7 @@ function TopologyClusterPanel({
           </button>
         </div>
 
-        <div className="w-full max-w-sm rounded-lg border border-[#2E2E2E] bg-[#0C0F17]/95 backdrop-blur-md p-4 shadow-xl space-y-3">
+        <div className="w-full max-w-md rounded-lg border border-[#2E2E2E] bg-[#0C0F17]/95 backdrop-blur-md p-4 shadow-xl space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="size-9 rounded-md bg-[#A3E635]/15 border border-[#A3E635]/40 grid place-items-center text-[#A3E635] shrink-0">
@@ -941,6 +941,54 @@ function TopologyClusterPanel({
               {isLive ? "LIVE" : "PROBING"}
             </span>
           </div>
+
+          {/* Database Hosting Location & Node Info */}
+          {(() => {
+            const HOST_LOCATIONS: Record<string, { city: string; country: string; node: string }> = {
+              "ap-southeast-1": {
+                city: "Singapore",
+                country: "Southeast Asia",
+                node: "SparrowX SG-1 · Tier-IV Sovereign Node",
+              },
+              "ap-south-1": {
+                city: "Mumbai / Chennai",
+                country: "India (South Asia)",
+                node: "SparrowX IN-1 · Tier-IV Sovereign Node",
+              },
+              "eu-central-1": {
+                city: "Frankfurt",
+                country: "Germany (Central Europe)",
+                node: "SparrowX EU-1 · Tier-IV Sovereign Node",
+              },
+            };
+            const loc = HOST_LOCATIONS[region] ?? {
+              city: region,
+              country: "SparrowX Cloud",
+              node: "SparrowX Sovereign PostgreSQL Node",
+            };
+            return (
+              <div className="rounded-md border border-[#242424] bg-[#05060A]/90 px-3 py-2 space-y-1.5 text-[11px] font-mono">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-zinc-500">
+                    <Globe className="size-3 text-[#A3E635]" aria-hidden="true" />
+                    <span>HOSTED IN</span>
+                  </span>
+                  <span className="text-zinc-100 font-semibold text-right">
+                    {loc.city}, {loc.country}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-zinc-500">
+                    <Server className="size-3 text-sky-400" aria-hidden="true" />
+                    <span>DATACENTER</span>
+                  </span>
+                  <span className="text-zinc-300 text-right truncate">
+                    {loc.node}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="border-t border-[#262626] pt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-zinc-300">
             <span>{tableCount} table(s)</span>
