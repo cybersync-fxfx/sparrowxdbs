@@ -93,10 +93,10 @@ export function Floating3DVisual({
     size === "sm"
       ? "h-28 sm:h-32"
       : size === "md"
-        ? "h-40 sm:h-48"
+        ? "h-44 sm:h-52"
         : size === "lg"
-          ? "h-56 sm:h-72"
-          : "h-64 sm:h-80 lg:h-[380px]";
+          ? "h-64 sm:h-80"
+          : "h-72 sm:h-96 lg:h-[430px]";
 
   const imgFetchPriority = priority === "lcp" ? "high" : undefined;
   const imgLoading = priority === "lazy" ? "lazy" : undefined;
@@ -130,7 +130,7 @@ export function Floating3DVisual({
             variant === "stage"
               ? "radial-gradient(circle at 50% 50%, var(--spx-accent-glow), transparent 70%)"
               : "radial-gradient(circle at 50% 50%, var(--spx-accent-glow), transparent 62%)",
-          opacity: variant === "stage" ? 1 : 0.65,
+          opacity: variant === "stage" ? 1 : isRasterDarkBackdrop ? 0.2 : 0.65,
         }}
       />
 
@@ -146,8 +146,8 @@ export function Floating3DVisual({
 
       {/* 3D Floating & Pointer-Tilting Artwork */}
       <div
-        className={`spx-3d-tilt relative z-10 flex size-full items-center justify-center p-2 ${
-          isRasterDarkBackdrop ? "spx-3d-blend" : ""
+        className={`spx-3d-tilt relative z-10 flex size-full items-center justify-center ${
+          isRasterDarkBackdrop ? "spx-3d-blend" : "p-2"
         }`}
       >
         <div className="spx-3d-float relative flex size-full items-center justify-center">
@@ -159,8 +159,8 @@ export function Floating3DVisual({
             decoding={priority === "lcp" ? "sync" : "async"}
             {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
             {...(imgLoading ? { loading: imgLoading } : {})}
-            className={`max-h-full max-w-full object-contain pointer-events-none ${
-              isRasterDarkBackdrop ? "spx-3d-img-raster" : "spx-3d-img-vector"
+            className={`size-full object-contain pointer-events-none ${
+              isRasterDarkBackdrop ? "spx-3d-img-raster scale-110" : "spx-3d-img-vector"
             }`}
           />
         </div>

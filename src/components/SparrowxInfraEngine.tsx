@@ -705,19 +705,16 @@ export function SparrowxInfraEngine() {
 
               {/* Right Column: 3D Server Blade Hardware Render on the side */}
               <div className="lg:col-span-5 relative flex flex-col items-center justify-center">
-                <div className="relative w-full max-w-md lg:max-w-none">
-                  {/* Subtle Background Glow behind the hardware */}
-                  <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-orange-500/15 via-cyan-500/10 to-transparent blur-2xl rounded-3xl" />
-                  
+                <div className="relative w-full max-w-lg lg:max-w-none">
                   <Floating3DVisual
                     src="/3d/cloud-infra-server.jpg"
                     alt="3D floating SparrowX bare-metal server rack cluster with anodized titanium blades and cyan fiber uplinks"
                     accent="cyan"
-                    size="lg"
+                    size="xl"
                     priority="lcp"
                     className="w-full relative z-10"
-                    width={560}
-                    height={560}
+                    width={640}
+                    height={640}
                   />
 
                   {/* Hardware Telemetry Badge Below Image */}

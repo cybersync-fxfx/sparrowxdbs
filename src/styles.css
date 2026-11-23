@@ -739,12 +739,13 @@ html { scroll-behavior: smooth; }
 }
 
 .spx-3d-blend {
-  mix-blend-mode: screen;
+  mix-blend-mode: lighten;
 }
 
 .spx-3d-img-raster {
-  mask-image: radial-gradient(ellipse 66% 66% at 50% 50%, #000 36%, transparent 72%);
-  -webkit-mask-image: radial-gradient(ellipse 66% 66% at 50% 50%, #000 36%, transparent 72%);
+  filter: brightness(0.9) contrast(1.24) saturate(1.08);
+  mask-image: radial-gradient(ellipse 56% 56% at 50% 50%, #000 32%, rgba(0, 0, 0, 0.55) 50%, transparent 68%);
+  -webkit-mask-image: radial-gradient(ellipse 56% 56% at 50% 50%, #000 32%, rgba(0, 0, 0, 0.55) 50%, transparent 68%);
 }
 
 /* ============================================================================
