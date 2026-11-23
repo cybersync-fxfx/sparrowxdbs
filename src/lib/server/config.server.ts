@@ -1,22 +1,16 @@
+import crypto from "node:crypto";
+
 // Server-only environment helpers. Read process.env inside functions (per-request injection).
 const env = (k: string) => {
   const v = process.env[k];
   return v && v.trim() ? v.trim() : undefined;
 };
 
-const DEFAULT_GOOGLE_ID_PARTS = [
-  "362341962998-68n50bokemkkg25r623s4sbjgmgkr7rb",
-  ".apps.googleusercontent.com",
-];
-const DEFAULT_GOOGLE_SEC_CODES = [
-  71, 79, 67, 83, 80, 88, 45, 111, 79, 122, 120, 83, 106, 54, 105, 82, 80, 88,
-  55, 77, 73, 72, 71, 75, 108, 57, 56, 57, 114, 108, 89, 51, 69, 89, 67,
-];
+let ephemeralSessionSecret: string | null = null;
 
 export function googleOAuthCredentials(): { clientId: string; clientSecret: string } {
-  const clientId = env("GOOGLE_CLIENT_ID") || DEFAULT_GOOGLE_ID_PARTS.join("");
-  const clientSecret =
-    env("GOOGLE_CLIENT_SECRET") || String.fromCharCode(...DEFAULT_GOOGLE_SEC_CODES);
+  const clientId = env("GOOGLE_CLIENT_ID") ?? "";
+  const clientSecret = env("GOOGLE_CLIENT_SECRET") ?? "";
   return { clientId, clientSecret };
 }
 
@@ -59,7 +53,11 @@ export function panelUrl(): string {
 
 export function sessionSecret(): string {
   const s = env("SESSION_SECRET");
-  return s && s.length >= 32 ? s : "sparrowx-game-portal-session-secret-key-2026";
+  if (s && s.length >= 32) return s;
+  if (!ephemeralSessionSecret) {
+    ephemeralSessionSecret = crypto.randomBytes(32).toString("hex");
+  }
+  return ephemeralSessionSecret;
 }
 
 export { env };

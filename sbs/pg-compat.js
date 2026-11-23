@@ -10,7 +10,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const MASTER_SSO_COOKIE_NAME = 'spx_master_sso';
-const DEFAULT_SHARED_SECRET = 'sparrowx_jwt_secret_key_32_characters_2026';
+const EPHEMERAL_FALLBACK_SECRET = crypto.randomBytes(32).toString('hex');
 const IDENT_RE = /^[a-z_][a-z0-9_]*$/i;
 
 let activePool = null;
@@ -32,7 +32,7 @@ function getJwtSecret(env = process.env) {
     env.JWT_SECRET ||
     env.SESSION_SECRET ||
     env.SUPABASE_JWT_SECRET ||
-    DEFAULT_SHARED_SECRET
+    EPHEMERAL_FALLBACK_SECRET
   );
 }
 
@@ -105,7 +105,7 @@ function buildPoolCandidates(env = process.env) {
   const primaryHost = env.POSTGRES_HOST || env.PGHOST || 'sparrowx-postgres';
   const port = Number(env.POSTGRES_PORT || env.PGPORT || 5432);
   const user = env.POSTGRES_USER || env.PGUSER || 'sparrowx';
-  const password = env.POSTGRES_PASSWORD || env.PGPASSWORD || 'sparrowx_ovh_secret_2026';
+  const password = env.POSTGRES_PASSWORD || env.PGPASSWORD || '';
   const database = env.POSTGRES_DB || env.PGDATABASE || 'sparrowx_db';
 
   const hosts = [primaryHost];

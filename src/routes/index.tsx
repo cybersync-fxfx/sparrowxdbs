@@ -39,6 +39,8 @@ import { SparrowxDropEngine } from "@/components/SparrowxDropEngine";
 import { SparrowxKeysEngine } from "@/components/SparrowxKeysEngine";
 import { SparrowxShieldEngine } from "@/components/SparrowxShieldEngine";
 import { SparrowxMasterLanding } from "@/components/SparrowxMasterLanding";
+import { DashboardSubscriptionLock } from "@/components/DashboardSubscriptionLock";
+import { hasVerifiedPaidSubscription } from "@/lib/sparrowx-plans";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
@@ -2868,29 +2870,41 @@ function Dashboard() {
                 activeNav === "Subscriptions & Due Dates" ||
                 activeNav === "Billing & Credits" ||
                 activeNav === "Profile Management"))) && (
-            <ClientPortalView
-              activeNav={activeNav}
-              assets={assets}
-              currentUser={currentUser}
-              incidents={incidents}
-              onCreateTenant={handleCreateTenant}
-              onDeleteTenant={handleDeleteTenant}
-              onGenerateReport={generateNewReport}
-              onNavigate={handleNavigate}
-              onOpenServiceSdk={(id) => setSdkServiceId(id)}
-              onRenameOrUpdateTenant={handleRenameOrUpdateTenant}
-              onSelectTenant={setSelectedTenantId}
-              onSignOut={handleSignOut}
-              onToggleTenantModule={handleToggleTenantModule}
-              onUpdateUserProfile={handleUpdateUserProfile}
-              onVerifyTenantSdk={handleVerifyTenantSdk}
-              protectedServices={visibleClientServices}
-              reports={reports}
-              selectedTenantId={selectedTenantId}
-              showToast={showToast}
-              tenants={visibleClientTenants}
-              vulnerabilities={vulnerabilities}
-            />
+            <DashboardSubscriptionLock
+              serviceName="SparrowX Shield & SOC"
+              mode="overlay"
+              locked={
+                !hasVerifiedPaidSubscription(selectedTenantId ?? undefined) &&
+                activeNav !== "Subscriptions & Due Dates" &&
+                activeNav !== "Billing & Credits" &&
+                activeNav !== "Profile Management"
+              }
+              onChoosePlan={() => handleNavigate("Subscriptions & Due Dates")}
+            >
+              <ClientPortalView
+                activeNav={activeNav}
+                assets={assets}
+                currentUser={currentUser}
+                incidents={incidents}
+                onCreateTenant={handleCreateTenant}
+                onDeleteTenant={handleDeleteTenant}
+                onGenerateReport={generateNewReport}
+                onNavigate={handleNavigate}
+                onOpenServiceSdk={(id) => setSdkServiceId(id)}
+                onRenameOrUpdateTenant={handleRenameOrUpdateTenant}
+                onSelectTenant={setSelectedTenantId}
+                onSignOut={handleSignOut}
+                onToggleTenantModule={handleToggleTenantModule}
+                onUpdateUserProfile={handleUpdateUserProfile}
+                onVerifyTenantSdk={handleVerifyTenantSdk}
+                protectedServices={visibleClientServices}
+                reports={reports}
+                selectedTenantId={selectedTenantId}
+                showToast={showToast}
+                tenants={visibleClientTenants}
+                vulnerabilities={vulnerabilities}
+              />
+            </DashboardSubscriptionLock>
           )}
 
           {authSession.role === "admin" &&

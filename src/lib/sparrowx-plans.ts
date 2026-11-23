@@ -380,6 +380,25 @@ export function saveClientActiveSubscription(sub: ClientSubscriptionRecord): voi
   }
 }
 
+export function hasVerifiedPaidSubscription(tenantId?: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_SUBSCRIPTION_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as ClientSubscriptionRecord & { verifiedPayment?: boolean };
+    if (!parsed || parsed.status !== "active" || parsed.priceUsd <= 0) return false;
+    // Ignore auto-seeded default stub records; require an explicit verified checkout or non-stub receipt
+    const isLegacyStub = parsed.receiptNumber === `REC-${new Date().getFullYear()}-SPX882` && !parsed.verifiedPayment;
+    if (isLegacyStub) return false;
+    if (tenantId && parsed.tenantId && parsed.tenantId !== "default-tenant" && parsed.tenantId !== tenantId) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function subscribeToPlan(
   planId: string,
   billingCycle: "monthly" | "annual" = "monthly",
@@ -398,7 +417,7 @@ export function subscribeToPlan(
 
   const receiptNumber = `REC-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
 
-  const record: ClientSubscriptionRecord = {
+  const record: ClientSubscriptionRecord & { verifiedPayment?: boolean } = {
     tenantId: tenantId ?? "current-client",
     planId: plan.id,
     planName: plan.name,
@@ -411,6 +430,7 @@ export function subscribeToPlan(
     receiptNumber,
     maxDomains: plan.maxDomains,
     requestQuotaMonthly: plan.requestQuotaMonthly,
+    verifiedPayment: true,
   };
 
   saveClientActiveSubscription(record);

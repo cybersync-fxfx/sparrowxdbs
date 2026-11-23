@@ -71,26 +71,8 @@ const BRAIN_MEMORY_STORAGE_KEY = "spx_ai_brain_memory_v1";
 const BRAIN_CHAT_STORAGE_KEY = "spx_ai_brain_chat_v1";
 const BRAIN_CONFIG_STORAGE_KEY = "spx_ai_brain_config_v1";
 
-// Obfuscated runtime key segments so raw secret strings are never exposed in UI or static scanners
-const DEFAULT_BRAIN_KEY_SEGMENTS = [
-  "QVEuQWI4Uk42",
-  "S2tZdG5VREZL",
-  "UzFULUlycEkw",
-  "Rlg5dWgxZkE2",
-  "V1JyYU5rSXd1",
-  "S19LcWhtZ1E=",
-];
-
-function decodeDefaultBrainKey(): string {
-  try {
-    const joined = DEFAULT_BRAIN_KEY_SEGMENTS.map((seg) =>
-      typeof atob === "function" ? atob(seg) : Buffer.from(seg, "base64").toString("utf8"),
-    ).join("");
-    return joined.trim();
-  } catch {
-    return "";
-  }
-}
+// Never hardcode or base64-encode API keys in source code or client bundles.
+// Configure SPARROWX_AI_KEY or GEMINI_API_KEY in server environment variables.
 
 export interface AiBrainConfig {
   model: SparrowxBrainModel;
@@ -156,18 +138,13 @@ export function resolveActiveGeminiApiKey(): string {
   if (typeof process !== "undefined" && process.env) {
     const serverKey = (
       process.env.SPARROWX_AI_KEY ??
-      process.env.GEMINI_API_KEY ??
-      process.env.VITE_GEMINI_API_KEY
+      process.env.GEMINI_API_KEY
     )?.trim();
     if (serverKey && serverKey.length > 10) {
       return serverKey;
     }
   }
-  const envKey = (import.meta.env?.VITE_GEMINI_API_KEY as string | undefined)?.trim();
-  if (envKey && envKey.length > 10) {
-    return envKey;
-  }
-  return decodeDefaultBrainKey();
+  return "";
 }
 
 export function getMaskedBrainKeyStatus(): {

@@ -32,6 +32,7 @@ import { INFRA_OS_IMAGES } from "@/lib/infra-plans";
 import { UpiAutoPayModal, type UpiCheckoutOrder } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { DashboardSubscriptionLock } from "@/components/DashboardSubscriptionLock";
 import {
   clearMasterSsoSession,
   fetchMasterSsoUser,
@@ -84,7 +85,7 @@ export function SparrowxInfraDashboard() {
   const [sshKeyPub, setSshKeyPub] = useState("");
   const [rotatedPass, setRotatedPass] = useState("");
   const [consoleLines, setConsoleLines] = useState<string[]>([
-    "SparrowX Proxmox VE Web Terminal Ready — click 'Connect Web SSH' to open live session.",
+    "SparrowX Physical Control Plane: Terminal commands execute on real hardware via SSH or Proxmox VE termproxy.",
   ]);
   const [terminalCmd, setTerminalCmd] = useState("");
   const [consoleConnected, setConsoleConnected] = useState(false);
@@ -252,19 +253,26 @@ export function SparrowxInfraDashboard() {
         proxmoxTicket?: string;
         consolePort?: number;
         mode?: string;
+        error?: string;
       };
-      if (json.ok) {
+      if (json.ok && json.mode === "live") {
         setConsoleConnected(true);
         setConsoleLines([
-          `[Proxmox VE termproxy :: ${json.mode?.toUpperCase()}] Ticket issued (${json.proxmoxTicket?.slice(0, 22)}...)`,
-          `Connected to ${activeServer.hostname} (${activeServer.ipv4}:${json.consolePort})`,
-          `Welcome to ${activeServer.os} (Linux 6.8.0-sparrowx-xdp x86_64)`,
-          `System load: ${(activeServer.cpuUsagePct / 100 * activeServer.cpuCores).toFixed(2)} | Memory: ${activeServer.ramUsedGb}/${activeServer.ramTotalGb} GB | IPv4: ${activeServer.ipv4}`,
+          `[Proxmox VE termproxy :: LIVE] Connected to ${activeServer.hostname}`,
+          `Direct SSH: ${json.sshCommand}`,
+          `Console Port: ${json.consolePort}`,
           `root@${activeServer.hostname.split(".")[0]}:~# `,
+        ]);
+      } else {
+        notify("err", json.error || "Proxmox VE hypervisor is not configured.");
+        setConsoleLines([
+          `[Terminal Notice] ${json.error || "No backend Proxmox VE hypervisor connected."}`,
+          `Mock terminal simulation is disabled. Real terminal access requires live PVE credentials (PVE_URL, PVE_TOKEN_ID) in server environment.`,
+          `To manage your host directly: ${json.sshCommand || `ssh ${activeServer.sshUser}@${activeServer.ipv4}`}`,
         ]);
       }
     } catch {
-      notify("err", "Could not initialize Proxmox console ticket.");
+      notify("err", "Could not reach Proxmox control plane.");
     } finally {
       setActionBusy("");
     }
@@ -275,18 +283,7 @@ export function SparrowxInfraDashboard() {
     if (!activeServer || !terminalCmd.trim()) return;
     const cmd = terminalCmd.trim();
     const hostShort = activeServer.hostname.split(".")[0] || "node";
-    let reply = `Executed '${cmd}' on ${activeServer.hostname}`;
-    if (cmd === "uname -a") {
-      reply = `Linux ${hostShort} 6.8.0-49-generic #49-Ubuntu SMP PREEMPT_DYNAMIC x86_64 GNU/Linux`;
-    } else if (cmd === "ip a" || cmd === "hostname -I") {
-      reply = `${activeServer.ipv4} ${activeServer.wireguardEnabled ? activeServer.wireguardIp.split("/")[0] : ""} ${activeServer.ipv6}`;
-    } else if (cmd === "uptime") {
-      reply = `up ${formatUptime(activeServer.uptimeSeconds)}, 1 user, load average: 0.42, 0.38, 0.31`;
-    } else if (cmd === "wg show") {
-      reply = activeServer.wireguardEnabled
-        ? `interface: wg0\n  listening port: 51820\n  peer: sparrowx-netsec-hub (10.66.0.1) — latest handshake: 14 seconds ago`
-        : "WireGuard interface wg0 is paused.";
-    } else if (cmd === "clear") {
+    if (cmd === "clear") {
       setConsoleLines([`root@${hostShort}:~# `]);
       setTerminalCmd("");
       return;
@@ -294,7 +291,7 @@ export function SparrowxInfraDashboard() {
     setConsoleLines((prev) => [
       ...prev.slice(0, -1),
       `root@${hostShort}:~# ${cmd}`,
-      reply,
+      `[Hardware Notice] Simulated mock commands removed. Commands must execute directly on your physical server via SSH: ssh ${activeServer.sshUser}@${activeServer.ipv4}`,
       `root@${hostShort}:~# `,
     ]);
     setTerminalCmd("");
@@ -511,36 +508,14 @@ export function SparrowxInfraDashboard() {
               Checking your SparrowX Cloud Infrastructure fleet...
             </div>
           ) : !activeServer && section !== "billing" && section !== "proxmox" ? (
-            <div className="rounded-2xl border border-white/12 bg-[#0C1018] p-8 sm:p-12 text-center space-y-5">
-              <div className="mx-auto size-14 rounded-2xl border border-white/15 bg-[#06080D] grid place-items-center text-sky-400">
-                <Server className="size-7" aria-hidden="true" />
-              </div>
-              <div className="space-y-2 max-w-md mx-auto">
-                <h1 className="text-2xl font-bold tracking-tight text-white">
-                  No servers deployed yet
-                </h1>
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  Your Cloud Management Dashboard is empty until you deploy a Bare Metal server, Dedicated node, or KVM VPS — or link your live Proxmox VE cluster.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-                <a
-                  href="/infra#catalog"
-                  className="inline-flex items-center gap-2 rounded-xl bg-sky-400 hover:bg-sky-300 px-5 py-2.5 text-sm font-semibold text-black transition-colors"
-                >
-                  <Plus className="size-4" aria-hidden="true" />
-                  <span>Deploy Your First Server</span>
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setSection("proxmox")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-[#06080D] hover:border-white/30 px-4 py-2.5 text-sm font-medium text-zinc-200 hover:text-white cursor-pointer"
-                >
-                  <Settings className="size-4" aria-hidden="true" />
-                  <span>Connect Proxmox VE</span>
-                </button>
-              </div>
-            </div>
+            <DashboardSubscriptionLock
+              serviceName="SparrowX Cloud Infra"
+              mode="panel"
+              locked={true}
+              plansHref="/infra#catalog"
+              secondaryActionLabel="Open UPI Billing"
+              onSecondaryAction={() => setSection("billing")}
+            />
           ) : (
             <>
               {/* Persistent Top Server Action Banner (shown only when a deployed server exists) */}

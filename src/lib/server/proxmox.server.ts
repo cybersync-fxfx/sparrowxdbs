@@ -41,7 +41,7 @@ export interface ManagedInfraServer {
 
 export interface ProxmoxConfigStatus {
   configured: boolean;
-  mode: "live" | "sandbox";
+  mode: "live" | "unconfigured";
   url: string;
   node: string;
   tokenIdMasked: string;
@@ -62,8 +62,8 @@ export function getProxmoxConfigStatus(): ProxmoxConfigStatus {
 
   return {
     configured,
-    mode: configured ? "live" : "sandbox",
-    url: url || "https://pve.sparrowx.net:8006",
+    mode: configured ? "live" : "unconfigured",
+    url: url || "",
     node,
     tokenIdMasked: tokenId
       ? `${tokenId.slice(0, 6)}***${tokenId.slice(-4)}`
@@ -333,11 +333,21 @@ export async function executeServerAction(input: {
   let proxmoxTask: string | undefined;
 
   if (["start", "stop", "shutdown", "reboot"].includes(input.action)) {
-    if (getProxmoxConfigStatus().configured) {
-      const pveRes = await callProxmoxApi("POST", `/nodes/${node}/qemu/${vmid}/status/${input.action}`);
-      if (pveRes.ok && typeof pveRes.data === "string") {
-        proxmoxTask = pveRes.data;
-      }
+    if (!getProxmoxConfigStatus().configured) {
+      return {
+        ok: false,
+        message: "No live Proxmox VE hypervisor is connected. Configure PVE_URL and PVE_TOKEN_ID in server environment to execute physical power states.",
+      };
+    }
+    const pveRes = await callProxmoxApi("POST", `/nodes/${node}/qemu/${vmid}/status/${input.action}`);
+    if (!pveRes.ok) {
+      return {
+        ok: false,
+        message: pveRes.error || `Failed to execute ${input.action} on Proxmox VE node.`,
+      };
+    }
+    if (typeof pveRes.data === "string") {
+      proxmoxTask = pveRes.data;
     }
     if (input.action === "start") {
       server.status = "running";
@@ -468,38 +478,44 @@ export async function createServerConsoleSession(serverId: string): Promise<{
   sshCommand?: string;
   proxmoxTicket?: string;
   consolePort?: number;
-  mode: "live" | "sandbox";
+  mode: "live" | "unconfigured";
   error?: string;
 }> {
   const server = serverStore.get(serverId);
   if (!server) {
-    return { ok: false, mode: "sandbox", error: "Server not found." };
+    return { ok: false, mode: "unconfigured", error: "Server instance not found." };
   }
   const cfg = getProxmoxConfigStatus();
   const sshCommand = `ssh ${server.sshUser}@${server.ipv4}${server.sshPort !== 22 ? ` -p ${server.sshPort}` : ""}`;
 
-  if (cfg.configured) {
-    const res = await callProxmoxApi(
-      "POST",
-      `/nodes/${encodeURIComponent(server.node)}/qemu/${encodeURIComponent(String(server.vmid))}/termproxy`,
-    );
-    if (res.ok && res.data && typeof res.data === "object") {
-      const payload = res.data as { ticket?: string; port?: number };
-      return {
-        ok: true,
-        sshCommand,
-        ...(payload.ticket ? { proxmoxTicket: payload.ticket } : {}),
-        consolePort: Number(payload.port || 5900),
-        mode: "live",
-      };
-    }
+  if (!cfg.configured) {
+    return {
+      ok: false,
+      sshCommand,
+      mode: "unconfigured",
+      error: "No backend Proxmox VE hypervisor connected. Connect PVE_URL and PVE_TOKEN_ID in server environment to enable live hardware terminal.",
+    };
+  }
+
+  const res = await callProxmoxApi(
+    "POST",
+    `/nodes/${encodeURIComponent(server.node)}/qemu/${encodeURIComponent(String(server.vmid))}/termproxy`,
+  );
+  if (res.ok && res.data && typeof res.data === "object") {
+    const payload = res.data as { ticket?: string; port?: number };
+    return {
+      ok: true,
+      sshCommand,
+      ...(payload.ticket ? { proxmoxTicket: payload.ticket } : {}),
+      consolePort: Number(payload.port || 5900),
+      mode: "live",
+    };
   }
 
   return {
-    ok: true,
+    ok: false,
     sshCommand,
-    proxmoxTicket: `PVE:spx-${crypto.randomBytes(10).toString("hex")}`,
-    consolePort: 5900 + (server.vmid % 100),
-    mode: "sandbox",
+    mode: "unconfigured",
+    error: res.error || "Proxmox termproxy could not be initialized on the node.",
   };
 }

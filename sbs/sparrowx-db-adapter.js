@@ -314,11 +314,18 @@ class SparrowxQueryBuilder {
 
 function createSparrowxDb({ pool: customPool, jwtSecret: customJwtSecret } = {}) {
   const pool = customPool || new Pool(resolvePoolConfig());
-  const jwtSecret =
+  const configuredSecret =
     customJwtSecret ||
     process.env.JWT_SECRET ||
     process.env.SPARROWX_JWT_SECRET ||
-    'sparrowx-sbs-production-secret-change-me';
+    '';
+  const jwtSecret =
+    configuredSecret && configuredSecret.length >= 16
+      ? configuredSecret
+      : crypto.randomBytes(32).toString('hex');
+  if (!configuredSecret) {
+    console.warn('[sparrowx-db] Warning: JWT_SECRET not set; using an ephemeral per-process CSPRNG secret.');
+  }
 
   async function ensureSchema() {
     await pool.query(`

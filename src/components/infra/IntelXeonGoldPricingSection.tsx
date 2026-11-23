@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import type { InfraServerPlan } from "@/lib/infra-plans";
 import { buildWhatsAppSupportUrl } from "@/lib/whatsapp-support";
+import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 
 export interface XeonPlanItem {
   id: string;
@@ -214,81 +215,88 @@ export function IntelXeonGoldPricingSection({
     <section
       id="xeon-gold-plans"
       aria-labelledby="xeon-gold-heading"
-      className="relative scroll-mt-20 border-t border-white/10 bg-[#05060A] px-4 py-16 text-[#F4F6FA] sm:px-6 sm:py-24"
+      className="relative scroll-mt-20 border-t border-[#0071C5]/30 bg-[#050811] px-4 py-16 text-[#F4F6FA] sm:px-6 sm:py-24"
     >
-      {/* Subtle dual-accent ambient glow */}
+      {/* Subtle Intel Blue ambient glow */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-72 bg-[radial-gradient(ellipse_at_top,rgba(56,189,248,0.12),transparent_65%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(0,113,197,0.18),transparent_65%)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute right-0 top-24 size-80 rounded-full bg-[#F96246]/[0.07] blur-3xl"
+        className="pointer-events-none absolute right-0 top-24 size-96 rounded-full bg-[#0284C7]/[0.10] blur-3xl"
       />
 
       <div className="relative mx-auto max-w-7xl">
-        {/* Header & Tab Toggle */}
-        <div className="mb-10 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
-          <div className="max-w-2xl space-y-3">
-            <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-[#38BDF8]/30 bg-[#38BDF8]/10 px-3.5 py-1 text-xs font-semibold text-[#38BDF8]">
-              <Cpu className="size-3.5" aria-hidden="true" />
-              <span>Dual Intel® Xeon® Gold Processors</span>
+        {/* Header & Tab Toggle with 3D Floating Intel Xeon Processor */}
+        <div className="mb-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="lg:col-span-8 space-y-4">
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-[#0071C5]/40 bg-[#0071C5]/10 px-3.5 py-1 text-xs font-semibold text-[#38BDF8]">
+              <Cpu className="size-3.5 text-[#38BDF8]" aria-hidden="true" />
+              <span>Dual Intel® Xeon® Gold Enterprise Silicon</span>
               <span className="text-white/30">·</span>
-              <span className="text-[#F96246]">DDR4 ECC Enterprise Silicon</span>
+              <span className="text-sky-300">Intel Blue Architecture</span>
             </div>
 
             <h2
               id="xeon-gold-heading"
-              className="text-3xl font-extrabold tracking-tight text-[#F4F6FA] sm:text-4xl"
+              className="text-3xl font-extrabold tracking-tight text-[#F4F6FA] sm:text-4xl lg:text-5xl"
             >
-              Intel Xeon Gold — VPS &amp; VDS
+              Intel Xeon Gold <span className="text-[#38BDF8]">Enterprise Servers</span>
             </h2>
 
-            <p className="text-sm leading-relaxed text-[#F4F6FA]/70 sm:text-base">
-              Enterprise-grade virtual servers powered by{" "}
-              <strong className="font-semibold text-[#F4F6FA]">
-                Dual Intel Xeon Gold processors
-              </strong>{" "}
-              with ECC registered memory, NVMe/SSD storage, dedicated IPv4, and
-              always-on DDoS mitigation. Switch seamlessly between shared KVM
-              VPS and dedicated-core VDS.
+            <p className="text-sm leading-relaxed text-[#F4F6FA]/80 sm:text-base max-w-2xl">
+              Enterprise dual-socket compute powered by <strong className="font-semibold text-white">Dual Intel Xeon Gold processors</strong> with DDR4/DDR5 ECC registered memory, ultra-fast NVMe/SSD arrays, dedicated static IPv4 with custom rDNS, and always-on L3/L4/L7 DDoS mitigation.
             </p>
+
+            {/* Clean Tab Toggle in pure Intel Blue theme */}
+            <div
+              role="tablist"
+              aria-label="Intel Xeon Gold server type"
+              className="inline-flex rounded-2xl border border-[#0071C5]/40 bg-[#06101E]/90 p-1.5 backdrop-blur-md"
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "vps"}
+                onClick={() => setActiveTab("vps")}
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
+                  activeTab === "vps"
+                    ? "bg-[#0071C5] text-white shadow-[0_0_24px_rgba(0,113,197,0.5)] font-bold"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                <Server className="size-4" aria-hidden="true" />
+                <span>KVM VPS (Shared vCPU)</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "vds"}
+                onClick={() => setActiveTab("vds")}
+                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
+                  activeTab === "vds"
+                    ? "bg-[#0284C7] text-white shadow-[0_0_24px_rgba(2,132,199,0.5)] font-bold"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                <Cpu className="size-4" aria-hidden="true" />
+                <span>VDS (Dedicated Cores)</span>
+              </button>
+            </div>
           </div>
 
-          {/* Clean Tab Toggle */}
-          <div
-            role="tablist"
-            aria-label="Intel Xeon Gold server type"
-            className="inline-flex self-start rounded-2xl border border-white/10 bg-[#090B11]/90 p-1.5 backdrop-blur-md lg:self-auto"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "vps"}
-              onClick={() => setActiveTab("vps")}
-              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
-                activeTab === "vps"
-                  ? "bg-[#38BDF8] text-[#05060A] shadow-[0_0_24px_rgba(56,189,248,0.35)]"
-                  : "text-[#F4F6FA]/70 hover:text-[#F4F6FA]"
-              }`}
-            >
-              <Server className="size-4" aria-hidden="true" />
-              <span>KVM VPS (Shared vCPU)</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "vds"}
-              onClick={() => setActiveTab("vds")}
-              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
-                activeTab === "vds"
-                  ? "bg-[#F96246] text-[#05060A] shadow-[0_0_24px_rgba(249,98,70,0.35)]"
-                  : "text-[#F4F6FA]/70 hover:text-[#F4F6FA]"
-              }`}
-            >
-              <Cpu className="size-4" aria-hidden="true" />
-              <span>VDS (Dedicated Cores)</span>
-            </button>
+          {/* Right Column: 3D Floating Intel Xeon Processor */}
+          <div className="lg:col-span-4 flex justify-center lg:justify-end">
+            <div className="relative w-full max-w-[280px] sm:max-w-[320px]">
+              <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-blue-600/20 via-sky-500/15 to-transparent blur-2xl rounded-3xl" />
+              <Floating3DVisual
+                src="/3d/intel-xeon-processor.svg"
+                alt="3D floating Dual Intel Xeon Gold Enterprise Processor"
+                accent="cyan"
+                size="md"
+              />
+            </div>
           </div>
         </div>
 
@@ -307,15 +315,15 @@ export function IntelXeonGoldPricingSection({
             return (
               <article
                 key={plan.id}
-                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#090B11]/90 p-5 backdrop-blur-xl transition-all duration-200 ${
+                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#08101C]/90 p-5 backdrop-blur-xl transition-all duration-200 ${
                   isHighlighted
-                    ? "border-[#F96246]/60 shadow-[0_0_40px_rgba(249,98,70,0.16)]"
-                    : "border-white/10 hover:border-[#38BDF8]/45 hover:shadow-[0_12px_36px_rgba(56,189,248,0.12)]"
+                    ? "border-[#0284C7]/70 shadow-[0_0_40px_rgba(2,132,199,0.22)]"
+                    : "border-white/10 hover:border-[#38BDF8]/45 hover:shadow-[0_12px_36px_rgba(56,189,248,0.14)]"
                 }`}
               >
                 {/* Highlight Ribbon */}
                 {plan.highlight && (
-                  <div className="absolute -top-3 right-4 inline-flex items-center gap-1 rounded-full bg-[#F96246] px-3 py-0.5 text-[11px] font-bold tracking-wide text-[#05060A] shadow-lg">
+                  <div className="absolute -top-3 right-4 inline-flex items-center gap-1 rounded-full bg-[#0071C5] px-3 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-lg shadow-sky-600/30">
                     <Sparkles className="size-3" aria-hidden="true" />
                     <span>{plan.highlight}</span>
                   </div>
@@ -336,7 +344,7 @@ export function IntelXeonGoldPricingSection({
                   <h3 className="text-xl font-bold tracking-tight text-[#F4F6FA]">
                     {plan.name}
                   </h3>
-                  <p className="mt-0.5 text-xs text-[#F4F6FA]/55">
+                  <p className="mt-0.5 text-xs text-[#F4F6FA]/65">
                     {plan.tier === "vds"
                       ? "Dedicated Physical Cores · Dual Socket"
                       : "KVM Shared vCPU · Dual Socket"}
@@ -400,7 +408,7 @@ export function IntelXeonGoldPricingSection({
                     onClick={() => onConfigurePlan?.(toInfraServerPlan(plan))}
                     className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-150 ${
                       isHighlighted
-                        ? "bg-[#F96246] text-[#05060A] hover:bg-[#ff745a] shadow-[0_6px_22px_rgba(249,98,70,0.3)]"
+                        ? "bg-[#0071C5] text-white hover:bg-[#0284C7] shadow-[0_6px_22px_rgba(0,113,197,0.4)]"
                         : "border border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#F4F6FA] hover:bg-[#38BDF8] hover:text-[#05060A]"
                     }`}
                   >
@@ -423,7 +431,7 @@ export function IntelXeonGoldPricingSection({
         </div>
 
         {/* 5-Column Included Features Bar with 3D Icon Placeholders */}
-        <div className="mt-12 rounded-2xl border border-white/10 bg-[#090B11]/90 p-6 backdrop-blur-xl">
+        <div className="mt-12 rounded-2xl border border-[#0071C5]/30 bg-[#08101C]/90 p-6 backdrop-blur-xl">
           <div className="mb-6 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
             <div>
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-[#38BDF8]">
@@ -433,7 +441,7 @@ export function IntelXeonGoldPricingSection({
                 Included With Every Intel Xeon Server
               </h3>
             </div>
-            <span className="font-mono text-xs text-[#F4F6FA]/50">
+            <span className="font-mono text-xs text-[#F4F6FA]/60">
               Zero extra add-on fees · Provisioned automatically
             </span>
           </div>
@@ -444,16 +452,16 @@ export function IntelXeonGoldPricingSection({
               return (
                 <div
                   key={feat.id}
-                  className="flex flex-col items-start gap-3 rounded-xl border border-white/[0.08] bg-[#05060A]/80 p-4 transition-colors hover:border-[#38BDF8]/35"
+                  className="flex flex-col items-start gap-3 rounded-xl border border-white/[0.08] bg-[#050811]/90 p-4 transition-colors hover:border-[#38BDF8]/45"
                 >
-                  {/* 3D Icon Placeholder Slot */}
+                  {/* 3D Icon Placeholder Slot in Blue Theme */}
                   <div
                     data-icon-slot={feat.id}
-                    className="relative flex size-12 items-center justify-center rounded-xl border border-dashed border-[#38BDF8]/35 bg-gradient-to-br from-[#38BDF8]/15 via-[#090B11] to-[#F96246]/15 shadow-inner"
+                    className="relative flex size-12 items-center justify-center rounded-xl border border-dashed border-[#38BDF8]/40 bg-gradient-to-br from-[#38BDF8]/20 via-[#08101C] to-[#0071C5]/20 shadow-inner"
                     title={feat.slotLabel}
                   >
                     <Icon className="size-5 text-[#38BDF8]" aria-hidden="true" />
-                    <span className="absolute -bottom-1.5 right-0 rounded bg-[#05060A] px-1 font-mono text-[8px] font-bold uppercase tracking-wider text-[#F96246] border border-[#F96246]/40">
+                    <span className="absolute -bottom-1.5 right-0 rounded bg-[#050811] px-1 font-mono text-[8px] font-bold uppercase tracking-wider text-[#38BDF8] border border-[#38BDF8]/40">
                       3D
                     </span>
                   </div>
@@ -461,7 +469,7 @@ export function IntelXeonGoldPricingSection({
                     <h4 className="text-sm font-semibold text-[#F4F6FA]">
                       {feat.title}
                     </h4>
-                    <p className="mt-0.5 text-xs leading-snug text-[#F4F6FA]/55">
+                    <p className="mt-0.5 text-xs leading-snug text-[#F4F6FA]/65">
                       {feat.subtitle}
                     </p>
                   </div>

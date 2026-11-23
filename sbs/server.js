@@ -29,7 +29,7 @@ if (!fs.existsSync(path.join(__dirname, '.env')) && !pgCompat.isPgConfigured(pro
 POSTGRES_HOST=sparrowx-postgres
 POSTGRES_PORT=5432
 POSTGRES_USER=sparrowx
-POSTGRES_PASSWORD=sparrowx_ovh_secret_2026
+POSTGRES_PASSWORD=CHANGE_ME
 POSTGRES_DB=sparrowx_db
 SPARROWX_MASTER_URL=https://sparrowx.net
 `;
@@ -1669,7 +1669,17 @@ app.get('/api/agent/download', authMiddleware, (req, res) => {
   let serverUrl = fallbackServerUrl;
   try {
     const parsed = new URL(requestedServerUrl);
-    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+    const h = parsed.hostname.toLowerCase();
+    const guardHost = String(process.env.GUARD_PUBLIC_IP || '').trim().toLowerCase();
+    const isAllowedHost =
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === 'sparrowx.net' ||
+      h.endsWith('.sparrowx.net') ||
+      h === 'sparrowx.sbs' ||
+      h.endsWith('.sparrowx.sbs') ||
+      (guardHost && h === guardHost);
+    if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && isAllowedHost) {
       serverUrl = parsed.origin;
     }
   } catch (_) {

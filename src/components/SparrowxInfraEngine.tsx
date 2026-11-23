@@ -237,10 +237,6 @@ export function InfraPriceCard({
         <ArrowRight className="size-4" />
       </button>
     </article>
-        <span>Configure &amp; Order</span>
-        <ArrowRight className="size-4" />
-      </button>
-    </article>
   );
 }
 
@@ -824,84 +820,106 @@ export function SparrowxInfraEngine() {
           </div>
         </section>
 
-        {/* SECTION: AMD RYZEN 9 9950X VPS & DEDICATED VDS PRICE CARDS */}
+        {/* SECTION: AMD RYZEN 9 9950X VPS & DEDICATED VDS PRICE CARDS (RED THEME + FLOATING 3D PROCESSOR) */}
         <section
           id="ryzen-plans"
-          className="scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/10"
+          className="relative scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-red-500/20"
         >
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
-            <div className="space-y-3 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/25">
-                <Cpu className="size-3.5 text-orange-400" />
+          {/* Ambient AMD Crimson Red Glow */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(ellipse_at_top,rgba(237,28,36,0.14),transparent_70%)]"
+          />
+
+          <div className="relative mb-12 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            {/* Left Column: Heading, Specs & Controls */}
+            <div className="lg:col-span-8 space-y-4">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/30">
+                <Cpu className="size-3.5 text-red-400" />
                 <span>Zen 5 High-Frequency Silicon · Tier IV Mumbai Node</span>
+                <span className="text-white/30">·</span>
+                <span className="text-red-300">AMD Red Edition</span>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white">
                 Ryzen 9 9950X VPS &amp; Dedicated VDS Plans
               </h2>
-              <p className="text-base text-zinc-400 leading-relaxed">
-                Flagship single-thread performance powered by AMD Ryzen 9 9950X @ 5.7GHz, DDR5 ECC On-Die memory, NVMe Gen5 storage, and Enterprise DDoS protection at our Tier IV Mumbai Node.
+              <p className="text-base text-zinc-300 leading-relaxed max-w-2xl">
+                Flagship single-thread performance powered by <strong className="text-white">AMD Ryzen 9 9950X @ 5.7GHz</strong>, on-die ECC DDR5 memory, NVMe Gen5 storage, and Enterprise DDoS protection at our Tier IV Mumbai Node.
               </p>
-            </div>
 
-            {/* Sub-Tabs: Cloud VPS vs Dedicated VDS + Currency Selector */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div
-                role="tablist"
-                aria-label="Select Ryzen 9 plan category"
-                className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={ryzenTab === "vps"}
-                  onClick={() => setRyzenTab("vps")}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                    ryzenTab === "vps"
-                      ? "bg-[#FFA14A] text-black shadow-md font-bold"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
+              {/* Sub-Tabs: Cloud VPS vs Dedicated VDS + Currency Selector */}
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <div
+                  role="tablist"
+                  aria-label="Select Ryzen 9 plan category"
+                  className="inline-flex rounded-xl border border-red-500/30 bg-[#12080A] p-1.5"
                 >
-                  <Server className="size-4" />
-                  <span>Cloud VPS (5.7GHz)</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={ryzenTab === "vds"}
-                  onClick={() => setRyzenTab("vds")}
-                  className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
-                    ryzenTab === "vds"
-                      ? "bg-[#FFA14A] text-black shadow-md font-bold"
-                      : "text-zinc-400 hover:text-white"
-                  }`}
-                >
-                  <Cpu className="size-4" />
-                  <span>Dedicated VDS (Bare-Metal Cores)</span>
-                </button>
-              </div>
-
-              {/* Currency toggle */}
-              <div
-                role="radiogroup"
-                aria-label="Currency"
-                className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
-              >
-                {(["INR", "USD"] as const).map((cur) => (
                   <button
-                    key={`ryzen-cur-${cur}`}
                     type="button"
-                    role="radio"
-                    aria-checked={currency === cur}
-                    onClick={() => setCurrency(cur)}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
-                      currency === cur
-                        ? "bg-sky-400 text-black"
+                    role="tab"
+                    aria-selected={ryzenTab === "vps"}
+                    onClick={() => setRyzenTab("vps")}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                      ryzenTab === "vps"
+                        ? "bg-[#ED1C24] text-white shadow-lg shadow-red-600/35 font-bold"
                         : "text-zinc-400 hover:text-white"
                     }`}
                   >
-                    {cur === "INR" ? "INR (₹)" : "USD ($)"}
+                    <Server className="size-4" />
+                    <span>Cloud VPS (5.7GHz)</span>
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={ryzenTab === "vds"}
+                    onClick={() => setRyzenTab("vds")}
+                    className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                      ryzenTab === "vds"
+                        ? "bg-[#ED1C24] text-white shadow-lg shadow-red-600/35 font-bold"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <Cpu className="size-4" />
+                    <span>Dedicated VDS (Bare-Metal Cores)</span>
+                  </button>
+                </div>
+
+                {/* Currency toggle */}
+                <div
+                  role="radiogroup"
+                  aria-label="Currency"
+                  className="inline-flex rounded-xl border border-white/15 bg-[#0B0E15] p-1.5"
+                >
+                  {(["INR", "USD"] as const).map((cur) => (
+                    <button
+                      key={`ryzen-cur-${cur}`}
+                      type="button"
+                      role="radio"
+                      aria-checked={currency === cur}
+                      onClick={() => setCurrency(cur)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors duration-150 cursor-pointer ${
+                        currency === cur
+                          ? "bg-red-500 text-white font-bold"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      {cur === "INR" ? "INR (₹)" : "USD ($)"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: 3D Floating AMD Ryzen Processor */}
+            <div className="lg:col-span-4 flex justify-center lg:justify-end">
+              <div className="relative w-full max-w-[280px] sm:max-w-[320px]">
+                <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-red-600/25 via-red-500/15 to-transparent blur-2xl rounded-3xl" />
+                <Floating3DVisual
+                  src="/3d/amd-ryzen-processor.svg"
+                  alt="3D floating AMD Ryzen 9 9950X Zen 5 Processor"
+                  accent="crimson"
+                  size="md"
+                />
               </div>
             </div>
           </div>

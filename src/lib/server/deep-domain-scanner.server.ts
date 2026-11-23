@@ -80,18 +80,20 @@ export interface ServerDeepScanResult {
 }
 
 function isPrivateOrReservedIp(ip: string): boolean {
-  const clean = ip.trim().toLowerCase();
+  const clean = ip.trim().toLowerCase().replace(/^\[|\]$/g, "");
   if (
     clean === "localhost" ||
     clean === "::1" ||
+    clean === "::" ||
     clean === "0.0.0.0" ||
-    clean.startsWith("fe80:") ||
-    clean.startsWith("fc00:") ||
-    clean.startsWith("fd00:")
+    /^fe[89ab][0-9a-f]:/.test(clean) ||
+    /^f[cd][0-9a-f]{2}:/.test(clean)
   ) {
     return true;
   }
-  const parts = clean.split(".").map(Number);
+  const v4Mapped = clean.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  const ipv4Candidate = v4Mapped ? v4Mapped[1]! : clean;
+  const parts = ipv4Candidate.split(".").map(Number);
   if (parts.length === 4 && parts.every((n) => !Number.isNaN(n) && n >= 0 && n <= 255)) {
     const [a, b] = parts as [number, number, number, number];
     if (a === 10 || a === 127 || a === 0) return true;
@@ -388,19 +390,21 @@ export async function runServerDeepDomainScan(rawInput: string): Promise<ServerD
     );
   }
 
-  if (resolvedIps.some((ip) => isPrivateOrReservedIp(ip))) {
+  const allResolvedIps = [...resolvedIps, ...ipv6Records];
+  if (allResolvedIps.some((ip) => isPrivateOrReservedIp(ip))) {
     throw new Error(
-      `DNS Rebinding Protection Triggered: ${cleanHost} resolved to restricted private IP (${resolvedIps.join(", ")}).`,
+      `DNS Rebinding Protection Triggered: ${cleanHost} resolved to restricted private IP (${allResolvedIps.join(", ")}).`,
     );
   }
 
   // Run Tools 2, 3, 4, 5 in parallel (TLS X.509 Socket + Uncensored HTTP Headers + Sensitive Endpoint Probes)
+  // Use redirect: "manual" on all probes to prevent SSRF via open HTTP redirects to internal/metadata hosts.
   const [tlsInfo, httpRes, secTxtRes, envProbeRes, gitProbeRes, openApiProbeRes] =
     await Promise.allSettled([
       inspectLiveTlsSocket(cleanHost, 3500),
       fetch(fullUrl, {
         method: "GET",
-        redirect: "follow",
+        redirect: "manual",
         headers: {
           "User-Agent": "SparrowX-Sec-Scanner/4.0 (+https://sec.sparrowx.net)",
           Accept: "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
@@ -409,7 +413,7 @@ export async function runServerDeepDomainScan(rawInput: string): Promise<ServerD
       }),
       fetch(`${fullUrl}/.well-known/security.txt`, {
         method: "GET",
-        redirect: "follow",
+        redirect: "manual",
         signal: AbortSignal.timeout(2500),
       }),
       fetch(`${fullUrl}/.env`, {

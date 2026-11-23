@@ -16,6 +16,7 @@ import { DeployPlans } from "@/components/dashboard/DeployPlans";
 import { ServerList } from "@/components/dashboard/ServerList";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { Transactions } from "@/components/dashboard/Transactions";
+import { DashboardSubscriptionLock } from "@/components/DashboardSubscriptionLock";
 import { errorText, useDashboard, useRefreshAll, useServers } from "@/components/dashboard/hooks";
 
 export const Route = createFileRoute("/game/dashboard")({
@@ -209,7 +210,18 @@ function GameDashboard() {
           {data ? <PanelCredentials panel={data.panel} /> : <Skeleton className="h-72 rounded-3xl bg-card" />}
         </div>
 
-        <ServerList />
+        <DashboardSubscriptionLock
+          serviceName="SparrowX Game Hosting"
+          mode="overlay"
+          locked={Boolean(data && servers && servers.length === 0)}
+          onChoosePlan={() =>
+            document.getElementById("game-deploy-plans")?.scrollIntoView({ behavior: "smooth" })
+          }
+          secondaryActionLabel="Add SparrowCoins"
+          onSecondaryAction={() => setTopUp(true)}
+        >
+          <ServerList />
+        </DashboardSubscriptionLock>
         {data && (
           <SubscriptionManager
             coins={data.coins}
@@ -217,11 +229,13 @@ function GameDashboard() {
           />
         )}
         {data && (
-          <DeployPlans
-            coins={data.coins}
-            {...(deploy ? { initialPlanId: deploy } : {})}
-            onNeedCoins={() => setTopUp(true)}
-          />
+          <div id="game-deploy-plans" className="scroll-mt-20">
+            <DeployPlans
+              coins={data.coins}
+              {...(deploy ? { initialPlanId: deploy } : {})}
+              onNeedCoins={() => setTopUp(true)}
+            />
+          </div>
         )}
         <Transactions />
 

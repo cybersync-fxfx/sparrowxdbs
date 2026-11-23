@@ -52,7 +52,7 @@ function getVerifPgPool(): pg.Pool | null {
           host: host || "127.0.0.1",
           port: Number(env("POSTGRES_PORT") || env("PG_HOST_PORT") || 5432),
           user: user || "sparrowx",
-          password: password || "sparrowx_ovh_secret_2026",
+          password: password || "",
           database: database || "sparrowx_db",
           max: 4,
           connectionTimeoutMillis: 3000,

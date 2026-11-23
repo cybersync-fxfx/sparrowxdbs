@@ -32,14 +32,21 @@ export interface MasterSsoClaims {
   exp: number;
 }
 
+let ephemeralMasterSsoSecret: string | null = null;
+
 function getMasterSsoSecret(): string {
-  return (
+  const configured =
     env("SPARROWX_MASTER_SSO_SECRET") ||
     env("SPARROWX_JWT_SECRET") ||
     env("JWT_SECRET") ||
-    env("SESSION_SECRET") ||
-    "sparrowx_jwt_secret_key_32_characters_2026"
-  );
+    env("SESSION_SECRET");
+  if (configured) return configured;
+  if (!ephemeralMasterSsoSecret) {
+    const bytes = new Uint8Array(32);
+    crypto.getRandomValues(bytes);
+    ephemeralMasterSsoSecret = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  }
+  return ephemeralMasterSsoSecret;
 }
 
 function toBase64Url(input: string): string {
@@ -251,7 +258,7 @@ async function openMasterAuthPool(): Promise<pg.Pool> {
     (process.env.NODE_ENV === "production" ? "postgres" : "127.0.0.1");
   const port = Number(env("POSTGRES_PORT") || env("PGPORT") || 5432);
   const user = env("POSTGRES_USER") || env("PGUSER") || "sparrowx";
-  const password = env("POSTGRES_PASSWORD") || env("PGPASSWORD") || "sparrowx_ovh_secret_2026";
+  const password = env("POSTGRES_PASSWORD") || env("PGPASSWORD") || "";
   const database = env("POSTGRES_DB") || env("PGDATABASE") || "sparrowx_db";
 
   const primary = new Pool({ host, port, user, password, database, connectionTimeoutMillis: 2500, max: 3 });
