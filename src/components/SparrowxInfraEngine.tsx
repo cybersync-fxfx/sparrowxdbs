@@ -151,11 +151,11 @@ export function InfraPriceCard({
       : `$${price.unitMonthly}.00`;
 
   return (
-    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-5 sm:p-6 hover:border-orange-500/40 hover:shadow-[0_12px_36px_rgba(249,115,22,0.14)] transition-all duration-200 flex flex-col justify-between">
+    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-5 sm:p-6 hover:border-red-500/40 hover:shadow-[0_12px_36px_rgba(237,28,36,0.18)] transition-all duration-200 flex flex-col justify-between">
       <div>
         {/* Top Node & Stock Badge row */}
         <div className="flex items-center justify-between gap-2 mb-5">
-          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/25 tracking-wide">
+          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-500/10 text-red-400 border border-red-500/30 tracking-wide">
             {plan.nodeLocation || "Mumbai Node"}
           </span>
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400">
@@ -166,11 +166,11 @@ export function InfraPriceCard({
 
         {/* Server Icon & Title */}
         <div className="flex items-center gap-3.5 mb-4">
-          <div className="size-11 rounded-xl bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-orange-400 shrink-0">
-            <Server className="size-5 text-orange-400" />
+          <div className="size-11 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0">
+            <Server className="size-5 text-red-400" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-orange-400 transition-colors">
+            <h3 className="text-base font-bold text-white tracking-tight truncate group-hover:text-red-400 transition-colors">
               {plan.name}
             </h3>
             <p className="text-xs text-zinc-400 mt-0.5">
@@ -217,11 +217,11 @@ export function InfraPriceCard({
         {/* Key Features Bullet List */}
         <ul className="space-y-1.5 text-xs text-zinc-300 mb-6">
           <li className="flex items-center gap-2">
-            <Check className="size-3.5 text-orange-400 shrink-0" />
+            <Check className="size-3.5 text-red-400 shrink-0" />
             <span className="truncate">{plan.network}</span>
           </li>
           <li className="flex items-center gap-2">
-            <Check className="size-3.5 text-orange-400 shrink-0" />
+            <Check className="size-3.5 text-red-400 shrink-0" />
             <span className="truncate">{plan.ddosProtection}</span>
           </li>
         </ul>
@@ -231,8 +231,12 @@ export function InfraPriceCard({
       <button
         type="button"
         onClick={() => onConfigure(plan)}
-        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#FFA14A] hover:bg-[#FF8F26] text-black font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_16px_rgba(255,161,74,0.2)] hover:shadow-[0_6px_24px_rgba(255,161,74,0.35)] cursor-pointer"
+        className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#ED1C24] hover:bg-red-600 text-white font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_16px_rgba(237,28,36,0.25)] hover:shadow-[0_6px_24px_rgba(237,28,36,0.4)] cursor-pointer"
       >
+        <span>Configure server</span>
+        <ArrowRight className="size-4" />
+      </button>
+    </article>
         <span>Configure &amp; Order</span>
         <ArrowRight className="size-4" />
       </button>
@@ -467,12 +471,12 @@ export function SparrowxInfraEngine() {
     INFRA_REGIONS.find((r) => r.id === region) ?? INFRA_REGIONS[0]!;
 
   return (
-    <div className="min-h-screen bg-[#05060A] text-[#F4F6FA] flex flex-col selection:bg-sky-400 selection:text-black">
+    <div className="min-h-screen bg-[#020307] text-[#F4F6FA] flex flex-col selection:bg-sky-400 selection:text-black">
       {/* Compact Single-Line Sticky Header */}
       <header
         className={`fixed top-0 inset-x-0 z-50 transition-colors duration-200 ${
           scrolled
-            ? "bg-[#05060A]/92 backdrop-blur-xl border-b border-white/12 shadow-[0_12px_36px_rgba(0,0,0,0.6)]"
+            ? "bg-[#020307]/92 backdrop-blur-xl border-b border-white/12 shadow-[0_12px_36px_rgba(0,0,0,0.6)]"
             : "bg-transparent border-b border-transparent"
         }`}
       >
