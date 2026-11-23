@@ -3791,7 +3791,7 @@ app.get('/api/radar/stats', authMiddleware, async (req, res) => {
           const geo = geoip.lookup(agent.ip);
           if (geo && geo.ll) return { lat: geo.ll[0], lon: geo.ll[1], ip: agent.ip, city: geo.city || '', country: geo.country || '' };
         }
-        return { lat: 1.3521, lon: 103.8198, ip: 'Guard Node', city: 'Singapore', country: 'SG' }; // Fallback
+        return { lat: -33.8688, lon: 151.2093, ip: 'Guard Node', city: 'Sydney', country: 'AU' }; // Fallback
       })()
     });
   } catch (err) {

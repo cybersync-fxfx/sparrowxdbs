@@ -945,10 +945,10 @@ function TopologyClusterPanel({
           {/* Database Hosting Location & Node Info */}
           {(() => {
             const HOST_LOCATIONS: Record<string, { city: string; country: string; node: string }> = {
-              "ap-southeast-1": {
-                city: "Singapore",
-                country: "Southeast Asia",
-                node: "SparrowX SG-1 · Tier-IV Sovereign Node",
+              "ap-southeast-2": {
+                city: "Sydney",
+                country: "Australia (Asia-Pacific)",
+                node: "SparrowX SYD-1 · OVH Australia Origin Node",
               },
               "ap-south-1": {
                 city: "Mumbai / Chennai",
@@ -1178,7 +1178,7 @@ export function SovereignDatabaseStudio({
 
   // Project General Settings state
   const [projectDisplayName, setProjectDisplayName] = useState<string>("sparrowx");
-  const [projectRegion, setProjectRegion] = useState<"ap-southeast-1" | "ap-south-1" | "eu-central-1">("ap-southeast-1");
+  const [projectRegion, setProjectRegion] = useState<"ap-southeast-2" | "ap-south-1" | "eu-central-1">("ap-southeast-2");
   const [projectRefId] = useState<string>("spxdgufjgfyxflgvboq");
 
   useEffect(() => {
@@ -1188,7 +1188,7 @@ export function SovereignDatabaseStudio({
         const savedRegion = localStorage.getItem(`spx_project_region_${tenantSlug}`);
         if (savedName) setProjectDisplayName(savedName);
         else setProjectDisplayName(tenantSlug || "sparrowx");
-        if (savedRegion === "ap-southeast-1" || savedRegion === "ap-south-1" || savedRegion === "eu-central-1") {
+        if (savedRegion === "ap-southeast-2" || savedRegion === "ap-south-1" || savedRegion === "eu-central-1") {
           setProjectRegion(savedRegion);
         }
       } catch {
@@ -2827,7 +2827,7 @@ export function SovereignDatabaseStudio({
                       onChange={(e) => setLandingRegisterRegion(e.target.value as "apac-sgp" | "eu-fra")}
                       className="w-full px-3 py-2 rounded-md bg-[#07090E] border border-[#2E2E2E] text-white text-xs focus:outline-none focus:border-[#A3E635]"
                     >
-                      <option value="apac-sgp">APAC — Singapore / Chennai (ap-south-1)</option>
+                      <option value="ap-southeast-2">APAC — Sydney, Australia (ap-southeast-2)</option>
                       <option value="eu-fra">EU — Frankfurt (eu-central-1)</option>
                     </select>
                   </div>
@@ -3304,7 +3304,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <ul className="space-y-1.5 text-zinc-300">
                   <li>• Focused startup engineering team rather than a mega-conglomerate.</li>
                   <li>• Purpose-built for PostgreSQL + pgvector workloads, not 50 legacy DB engines.</li>
-                  <li>• Primary compute clusters focused in APAC (Singapore / Chennai) &amp; EU (Frankfurt).</li>
+                  <li>• Primary compute cluster hosted in Sydney, Australia (OVH SYD-1) with global edge routing.</li>
                 </ul>
               </div>
             </div>
@@ -6206,12 +6206,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                             value={projectRegion}
                             onChange={(e) =>
                               setProjectRegion(
-                                e.target.value as "ap-southeast-1" | "ap-south-1" | "eu-central-1"
+                                e.target.value as "ap-southeast-2" | "ap-south-1" | "eu-central-1"
                               )
                             }
                             className="flex-1 h-9 rounded-md border border-[#2E2E2E] bg-[#05060A] px-3 font-mono text-xs text-zinc-200"
                           >
-                            <option value="ap-southeast-1">ap-southeast-1 — Southeast Asia (Singapore)</option>
+                            <option value="ap-southeast-2">ap-southeast-2 — Australia (Sydney · Primary Origin)</option>
                             <option value="ap-south-1">ap-south-1 — South Asia (Chennai / Mumbai)</option>
                             <option value="eu-central-1">eu-central-1 — Central Europe (Frankfurt)</option>
                           </select>
