@@ -127,13 +127,13 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 999, // Base ₹799 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     specsHighlights: [
-      "Tier IV Mumbai Node with ultra-low latency",
-      "AMD Ryzen 9 9950X Zen 5 single-thread monster",
+      "Ultra-low latency across India & Singapore hubs",
+      "AMD Ryzen 9 9950X Zen 5 single-thread performance",
       "DDR5 ECC On-Die memory with zero noisy neighbours",
-      "Instant 45-second provisioning & automated backups",
+      "1 Dedicated Static IPv4 & 99.9% Uptime SLA",
     ],
   },
   {
@@ -154,10 +154,10 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     featured: true,
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     specsHighlights: [
-      "Tier IV Mumbai Node with sub-8ms Asia-IN peering",
+      "Sub-8ms Asia-IN peering across India & Singapore",
       "4 Zen 5 compute threads @ up to 5.7 GHz boost",
       "120 GB high-IOPS NVMe Gen5 enterprise storage",
       "Always-on eBPF/XDP volumetric attack filtering",
@@ -180,10 +180,10 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 1999, // Base ₹1,799 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     specsHighlights: [
-      "Tier IV Mumbai Node with dedicated fiber path",
+      "Dedicated multi-gigabit fiber path across India & Singapore",
       "6 Zen 5 high-speed virtual execution cores",
       "DDR5 ECC On-Die memory for mission-critical apps",
       "SparrowXNet WireGuard private mesh pre-installed",
@@ -206,10 +206,10 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 2599, // Base ₹2,399 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     specsHighlights: [
-      "Tier IV Mumbai Node with redundant power & cooling",
+      "Redundant power & enterprise cooling across all nodes",
       "8 high-throughput Zen 5 compute threads",
       "10 Gbps burst network interface with DDoS filter",
       "Dedicated IPv4 + /64 IPv6 included",
@@ -232,10 +232,10 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 3199, // Base ₹2,999 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/vps-kvm-cubes.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     specsHighlights: [
-      "Tier IV Mumbai Node enterprise infrastructure",
+      "Enterprise high-frequency infrastructure",
       "10 Zen 5 cores for heavy databases and multi-containers",
       "360 GB blistering Gen5 NVMe read/write speeds",
       "Flat rate billing with zero hidden egress traps",
@@ -262,13 +262,13 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 2700, // Base ₹2,500 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     isVds: true,
     specsHighlights: [
       "100% Dedicated Bare-Metal physical silicon allocation",
       "Locked 5.7 GHz single-thread clocks without CPU throttling",
-      "Tier IV Mumbai Node with direct IXP Indian peering",
+      "Direct IXP peering across India & Singapore",
       "GameSec UDP/RakNet/ENet & TCP flood mitigation",
     ],
   },
@@ -290,12 +290,12 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     featured: true,
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     isVds: true,
     specsHighlights: [
       "4 100% dedicated physical Zen 5 cores (no hypervisor steal)",
-      "Tier IV Mumbai Node with ultra-low ping across India",
+      "Ultra-low ping across India & Singapore",
       "DDR5 ECC On-Die memory for zero memory corruption",
       "Unmetered 10 Gbps uplink with zero egress costs",
     ],
@@ -317,12 +317,12 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 4499, // Base ₹4,299 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     isVds: true,
     specsHighlights: [
       "4 Dedicated bare-metal cores with 12 GB DDR5 ECC",
-      "Tier IV Mumbai Node enterprise security infrastructure",
+      "Enterprise security infrastructure with 99.9% SLA",
       "300 GB enterprise Gen5 NVMe with high IOPS",
       "1-click Pterodactyl, Docker, and WireGuard mesh pairing",
     ],
@@ -344,14 +344,14 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 5099, // Base ₹4,899 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     isVds: true,
     specsHighlights: [
       "6 Dedicated Bare-Metal cores with 12 execution threads",
-      "Tier IV Mumbai Node with redundant BGP routing",
+      "Redundant BGP routing & 1 Dedicated Static IPv4",
       "Pre-tuned Linux kernel for 20 TPS lock in game servers",
-      "Nightly automated snapshot backups included",
+      "24/7 engineering support & 99.9% uptime SLA",
     ],
   },
   {
@@ -371,12 +371,12 @@ export const INFRA_PLANS: InfraServerPlan[] = [
     priceMonthlyInr: 5699, // Base ₹5,499 + ₹200
     regions: ["in-mum", "in-maa", "sg-sin", "uk-lon"],
     visual3d: "/3d/game-server-node.svg",
-    nodeLocation: "Tier IV Mumbai",
+    nodeLocation: "Ryzen 9",
     inStock: true,
     isVds: true,
     specsHighlights: [
       "8 Dedicated Bare-Metal Zen 5 cores (half of physical 9950X)",
-      "Tier IV Mumbai Node with enterprise SLA guarantee",
+      "Enterprise 99.9% uptime SLA guarantee",
       "600 GB enterprise Gen5 storage for heavy persistent state",
       "Priority Discord & 24/7 senior NOC engineer hotline",
     ],

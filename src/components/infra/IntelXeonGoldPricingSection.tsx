@@ -204,14 +204,17 @@ function toInfraServerPlan(item: XeonPlanItem): InfraServerPlan {
 
 export interface IntelXeonGoldPricingSectionProps {
   currency?: "INR" | "USD";
+  forcedTier?: "vps" | "vds";
   onConfigurePlan?: (plan: InfraServerPlan) => void;
 }
 
 export function IntelXeonGoldPricingSection({
   currency = "INR",
+  forcedTier,
   onConfigurePlan,
 }: IntelXeonGoldPricingSectionProps) {
-  const [activeTab, setActiveTab] = useState<"vps" | "vds">("vps");
+  const [internalTab, setInternalTab] = useState<"vps" | "vds">("vps");
+  const activeTab = forcedTier ?? internalTab;
 
   const visiblePlans = XEON_GOLD_PLANS.filter((p) => p.tier === activeTab);
 
@@ -254,40 +257,42 @@ export function IntelXeonGoldPricingSection({
             </p>
 
             {/* Clean Tab Toggle in pure Intel Blue theme */}
-            <div
-              role="tablist"
-              aria-label="Intel Xeon Gold server type"
-              className="inline-flex rounded-2xl border border-[#0071C5]/40 bg-[#06101E]/90 p-1.5 backdrop-blur-md"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "vps"}
-                onClick={() => setActiveTab("vps")}
-                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
-                  activeTab === "vps"
-                    ? "bg-[#0071C5] text-white shadow-[0_0_24px_rgba(0,113,197,0.5)] font-bold"
-                    : "text-zinc-400 hover:text-white"
-                }`}
+            {!forcedTier && (
+              <div
+                role="tablist"
+                aria-label="Intel Xeon Gold server type"
+                className="inline-flex flex-wrap rounded-2xl border border-[#0071C5]/40 bg-[#06101E]/90 p-1.5 backdrop-blur-md"
               >
-                <Server className="size-4" aria-hidden="true" />
-                <span>KVM VPS (Shared vCPU)</span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "vds"}
-                onClick={() => setActiveTab("vds")}
-                className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
-                  activeTab === "vds"
-                    ? "bg-[#0284C7] text-white shadow-[0_0_24px_rgba(2,132,199,0.5)] font-bold"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                <Cpu className="size-4" aria-hidden="true" />
-                <span>VDS (Dedicated Cores)</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "vps"}
+                  onClick={() => setInternalTab("vps")}
+                  className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
+                    activeTab === "vps"
+                      ? "bg-[#0071C5] text-white shadow-[0_0_24px_rgba(0,113,197,0.5)] font-bold"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Server className="size-4" aria-hidden="true" />
+                  <span>KVM VPS (Shared vCPU)</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "vds"}
+                  onClick={() => setInternalTab("vds")}
+                  className={`inline-flex min-h-[44px] cursor-pointer items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 ${
+                    activeTab === "vds"
+                      ? "bg-[#0284C7] text-white shadow-[0_0_24px_rgba(2,132,199,0.5)] font-bold"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  <Cpu className="size-4" aria-hidden="true" />
+                  <span>VDS (Dedicated Cores)</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Column: 3D Floating Intel Xeon Processor */}
@@ -304,8 +309,8 @@ export function IntelXeonGoldPricingSection({
           </div>
         </div>
 
-        {/* 4-Column Pricing Grid */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Spacious 4-Column Pricing Grid */}
+        <div className="grid grid-cols-1 gap-6 pt-3 sm:grid-cols-2 lg:grid-cols-4">
           {visiblePlans.map((plan) => {
             const isHighlighted = Boolean(plan.highlight);
             const priceLabel =
@@ -319,7 +324,7 @@ export function IntelXeonGoldPricingSection({
             return (
               <article
                 key={plan.id}
-                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#08101C]/90 p-5 backdrop-blur-xl transition-all duration-200 overflow-hidden ${
+                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#08101C]/90 p-6 backdrop-blur-xl transition-all duration-200 overflow-visible ${
                   isHighlighted
                     ? "border-[#0284C7]/70 shadow-[0_0_40px_rgba(2,132,199,0.22)]"
                     : "border-white/10 hover:border-[#38BDF8]/45 hover:shadow-[0_12px_36px_rgba(56,189,248,0.14)]"
@@ -327,6 +332,12 @@ export function IntelXeonGoldPricingSection({
               >
                 {/* Background LGA Circuit & Pin Matrix Watermark */}
                 <HardwarePinGridWatermark accent="blue" />
+
+                {/* Pinned Upper-Edge "In Stock" Sticker (outside card body) */}
+                <div className="absolute -top-3 left-4 z-20 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-[#050C12] px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 shadow-md">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>In Stock</span>
+                </div>
 
                 {/* Highlight Ribbon */}
                 {plan.highlight && (
@@ -336,15 +347,15 @@ export function IntelXeonGoldPricingSection({
                   </div>
                 )}
 
-                <div className="relative z-10">
+                <div className="relative z-10 pt-1">
                   {/* Plan Header */}
                   <div className="mb-4 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-[#38BDF8]/25 bg-[#38BDF8]/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#38BDF8]">
-                      Dual Xeon Gold • LGA
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-[#38BDF8]/25 bg-[#38BDF8]/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#38BDF8]">
+                      Dual Xeon Gold
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
-                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      In Stock
+                    <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
+                      <Database className="size-3" aria-hidden="true" />
+                      1 Free Backup
                     </span>
                   </div>
 

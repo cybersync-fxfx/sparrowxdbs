@@ -211,7 +211,7 @@ export function SparrowxLegalCenter({
               </h2>
               <div className="text-sm text-zinc-300 space-y-3 leading-relaxed pl-8">
                 <p>
-                  We target an operational uptime of <strong>99.9%</strong> on core compute nodes, power feeds, and backbone network connectivity in our Tier IV Mumbai and EU partner facilities.
+                  We target an operational uptime of <strong>99.9%</strong> on core compute nodes, power feeds, and backbone network connectivity across our Mumbai, Chennai, and Singapore datacenter facilities.
                 </p>
                 <p>
                   SLA exclusions include scheduled maintenance (communicated at least 24 hours in advance), customer configuration errors, upstream transit fiber cuts beyond our Anycast redundancy, or customer operating system kernel panics.
@@ -304,7 +304,7 @@ export function SparrowxLegalCenter({
                       <span>Transit &amp; DDoS Scrubbing Pipes</span>
                     </div>
                     <p className="text-xs text-zinc-400">
-                      Multi-gigabit upstream transit capacity at Tier IV Mumbai (NIXI/DE-CIX) is committed to your node&apos;s MAC and VLAN boundary.
+                      Multi-gigabit upstream transit capacity across our India and Singapore hubs (NIXI/Equinix) is committed to your node&apos;s MAC and VLAN boundary.
                     </p>
                   </div>
                 </div>

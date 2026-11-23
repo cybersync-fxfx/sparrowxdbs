@@ -134,19 +134,60 @@ export const POWERING_TECHNOLOGIES: TechLogoItem[] = [
     docsUrl: "https://cloud-init.io",
     logoSrc: "/logos/tech/cloud-init.svg",
   },
+  {
+    id: "sparrowx-sec",
+    name: "SparrowX Sec",
+    category: "Edge & Networking",
+    role: "Autonomous Perimeter Security, WAF & Origin Protection",
+    badge: "Protected by SparrowX Sec",
+    color: "#38BDF8",
+    accentBg: "rgba(56, 189, 248, 0.14)",
+    accentBorder: "rgba(56, 189, 248, 0.35)",
+    docsUrl: "https://sec.sparrowx.net",
+    logoSrc: "/logos/sparrowx-shield.png",
+  },
+  {
+    id: "sparrowx-netsec",
+    name: "SparrowX NetSec",
+    category: "Edge & Networking",
+    role: "Line-Rate L3/L4/L7 DDoS Mitigation & Anycast Scrubbing",
+    badge: "DDoS Protection",
+    color: "#10B981",
+    accentBg: "rgba(16, 185, 129, 0.14)",
+    accentBorder: "rgba(16, 185, 129, 0.35)",
+    docsUrl: "https://netsec.sparrowx.net",
+    logoSrc: "/logos/sparrowx-netsec-3d.png",
+  },
 ];
+
+const INFRA_TECH_IDS = new Set([
+  "proxmox",
+  "amd-ryzen",
+  "sparrowx-sec",
+  "sparrowx-netsec",
+  "wireguard",
+  "ebpf-xdp",
+  "linux-kernel",
+  "cloud-init",
+]);
 
 export interface SparrowxPoweredByTechProps {
   title?: string;
   subtitle?: string;
+  service?: "all" | "infra";
   className?: string;
 }
 
 export function SparrowxPoweredByTech({
   title = "Powered by",
+  service = "all",
   className = "",
 }: SparrowxPoweredByTechProps) {
-  const marqueeItems = [...POWERING_TECHNOLOGIES, ...POWERING_TECHNOLOGIES];
+  const items =
+    service === "infra"
+      ? POWERING_TECHNOLOGIES.filter((t) => INFRA_TECH_IDS.has(t.id))
+      : POWERING_TECHNOLOGIES;
+  const marqueeItems = [...items, ...items];
 
   return (
     <section

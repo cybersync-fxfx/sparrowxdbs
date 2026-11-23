@@ -54,20 +54,29 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     expect(screen.queryByRole("button", { name: /Pause 3D animation/i })).toBeNull();
   });
 
-  it("renders SparrowxInfraEngine with Bare Metal, Dedicated, and KVM VPS catalog tabs", () => {
+  it("renders simplified SparrowxInfraEngine hero and reveals Bare Metal & Cloud KVM VPS plans only when selected in workload selector", () => {
     render(<SparrowxInfraEngine />);
-    expect(screen.getByRole("heading", { level: 1, name: /Raw silicon/i })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { level: 1, name: /Your life's work deserves infrastructure/i }),
+    ).toBeTruthy();
+    // Raw silicon, Tier IV Mumbai, and Pterodactyl Panel must not appear on SparrowX Infra
+    expect(screen.queryByText(/Raw silicon/i)).toBeNull();
+    expect(screen.queryByText(/Tier IV Mumbai/i)).toBeNull();
+    expect(screen.queryByText(/Pterodactyl Panel/i)).toBeNull();
+    // SparrowX Sec & NetSec logos must appear in Powered By
+    expect(screen.getAllByText("SparrowX Sec").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("SparrowX NetSec").length).toBeGreaterThan(0);
+
+    // Price lists are hidden by default until a workload is chosen
+    expect(screen.queryByRole("heading", { name: /Ryzen 9 9950X Cloud VPS Plans/i })).toBeNull();
+
+    // Select Bare Metal Servers from the isolation workload selector
+    fireEvent.click(screen.getByRole("heading", { name: "Bare Metal Servers" }));
     expect(screen.getByRole("tab", { name: "Bare metal" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Dedicated servers" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Cloud KVM VPS" })).toBeTruthy();
-
-    // Filter to Cloud KVM VPS
-    fireEvent.click(screen.getByRole("tab", { name: "Cloud KVM VPS" }));
-    expect(screen.getByText("VPS-Nano NVMe")).toBeTruthy();
-    expect(screen.queryByText("BM-Edge 7950X")).toBeNull();
   });
 
-  it("verifies Ryzen 9 9950X VPS & VDS plans with +₹200 added to all base reference prices", () => {
+  it("verifies Ryzen 9 9950X VPS & VDS plans with +₹200 added to all base reference prices and Intel Free Backup difference", () => {
     // Cloud VPS plans: 4GB(799+200), 8GB(1299+200), 12GB(1799+200), 16GB(2399+200), 24GB(2999+200)
     const vps4 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-4gb")!;
     const vps8 = INFRA_PLANS.find((p) => p.id === "vps-ryzen-9950x-8gb")!;
@@ -94,11 +103,13 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     expect(vds16.priceMonthlyInr).toBe(5099);
     expect(vds24.priceMonthlyInr).toBe(5699);
 
-    // Render engine and verify Mumbai Node & In Stock indicators
+    // Render engine, select Cloud KVM VPS, and verify Ryzen 9 badge, pinned In Stock stickers, & Intel 1 Free Backup
     render(<SparrowxInfraEngine />);
-    expect(screen.getByRole("heading", { name: /Ryzen 9 9950X VPS & Dedicated VDS Plans/i })).toBeTruthy();
-    expect(screen.getAllByText("Mumbai Node").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("heading", { name: "Cloud KVM VPS" }));
+    expect(screen.getByRole("heading", { name: /Ryzen 9 9950X Cloud VPS Plans/i })).toBeTruthy();
+    expect(screen.getAllByText("Ryzen 9").length).toBeGreaterThan(0);
     expect(screen.getAllByText("In Stock").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1 Free Backup").length).toBeGreaterThan(0);
   });
 
   it("starts with an empty server list (zero mock data), then provisions on UPI webhook auto-confirmation", async () => {
