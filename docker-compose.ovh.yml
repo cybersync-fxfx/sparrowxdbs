@@ -161,8 +161,8 @@ services:
     environment:
       PMA_HOST: ${PMA_HOST:-host.docker.internal}
       PMA_PORT: ${PMA_PORT:-3306}
-      PMA_ARBITRARY: "1"
-      PMA_ABSOLUTE_URI: "https://${DOMAIN_PHP:-php.${SPARROWX_DOMAIN:-sparrowx.net}}/"
+      PMA_ARBITRARY: "0"
+      PMA_ABSOLUTE_URI: "https://php.sparrowx.net/"
       UPLOAD_LIMIT: 128M
     networks:
       sparrowx_net:
