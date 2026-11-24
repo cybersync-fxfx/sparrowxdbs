@@ -383,18 +383,43 @@ export async function runServerDeepDomainScan(rawInput: string): Promise<ServerD
   }
 
   if (!dnsLookupSucceeded || dnsRcode === 3 || (resolvedIps.length === 0 && ipv6Records.length === 0)) {
-    throw new Error(
+    const dnsMsg =
       dnsRcode === 3
         ? `Domain not found: ${cleanHost} does not exist (DNS NXDOMAIN).`
-        : `No DNS A/AAAA records resolved for ${cleanHost}. Verify the domain is registered and active.`,
-    );
+        : `No DNS A/AAAA records resolved for ${cleanHost}. Verify the domain is registered and active.`;
+    const { sendDiscordTelemetry } = await import("./discord-webhook.server");
+    void sendDiscordTelemetry({
+      category: "error",
+      severity: "high",
+      service: "SparrowX DNS & Perimeter Scanner",
+      title: `DNS Resolution Failure: ${cleanHost}`,
+      description: dnsMsg,
+      fields: {
+        Host: cleanHost,
+        DnsRcode: dnsRcode ?? "UNKNOWN",
+        IPv4Count: resolvedIps.length,
+        IPv6Count: ipv6Records.length,
+      },
+    });
+    throw new Error(dnsMsg);
   }
 
   const allResolvedIps = [...resolvedIps, ...ipv6Records];
   if (allResolvedIps.some((ip) => isPrivateOrReservedIp(ip))) {
-    throw new Error(
-      `DNS Rebinding Protection Triggered: ${cleanHost} resolved to restricted private IP (${allResolvedIps.join(", ")}).`,
-    );
+    const rebindMsg = `DNS Rebinding Protection Triggered: ${cleanHost} resolved to restricted private IP (${allResolvedIps.join(", ")}).`;
+    const { sendDiscordTelemetry } = await import("./discord-webhook.server");
+    void sendDiscordTelemetry({
+      category: "security",
+      severity: "critical",
+      service: "SparrowX DNS & SSRF Guard",
+      title: `DNS Rebinding / SSRF Blocked: ${cleanHost}`,
+      description: rebindMsg,
+      fields: {
+        Host: cleanHost,
+        ResolvedIPs: allResolvedIps.join(", "),
+      },
+    });
+    throw new Error(rebindMsg);
   }
 
   // Run Tools 2, 3, 4, 5 in parallel (TLS X.509 Socket + Uncensored HTTP Headers + Sensitive Endpoint Probes)

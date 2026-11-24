@@ -12,6 +12,14 @@ export const Route = createFileRoute("/api/db/health")({
           return Response.json(health);
         } catch (err) {
           const message = err instanceof Error ? err.message : "PostgreSQL cluster unreachable";
+          const { sendDiscordTelemetry } = await import("@/lib/server/discord-webhook.server");
+          void sendDiscordTelemetry({
+            category: "error",
+            severity: "critical",
+            service: "PostgreSQL Sovereign Cluster",
+            title: "Database Cluster Health Failure",
+            description: message,
+          });
           return Response.json(
             {
               ok: false,

@@ -86,6 +86,16 @@ export const Route = createFileRoute("/api/db/provision")({
               ? Number((err as { statusCode: number }).statusCode)
               : 503;
           const message = err instanceof Error ? err.message : "Database provisioning failed";
+          const { sendDiscordTelemetry } = await import("@/lib/server/discord-webhook.server");
+          void sendDiscordTelemetry({
+            category: "error",
+            severity: status >= 500 ? "critical" : "medium",
+            service: "PostgreSQL Provisioner",
+            title: `DB Provisioning Failed (${status})`,
+            description: message,
+            ip,
+            fields: { Email: email, TenantId: tenantId, Plan: planId || "free" },
+          });
           return Response.json(
             { ok: false, error: message },
             { status },

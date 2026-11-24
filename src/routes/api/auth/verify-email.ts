@@ -130,10 +130,21 @@ export const Route = createFileRoute("/api/auth/verify-email")({
             headers: { "Cache-Control": "no-store" },
           });
         } catch (err) {
+          const message = err instanceof Error ? err.message : "Email verification request failed.";
+          const { sendDiscordTelemetry } = await import("@/lib/server/discord-webhook.server");
+          void sendDiscordTelemetry({
+            category: "error",
+            severity: "high",
+            service: "SMTP Email Verification",
+            title: `Email Verification Failure (${action})`,
+            description: message,
+            ip,
+            fields: { Email: email },
+          });
           return Response.json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : "Email verification request failed.",
+              error: message,
             },
             { status: 500, headers: { "Cache-Control": "no-store" } },
           );

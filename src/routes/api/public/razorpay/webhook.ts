@@ -7,7 +7,14 @@ export const Route = createFileRoute("/api/public/razorpay/webhook")({
       POST: async ({ request }) => {
         const raw = await request.text();
         const { verifyWebhook } = await import("@/lib/server/razorpay.server");
+        const { sendDiscordTelemetry } = await import("@/lib/server/discord-webhook.server");
         if (!(await verifyWebhook(raw, request.headers.get("x-razorpay-signature")))) {
+          void sendDiscordTelemetry({
+            category: "security",
+            severity: "high",
+            service: "Razorpay Billing Webhook",
+            title: "Invalid Razorpay Webhook Signature Rejected",
+          });
           return new Response("invalid signature", { status: 401 });
         }
         let evt: { event?: string; payload?: { payment?: { entity?: { id?: string; amount?: number; status?: string; notes?: { client_id?: string } } } } };
@@ -34,8 +41,17 @@ export const Route = createFileRoute("/api/public/razorpay/webhook")({
           const r = await creditTopup(clientId, Math.floor(p.amount / 100), p.id);
           return Response.json({ ok: true, applied: r.applied });
         } catch (err) {
+          const message = err instanceof Error ? err.message : "Failed to apply topup";
+          void sendDiscordTelemetry({
+            category: "error",
+            severity: "critical",
+            service: "Razorpay Billing Webhook",
+            title: "Payment Topup Credit Failed",
+            description: message,
+            fields: { ClientId: clientId, PaymentId: p.id, AmountPaise: p.amount },
+          });
           return Response.json(
-            { ok: false, error: err instanceof Error ? err.message : "Failed to apply topup" },
+            { ok: false, error: message },
             { status: 500 },
           );
         }

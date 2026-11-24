@@ -225,10 +225,47 @@ function useGlobalScrollReveal() {
   }, []);
 }
 
+function useGlobalErrorWebhookCapture() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let lastSentAt = 0;
+    let lastSignature = "";
+
+    const dispatchError = (err: unknown, mechanism: string, extra?: Record<string, unknown>) => {
+      const msg = err instanceof Error ? err.message : String(err || "Unknown runtime error");
+      const sig = `${mechanism}:${msg}`;
+      const now = Date.now();
+      if (sig === lastSignature && now - lastSentAt < 10_000) return;
+      lastSignature = sig;
+      lastSentAt = now;
+      reportSparrowxError(err, { mechanism, ...extra });
+    };
+
+    const onError = (event: ErrorEvent) => {
+      dispatchError(event.error ?? event.message, "window.onerror", {
+        Filename: event.filename || window.location.pathname,
+        Line: event.lineno,
+      });
+    };
+
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      dispatchError(event.reason, "window.unhandledrejection");
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+    };
+  }, []);
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useServiceFavicon();
   useGlobalScrollReveal();
+  useGlobalErrorWebhookCapture();
 
   return (
     <QueryClientProvider client={queryClient}>
