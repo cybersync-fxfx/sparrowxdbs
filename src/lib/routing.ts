@@ -10,6 +10,8 @@ export type RootRedirectTarget = {
     | "/infra"
     | "/deploy"
     | "/ai"
+    | "/agents"
+    | "/dpdp"
     | "/security";
   search: Record<string, unknown>;
   hash?: string;
@@ -27,6 +29,7 @@ export type SubdomainProduct =
   | "infra"
   | "deploy"
   | "ai"
+  | "agents"
   | "dpdp";
 
 /**
@@ -43,8 +46,9 @@ const SUBDOMAIN_RULES: ReadonlyArray<{
   { prefixes: ["game.", "game-"], product: "game", route: "/game" },
   { prefixes: ["infra.", "metal.", "vps.", "cloud."], product: "infra", route: "/infra" },
   { prefixes: ["deploy."], product: "deploy", route: "/deploy" },
-  { prefixes: ["ai.", "agents."], product: "ai", route: "/ai" },
-  { prefixes: ["dpdp."], product: "dpdp", route: "/security" },
+  { prefixes: ["ai."], product: "ai", route: "/ai" },
+  { prefixes: ["agents."], product: "agents", route: "/agents" },
+  { prefixes: ["dpdp."], product: "dpdp", route: "/dpdp" },
   { prefixes: ["db.", "studio.", "supabase.", "sparrowbase."], product: "db", route: "/db" },
   { prefixes: ["sec.", "shield."], product: "shield", route: "/shield" },
   { prefixes: ["file.", "drop.", "share."], product: "drop", route: "/drop" },
@@ -206,10 +210,12 @@ export function resolveRootRedirectTarget(input: {
     destination = "/infra";
   } else if (search.deploy === "1") {
     destination = "/deploy";
-  } else if (search.ai === "1" || search.agents === "1") {
+  } else if (search.ai === "1") {
     destination = "/ai";
+  } else if (search.agents === "1") {
+    destination = "/agents";
   } else if (search.dpdp === "1") {
-    destination = "/security";
+    destination = "/dpdp";
   }
 
   if (!destination) return null;

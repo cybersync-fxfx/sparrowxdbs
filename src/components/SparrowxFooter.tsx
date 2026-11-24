@@ -2,7 +2,18 @@ import React from "react";
 import { buildMasterHref } from "@/lib/routing";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 
-export type SparrowxServiceKey = "db" | "sec" | "file" | "password" | "api" | "infra" | "deploy" | "ai" | "game";
+export type SparrowxServiceKey =
+  | "db"
+  | "sec"
+  | "file"
+  | "password"
+  | "api"
+  | "infra"
+  | "deploy"
+  | "ai"
+  | "agents"
+  | "dpdp"
+  | "game";
 
 export interface SparrowxFooterProps {
   onLaunchService?: ((
@@ -66,6 +77,18 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     sublabel: "ai.sparrowx.net",
     href: "https://ai.sparrowx.net",
     serviceKey: "ai",
+  },
+  {
+    label: "Autonomous Agents",
+    sublabel: "agents.sparrowx.net",
+    href: "https://agents.sparrowx.net",
+    serviceKey: "agents",
+  },
+  {
+    label: "DPDP Compliance",
+    sublabel: "dpdp.sparrowx.net",
+    href: "https://dpdp.sparrowx.net",
+    serviceKey: "dpdp",
   },
   {
     label: "NetSec Guard",

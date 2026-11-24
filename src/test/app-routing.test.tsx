@@ -79,8 +79,8 @@ describe("App routing", () => {
     expect(matchProductSubdomain("infra.sparrowx.net")?.route).toBe("/infra");
     expect(matchProductSubdomain("deploy.sparrowx.net")?.route).toBe("/deploy");
     expect(matchProductSubdomain("ai.sparrowx.net")?.route).toBe("/ai");
-    expect(matchProductSubdomain("agents.sparrowx.net")?.route).toBe("/ai");
-    expect(matchProductSubdomain("dpdp.sparrowx.net")?.route).toBe("/security");
+    expect(matchProductSubdomain("agents.sparrowx.net")?.route).toBe("/agents");
+    expect(matchProductSubdomain("dpdp.sparrowx.net")?.route).toBe("/dpdp");
     expect(matchProductSubdomain("game.panel.sparrowx.net")?.route).toBeNull();
     expect(matchProductSubdomain("gamesec.sparrowx.net")).toBeNull();
 

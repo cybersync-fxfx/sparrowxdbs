@@ -593,7 +593,8 @@ const server = createServer(async (req, res) => {
       host.startsWith("vps.") ||
       host.startsWith("cloud.");
     const isDeployHost = host.startsWith("deploy.");
-    const isAiHost = host.startsWith("ai.") || host.startsWith("agents.");
+    const isAiHost = host.startsWith("ai.");
+    const isAgentsHost = host.startsWith("agents.");
     const isDpdpHost = host.startsWith("dpdp.");
 
     if ((req.method === "GET" || req.method === "HEAD") && pathname === "/") {
@@ -604,7 +605,8 @@ const server = createServer(async (req, res) => {
       else if (isInfraHost) redirectDest = `/infra${qs}`;
       else if (isDeployHost) redirectDest = `/deploy${qs}`;
       else if (isAiHost) redirectDest = `/ai${qs}`;
-      else if (isDpdpHost) redirectDest = `/security${qs}`;
+      else if (isAgentsHost) redirectDest = `/agents${qs}`;
+      else if (isDpdpHost) redirectDest = `/dpdp${qs}`;
       else if (isDbHost) redirectDest = `/db${qs}`;
       else if (isShieldHost) redirectDest = `/shield${qs}`;
       else if (isDropHost) redirectDest = `/drop${qs}`;
@@ -735,6 +737,8 @@ const server = createServer(async (req, res) => {
       pathname.startsWith("/infra/") ||
       pathname === "/deploy" ||
       pathname === "/ai" ||
+      pathname === "/agents" ||
+      pathname === "/dpdp" ||
       pathname === "/security" ||
       pathname === "/terms" ||
       pathname === "/refund" ||

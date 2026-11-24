@@ -589,8 +589,8 @@ export function SparrowxMasterLanding({
     infra: "/infra",
     deploy: "/deploy",
     ai: "/ai",
-    agents: "/ai",
-    dpdp: "/security",
+    agents: "/agents",
+    dpdp: "/dpdp",
   };
 
   const resolveServiceHref = (targetId: string, url: string) => {
@@ -756,10 +756,34 @@ export function SparrowxMasterLanding({
                     onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-main.png" alt="SparrowX AI & Agentics" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-emerald-500/30 bg-[#0A0E17] p-0.5" />
+                    <img src="/logos/sparrowx-main.png" alt="SparrowX AI Gateway" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-violet-500/30 bg-[#0A0E17] p-0.5" />
                     <div>
-                      <div className="font-semibold text-xs">SparrowX AI &amp; Agentics</div>
-                      <div className="text-[11px] text-zinc-400">AI Brain &amp; LLM Guardrails</div>
+                      <div className="font-semibold text-xs">SparrowX AI Gateway</div>
+                      <div className="text-[11px] text-zinc-400">Model Playground &amp; Guardrails</div>
+                    </div>
+                  </a>
+
+                  <a
+                    href={resolveServiceHref("agents", "https://agents.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <img src="/logos/sparrowx-main.png" alt="SparrowX Autonomous Agents" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-emerald-500/30 bg-[#0A0E17] p-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX Agents</div>
+                      <div className="text-[11px] text-zinc-400">Autonomous AI Fleet &amp; Traces</div>
+                    </div>
+                  </a>
+
+                  <a
+                    href={resolveServiceHref("dpdp", "https://dpdp.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <img src="/logos/sparrowx-shield.png" alt="SparrowX DPDP Compliance" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-emerald-500/30 bg-[#0A0E17] p-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX DPDP</div>
+                      <div className="text-[11px] text-zinc-400">India DPDP 2023 Consent &amp; DSAR</div>
                     </div>
                   </a>
 
