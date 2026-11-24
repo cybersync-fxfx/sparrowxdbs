@@ -1329,6 +1329,44 @@ compose_cmd() {
   fi
 }
 
+reconcile_compose_containers() {
+  local default_proj
+  default_proj="$(basename "${INSTALL_DIR}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]//g')"
+  [ -z "${default_proj}" ] && default_proj="sparrowx"
+
+  # Preserve existing Compose project & data volume if sparrowx-postgres already belongs to service "postgres"
+  if [ -z "${COMPOSE_PROJECT_NAME:-}" ] && docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+    local existing_pg_proj existing_pg_svc
+    existing_pg_proj="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' sparrowx-postgres 2>/dev/null || true)"
+    existing_pg_svc="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' sparrowx-postgres 2>/dev/null || true)"
+    if [ -n "${existing_pg_proj}" ] && [ "${existing_pg_svc}" = "postgres" ]; then
+      export COMPOSE_PROJECT_NAME="${existing_pg_proj}"
+      log_info "Adopted Compose project '${COMPOSE_PROJECT_NAME}' from existing sparrowx-postgres"
+    fi
+  fi
+
+  local target_proj="${COMPOSE_PROJECT_NAME:-${default_proj}}"
+  local pair ctr expected_svc ctr_proj ctr_svc ctr_state
+  for pair in \
+    "sparrowx-postgres:postgres" \
+    "sparrowx-postgrest:postgrest" \
+    "sparrowx-app:${APP_SERVICE:-sparrowx}" \
+    "sparrowx-phpmyadmin:phpmyadmin" \
+    "sparrowx-nginx:nginx"; do
+    ctr="${pair%%:*}"
+    expected_svc="${pair#*:}"
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "${ctr}"; then
+      ctr_proj="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "${ctr}" 2>/dev/null || true)"
+      ctr_svc="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' "${ctr}" 2>/dev/null || true)"
+      ctr_state="$(docker inspect -f '{{.State.Status}}' "${ctr}" 2>/dev/null || true)"
+      if [ "${ctr_state}" != "running" ] || [ "${ctr_proj}" != "${target_proj}" ] || [ "${ctr_svc}" != "${expected_svc}" ]; then
+        log_warn "Clearing conflicting/stale container ${ctr} (state=${ctr_state:-unknown}, project=${ctr_proj:-none}, service=${ctr_svc:-none})"
+        docker rm -f "${ctr}" >/dev/null 2>&1 || true
+      fi
+    fi
+  done
+}
+
 strip_crlf_all() {
   local cleaned=0
   for f in \
@@ -2494,6 +2532,8 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     log_warn "Shifted APP_HOST_PORT=${APP_HOST_PORT} to bypass port conflict"
   fi
 
+  reconcile_compose_containers
+
   IS_PG_RUNNING="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-postgres" || true)"
   IS_PGRST_RUNNING="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-postgrest" || true)"
 
@@ -2526,7 +2566,7 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     if ! compose_cmd -f "${COMPOSE_FILE}" up --build -d --remove-orphans; then
       log_warn "Initial Compose startup hit conflict — cleaning bridge networks, stale containers & retrying"
       compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
-      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
+      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-phpmyadmin sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
       docker network prune -f >/dev/null 2>&1 || true
       free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
       command -v fuser >/dev/null 2>&1 && fuser -k 5432/tcp >/dev/null 2>&1 || true

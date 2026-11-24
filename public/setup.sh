@@ -2375,12 +2375,32 @@ if [ "${DOCKER_AVAILABLE}" = "yes" ] && [ -f "${COMPOSE_FILE}" ]; then
     done
 
     log_info "Building & starting PostgreSQL 16, PostgREST, SparrowX App & Nginx Edge Proxy..."
+    # Pre-clear stopped or foreign-project containers with matching static names before Compose launch
+    if [ -z "${COMPOSE_PROJECT_NAME:-}" ] && docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+      _pg_proj="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' sparrowx-postgres 2>/dev/null || true)"
+      _pg_svc="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' sparrowx-postgres 2>/dev/null || true)"
+      if [ -n "${_pg_proj}" ] && [ "${_pg_svc}" = "postgres" ]; then
+        export COMPOSE_PROJECT_NAME="${_pg_proj}"
+      fi
+    fi
+    _target_proj="${COMPOSE_PROJECT_NAME:-$(basename "${INSTALL_DIR}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]//g')}"
+    for _pair in "sparrowx-postgres:postgres" "sparrowx-postgrest:postgrest" "sparrowx-app:sparrowx" "sparrowx-phpmyadmin:phpmyadmin" "sparrowx-nginx:nginx"; do
+      _ctr="${_pair%%:*}"; _svc="${_pair#*:}"
+      if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "${_ctr}"; then
+        _c_proj="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project" }}' "${_ctr}" 2>/dev/null || true)"
+        _c_svc="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.service" }}' "${_ctr}" 2>/dev/null || true)"
+        _c_state="$(docker inspect -f '{{.State.Status}}' "${_ctr}" 2>/dev/null || true)"
+        if [ "${_c_state}" != "running" ] || [ "${_c_proj}" != "${_target_proj}" ] || [ "${_c_svc}" != "${_svc}" ]; then
+          docker rm -f "${_ctr}" >/dev/null 2>&1 || true
+        fi
+      fi
+    done
     if compose_cmd -f "${COMPOSE_FILE}" up -d --build --remove-orphans; then
       STACK_STARTED="yes"
     else
       log_warn "First launch attempt hit a conflict. Healing conflicting containers/networks/ports & retrying..."
       compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
-      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
+      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-phpmyadmin sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
       docker network prune -f >/dev/null 2>&1 || true
       reclaim_web_ports
       HTTP_PORT="$(find_free_port "${HTTP_PORT}" 8180 "HTTP Edge Proxy" "sparrowx-nginx")"
