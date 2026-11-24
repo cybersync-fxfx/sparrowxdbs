@@ -35,6 +35,9 @@ curl_headers() {
   if [[ -n "$TARGET_IP" ]]; then
     extra+=(--resolve "${host}:${port}:${TARGET_IP}")
   fi
+  if [[ "${INSECURE_TLS:-0}" == "1" ]]; then
+    extra+=(-k)
+  fi
 
   curl -sS -I --max-time 8 "${extra[@]}" "${scheme}://${host}${path}" 2>/dev/null || true
 }

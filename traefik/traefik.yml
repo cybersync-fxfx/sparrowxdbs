@@ -147,7 +147,8 @@ certificatesResolvers:
       keyType: EC384
       dnsChallenge:
         provider: cloudflare
-        delayBeforeChecks: 15
+        propagation:
+          delayBeforeChecks: 15s
         resolvers:
           - "1.1.1.1:53"
           - "8.8.8.8:53"
