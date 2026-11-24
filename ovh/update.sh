@@ -1969,8 +1969,8 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_session_cache shared:SSL:20m;
-    ssl_session_timeout 1h;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
     client_max_body_size 150M;
     client_body_timeout 60s;
     client_header_timeout 30s;

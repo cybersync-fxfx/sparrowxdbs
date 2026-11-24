@@ -1392,7 +1392,7 @@ ensure_netsec_dashboard_running() {
   fi
 
   if [ "${need_build}" = "yes" ]; then
-    log_info "Building ${netsec_domain} (saprrowx.sbs) backend + React frontend..."
+    echo "  [SCAN]     Building ${netsec_domain} (saprrowx.sbs) backend + React frontend..."
     local build_rc=1
     if [ "${docker_ok}" = "yes" ]; then
       if docker run --rm \
