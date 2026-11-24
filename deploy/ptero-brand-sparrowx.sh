@@ -293,15 +293,49 @@ cat > "${BRAND_ASSET_DIR}/sparrowx-brand.js" <<'EOF'
     var brandLink =
       document.querySelector('a[href="/"] span') ||
       document.querySelector('nav a[href="/"]') ||
-      document.querySelector('header a[href="/"]');
+      document.querySelector('header a[href="/"]') ||
+      document.querySelector('aside a[href="/"]');
     if (!brandLink) return;
     var container = brandLink.tagName === "A" ? brandLink : brandLink.parentElement;
-    if (!container || container.querySelector(".spx-nav-logo")) return;
-    var img = document.createElement("img");
-    img.src = LOGO_URL;
-    img.alt = BRAND;
-    img.className = "spx-nav-logo";
-    container.insertBefore(img, container.firstChild);
+    if (!container) return;
+
+    // Replace any existing (or broken) theme <img> inside the brand header with our official SparrowX logo
+    var existingImgs = container.querySelectorAll("img:not(.spx-nav-logo)");
+    if (existingImgs.length > 0) {
+      existingImgs.forEach(function (el, idx) {
+        if (idx === 0) {
+          el.src = LOGO_URL;
+          el.alt = BRAND;
+          el.className = "spx-nav-logo";
+        } else {
+          el.style.display = "none";
+        }
+      });
+    } else if (!container.querySelector(".spx-nav-logo")) {
+      var img = document.createElement("img");
+      img.src = LOGO_URL;
+      img.alt = BRAND;
+      img.className = "spx-nav-logo";
+      container.insertBefore(img, container.firstChild);
+    }
+
+    // Normalize "Sparrowxhosting" brand text to clean "SparrowX Hosting"
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    var node;
+    while ((node = walker.nextNode())) {
+      if (node.nodeValue && /sparrowxhosting/i.test(node.nodeValue)) {
+        node.nodeValue = node.nodeValue.replace(/sparrowxhosting/gi, BRAND);
+      }
+    }
+  }
+
+  function fixBrokenBrandImages() {
+    document.querySelectorAll("header img, nav img, aside img").forEach(function (img) {
+      if (img.classList.contains("spx-nav-logo")) return;
+      if (img.complete && img.naturalWidth === 0) {
+        img.style.display = "none";
+      }
+    });
   }
 
   function enhanceLoginHeader() {
@@ -331,6 +365,7 @@ cat > "${BRAND_ASSET_DIR}/sparrowx-brand.js" <<'EOF'
 
   function run() {
     enhanceNavLogo();
+    fixBrokenBrandImages();
     enhanceLoginHeader();
     ensureFooterPill();
   }
@@ -365,9 +400,9 @@ txt = re.sub(r"\n?<!-- SPARROWX-BRAND:START -->.*?<!-- SPARROWX-BRAND:END -->\n?
 
 snippet = """
 <!-- SPARROWX-BRAND:START -->
-<link rel="icon" type="image/png" href="/sparrowx/logo.png?v=2026">
-<link rel="stylesheet" href="/sparrowx/sparrowx-theme.css?v=2026">
-<script src="/sparrowx/sparrowx-brand.js?v=2026" defer></script>
+<link rel="icon" type="image/png" href="/sparrowx/logo.png?v=2026b">
+<link rel="stylesheet" href="/sparrowx/sparrowx-theme.css?v=2026b">
+<script src="/sparrowx/sparrowx-brand.js?v=2026b" defer></script>
 <!-- SPARROWX-BRAND:END -->
 """
 
