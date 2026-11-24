@@ -50,15 +50,35 @@ PG_USER="${PG_USER:-sparrowx}"
 PG_DB="${PG_DB:-sparrowx_db}"
 DISCORD_WEBHOOK="${SPARROWX_DISCORD_WEBHOOK_URL:-$(load_env_key SPARROWX_DISCORD_WEBHOOK_URL)}"
 
-# Execute psql inside sparrowx-postgres container (with -v variable passing for SQL injection safety)
+# Execute psql inside sparrowx-postgres container (auto-starting it if stopped)
 run_psql() {
-  if docker ps --format '{{.Names}}' | grep -qx "${PG_CONTAINER}"; then
-    docker exec -i "${PG_CONTAINER}" psql -U "${PG_USER}" -d "${PG_DB}" -v ON_ERROR_STOP=1 "$@"
+  local container="${PG_CONTAINER}"
+  if ! docker ps --format '{{.Names}}' | grep -qx "${container}"; then
+    # Auto-detect any running SparrowX Postgres container
+    local detected
+    detected=$(docker ps --format '{{.Names}}' | grep -iE 'sparrowx.*postgres|postgres.*sparrowx' | head -n 1 || true)
+    if [[ -n "$detected" ]]; then
+      container="$detected"
+    elif docker ps -a --format '{{.Names}}' | grep -qx "${container}"; then
+      echo -e "${YELLOW}[INFO] Container '${container}' is stopped — starting it now...${NC}" >&2
+      docker start "${container}" >/dev/null
+      for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if docker exec "${container}" pg_isready -U "${PG_USER}" -d "${PG_DB}" >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+    fi
+  fi
+
+  if docker ps --format '{{.Names}}' | grep -qx "${container}"; then
+    docker exec -i "${container}" psql -U "${PG_USER}" -d "${PG_DB}" -v ON_ERROR_STOP=1 "$@"
   elif command -v psql >/dev/null 2>&1; then
     PGPASSWORD="${POSTGRES_PASSWORD:-$(load_env_key POSTGRES_PASSWORD)}" \
       psql -h 127.0.0.1 -U "${PG_USER}" -d "${PG_DB}" -v ON_ERROR_STOP=1 "$@"
   else
-    echo -e "${RED}[ERROR] Neither Docker container '${PG_CONTAINER}' nor local 'psql' is available.${NC}" >&2
+    echo -e "${RED}[ERROR] Postgres container '${PG_CONTAINER}' is not running. Start it with:${NC}" >&2
+    echo "  cd ${REPO_DIR} && docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d postgres postgrest" >&2
     exit 1
   fi
 }
