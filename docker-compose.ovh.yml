@@ -152,6 +152,24 @@ services:
           - sparrowx-smtp
           - mail
 
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    container_name: sparrowx-phpmyadmin
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PMA_HOST: ${PMA_HOST:-host.docker.internal}
+      PMA_PORT: ${PMA_PORT:-3306}
+      PMA_ARBITRARY: "1"
+      PMA_ABSOLUTE_URI: "https://${DOMAIN_PHP:-php.${SPARROWX_DOMAIN:-sparrowx.net}}/"
+      UPLOAD_LIMIT: 128M
+    networks:
+      sparrowx_net:
+        aliases:
+          - phpmyadmin
+          - sparrowx-phpmyadmin
+
   nginx:
     image: nginx:1.27-alpine
     container_name: sparrowx-nginx

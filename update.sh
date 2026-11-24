@@ -1195,6 +1195,7 @@ ensure_game_letsencrypt_ssl() {
   local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN}}"
   local infra_domain="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
+  local php_domain="${DOMAIN_PHP:-php.${SPARROWX_DOMAIN}}"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
 
@@ -1223,6 +1224,7 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${gamesec_domain}" "gamesec"
   issue_le_cert_to_ovh_ssl "${netsec_domain}" "netsec"
   issue_le_cert_to_ovh_ssl "${infra_domain}" "infra"
+  issue_le_cert_to_ovh_ssl "${php_domain}" "php"
 }
 
 ensure_core_letsencrypt_ssl() {
@@ -1817,6 +1819,13 @@ render_sparrowx_nginx_conf() {
     infra_ssl_cert="/etc/nginx/ssl/infra-fullchain.pem"
     infra_ssl_key="/etc/nginx/ssl/infra-privkey.pem"
   fi
+  local php_domain="${DOMAIN_PHP:-php.${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local php_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local php_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/php-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/php-privkey.pem" ]; then
+    php_ssl_cert="/etc/nginx/ssl/php-fullchain.pem"
+    php_ssl_key="/etc/nginx/ssl/php-privkey.pem"
+  fi
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN:-sparrowx.local}}"
   local netsec_p="${NETSEC_PORT:-3006}"
   local netsec_ssl_cert="/etc/nginx/ssl/fullchain.pem"
@@ -2353,6 +2362,43 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+
+# 10. phpMyAdmin Database Console (${php_domain})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${php_domain};
+    ssl_certificate ${php_ssl_cert};
+    ssl_certificate_key ${php_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    client_max_body_size 128M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_pma http://sparrowx-phpmyadmin:80;
+        proxy_pass \$upstream_pma;
+        proxy_http_version 1.1;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
