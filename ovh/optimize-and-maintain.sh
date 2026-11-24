@@ -179,9 +179,14 @@ EOF
 run_maintain() {
   local healed=()
 
-  # 2A. Check Core Docker Containers
+  # 2A. Kill rogue sparrowx-traefik if it tries to compete with sparrowx-nginx on :80/:443, then verify core containers
   if command -v docker >/dev/null 2>&1; then
-    for cname in sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx; do
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+      log_msg "HEAL" "Removing conflicting sparrowx-traefik container competing with sparrowx-nginx..."
+      docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+      healed+=("removed:sparrowx-traefik")
+    fi
+    for cname in sparrowx-postgres sparrowx-postgrest sparrowx-phpmyadmin sparrowx-app sparrowx-nginx; do
       if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "${cname}"; then
         local state
         state="$(docker inspect -f '{{.State.Running}}' "${cname}" 2>/dev/null || echo "false")"

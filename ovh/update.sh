@@ -2643,6 +2643,12 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
   free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
 
+  # Remove conflicting Traefik proxy container if present so sparrowx-nginx exclusively owns :80/:443
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+    log_warn "Stopping & removing conflicting sparrowx-traefik container (fighting sparrowx-nginx for :80/:443)..."
+    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+  fi
+
   # Free HTTP/HTTPS ports if held by non-sparrowx-nginx processes
   for wp in "${HTTP_PORT}" "${HTTPS_PORT}"; do
     if port_held_by_other "${wp}" "sparrowx-nginx"; then
