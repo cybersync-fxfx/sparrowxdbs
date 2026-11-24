@@ -448,7 +448,7 @@ http:
       middlewares:
         - tenant-security-headers
         - noindex
-      service: noop@internal
+      service: sparrowx-web
       tls:
         certResolver: letsencrypt
 
