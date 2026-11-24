@@ -27,6 +27,7 @@ import {
   type LiveDomainAuditResult,
 } from "@/components/GrowthAndMonetizationHub";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { UnderAttackModal } from "@/components/shield/UnderAttackModal";
 
@@ -740,6 +741,7 @@ export function ShieldLandingView({
               );
             })}
           </div>
+          <PurchasePolicyNotice className="max-w-2xl mx-auto" />
         </section>
       </main>
 

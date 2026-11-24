@@ -10,6 +10,7 @@ import { deployPlan } from "@/lib/portal.functions";
 import { findPlan, formatRam, planCostCoins, SERVICES, type Plan, type ServiceId } from "@/lib/services";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { cn } from "@/lib/utils";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { errorText, useRefreshAll } from "./hooks";
 
 export function DeployPlans({ coins, initialPlanId, onNeedCoins }: { coins: number; initialPlanId?: string; onNeedCoins: () => void }) {
@@ -93,6 +94,7 @@ export function DeployPlans({ coins, initialPlanId, onNeedCoins }: { coins: numb
                   <span className={cn("font-mono", short > 0 ? "text-destructive" : "text-success")}>{coins - planCostCoins(selected)} coins</span>
                 </div>
               </div>
+              <PurchasePolicyNotice compact />
               <DialogFooter className="flex-col gap-2 sm:flex-col">
                 {short > 0 ? (
                   <Button variant="discord" className="w-full rounded-xl" onClick={() => { setSelected(null); onNeedCoins(); }}>

@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import type { InfraServerPlan } from "@/lib/infra-plans";
 import { buildWhatsAppSupportUrl } from "@/lib/whatsapp-support";
-import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { Real3DProcessorChip } from "@/components/ui/Real3DProcessorChip";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import {
   IntelXeonChipPinIcon,
   HardwarePinGridWatermark,
@@ -299,10 +300,9 @@ export function IntelXeonGoldPricingSection({
           <div className="lg:col-span-4 flex justify-center lg:justify-end">
             <div className="relative w-full max-w-[280px] sm:max-w-[320px]">
               <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-blue-600/20 via-sky-500/15 to-transparent blur-2xl rounded-3xl" />
-              <Floating3DVisual
-                src="/3d/intel-xeon-processor.svg"
+              <Real3DProcessorChip
+                variant="xeon"
                 alt="3D floating Dual Intel Xeon Gold Enterprise Processor"
-                accent="cyan"
                 size="md"
               />
             </div>
@@ -455,6 +455,8 @@ export function IntelXeonGoldPricingSection({
             );
           })}
         </div>
+
+        <PurchasePolicyNotice className="mt-6 max-w-2xl mx-auto" />
 
         {/* 5-Column Included Features Bar with 3D Icon Placeholders */}
         <div className="mt-12 rounded-2xl border border-[#0071C5]/30 bg-[#08101C]/90 p-6 backdrop-blur-xl">

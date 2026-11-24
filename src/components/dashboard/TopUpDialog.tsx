@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { confirmTopup, redeemPromo, startTopup } from "@/lib/portal.functions";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { cn } from "@/lib/utils";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { errorText, useRefreshAll } from "./hooks";
 
 const PRESETS = [100, 250, 500, 1000, 2000];
@@ -133,6 +134,7 @@ export function TopUpDialog({ open, onOpenChange, demo, razorpay }: { open: bool
             </Button>
           </TabsContent>
         </Tabs>
+        <PurchasePolicyNotice compact />
       </DialogContent>
     </Dialog>
   );

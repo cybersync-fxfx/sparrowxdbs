@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { GoogleGIcon, useSessionSummary } from "./Navbar";
 import { buildGoogleLoginHref } from "@/components/GoogleSignInButton";
 import type { InfraRegionId } from "@/lib/infra-plans";
@@ -111,6 +112,9 @@ export function Pricing({ service }: { service: Service }) {
           ))}
         </motion.div>
       </AnimatePresence>
+      <div className="mt-8 max-w-2xl mx-auto">
+        <PurchasePolicyNotice />
+      </div>
     </section>
   );
 }

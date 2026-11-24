@@ -19,6 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { querySparrowxCrossSystemAi, type CrossSystemAiResponse } from "@/lib/sparrowx-ai-brain";
 
@@ -896,6 +897,8 @@ export function SparrowxKeysEngine() {
             </a>
           </div>
         </section>
+
+        <PurchasePolicyNotice className="max-w-2xl mx-auto" />
       </main>
 
       {/* FOOTER */}

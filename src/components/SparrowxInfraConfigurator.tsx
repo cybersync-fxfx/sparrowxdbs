@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { WhatsAppLogo } from "@/components/WhatsAppPlansToaster";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import {
   SiAlmalinux,
   SiAlpinelinux,
@@ -762,6 +763,8 @@ export function SparrowxInfraConfigurator({
                   {orderError}
                 </p>
               )}
+
+              <PurchasePolicyNotice compact />
 
               <div className="space-y-2.5">
                 <button

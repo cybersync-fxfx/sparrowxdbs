@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 import { SparrowxLegalCenter } from "@/components/SparrowxLegalCenter";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 
 describe("SparrowX Legal Center, Terms of Service & Refund Policy", () => {
   it("renders Master Terms of Service with SLA and acceptable use policy", () => {
@@ -89,5 +90,21 @@ describe("SparrowX Legal Center, Terms of Service & Refund Policy", () => {
 
     const secLink = screen.getByRole("link", { name: /^Data Security$/i });
     expect(secLink.getAttribute("href")).toBe("/security");
+  });
+
+  it("renders the unified pre-purchase Terms of Service and Refund Policy notice", () => {
+    render(<PurchasePolicyNotice />);
+
+    expect(
+      screen.getByText(/Before purchasing, we request you to read our/i)
+    ).toBeDefined();
+
+    const termsLink = screen.getByRole("link", { name: /^Terms of Service$/i });
+    expect(termsLink.getAttribute("href")).toBe("/terms");
+    expect(termsLink.getAttribute("target")).toBe("_blank");
+
+    const refundLink = screen.getByRole("link", { name: /^Refund Policy$/i });
+    expect(refundLink.getAttribute("href")).toBe("/refund");
+    expect(refundLink.getAttribute("target")).toBe("_blank");
   });
 });

@@ -21,6 +21,7 @@ import {
   syncMasterSsoSession,
 } from "@/lib/developer-connection";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
@@ -3611,6 +3612,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 );
               })}
             </div>
+            <PurchasePolicyNotice className="max-w-2xl mx-auto" />
           </section>
         </main>
 

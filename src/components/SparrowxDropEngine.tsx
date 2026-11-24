@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import {
   UploadCloud,
@@ -2386,6 +2387,7 @@ export function SparrowxDropEngine() {
               </a>
             </div>
           </div>
+          <PurchasePolicyNotice className="max-w-2xl mx-auto" />
         </div>
 
         {/* SparrowX AI Zero-Knowledge Vault Guard & Transfer Policy Advisor */}
