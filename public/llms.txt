@@ -1,0 +1,32 @@
+# SparrowX Technologies
+
+> Independent sovereign cloud infrastructure, bare-metal & Intel Xeon Gold / AMD Ryzen 9 VPS & VDS hosting, managed PostgreSQL databases, autonomous eBPF/XDP DDoS defense, game server hosting, and zero-knowledge developer utilities.
+
+## Core Platforms
+
+- [SparrowX Platform Hub](https://sparrowx.net/): Unified overview, live system status, documentation, and Client Area.
+- [SparrowX Cloud Infra](https://infra.sparrowx.net/): Dual Intel Xeon Gold & AMD Ryzen 9 9950X KVM VPS, Dedicated VDS, and Bare Metal servers in Mumbai, Singapore, Frankfurt, and Gravelines.
+- [SparrowX Cloud DB](https://db.sparrowx.net/): Managed PostgreSQL 16 + pgvector Studio with PostgREST API and PgBouncer connection pooling.
+- [SparrowX Shield](https://sec.sparrowx.net/): Autonomous Edge WAF, L7/L4 DDoS mitigation, origin IP cloaking, and SOC telemetry.
+- [SparrowX NetSec Guard](https://netsec.sparrowx.net/): Linux firewall agent, WireGuard Guard tunnels, nftables/XDP automation, and live threat radar.
+- [SparrowX Game Hosting](https://sparrowx.net/game): Low-latency Asia-IN NVMe game servers for FiveM, Minecraft, SA-MP, and Discord bots with Pterodactyl panel access.
+- [SparrowX GameSec L4](https://gamesec.sparrowx.net/): Stateful UDP/RakNet/ENet packet scrubbing for multiplayer game networks.
+
+## Free Zero-Knowledge Developer Utilities
+
+- [SparrowX Drop](https://file.sparrowx.net/): Zero-disk encrypted ephemeral file transfer and cloud vault.
+- [SparrowX Keys](https://password.sparrowx.net/): 100% client-side offline cryptographic password and key generator.
+
+## Documentation & Legal
+
+- [Documentation](https://sparrowx.net/docs): Setup guides, architecture references, and CLI tools (`sparrowx-noc`).
+- [Error Reference](https://sparrowx.net/docs/errors): Standardized error codes and troubleshooting.
+- [Security & Sovereignty](https://sparrowx.net/security): Infrastructure security practices and disclosures.
+- [Terms of Service](https://sparrowx.net/terms): Terms governing SparrowX services.
+- [Refund Policy](https://sparrowx.net/refund): Billing and provisioning policy.
+
+## Contact
+
+- Engineering & Founder: founder@sparrowx.net
+- Security Disclosures: security@sparrowx.net
+- WhatsApp Support (India): https://wa.me/919025056678

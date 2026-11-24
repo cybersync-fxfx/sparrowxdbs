@@ -949,6 +949,37 @@ export default {
         });
       }
 
+      if (url.pathname === "/llms.txt" && (request.method === "GET" || request.method === "HEAD")) {
+        const llmsBody = [
+          "# SparrowX Technologies",
+          "",
+          "> Independent sovereign cloud infrastructure, Dual Intel Xeon Gold & AMD Ryzen 9 VPS/VDS, managed PostgreSQL databases, autonomous eBPF/XDP DDoS defense, game hosting, and encrypted developer utilities.",
+          "",
+          "## Platforms",
+          "- https://sparrowx.net/ — SparrowX Platform Hub & Client Area",
+          "- https://infra.sparrowx.net/ — Cloud Infra (KVM VPS, Dedicated VDS, Bare Metal)",
+          "- https://db.sparrowx.net/ — Managed PostgreSQL 16 & pgvector Studio",
+          "- https://sec.sparrowx.net/ — SparrowX Shield Edge WAF & DDoS Defense",
+          "- https://netsec.sparrowx.net/ — NetSec Linux Firewall & WireGuard Guard",
+          "- https://sparrowx.net/game — Low-Latency FiveM, Minecraft & SA-MP Game Hosting",
+          "- https://file.sparrowx.net/ — SparrowX Drop Encrypted File Transfer",
+          "- https://password.sparrowx.net/ — SparrowX Keys Offline Password Generator",
+          "",
+          "## Documentation & Support",
+          "- https://sparrowx.net/docs — Documentation",
+          "- https://sparrowx.net/security — Security & Sovereignty",
+          "- https://wa.me/919025056678 — WhatsApp Support (+91 90250 56678)",
+          "",
+        ].join("\n");
+        return new Response(llmsBody, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+          },
+        });
+      }
+
       // 0b. HTTP 301 canonical redirects on sparrowx.net / www.sparrowx.net for dedicated subdomain routes
       if (request.method === "GET" || request.method === "HEAD") {
         const canonicalRedirect = resolveCanonicalSubdomainRedirect(

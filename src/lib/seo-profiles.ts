@@ -40,9 +40,9 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     key: "master",
     siteName: "SparrowX",
     canonicalUrl: "https://sparrowx.net/",
-    title: "SparrowX — Complete Developer Toolkit for Security, Cloud, Deployment & AI Agentics",
+    title: "SparrowX — Cloud Infrastructure, DDoS Security & Databases",
     description:
-      "Official SparrowX Technologies Developer Toolkit. Launch managed PostgreSQL & pgvector databases, instant REST APIs, bare-metal cloud deployment, autonomous WAF/DDoS security, encrypted file transfer, offline keys, and AI agentic guardrails.",
+      "SparrowX Technologies: Sovereign cloud VPS & VDS, managed PostgreSQL databases, autonomous WAF/DDoS protection, game hosting, and encrypted tools.",
     keywords:
       "sparrowx, sparrowx.net, developer toolkit, cloud development platform, ai automation, agentic ai security, managed postgresql, bare metal deployment, edge waf, ddos defense, sparrowx technologies",
     ogTitle: "SparrowX — Complete Developer Toolkit for Security, Cloud & AI Agentics",

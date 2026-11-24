@@ -160,6 +160,11 @@ http:
         customResponseHeaders:
           X-Accel-Buffering: "no"
 
+    # 9. Automatic Gzip / Brotli HTTP Response Compression (cuts page size & boosts SEO speed)
+    compress:
+      compress:
+        minResponseBodyBytes: 1024
+
   # ----------------------------------------------------------------------------
   # ROUTERS
   # ----------------------------------------------------------------------------
@@ -212,6 +217,7 @@ http:
       priority: 100
       middlewares:
         - security-headers
+        - compress
       service: sparrowx-web
       tls:
         certResolver: letsencrypt
