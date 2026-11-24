@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/deploy/projects")({
           }
 
           const project = await mod.createDeployProject({
-            name: typeof body.name === "string" ? body.name : undefined,
+            ...(typeof body.name === "string" && body.name.trim() ? { name: body.name } : {}),
             repoUrl: typeof body.repoUrl === "string" ? body.repoUrl : "",
             branch: typeof body.branch === "string" ? body.branch : "main",
             framework: typeof body.framework === "string" ? (body.framework as any) : "nextjs",

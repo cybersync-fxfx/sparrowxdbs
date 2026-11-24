@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AiRouteImport } from './routes/ai'
 import { Route as DbRouteImport } from './routes/db'
 import { Route as DeployRouteImport } from './routes/deploy'
 import { Route as DropRouteImport } from './routes/drop'
@@ -58,6 +59,11 @@ import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/publi
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AiRoute = AiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DbRoute = DbRouteImport.update({
@@ -287,6 +293,7 @@ const ApiPublicRazorpayWebhookRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/db': typeof DbRoute
   '/deploy': typeof DeployRoute
   '/drop': typeof DropRoute
@@ -334,6 +341,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/db': typeof DbRoute
   '/deploy': typeof DeployRoute
   '/drop': typeof DropRoute
@@ -382,6 +390,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ai': typeof AiRoute
   '/db': typeof DbRoute
   '/deploy': typeof DeployRoute
   '/drop': typeof DropRoute
@@ -431,6 +440,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/ai'
     | '/db'
     | '/deploy'
     | '/drop'
@@ -478,6 +488,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/ai'
     | '/db'
     | '/deploy'
     | '/drop'
@@ -525,6 +536,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/ai'
     | '/db'
     | '/deploy'
     | '/drop'
@@ -573,6 +585,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AiRoute: typeof AiRoute
   DbRoute: typeof DbRoute
   DeployRoute: typeof DeployRoute
   DropRoute: typeof DropRoute
@@ -626,6 +639,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ai': {
+      id: '/ai'
+      path: '/ai'
+      fullPath: '/ai'
+      preLoaderRoute: typeof AiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/db': {
@@ -941,6 +961,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AiRoute: AiRoute,
   DbRoute: DbRoute,
   DeployRoute: DeployRoute,
   DropRoute: DropRoute,

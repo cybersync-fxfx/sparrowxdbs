@@ -76,6 +76,11 @@ describe("App routing", () => {
     expect(matchProductSubdomain("game-web.sparrowx.net")?.route).toBe("/game");
     expect(matchProductSubdomain("game.dash.sparrowx.net")?.route).toBe("/game/dashboard");
     expect(matchProductSubdomain("game-dash.sparrowx.net")?.route).toBe("/game/dashboard");
+    expect(matchProductSubdomain("infra.sparrowx.net")?.route).toBe("/infra");
+    expect(matchProductSubdomain("deploy.sparrowx.net")?.route).toBe("/deploy");
+    expect(matchProductSubdomain("ai.sparrowx.net")?.route).toBe("/ai");
+    expect(matchProductSubdomain("agents.sparrowx.net")?.route).toBe("/ai");
+    expect(matchProductSubdomain("dpdp.sparrowx.net")?.route).toBe("/security");
     expect(matchProductSubdomain("game.panel.sparrowx.net")?.route).toBeNull();
     expect(matchProductSubdomain("gamesec.sparrowx.net")).toBeNull();
 
@@ -191,7 +196,13 @@ describe("App routing", () => {
     expect(dbLink.getAttribute("href")).toBe("https://db.sparrowx.net");
 
     const gameLink = screen.getByRole("link", { name: /Game Hosting/i });
-    expect(gameLink.getAttribute("href")).toBe("/game");
+    expect(gameLink.getAttribute("href")).toBe("https://game.sparrowx.net");
+
+    const aiLink = screen.getByRole("link", { name: /AI & Agentics/i });
+    expect(aiLink.getAttribute("href")).toBe("https://ai.sparrowx.net");
+
+    const deployLink = screen.getByRole("link", { name: /Deploy PaaS/i });
+    expect(deployLink.getAttribute("href")).toBe("https://deploy.sparrowx.net");
 
     const allHrefs = screen
       .getAllByRole("link")

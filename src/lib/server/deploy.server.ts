@@ -168,7 +168,7 @@ async function executeServerDeployPipeline(record: DeployProjectRecord): Promise
   const projectDir = path.resolve(workDir, relRoot);
   if (!projectDir.startsWith(path.resolve(workDir))) {
     log("Security block: rootDir escaped repository workspace.");
-    return { status: "Failed", commitSha, logs };
+    return { status: "Failed", ...(commitSha ? { commitSha } : {}), logs };
   }
 
   // Build environment map from real stored envVars
@@ -221,7 +221,7 @@ async function executeServerDeployPipeline(record: DeployProjectRecord): Promise
     } catch (err) {
       const msg = err instanceof Error ? err.message.split("\n")[0] : "build failed";
       log(`Build failed: ${msg}`);
-      return { status: "Failed", commitSha, logs };
+      return { status: "Failed", ...(commitSha ? { commitSha } : {}), logs };
     }
   }
 
@@ -238,11 +238,11 @@ async function executeServerDeployPipeline(record: DeployProjectRecord): Promise
     copyDirRecursive(publishSource, siteDir);
     const livePath = `/api/deploy/site?slug=${encodeURIComponent(record.slug)}`;
     log(`Published live artifacts from ${path.relative(workDir, publishSource) || "."} -> ${livePath}`);
-    return { status: "Ready", commitSha, livePath, logs };
+    return { status: "Ready", ...(commitSha ? { commitSha } : {}), livePath, logs };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "publish failed";
     log(`Publish error: ${msg}`);
-    return { status: "Failed", commitSha, logs };
+    return { status: "Failed", ...(commitSha ? { commitSha } : {}), logs };
   }
 }
 

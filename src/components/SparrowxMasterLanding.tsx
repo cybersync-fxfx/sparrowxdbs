@@ -587,6 +587,10 @@ export function SparrowxMasterLanding({
     api: "/gateway",
     game: "/game",
     infra: "/infra",
+    deploy: "/deploy",
+    ai: "/ai",
+    agents: "/ai",
+    dpdp: "/security",
   };
 
   const resolveServiceHref = (targetId: string, url: string) => {
@@ -736,6 +740,30 @@ export function SparrowxMasterLanding({
                   </a>
 
                   <a
+                    href={resolveServiceHref("deploy", "https://deploy.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <img src="/logos/sparrowx-network.png" alt="SparrowX Deploy PaaS" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX Deploy</div>
+                      <div className="text-[11px] text-zinc-400">Git-to-Edge PaaS &amp; Builds</div>
+                    </div>
+                  </a>
+
+                  <a
+                    href={resolveServiceHref("ai", "https://ai.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <img src="/logos/sparrowx-main.png" alt="SparrowX AI & Agentics" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-emerald-500/30 bg-[#0A0E17] p-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX AI &amp; Agentics</div>
+                      <div className="text-[11px] text-zinc-400">AI Brain &amp; LLM Guardrails</div>
+                    </div>
+                  </a>
+
+                  <a
                     href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
                     onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
@@ -750,8 +778,11 @@ export function SparrowxMasterLanding({
               )}
             </div>
 
-            <a href="#comparison" aria-current={activeSection === "comparison" ? "true" : undefined} className={navLinkClass("comparison")}>
-              Comparison
+            <a href="#products" aria-current={activeSection === "products" ? "true" : undefined} className={navLinkClass("products")}>
+              Platforms
+            </a>
+            <a href="/docs" className="hover:text-white transition-colors">
+              Docs
             </a>
             <a href="#story" aria-current={activeSection === "story" ? "true" : undefined} className={navLinkClass("story")}>
               Story
@@ -1228,8 +1259,8 @@ export function SparrowxMasterLanding({
               badge: "AI AUTOMATION",
               logo: "/logos/sparrowx-main.png",
               desc: "Autonomous AI security guardrails, LLM prompt-injection filtering, automated remediation workflows, and pgvector agent memory.",
-              domain: "sec.sparrowx.net",
-              href: resolveServiceHref("sec", "https://sec.sparrowx.net"),
+              domain: "ai.sparrowx.net",
+              href: resolveServiceHref("ai", "https://ai.sparrowx.net"),
               highlight: false,
             },
             {

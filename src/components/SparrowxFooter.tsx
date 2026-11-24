@@ -1,7 +1,8 @@
 import React from "react";
+import { buildMasterHref } from "@/lib/routing";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 
-export type SparrowxServiceKey = "db" | "sec" | "file" | "password" | "api" | "infra";
+export type SparrowxServiceKey = "db" | "sec" | "file" | "password" | "api" | "infra" | "deploy" | "ai" | "game";
 
 export interface SparrowxFooterProps {
   onLaunchService?: ((
@@ -31,9 +32,16 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     serviceKey: "infra",
   },
   {
+    label: "Deploy PaaS",
+    sublabel: "deploy.sparrowx.net",
+    href: "https://deploy.sparrowx.net",
+    serviceKey: "deploy",
+  },
+  {
     label: "Game Hosting",
-    sublabel: "sparrowx.net/game",
-    href: "/game",
+    sublabel: "game.sparrowx.net",
+    href: "https://game.sparrowx.net",
+    serviceKey: "game",
   },
   {
     label: "Cloud Database",
@@ -42,10 +50,22 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     serviceKey: "db",
   },
   {
+    label: "API Gateway",
+    sublabel: "api.sparrowx.net",
+    href: "https://api.sparrowx.net",
+    serviceKey: "api",
+  },
+  {
     label: "Shield SOC & WAF",
     sublabel: "sec.sparrowx.net",
     href: "https://sec.sparrowx.net",
     serviceKey: "sec",
+  },
+  {
+    label: "AI & Agentics",
+    sublabel: "ai.sparrowx.net",
+    href: "https://ai.sparrowx.net",
+    serviceKey: "ai",
   },
   {
     label: "NetSec Guard",
@@ -76,7 +96,13 @@ export function SparrowxFooter({
   onSignOut,
   inPageAnchors = false,
 }: SparrowxFooterProps) {
-  const anchorPrefix = inPageAnchors ? "#" : "/#";
+  const masterHomeHref = buildMasterHref("/");
+  const statusHref = inPageAnchors ? "#status" : buildMasterHref("/#status");
+  const infraHref =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+      ? "/infra"
+      : "https://infra.sparrowx.net";
 
   const handleProductClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -102,7 +128,7 @@ export function SparrowxFooter({
           {/* Brand Summary & Status Column */}
           <div className="md:col-span-4 space-y-4 min-w-0">
             <a
-              href="/"
+              href={masterHomeHref}
               className="min-h-6 inline-flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
               <img
@@ -126,7 +152,7 @@ export function SparrowxFooter({
 
             <div>
               <a
-                href={`${anchorPrefix}status`}
+                href={statusHref}
                 className={LINK_CLASSES}
               >
                 <span
@@ -173,30 +199,30 @@ export function SparrowxFooter({
               </h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 <li className="min-w-0">
-                  <a href="/infra" className={LINK_CLASSES}>
+                  <a href={infraHref} className={LINK_CLASSES}>
                     Dedicated NVMe VPS
                   </a>
                 </li>
                 <li className="min-w-0">
                   <a
-                    href="/story"
+                    href={buildMasterHref("/story")}
                     className={LINK_CLASSES}
                   >
                     Why SparrowX
                   </a>
                 </li>
                 <li className="min-w-0">
-                  <a href={`${anchorPrefix}status`} className={LINK_CLASSES}>
+                  <a href={statusHref} className={LINK_CLASSES}>
                     Live System Status
                   </a>
                 </li>
                 <li className="min-w-0">
-                  <a href="/docs" className={LINK_CLASSES}>
+                  <a href={buildMasterHref("/docs")} className={LINK_CLASSES}>
                     Documentation
                   </a>
                 </li>
                 <li className="min-w-0">
-                  <a href="/docs/errors" className={LINK_CLASSES}>
+                  <a href={buildMasterHref("/docs/errors")} className={LINK_CLASSES}>
                     Error Reference
                   </a>
                 </li>
@@ -208,12 +234,15 @@ export function SparrowxFooter({
               <h3 className="text-sm font-medium text-[#F4F6FA]">Company</h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 <li className="min-w-0">
-                  <a href="/story" className={LINK_CLASSES}>
+                  <a href={buildMasterHref("/story")} className={LINK_CLASSES}>
                     Read Our Story
                   </a>
                 </li>
                 <li className="min-w-0">
-                  <a href={`${anchorPrefix}contact`} className={LINK_CLASSES}>
+                  <a
+                    href={inPageAnchors ? "#contact" : buildMasterHref("/#contact")}
+                    className={LINK_CLASSES}
+                  >
                     Contact Engineering
                   </a>
                 </li>

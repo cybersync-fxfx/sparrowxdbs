@@ -16,7 +16,6 @@ import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
 import { ThreatHuntingView } from "@/components/ThreatHuntingView";
 import { SiemAndDetectionRulesView } from "@/components/SiemAndDetectionRulesView";
 import { ProtectionVerificationCenter } from "@/components/ProtectionVerificationCenter";
-import { ErrorDocumentationCenter } from "@/components/ErrorDocumentationCenter";
 import { AdminErrorMonitoring } from "@/components/AdminErrorMonitoring";
 import { UserActivityHistory } from "@/components/UserActivityHistory";
 import { SystemStatusSection } from "@/components/SystemStatusSection";
@@ -28,19 +27,42 @@ import {
   notifyLoading,
   registerGlobalDocsNavigator,
 } from "@/lib/feedback";
-import {
-  GlobalAiBrainFloatingDock,
-  SparrowxAiBrainCenter,
-} from "@/components/SparrowxAiBrainCenter";
 import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
-import { SovereignDatabaseStudio } from "@/components/SovereignDatabaseStudio";
-import { SparrowxApiGatewayPortal } from "@/components/SparrowxApiGatewayPortal";
-import { SparrowxDropEngine } from "@/components/SparrowxDropEngine";
-import { SparrowxKeysEngine } from "@/components/SparrowxKeysEngine";
-import { SparrowxShieldEngine } from "@/components/SparrowxShieldEngine";
 import { SparrowxMasterLanding } from "@/components/SparrowxMasterLanding";
+
+// Lazy-load heavy standalone product engines so sparrowx.net initial load stays lean & fast
+const ErrorDocumentationCenter = lazy(() =>
+  import("@/components/ErrorDocumentationCenter").then((m) => ({ default: m.ErrorDocumentationCenter })),
+);
+const SparrowxAiBrainCenter = lazy(() =>
+  import("@/components/SparrowxAiBrainCenter").then((m) => ({ default: m.SparrowxAiBrainCenter })),
+);
+const GlobalAiBrainFloatingDock = lazy(() =>
+  import("@/components/SparrowxAiBrainCenter").then((m) => ({ default: m.GlobalAiBrainFloatingDock })),
+);
+const SovereignDatabaseStudio = lazy(() =>
+  import("@/components/SovereignDatabaseStudio").then((m) => ({ default: m.SovereignDatabaseStudio })),
+);
+const SparrowxApiGatewayPortal = lazy(() =>
+  import("@/components/SparrowxApiGatewayPortal").then((m) => ({ default: m.SparrowxApiGatewayPortal })),
+);
+const SparrowxDropEngine = lazy(() =>
+  import("@/components/SparrowxDropEngine").then((m) => ({ default: m.SparrowxDropEngine })),
+);
+const SparrowxKeysEngine = lazy(() =>
+  import("@/components/SparrowxKeysEngine").then((m) => ({ default: m.SparrowxKeysEngine })),
+);
+const SparrowxShieldEngine = lazy(() =>
+  import("@/components/SparrowxShieldEngine").then((m) => ({ default: m.SparrowxShieldEngine })),
+);
+
+const lazyEngineFallback = (
+  <div className="min-h-screen bg-[#05060A] text-zinc-400 flex items-center justify-center font-mono text-xs">
+    Loading SparrowX platform module...
+  </div>
+);
 import { hasVerifiedPaidSubscription } from "@/lib/sparrowx-plans";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import {
   Activity,
@@ -2048,7 +2070,7 @@ function Dashboard() {
     // 1. If visiting db.sparrowx.net or ?db=1 -> Direct to Sovereign DB Studio
     if (isStudioDomainOrParam) {
       return (
-        <>
+        <Suspense fallback={lazyEngineFallback}>
           <SovereignDatabaseStudio
             isStandaloneDomain={true}
             currentUser={currentUser}
@@ -2057,51 +2079,51 @@ function Dashboard() {
             onClose={() => setActiveNav("Overview")}
           />
           <BackgroundEngineToaster />
-        </>
+        </Suspense>
       );
     }
 
     // 2. If visiting api.sparrowx.net or ?api=1 -> Direct to REST API Gateway Portal & Documentation
     if (isApiDomainOrParam) {
       return (
-        <>
+        <Suspense fallback={lazyEngineFallback}>
           <SparrowxApiGatewayPortal />
           <BackgroundEngineToaster />
-        </>
+        </Suspense>
       );
     }
 
     // 3. If visiting file.sparrowx.net or ?file=1 -> Direct to SparrowX Drop Ephemeral File Sharing
     if (isFileDomainOrParam) {
       return (
-        <>
+        <Suspense fallback={lazyEngineFallback}>
           <SparrowxDropEngine />
           <BackgroundEngineToaster />
-        </>
+        </Suspense>
       );
     }
 
     // 4. If visiting password.sparrowx.net or passwd.sparrowx.net -> Direct to SparrowX Keys Cryptographic Engine
     if (isPasswordDomainOrParam) {
       return (
-        <>
+        <Suspense fallback={lazyEngineFallback}>
           <SparrowxKeysEngine />
           <BackgroundEngineToaster />
-        </>
+        </Suspense>
       );
     }
 
     // 5. If visiting shield.sparrowx.net or ?shield=1 -> Direct to SparrowX Shield Edge Defense
     if (isShieldDomainOrParam) {
       return (
-        <>
+        <Suspense fallback={lazyEngineFallback}>
           <SparrowxShieldEngine
             currentUser={currentUser}
             onUserAuthenticated={handleUserAuthenticated}
             onSignOut={handleSignOut}
           />
           <BackgroundEngineToaster />
-        </>
+        </Suspense>
       );
     }
   }
@@ -2128,9 +2150,13 @@ function Dashboard() {
                     sec: "https://sec.sparrowx.net",
                     shield: "https://sec.sparrowx.net",
                     infra: "https://infra.sparrowx.net",
+                    deploy: "https://deploy.sparrowx.net",
+                    ai: "https://ai.sparrowx.net",
+                    agents: "https://ai.sparrowx.net",
+                    dpdp: "https://dpdp.sparrowx.net",
                     netsec: "https://netsec.sparrowx.net",
-                    game: "/game",
-                    api: "/gateway",
+                    game: "https://game.sparrowx.net",
+                    api: "https://api.sparrowx.net",
                   }
                 : {
                     db: "/db",
@@ -2141,6 +2167,10 @@ function Dashboard() {
                     sec: "/shield",
                     shield: "/shield",
                     infra: "/infra",
+                    deploy: "/deploy",
+                    ai: "/ai",
+                    agents: "/ai",
+                    dpdp: "/security",
                     game: "/game",
                     api: "/gateway",
                   };
@@ -2276,7 +2306,7 @@ function Dashboard() {
     activeNav === "SparrowX DB"
   ) {
     return (
-      <>
+      <Suspense fallback={lazyEngineFallback}>
         <SovereignDatabaseStudio
           isStandaloneDomain={false}
           currentUser={currentUser}
@@ -2291,13 +2321,13 @@ function Dashboard() {
           }}
         />
         <BackgroundEngineToaster />
-      </>
+      </Suspense>
     );
   }
 
   if (activeNav === "SparrowX Shield" || activeNav === "Shield Edge Defense") {
     return (
-      <>
+      <Suspense fallback={lazyEngineFallback}>
         <SparrowxShieldEngine
           currentUser={currentUser}
           onUserAuthenticated={handleUserAuthenticated}
@@ -2307,7 +2337,7 @@ function Dashboard() {
           }}
         />
         <BackgroundEngineToaster />
-      </>
+      </Suspense>
     );
   }
 
@@ -2700,21 +2730,23 @@ function Dashboard() {
             activeNav === "Defense Updates & Threat Intel" ||
             activeNav === "Defense Updates & Intel") && (
             authSession.role === "admin" ? (
-              <SparrowxAiBrainCenter
-                activeNav={activeNav}
-                portalMode={portalMode}
-                incidents={incidents}
-                threatIndicators={threatIndicators}
-                assets={assets}
-                vulnerabilities={vulnerabilities}
-                protectedServices={protectedServices}
-                clientTenants={clientTenants}
-                auditLogs={auditLogs}
-                onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
-                onNavigate={handleNavigate}
-                showToast={showToast}
-                initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : "copilot"}
-              />
+              <Suspense fallback={lazyEngineFallback}>
+                <SparrowxAiBrainCenter
+                  activeNav={activeNav}
+                  portalMode={portalMode}
+                  incidents={incidents}
+                  threatIndicators={threatIndicators}
+                  assets={assets}
+                  vulnerabilities={vulnerabilities}
+                  protectedServices={protectedServices}
+                  clientTenants={clientTenants}
+                  auditLogs={auditLogs}
+                  onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
+                  onNavigate={handleNavigate}
+                  showToast={showToast}
+                  initialTab={activeNav.toLowerCase().includes("defense") ? "intel_updates" : "copilot"}
+                />
+              </Suspense>
             ) : (
               <div className="rounded-2xl border border-destructive/30 bg-card p-8 text-center space-y-4">
                 <div className="mx-auto flex size-12 items-center justify-center rounded-xl bg-destructive/15 border border-destructive/30 text-destructive">
@@ -2799,14 +2831,16 @@ function Dashboard() {
             activeNav === "docs_errors" ||
             activeNav === "Installation & Integration Docs" ||
             activeNav === "How-To Install Docs") && (
-            <ErrorDocumentationCenter
-              initialCode={activeDocCode}
-              initialReferenceId={activeDocRef}
-              initialSection={activeDocSection}
-              onNavigateBack={() => handleNavigate(portalMode === "soc" ? "Overview" : "My Services")}
-              onNavigateToGlobe={() => handleNavigate("Global Traffic Mesh")}
-              showToast={showToast}
-            />
+            <Suspense fallback={lazyEngineFallback}>
+              <ErrorDocumentationCenter
+                initialCode={activeDocCode}
+                initialReferenceId={activeDocRef}
+                initialSection={activeDocSection}
+                onNavigateBack={() => handleNavigate(portalMode === "soc" ? "Overview" : "My Services")}
+                onNavigateToGlobe={() => handleNavigate("Global Traffic Mesh")}
+                showToast={showToast}
+              />
+            </Suspense>
           )}
 
           {(activeNav === "System Status" ||
@@ -5117,20 +5151,22 @@ function Dashboard() {
           })()}
 
         {authSession.role === "admin" && (
-          <GlobalAiBrainFloatingDock
-            activeNav={activeNav}
-            portalMode={portalMode}
-            incidents={incidents}
-            threatIndicators={threatIndicators}
-            assets={assets}
-            vulnerabilities={vulnerabilities}
-            protectedServices={protectedServices}
-            clientTenants={clientTenants}
-            auditLogs={auditLogs}
-            onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
-            onOpenFullBrainView={() => handleNavigate("AI Brain")}
-            showToast={showToast}
-          />
+          <Suspense fallback={null}>
+            <GlobalAiBrainFloatingDock
+              activeNav={activeNav}
+              portalMode={portalMode}
+              incidents={incidents}
+              threatIndicators={threatIndicators}
+              assets={assets}
+              vulnerabilities={vulnerabilities}
+              protectedServices={protectedServices}
+              clientTenants={clientTenants}
+              auditLogs={auditLogs}
+              onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
+              onOpenFullBrainView={() => handleNavigate("AI Brain")}
+              showToast={showToast}
+            />
+          </Suspense>
         )}
         <BackgroundEngineToaster />
       </SidebarInset>

@@ -587,12 +587,24 @@ const server = createServer(async (req, res) => {
       !isGameDashHost &&
       !host.startsWith("game.panel.") &&
       (host.startsWith("game.") || host.startsWith("game-"));
+    const isInfraHost =
+      host.startsWith("infra.") ||
+      host.startsWith("metal.") ||
+      host.startsWith("vps.") ||
+      host.startsWith("cloud.");
+    const isDeployHost = host.startsWith("deploy.");
+    const isAiHost = host.startsWith("ai.") || host.startsWith("agents.");
+    const isDpdpHost = host.startsWith("dpdp.");
 
     if ((req.method === "GET" || req.method === "HEAD") && pathname === "/") {
       const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
       let redirectDest = null;
       if (isGameDashHost) redirectDest = `/game/dashboard${qs}`;
       else if (isGameWebHost) redirectDest = `/game${qs}`;
+      else if (isInfraHost) redirectDest = `/infra${qs}`;
+      else if (isDeployHost) redirectDest = `/deploy${qs}`;
+      else if (isAiHost) redirectDest = `/ai${qs}`;
+      else if (isDpdpHost) redirectDest = `/security${qs}`;
       else if (isDbHost) redirectDest = `/db${qs}`;
       else if (isShieldHost) redirectDest = `/shield${qs}`;
       else if (isDropHost) redirectDest = `/drop${qs}`;
@@ -721,6 +733,11 @@ const server = createServer(async (req, res) => {
       pathname === "/shield" ||
       pathname === "/infra" ||
       pathname.startsWith("/infra/") ||
+      pathname === "/deploy" ||
+      pathname === "/ai" ||
+      pathname === "/security" ||
+      pathname === "/terms" ||
+      pathname === "/refund" ||
       pathname === "/game" ||
       pathname.startsWith("/game/") ||
       pathname.startsWith("/f/");
