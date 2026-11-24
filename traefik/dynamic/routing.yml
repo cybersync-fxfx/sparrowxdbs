@@ -344,7 +344,7 @@ http:
         certResolver: letsencrypt
 
     sparrowx-panel:
-      rule: "Host(`panel.sparrowx.net`)"
+      rule: "Host(`panel.sparrowx.net`) || Host(`game.panel.sparrowx.net`)"
       entryPoints: [websecure]
       priority: 110
       middlewares:
@@ -352,6 +352,27 @@ http:
         - noindex
         - streaming-headers
       service: pterodactyl-panel
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-netsec:
+      rule: "Host(`netsec.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 110
+      middlewares:
+        - security-headers
+        - streaming-headers
+      service: netsec-app
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-gamesec:
+      rule: "Host(`gamesec.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 110
+      middlewares:
+        - security-headers
+      service: gamesec-app
       tls:
         certResolver: letsencrypt
 
@@ -482,3 +503,17 @@ http:
         passHostHeader: true
         servers:
           - url: "http://sparrowx-phpmyadmin:80"
+
+    netsec-app:
+      loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "-1"
+        servers:
+          - url: "http://host.docker.internal:3006"
+
+    gamesec-app:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://host.docker.internal:3005"
