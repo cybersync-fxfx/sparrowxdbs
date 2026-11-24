@@ -41,6 +41,7 @@ import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
+import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
 import { Route as ApiInfraServersIndexRouteImport } from './routes/api/infra/servers/index'
@@ -212,6 +213,11 @@ const ApiInfraLatencyProbeRoute = ApiInfraLatencyProbeRouteImport.update({
   path: '/api/infra/latency-probe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTelemetryDiscordRoute = ApiTelemetryDiscordRouteImport.update({
+  id: '/api/telemetry/discord',
+  path: '/api/telemetry/discord',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   id: '/api/auth/google/callback',
   path: '/api/auth/google/callback',
@@ -288,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
@@ -330,6 +337,7 @@ export interface FileRoutesByTo {
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
@@ -373,6 +381,7 @@ export interface FileRoutesById {
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
@@ -417,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/db/summary'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/telemetry/discord'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/infra/servers/action'
@@ -459,6 +469,7 @@ export interface FileRouteTypes {
     | '/api/db/summary'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/telemetry/discord'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/infra/servers/action'
@@ -501,6 +512,7 @@ export interface FileRouteTypes {
     | '/api/db/summary'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/telemetry/discord'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/infra/servers/action'
@@ -544,6 +556,7 @@ export interface RootRouteChildren {
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
+  ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
   ApiInfraServersActionRoute: typeof ApiInfraServersActionRoute
@@ -780,6 +793,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInfraLatencyProbeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/telemetry/discord': {
+      id: '/api/telemetry/discord'
+      path: '/api/telemetry/discord'
+      fullPath: '/api/telemetry/discord'
+      preLoaderRoute: typeof ApiTelemetryDiscordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/google/callback': {
       id: '/api/auth/google/callback'
       path: '/api/auth/google/callback'
@@ -872,6 +892,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbSummaryRoute: ApiDbSummaryRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
+  ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
   ApiInfraServersActionRoute: ApiInfraServersActionRoute,

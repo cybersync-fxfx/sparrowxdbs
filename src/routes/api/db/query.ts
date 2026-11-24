@@ -9,9 +9,20 @@ export const Route = createFileRoute("/api/db/query")({
           checkDbRateLimit,
           extractClientIp,
         } = await import("@/lib/server/db-auth.server");
+        const { sendDiscordTelemetry } = await import(
+          "@/lib/server/discord-webhook.server"
+        );
         const ip = extractClientIp(request);
         const rate = checkDbRateLimit(`query:${ip}`, 60, 60_000);
         if (!rate.allowed) {
+          void sendDiscordTelemetry({
+            category: "security",
+            severity: "high",
+            service: "SparrowX Cloud DB",
+            title: "SQL Query Rate Limit Triggered",
+            ip,
+            fields: { RetryAfterSec: rate.retryAfterSec },
+          });
           return Response.json(
             { ok: false, error: `Query rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
             { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },

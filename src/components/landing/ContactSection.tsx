@@ -10,6 +10,7 @@ import {
   Send,
 } from "lucide-react";
 import { CONTACT_TOPICS } from "@/lib/contact-inquiry";
+import { emitDiscordTelemetry } from "@/lib/discord-telemetry";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -91,6 +92,19 @@ export function ContactSection() {
       if (res.status === 201 && data.ticketId) {
         setTicketId(data.ticketId);
         setStatus("success");
+        void emitDiscordTelemetry({
+          category: "form",
+          severity: "info",
+          service: "SparrowX Contact Form",
+          title: `Contact Inquiry: ${form.topic}`,
+          description: form.message,
+          fields: {
+            Name: form.name,
+            Email: form.email,
+            Topic: form.topic,
+            TicketID: data.ticketId,
+          },
+        });
         return;
       }
       if (res.status === 422 && data.fields) setErrors(data.fields);

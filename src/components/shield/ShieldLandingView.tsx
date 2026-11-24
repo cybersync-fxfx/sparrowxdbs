@@ -28,6 +28,7 @@ import {
 } from "@/components/GrowthAndMonetizationHub";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { UnderAttackModal } from "@/components/shield/UnderAttackModal";
 
 export const GAMESEC_URL = "https://gamesec.sparrowx.net";
 
@@ -52,6 +53,7 @@ export function ShieldLandingView({
   const [liveAudit, setLiveAudit] = useState<LiveDomainAuditResult | null>(null);
   const [currency, setCurrency] = useState<"INR" | "USD" | "EUR">("INR");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+  const [underAttackOpen, setUnderAttackOpen] = useState(false);
 
   const runLandingScan = async (overrideDomain?: string) => {
     const raw = (overrideDomain ?? scanInput).trim();
@@ -118,6 +120,14 @@ export function ShieldLandingView({
           </nav>
 
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setUnderAttackOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-600/20 hover:bg-red-600/35 px-3 py-2 text-xs font-bold text-red-200 hover:text-white transition-all cursor-pointer shadow-[0_0_20px_rgba(239,68,68,0.28)]"
+            >
+              <span className="size-2 rounded-full bg-red-500 animate-ping" aria-hidden="true" />
+              <span>Under Attack?</span>
+            </button>
             {activeUser ? (
               <>
                 <button
@@ -738,6 +748,7 @@ export function ShieldLandingView({
         onSignIn={() => onOpenAuthModal("signin")}
         onSignOut={onSignOut}
       />
+      <UnderAttackModal open={underAttackOpen} onOpenChange={setUnderAttackOpen} />
     </div>
   );
 }

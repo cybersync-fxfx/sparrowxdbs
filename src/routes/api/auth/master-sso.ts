@@ -38,10 +38,19 @@ export const Route = createFileRoute("/api/auth/master-sso")({
           createMasterSsoToken,
         } = await import("@/lib/server/master-sso.server");
         const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
+        const { sendDiscordTelemetry } = await import("@/lib/server/discord-webhook.server");
 
         const ip = extractClientIp(request);
         const rate = checkDbRateLimit(`master-sso:${ip}`, 30, 60_000);
         if (!rate.allowed) {
+          void sendDiscordTelemetry({
+            category: "security",
+            severity: "high",
+            service: "Master SSO Auth",
+            title: "Auth Rate Limit Triggered",
+            ip,
+            fields: { RetryAfterSec: rate.retryAfterSec },
+          });
           return Response.json(
             { ok: false, error: `Too many requests. Retry in ${rate.retryAfterSec}s.` },
             { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
@@ -86,11 +95,33 @@ export const Route = createFileRoute("/api/auth/master-sso")({
         });
 
         if (!authResult.user) {
+          void sendDiscordTelemetry({
+            category: "security",
+            severity: "medium",
+            service: "Master SSO Auth",
+            title: `Failed ${body.mode === "register" ? "Sign Up" : "Sign In"} Attempt`,
+            ip,
+            fields: { Email: email, Mode: body.mode || "signin" },
+          });
           return Response.json(
             { ok: false, error: "Credentials did not verify against PostgreSQL." },
             { status: 401, headers: { "Cache-Control": "no-store" } },
           );
         }
+
+        void sendDiscordTelemetry({
+          category: "auth",
+          severity: "info",
+          service: "Master SSO Auth",
+          title: body.mode === "register" ? "New User Registered" : "User Signed In",
+          ip,
+          fields: {
+            Email: authResult.user.email,
+            FullName: authResult.user.fullName,
+            Role: authResult.user.role,
+            Source: authResult.source,
+          },
+        });
 
         const ssoToken = await createMasterSsoToken(authResult.user);
         const postHeaders = new Headers();

@@ -1,3 +1,5 @@
+import { emitDiscordTelemetry } from "./discord-telemetry";
+
 type SparrowxErrorOptions = {
   mechanism?: "manual" | "onerror" | "unhandledrejection" | "react_error_boundary";
   handled?: boolean;
@@ -39,11 +41,23 @@ export function reportSparrowxError(error: unknown, context: Record<string, unkn
       severity: "error",
     },
   );
+  const message = describeThrown(error);
   const stack = error instanceof Error ? error.stack : undefined;
   window.__sparrowxReportRuntimeError?.({
-    message: describeThrown(error),
+    message,
     ...(stack !== undefined && { stack }),
     filename: window.location.pathname,
+  });
+  void emitDiscordTelemetry({
+    category: "error",
+    severity: "high",
+    service: "SparrowX Web Client",
+    title: message.slice(0, 140),
+    description: stack ? stack.slice(0, 1200) : undefined,
+    fields: {
+      Route: window.location.pathname,
+      ...context,
+    },
   });
 }
 
