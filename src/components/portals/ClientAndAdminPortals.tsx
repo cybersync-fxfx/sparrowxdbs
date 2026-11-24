@@ -200,16 +200,25 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     name: "SparrowX Cloud Infra (VPS & VDS)",
     tagline: "Dual Intel Xeon Gold & AMD Ryzen 9 9950X KVM VPS, Dedicated VDS, and Bare Metal servers.",
     domain: "infra.sparrowx.net",
-    prodUrl: "https://infra.sparrowx.net",
-    url: "/infra",
+    prodUrl: "https://infra.sparrowx.net/infra/dashboard",
+    url: "/infra/dashboard",
     badge: "Compute",
+  },
+  {
+    id: "deploy",
+    name: "SparrowX Deploy (Cloud PaaS)",
+    tagline: "Git-to-Edge Next.js, Vite, React, Node.js, Python & Docker deployments with live build logs.",
+    domain: "deploy.sparrowx.net",
+    prodUrl: "https://deploy.sparrowx.net",
+    url: "/deploy",
+    badge: "PaaS",
   },
   {
     id: "game-hosting",
     name: "SparrowX Game Hosting",
     tagline: "NVMe Gen4 FiveM, SA-MP, Minecraft & Discord Bot servers with 1-click Pterodactyl SSO.",
-    domain: "sparrowx.net/game",
-    prodUrl: "https://sparrowx.net/game/dashboard",
+    domain: "game.dash.sparrowx.net",
+    prodUrl: "https://game.dash.sparrowx.net",
     url: "/game/dashboard",
     badge: "Game Cloud",
   },
@@ -223,6 +232,15 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     badge: "PostgreSQL",
   },
   {
+    id: "api-gateway",
+    name: "SparrowX API Gateway",
+    tagline: "Instant PostgREST API gateway over your PostgreSQL schemas with scoped API keys & SDKs.",
+    domain: "api.sparrowx.net",
+    prodUrl: "https://api.sparrowx.net",
+    url: "/gateway",
+    badge: "REST API",
+  },
+  {
     id: "shield",
     name: "SparrowX Shield (Web Scanner & WAF)",
     tagline: "8-tool deep domain security scanner, Layer-7 WAF, DDoS defense & AI threat advisory.",
@@ -232,12 +250,39 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     badge: "WAF & Audit",
   },
   {
+    id: "ai-gateway",
+    name: "SparrowX AI Gateway",
+    tagline: "Unified OpenAI-compatible LLM gateway, model playground & inline prompt-injection guardrails.",
+    domain: "ai.sparrowx.net",
+    prodUrl: "https://ai.sparrowx.net",
+    url: "/ai",
+    badge: "AI Gateway",
+  },
+  {
+    id: "agents",
+    name: "SparrowX Autonomous Agents",
+    tagline: "Deploy event-driven AI agents with pgvector memory, authorized tools & live execution traces.",
+    domain: "agents.sparrowx.net",
+    prodUrl: "https://agents.sparrowx.net",
+    url: "/agents",
+    badge: "Agentics",
+  },
+  {
+    id: "dpdp",
+    name: "SparrowX DPDP Compliance",
+    tagline: "India DPDP Act 2023 Section 6 consent builder, DSAR rights desk & 72-hour breach console.",
+    domain: "dpdp.sparrowx.net",
+    prodUrl: "https://dpdp.sparrowx.net",
+    url: "/dpdp",
+    badge: "Compliance",
+  },
+  {
     id: "netsec",
     name: "SparrowX NetSec (Linux & Edge Guard)",
     tagline: "Autonomous L3/L4/L7 XDP/eBPF packet scrubbing, WireGuard tunnels & live threat radar.",
     domain: "netsec.sparrowx.net",
-    prodUrl: "https://netsec.sparrowx.net",
-    url: "https://netsec.sparrowx.net",
+    prodUrl: "https://netsec.sparrowx.net/login?sso=master",
+    url: "https://netsec.sparrowx.net/login?sso=master",
     external: true,
     badge: "Protection",
   },
@@ -275,9 +320,32 @@ function resolveCatalogUrl(svc: SparrowxCatalogService): string {
 function resolveServiceDashboardUrl(srv: ClientTenant): string {
   const prod = isProductionSparrowxHost();
   const hay = `${srv.name} ${srv.primaryDomain} ${srv.enabledModules.join(" ")}`.toLowerCase();
-  if (hay.includes("netsec") || hay.includes("ddos")) return "https://netsec.sparrowx.net";
-  if (hay.includes("game") || hay.includes("fivem") || hay.includes("minecraft")) {
-    return prod ? "https://sparrowx.net/game/dashboard" : "/game/dashboard";
+  if (hay.includes("netsec") || hay.includes("ddos") || hay.includes("xdp")) {
+    return getNetsecSsoUrl({ autoSso: true });
+  }
+  if (
+    hay.includes("game") ||
+    hay.includes("fivem") ||
+    hay.includes("minecraft") ||
+    hay.includes("samp") ||
+    hay.includes("discord")
+  ) {
+    return prod ? "https://game.dash.sparrowx.net" : "/game/dashboard";
+  }
+  if (hay.includes("deploy") || hay.includes("paas") || hay.includes("vercel")) {
+    return prod ? "https://deploy.sparrowx.net" : "/deploy";
+  }
+  if (hay.includes("agent")) {
+    return prod ? "https://agents.sparrowx.net" : "/agents";
+  }
+  if (hay.includes("dpdp") || hay.includes("compliance")) {
+    return prod ? "https://dpdp.sparrowx.net" : "/dpdp";
+  }
+  if (hay.includes("ai_shield") || hay.includes("ai.") || hay.includes("llm") || hay.includes("guardrail")) {
+    return prod ? "https://ai.sparrowx.net" : "/ai";
+  }
+  if (hay.includes("gateway") || hay.includes("api.")) {
+    return prod ? "https://api.sparrowx.net" : "/gateway";
   }
   if (hay.includes("db") || hay.includes("postgres") || hay.includes("database")) {
     return prod ? "https://db.sparrowx.net" : "/db";
@@ -288,8 +356,8 @@ function resolveServiceDashboardUrl(srv: ClientTenant): string {
   if (hay.includes("key") || hay.includes("password")) {
     return prod ? "https://password.sparrowx.net" : "/keys";
   }
-  if (hay.includes("infra") || hay.includes("vps")) {
-    return prod ? "https://infra.sparrowx.net" : "/infra";
+  if (hay.includes("infra") || hay.includes("vps") || hay.includes("vds") || hay.includes("metal")) {
+    return prod ? "https://infra.sparrowx.net/infra/dashboard" : "/infra/dashboard";
   }
   return prod ? "https://sec.sparrowx.net" : "/shield";
 }
