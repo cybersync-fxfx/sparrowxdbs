@@ -30,15 +30,18 @@
     },
   };
 
+  // Zero-reflow theme detection: uses textContent on small header nodes only (never innerText)
   function detectThemeFromPage() {
-    const text = (document.title + " " + (document.body?.innerText?.slice(0, 1200) || "")).toLowerCase();
-    if (/\b(minecraft|paper|purpur|forge|fabric|spigot|velocity|bedrock)\b/.test(text)) return "minecraft";
-    if (/\b(fivem|txadmin|cfx|onesync|qbcore|esx)\b/.test(text)) return "fivem";
-    if (/\b(sa-mp|samp|open\.mp|pawn)\b/.test(text)) return "samp";
-    if (/\b(discord|bot|node\.js|python|lavalink)\b/.test(text)) return "discord";
+    const header = document.querySelector("h1, h2, [class*='SubNavigation']");
+    const sample = ((document.title || "") + " " + (header ? header.textContent || "" : "")).toLowerCase();
+    if (/\b(minecraft|paper|purpur|forge|fabric|spigot|velocity|bedrock)\b/.test(sample)) return "minecraft";
+    if (/\b(fivem|txadmin|cfx|onesync|qbcore|esx)\b/.test(sample)) return "fivem";
+    if (/\b(sa-mp|samp|open\.mp|pawn)\b/.test(sample)) return "samp";
+    if (/\b(discord|bot|node\.js|python|lavalink)\b/.test(sample)) return "discord";
     return "default";
   }
 
+  let toastTimer = null;
   function showToast(guide) {
     let root = document.getElementById("spx-ptero-toast-root");
     if (!root) {
@@ -46,7 +49,7 @@
       root.id = "spx-ptero-toast-root";
       document.body.appendChild(root);
     }
-    root.innerHTML = "";
+    root.textContent = "";
     const el = document.createElement("div");
     el.className = "spx-ptero-toast";
     el.innerHTML = `
@@ -57,13 +60,19 @@
       </div>
       <div>${guide.body}</div>
     `;
-    el.querySelector(".spx-ptero-toast-close")?.addEventListener("click", () => el.remove());
+    const closeBtn = el.querySelector(".spx-ptero-toast-close");
+    if (closeBtn) closeBtn.addEventListener("click", () => el.remove(), { once: true });
     root.appendChild(el);
-    setTimeout(() => el.remove(), 14000);
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.remove(), 12000);
   }
 
   let lastTheme = "";
+  let lastPath = "";
+  let scheduled = null;
+
   function syncTheme() {
+    const path = window.location.pathname;
     const theme = detectThemeFromPage();
     if (theme !== lastTheme) {
       lastTheme = theme;
@@ -72,15 +81,40 @@
       } else {
         document.documentElement.setAttribute("data-spx-theme", theme);
       }
-      if (window.location.pathname.startsWith("/server/")) {
-        showToast(THEME_GUIDES[theme] || THEME_GUIDES.default);
-      }
+    }
+    if (path !== lastPath && path.startsWith("/server/")) {
+      lastPath = path;
+      showToast(THEME_GUIDES[theme] || THEME_GUIDES.default);
+    } else if (!path.startsWith("/server/")) {
+      lastPath = path;
     }
   }
 
-  setTimeout(syncTheme, 900);
-  const mo = new MutationObserver(() => syncTheme());
-  if (document.body) {
-    mo.observe(document.body, { childList: true, subtree: true });
+  function scheduleSync() {
+    if (scheduled) clearTimeout(scheduled);
+    scheduled = setTimeout(() => {
+      scheduled = null;
+      if (typeof window.requestIdleCallback === "function") {
+        window.requestIdleCallback(syncTheme, { timeout: 600 });
+      } else {
+        syncTheme();
+      }
+    }, 350);
   }
+
+  // Hook SPA navigation only (zero MutationObserver overhead on live console output)
+  const origPush = history.pushState;
+  const origReplace = history.replaceState;
+  history.pushState = function () {
+    const res = origPush.apply(this, arguments);
+    scheduleSync();
+    return res;
+  };
+  history.replaceState = function () {
+    const res = origReplace.apply(this, arguments);
+    scheduleSync();
+    return res;
+  };
+  window.addEventListener("popstate", scheduleSync, { passive: true });
+  scheduleSync();
 })();
