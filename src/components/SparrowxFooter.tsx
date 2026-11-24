@@ -60,16 +60,6 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     href: "/gateway",
     serviceKey: "api",
   },
-  {
-    label: "Game Hosting",
-    sublabel: "game.sparrowx.net",
-    href: "/game",
-  },
-  {
-    label: "Game DDoS Defense",
-    sublabel: "gamesec.sparrowx.net",
-    href: "https://gamesec.sparrowx.net",
-  },
 ];
 
 const LINK_CLASSES =

@@ -736,30 +736,6 @@ export function SparrowxMasterLanding({
                   </a>
 
                   <a
-                    href={resolveServiceHref("game", "https://game.sparrowx.net")}
-                    onClick={() => setProductDropdownOpen(false)}
-                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
-                  >
-                    <img src="/logos/sparrowx-main.png" alt="SparrowX Game Hosting" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
-                    <div>
-                      <div className="font-semibold text-xs">SparrowX Game Hosting</div>
-                      <div className="text-[11px] text-zinc-400">FiveM, Minecraft &amp; Pterodactyl</div>
-                    </div>
-                  </a>
-
-                  <a
-                    href="https://gamesec.sparrowx.net"
-                    onClick={() => setProductDropdownOpen(false)}
-                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
-                  >
-                    <img src="/logos/sparrowx-network.png" alt="SparrowX GameSec L4" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-white/15 bg-[#0A0E17] p-0.5" />
-                    <div>
-                      <div className="font-semibold text-xs">SparrowX GameSec L4</div>
-                      <div className="text-[11px] text-zinc-400">Anycast Game DDoS Defense</div>
-                    </div>
-                  </a>
-
-                  <a
                     href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
                     onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
@@ -928,39 +904,6 @@ export function SparrowxMasterLanding({
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">infra.sparrowx.net</span>
               </a>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  handleLaunch("game", "https://game.sparrowx.net", "game");
-                }}
-                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
-              >
-                <div className="size-8 rounded bg-white/10 border border-white/25 grid place-items-center text-white shrink-0">
-                  <Server className="size-4" aria-hidden="true" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs text-white">SparrowX Game Hosting</div>
-                  <div className="text-[10px] text-zinc-400 truncate">FiveM, Minecraft, SA-MP &amp; Pterodactyl SSO</div>
-                </div>
-                <span className="text-[10px] font-mono text-zinc-300 shrink-0">game.sparrowx.net</span>
-              </button>
-
-              <a
-                href="https://gamesec.sparrowx.net"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
-              >
-                <div className="size-8 rounded bg-red-500/15 border border-red-500/35 grid place-items-center text-red-400 shrink-0">
-                  <Shield className="size-4" aria-hidden="true" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-bold text-xs text-white">SparrowX GameSec L4</div>
-                  <div className="text-[10px] text-zinc-400 truncate">Dedicated Anycast Game Server DDoS Defense</div>
-                </div>
-                <span className="text-[10px] font-mono text-zinc-300 shrink-0">gamesec.sparrowx.net</span>
-              </a>
-
               <a
                 href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
                 onClick={() => setMobileMenuOpen(false)}
@@ -1119,66 +1062,80 @@ export function SparrowxMasterLanding({
         </section>
       )}
 
-      {/* SECTION 2: EMOTIONAL STARTUP HERO */}
+      {/* SECTION 2: DEVELOPER TOOLKIT HERO */}
       <section className="border-b border-white/15 bg-gradient-to-b from-black/80 via-black/60 to-transparent px-4 sm:px-6 py-10 sm:py-20 relative z-10 overflow-hidden">
         {/* Soft Animated Ambient Glow */}
         <div className="animate-spx-orb-1 absolute -top-10 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="animate-spx-orb-2 absolute bottom-0 right-1/5 w-72 h-72 bg-white/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
-          {/* Left Column: Human, Emotional Pitch */}
+          {/* Left Column: Developer Toolkit Pitch */}
           <div className="lg:col-span-7 space-y-5 sm:space-y-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.04] px-3 py-1 text-[11px] font-mono text-zinc-200">
+              <Terminal className="size-3.5 text-emerald-400" aria-hidden="true" />
+              <span>SPARROWX DEVELOPER TOOLKIT</span>
+            </span>
+
             <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white leading-tight font-sans text-balance">
-              Simple, Honest Cloud Tools <br />
-              <span className="text-zinc-300">Built for Real Builders.</span>
+              The Complete Developer Toolkit <br />
+              <span className="text-zinc-300">Security, Cloud, Deployment &amp; Agentic AI.</span>
             </h1>
 
             <p className="text-xs sm:text-base text-zinc-400 max-w-2xl leading-relaxed">
-              We&apos;re a small, independent developer team building fast cloud databases, instant encrypted file sharing, hardware-grade offline passwords, and automated DDoS defense.
-              No surprise bills, no shady telemetry, and no forced logins for simple utilities.
+              One sovereign engineering platform built for modern developers and cloud teams—combining managed PostgreSQL &amp; pgvector databases, instant REST APIs, bare-metal deployment, autonomous WAF/DDoS security, zero-login developer utilities, and AI automation &amp; agentic guardrails.
             </p>
           </div>
 
-          {/* Right Column: Why Developers Love Us Card */}
-          <div id="status" className="scroll-mt-24 lg:col-span-5 border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg p-6 space-y-4 shadow-xl">
+          {/* Right Column: Four Core Developer Kits */}
+          <div id="status" className="scroll-mt-24 lg:col-span-5 border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg p-6 space-y-3.5 shadow-xl">
             <div className="flex items-center justify-between border-b border-white/15 pb-3">
               <span className="text-xs font-mono text-white font-bold uppercase tracking-wider">
-                Why Builders Choose SparrowX
+                Four Core Developer Kits
               </span>
               <span className="text-white text-[10px] font-mono flex items-center gap-1">
-                <span className="size-1.5 rounded-full bg-white animate-pulse" aria-hidden="true" />
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
                 ONLINE &amp; ACTIVE
               </span>
             </div>
 
-            <div className="space-y-3 text-xs">
+            <div className="space-y-2.5 text-xs">
               <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
-                  <Zap className="size-3.5 text-white" aria-hidden="true" />
-                  <span>Zero Forced Sign-Ups</span>
+                  <Shield className="size-3.5 text-red-400" aria-hidden="true" />
+                  <span>Security &amp; Defense Kit</span>
                 </div>
                 <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  Need a secure 64-character password or to send a file to a client? Just open the link and do it. No account creation required.
+                  Edge WAF, eBPF/XDP DDoS mitigation, WireGuard origin cloaking, deep domain audits, and offline CSPRNG keys.
                 </p>
               </div>
 
               <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
-                  <Shield className="size-3.5 text-white" aria-hidden="true" />
-                  <span>DDoS Mitigation &amp; Origin Protection</span>
+                  <Database className="size-3.5 text-[#A3E635]" aria-hidden="true" />
+                  <span>Development &amp; Data Kit</span>
                 </div>
                 <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  Proxy your origin server IP behind our reverse proxy to filter DDoS floods and inspect traffic in real time.
+                  Managed PostgreSQL 16 + pgvector, instant PostgREST API gateway with SDKs, and zero-login AES-256 file transfers.
                 </p>
               </div>
 
               <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
                 <div className="font-bold text-white flex items-center gap-2">
-                  <Heart className="size-3.5 text-white" aria-hidden="true" />
-                  <span>Real Human Support</span>
+                  <Cpu className="size-3.5 text-sky-400" aria-hidden="true" />
+                  <span>Deployment &amp; Cloud Infra Kit</span>
                 </div>
                 <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  We are a small startup. When you reach out to us, you talk directly to the engineers building the product.
+                  Single-tenant AMD Ryzen &amp; EPYC bare metal, dedicated nodes, and KVM NVMe compute with zero egress fees.
+                </p>
+              </div>
+
+              <div className="p-3 rounded bg-[#05060A] border border-white/15 space-y-1">
+                <div className="font-bold text-white flex items-center gap-2">
+                  <Zap className="size-3.5 text-amber-300" aria-hidden="true" />
+                  <span>AI Automation &amp; Agentics Kit</span>
+                </div>
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
+                  Inline LLM prompt-injection guardrails, autonomous threat response workflows, and vector memory infrastructure for AI agents.
                 </p>
               </div>
             </div>
@@ -1191,14 +1148,14 @@ export function SparrowxMasterLanding({
         <SparrowxPoweredByTech />
       </div>
 
-      {/* SECTION 3: 9 DEDICATED PRODUCT TOOLS (UNIFIED ECOSYSTEM BENTO GRID) */}
+      {/* SECTION 3: DEVELOPER TOOLKIT ECOSYSTEM BENTO GRID */}
       <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
         <div className="space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
-            Nine Focused Platforms. One Connected Ecosystem.
+            Eight Developer Platforms. One Unified Toolkit.
           </h2>
           <p className="text-xs sm:text-sm text-zinc-400">
-            Every platform runs on its own dedicated subdomain and synchronizes seamlessly with your SparrowX Developer account.
+            Every kit runs on its own dedicated subdomain—covering databases, APIs, cloud deployment, autonomous security, and AI agentics under one SparrowX Developer account.
           </p>
         </div>
 
@@ -1256,23 +1213,23 @@ export function SparrowxMasterLanding({
               highlight: false,
             },
             {
-              id: "game",
-              name: "SparrowX Game Hosting",
-              badge: "DISCORD + PTERO SSO",
-              logo: "/logos/sparrowx-main.png",
-              desc: "Low-ping Asia-IN NVMe Gen4 servers for FiveM, SA-MP, Minecraft, and Discord bots with SparrowCoins wallet and 1-click Pterodactyl SSO.",
-              domain: "game.sparrowx.net",
-              href: resolveServiceHref("game", "https://game.sparrowx.net"),
+              id: "api",
+              name: "SparrowX API Gateway",
+              badge: "REST API + SDKS",
+              logo: "/logos/sparrowx-network.png",
+              desc: "Instant PostgREST API gateway over your sovereign PostgreSQL schemas with scoped API keys and TypeScript, Python & cURL SDKs.",
+              domain: "api.sparrowx.net",
+              href: resolveServiceHref("api", "https://api.sparrowx.net"),
               highlight: false,
             },
             {
-              id: "gamesec",
-              name: "SparrowX GameSec L4",
-              badge: "L3/L4 ANYCAST",
-              logo: "/logos/sparrowx-network.png",
-              desc: "Dedicated Anycast L3/L4 packet scrubbing and stateful UDP/RakNet/ENet filtering engineered to keep multiplayer game servers online.",
-              domain: "gamesec.sparrowx.net",
-              href: "https://gamesec.sparrowx.net",
+              id: "agentics",
+              name: "SparrowX AI & Agentics",
+              badge: "AI AUTOMATION",
+              logo: "/logos/sparrowx-main.png",
+              desc: "Autonomous AI security guardrails, LLM prompt-injection filtering, automated remediation workflows, and pgvector agent memory.",
+              domain: "sec.sparrowx.net",
+              href: resolveServiceHref("sec", "https://sec.sparrowx.net"),
               highlight: false,
             },
             {

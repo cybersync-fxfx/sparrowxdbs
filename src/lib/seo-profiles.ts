@@ -40,14 +40,14 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     key: "master",
     siteName: "SparrowX",
     canonicalUrl: "https://sparrowx.net/",
-    title: "SparrowX — Official Cloud, Security & Developer Platform (sparrowx.net)",
+    title: "SparrowX — Complete Developer Toolkit for Security, Cloud, Deployment & AI Agentics",
     description:
-      "Official SparrowX Technologies hub. Launch SparrowX Shield, SparrowX Game Hosting, SparrowX Cloud Infra, SparrowX Cloud DB, SparrowX Drop, SparrowX Keys, and your unified SparrowX Client Area.",
+      "Official SparrowX Technologies Developer Toolkit. Launch managed PostgreSQL & pgvector databases, instant REST APIs, bare-metal cloud deployment, autonomous WAF/DDoS security, encrypted file transfer, offline keys, and AI agentic guardrails.",
     keywords:
-      "sparrowx, sparrowx.net, sparrowx technologies, sparrowx cloud, sparrowx client area, sparrowx login, sparrowx ecosystem",
-    ogTitle: "SparrowX — Official Sovereign Cloud & Security Ecosystem",
+      "sparrowx, sparrowx.net, developer toolkit, cloud development platform, ai automation, agentic ai security, managed postgresql, bare metal deployment, edge waf, ddos defense, sparrowx technologies",
+    ogTitle: "SparrowX — Complete Developer Toolkit for Security, Cloud & AI Agentics",
     ogDescription:
-      "Access the complete SparrowX Technologies product suite from one official portal — dedicated subdomains for security, game hosting, cloud infrastructure, databases, encrypted file transfer, and offline cryptography.",
+      "All-in-one sovereign developer toolkit for security, cloud databases, REST APIs, bare-metal deployment, encrypted utilities, and AI automation.",
     ogImage: "https://sparrowx.net/logos/sparrowx-main.png",
     ogImageAlt: "SparrowX Technologies Official Platform Logo",
     twitterTitle: "SparrowX — Official Cloud & Security Ecosystem",
