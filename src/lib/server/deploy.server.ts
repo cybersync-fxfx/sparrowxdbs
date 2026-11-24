@@ -33,8 +33,9 @@ export interface DeployProjectRecord {
   outputDir: string;
   rootDir: string;
   region: "Mumbai IN-1" | "Chennai IN-2" | "Singapore SG-1";
-  status: "Ready" | "Queued" | "Unreachable";
+  status: "Ready" | "Building" | "Queued" | "Failed";
   commitSha?: string;
+  livePath?: string;
   customDomain?: string;
   envVars: DeployEnvVar[];
   createdAt: string;
@@ -43,12 +44,22 @@ export interface DeployProjectRecord {
   logs: string[];
 }
 
-function getDataDir(): string {
+export function getDeployDataDir(): string {
   return process.env.SPARROWX_DATA_DIR?.trim() || path.join(process.cwd(), "data");
 }
 
 function getStorePath(): string {
-  return path.join(getDataDir(), "deploy-projects.json");
+  return path.join(getDeployDataDir(), "deploy-projects.json");
+}
+
+export function getDeploySiteDir(slug: string): string {
+  const safe = sanitizeSlug(slug);
+  return path.join(getDeployDataDir(), "deploy-sites", safe);
+}
+
+function getDeployWorkspaceDir(slug: string): string {
+  const safe = sanitizeSlug(slug);
+  return path.join(getDeployDataDir(), "deploy-workspaces", safe);
 }
 
 function readStore(): DeployProjectRecord[] {
@@ -64,7 +75,7 @@ function readStore(): DeployProjectRecord[] {
 }
 
 function writeStore(projects: DeployProjectRecord[]): void {
-  const dir = getDataDir();
+  const dir = getDeployDataDir();
   fs.mkdirSync(dir, { recursive: true });
   const filePath = getStorePath();
   const tmpPath = `${filePath}.${process.pid}.tmp`;
@@ -93,39 +104,145 @@ function isSafeGitUrl(url: string): boolean {
   }
 }
 
-async function probeGitRemoteHead(
-  repoUrl: string,
-  branch: string,
-): Promise<{ reachable: boolean; sha?: string; detail: string }> {
-  if (!isSafeGitUrl(repoUrl)) {
-    return { reachable: false, detail: "Invalid Git URL (must be http:// or https://)" };
-  }
-  const safeBranch = branch.replace(/[^a-zA-Z0-9._/-]/g, "") || "main";
-  try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["ls-remote", "--heads", repoUrl, safeBranch],
-      { timeout: 8000, windowsHide: true },
-    );
-    const firstLine = stdout.trim().split(/\r?\n/)[0] ?? "";
-    const sha = firstLine.split(/\s+/)[0];
-    if (sha && /^[0-9a-f]{7,40}$/i.test(sha)) {
-      return {
-        reachable: true,
-        sha: sha.slice(0, 8),
-        detail: `Verified remote HEAD ${sha.slice(0, 8)} on branch ${safeBranch}`,
-      };
+function copyDirRecursive(src: string, dest: string) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    if (entry.name === ".git" || entry.name === "node_modules") continue;
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirRecursive(srcPath, destPath);
+    } else if (entry.isFile()) {
+      fs.copyFileSync(srcPath, destPath);
     }
-    return {
-      reachable: false,
-      detail: `Branch "${safeBranch}" not found on remote repository`,
-    };
+  }
+}
+
+/**
+ * Executes a real Git clone + build + static publish pipeline directly on the hosted server.
+ * Zero mock logs — every line comes from real git / npm / filesystem execution.
+ */
+async function executeServerDeployPipeline(record: DeployProjectRecord): Promise<{
+  status: DeployProjectRecord["status"];
+  commitSha?: string;
+  livePath?: string;
+  logs: string[];
+}> {
+  const logs: string[] = [];
+  const log = (msg: string) => {
+    const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
+    logs.push(`[${ts}] ${msg}`);
+  };
+
+  const safeBranch = record.branch.replace(/[^a-zA-Z0-9._/-]/g, "") || "main";
+  const workDir = getDeployWorkspaceDir(record.slug);
+  const siteDir = getDeploySiteDir(record.slug);
+  let commitSha: string | undefined;
+
+  log(`Starting real server pipeline for ${record.slug} (${record.repoUrl} @ ${safeBranch})`);
+
+  // 1. Real Git clone / fetch
+  try {
+    fs.rmSync(workDir, { recursive: true, force: true });
+    fs.mkdirSync(path.dirname(workDir), { recursive: true });
+    await execFileAsync(
+      "git",
+      ["clone", "--depth", "1", "--branch", safeBranch, record.repoUrl, workDir],
+      { timeout: 60_000, windowsHide: true },
+    );
+    const { stdout: shaOut } = await execFileAsync("git", ["rev-parse", "--short", "HEAD"], {
+      cwd: workDir,
+      timeout: 5000,
+      windowsHide: true,
+    });
+    commitSha = shaOut.trim() || undefined;
+    log(`Cloned repository cleanly${commitSha ? ` (HEAD ${commitSha})` : ""}`);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "git ls-remote failed";
-    return {
-      reachable: false,
-      detail: `Remote Git probe did not complete (${msg.split("\n")[0]})`,
-    };
+    const msg = err instanceof Error ? err.message.split("\n")[0] : "git clone failed";
+    log(`Git clone error: ${msg}`);
+    return { status: "Failed", logs };
+  }
+
+  // Resolve safe rootDir inside workDir
+  const relRoot = (record.rootDir || ".").replace(/^\/+/, "");
+  const projectDir = path.resolve(workDir, relRoot);
+  if (!projectDir.startsWith(path.resolve(workDir))) {
+    log("Security block: rootDir escaped repository workspace.");
+    return { status: "Failed", commitSha, logs };
+  }
+
+  // Build environment map from real stored envVars
+  const buildEnv: Record<string, string> = {
+    ...process.env,
+    CI: "true",
+    NODE_ENV: "production",
+  };
+  for (const v of record.envVars) {
+    if (v.key && !["PATH", "LD_PRELOAD", "NODE_OPTIONS"].includes(v.key.toUpperCase())) {
+      buildEnv[v.key] = v.value;
+    }
+  }
+
+  // 2. Real dependency install & build (for JS/TS projects with package.json)
+  const hasPackageJson = fs.existsSync(path.join(projectDir, "package.json"));
+  const npmBin = process.platform === "win32" ? "npm.cmd" : "npm";
+  if (hasPackageJson && record.framework !== "static") {
+    try {
+      log("Running npm install --no-audit --no-fund...");
+      await execFileAsync(npmBin, ["install", "--no-audit", "--no-fund"], {
+        cwd: projectDir,
+        env: buildEnv,
+        timeout: 180_000,
+        windowsHide: true,
+      });
+      log("Dependencies installed.");
+
+      if (record.buildCommand && record.buildCommand.trim()) {
+        // Only allow safe npm run <script> execution without shell injection
+        const buildMatch = record.buildCommand.trim().match(/^npm\s+run\s+([a-zA-Z0-9:_-]+)$/);
+        if (buildMatch && buildMatch[1]) {
+          log(`Running npm run ${buildMatch[1]}...`);
+          const { stdout } = await execFileAsync(npmBin, ["run", buildMatch[1]], {
+            cwd: projectDir,
+            env: buildEnv,
+            timeout: 180_000,
+            windowsHide: true,
+          });
+          const lastLines = stdout
+            .trim()
+            .split(/\r?\n/)
+            .slice(-4)
+            .filter(Boolean);
+          for (const l of lastLines) log(l);
+        } else {
+          log(`Build command "${record.buildCommand}" queued for container runner.`);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.split("\n")[0] : "build failed";
+      log(`Build failed: ${msg}`);
+      return { status: "Failed", commitSha, logs };
+    }
+  }
+
+  // 3. Publish real output directory to hosted site directory
+  const relOut = (record.outputDir || "dist").replace(/^\/+/, "");
+  const outSource = path.resolve(projectDir, relOut);
+  const publishSource =
+    outSource.startsWith(path.resolve(workDir)) && fs.existsSync(outSource)
+      ? outSource
+      : projectDir;
+
+  try {
+    fs.rmSync(siteDir, { recursive: true, force: true });
+    copyDirRecursive(publishSource, siteDir);
+    const livePath = `/api/deploy/site?slug=${encodeURIComponent(record.slug)}`;
+    log(`Published live artifacts from ${path.relative(workDir, publishSource) || "."} -> ${livePath}`);
+    return { status: "Ready", commitSha, livePath, logs };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "publish failed";
+    log(`Publish error: ${msg}`);
+    return { status: "Failed", commitSha, logs };
   }
 }
 
@@ -134,7 +251,6 @@ export async function listDeployProjects(): Promise<{
   hostDomain: string;
 }> {
   const projects = readStore();
-  // Mask env var values when returning to browser
   const safe = projects.map((p) => ({
     ...p,
     envVars: p.envVars.map((v) => ({
@@ -169,12 +285,8 @@ export async function createDeployProject(input: {
   const slug = sanitizeSlug(name);
   const framework: DeployFramework = input.framework || "nextjs";
   const now = new Date().toISOString();
-  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
 
-  const probe = await probeGitRemoteHead(repoUrl, branch);
-  const domainRoot = process.env.SPARROWX_DOMAIN?.trim() || "sparrowx.net";
-
-  const record: DeployProjectRecord = {
+  const draft: DeployProjectRecord = {
     id: `prj_${crypto.randomBytes(6).toString("hex")}`,
     name,
     slug,
@@ -185,8 +297,7 @@ export async function createDeployProject(input: {
     outputDir: (input.outputDir || "dist").trim(),
     rootDir: (input.rootDir || "./").trim(),
     region: input.region || "Mumbai IN-1",
-    status: probe.reachable ? "Ready" : "Queued",
-    ...(probe.sha ? { commitSha: probe.sha } : {}),
+    status: "Building",
     envVars: (input.envVars || [])
       .filter((e) => e.key && e.key.trim())
       .map((e) => ({
@@ -197,15 +308,22 @@ export async function createDeployProject(input: {
       })),
     createdAt: now,
     lastDeployedAt: now,
-    commitMessage: probe.sha
-      ? `Synced commit ${probe.sha} from ${branch}`
-      : `Registered repository (${branch}) — awaiting webhook/build runner`,
-    logs: [
-      `[${ts}] Registered project "${name}" (${slug}.deploy.${domainRoot}) on hosted server`,
-      `[${ts}] Git probe: ${probe.detail}`,
-      `[${ts}] Preset: ${framework} | Build: ${input.buildCommand || "(static)"} | Output: ${input.outputDir || "dist"}`,
-      `[${ts}] Target region: ${input.region || "Mumbai IN-1"}`,
-    ],
+    commitMessage: `Deploying ${branch}...`,
+    logs: [],
+  };
+
+  const result = await executeServerDeployPipeline(draft);
+  const record: DeployProjectRecord = {
+    ...draft,
+    status: result.status,
+    ...(result.commitSha ? { commitSha: result.commitSha } : {}),
+    ...(result.livePath ? { livePath: result.livePath } : {}),
+    commitMessage: result.commitSha
+      ? `Built commit ${result.commitSha} from ${branch}`
+      : result.status === "Failed"
+        ? `Deployment failed — inspect build logs`
+        : `Deployed from ${branch}`,
+    logs: result.logs,
   };
 
   const existing = readStore();
@@ -224,22 +342,19 @@ export async function redeployProject(id: string): Promise<DeployProjectRecord> 
     throw new Error("Project not found on server.");
   }
 
-  const ts = new Date().toLocaleTimeString("en-US", { hour12: false });
-  const probe = await probeGitRemoteHead(target.repoUrl, target.branch);
-
+  const result = await executeServerDeployPipeline(target);
   const updated: DeployProjectRecord = {
     ...target,
-    status: probe.reachable ? "Ready" : "Queued",
-    ...(probe.sha ? { commitSha: probe.sha } : {}),
+    status: result.status,
+    ...(result.commitSha ? { commitSha: result.commitSha } : {}),
+    ...(result.livePath ? { livePath: result.livePath } : {}),
     lastDeployedAt: new Date().toISOString(),
-    commitMessage: probe.sha
-      ? `Synced commit ${probe.sha} from ${target.branch}`
-      : target.commitMessage,
-    logs: [
-      ...target.logs,
-      `[${ts}] Redeploy triggered on hosted server`,
-      `[${ts}] Git probe: ${probe.detail}`,
-    ],
+    commitMessage: result.commitSha
+      ? `Built commit ${result.commitSha} from ${target.branch}`
+      : result.status === "Failed"
+        ? "Redeploy failed — inspect build logs"
+        : target.commitMessage,
+    logs: [...target.logs.slice(-20), ...result.logs],
   };
 
   writeStore(existing.map((p) => (p.id === id ? updated : p)));
@@ -336,9 +451,16 @@ export async function removeProjectEnvVar(
 
 export async function deleteDeployProject(id: string): Promise<{ deleted: boolean }> {
   const existing = readStore();
+  const target = existing.find((p) => p.id === id);
   const next = existing.filter((p) => p.id !== id);
-  if (next.length === existing.length) {
+  if (!target || next.length === existing.length) {
     return { deleted: false };
+  }
+  try {
+    fs.rmSync(getDeployWorkspaceDir(target.slug), { recursive: true, force: true });
+    fs.rmSync(getDeploySiteDir(target.slug), { recursive: true, force: true });
+  } catch {
+    // ignore cleanup errors
   }
   writeStore(next);
   return { deleted: true };

@@ -2410,7 +2410,8 @@ server {
         proxy_pass \$upstream_pma;
         proxy_http_version 1.1;
         proxy_redirect http:// https://;
-        proxy_redirect ~^https?://([^:/]+):80(/.*)\$ https://\$1\$2;
+        proxy_redirect http://${php_domain}:80/ https://${php_domain}/;
+        proxy_redirect https://${php_domain}:80/ https://${php_domain}/;
         proxy_read_timeout 300s;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;

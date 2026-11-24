@@ -58,8 +58,9 @@ export interface DeployProject {
   outputDir: string;
   rootDir: string;
   region: "Mumbai IN-1" | "Chennai IN-2" | "Singapore SG-1";
-  status: "Ready" | "Building" | "Queued" | "Unreachable";
+  status: "Ready" | "Building" | "Queued" | "Unreachable" | "Failed";
   commitSha?: string;
+  livePath?: string;
   customDomain?: string;
   envVars: DeployEnvVar[];
   createdAt: string;
@@ -657,7 +658,10 @@ export function SparrowxDeployDashboard() {
                     }
                   >
                     {filteredProjects.map((proj) => {
-                      const liveUrl = `https://${proj.customDomain || `${proj.slug}.deploy.sparrowx.net`}`;
+                      const liveUrl = proj.customDomain
+                        ? `https://${proj.customDomain}`
+                        : proj.livePath || `https://${proj.slug}.deploy.sparrowx.net`;
+                      const isFailed = proj.status === "Failed" || proj.status === "Unreachable";
                       return (
                         <article
                           key={proj.id}
@@ -692,8 +696,18 @@ export function SparrowxDeployDashboard() {
                               </div>
                             </div>
 
-                            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-400 shrink-0">
-                              <span className="size-1.5 rounded-full bg-emerald-400" />
+                            <span
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium shrink-0 ${
+                                isFailed
+                                  ? "border-red-500/30 bg-red-500/10 text-red-400"
+                                  : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                              }`}
+                            >
+                              <span
+                                className={`size-1.5 rounded-full ${
+                                  isFailed ? "bg-red-400" : "bg-emerald-400"
+                                }`}
+                              />
                               {proj.status}
                             </span>
                           </div>

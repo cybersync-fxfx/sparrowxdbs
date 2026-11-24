@@ -41,8 +41,10 @@ import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
 import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
 import { Route as ApiDeployProjectsRouteImport } from './routes/api/deploy/projects'
+import { Route as ApiDeploySiteRouteImport } from './routes/api/deploy/site'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
+import { Route as ApiSystemBackboneRouteImport } from './routes/api/system/backbone'
 import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
@@ -215,6 +217,11 @@ const ApiDeployProjectsRoute = ApiDeployProjectsRouteImport.update({
   path: '/api/deploy/projects',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDeploySiteRoute = ApiDeploySiteRouteImport.update({
+  id: '/api/deploy/site',
+  path: '/api/deploy/site',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
   id: '/api/game/panel-sso',
   path: '/api/game/panel-sso',
@@ -223,6 +230,11 @@ const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
 const ApiInfraLatencyProbeRoute = ApiInfraLatencyProbeRouteImport.update({
   id: '/api/infra/latency-probe',
   path: '/api/infra/latency-probe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSystemBackboneRoute = ApiSystemBackboneRouteImport.update({
+  id: '/api/system/backbone',
+  path: '/api/system/backbone',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTelemetryDiscordRoute = ApiTelemetryDiscordRouteImport.update({
@@ -306,8 +318,10 @@ export interface FileRoutesByFullPath {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/deploy/projects': typeof ApiDeployProjectsRoute
+  '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
@@ -351,8 +365,10 @@ export interface FileRoutesByTo {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/deploy/projects': typeof ApiDeployProjectsRoute
+  '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
@@ -397,8 +413,10 @@ export interface FileRoutesById {
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
   '/api/deploy/projects': typeof ApiDeployProjectsRoute
+  '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
@@ -444,8 +462,10 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/deploy/projects'
+    | '/api/deploy/site'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
@@ -489,8 +509,10 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/deploy/projects'
+    | '/api/deploy/site'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
@@ -534,8 +556,10 @@ export interface FileRouteTypes {
     | '/api/db/query'
     | '/api/db/summary'
     | '/api/deploy/projects'
+    | '/api/deploy/site'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
@@ -580,8 +604,10 @@ export interface RootRouteChildren {
   ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
   ApiDeployProjectsRoute: typeof ApiDeployProjectsRoute
+  ApiDeploySiteRoute: typeof ApiDeploySiteRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
+  ApiSystemBackboneRoute: typeof ApiSystemBackboneRoute
   ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
@@ -819,6 +845,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDeployProjectsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/deploy/site': {
+      id: '/api/deploy/site'
+      path: '/api/deploy/site'
+      fullPath: '/api/deploy/site'
+      preLoaderRoute: typeof ApiDeploySiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/game/panel-sso': {
       id: '/api/game/panel-sso'
       path: '/api/game/panel-sso'
@@ -831,6 +864,13 @@ declare module '@tanstack/react-router' {
       path: '/api/infra/latency-probe'
       fullPath: '/api/infra/latency-probe'
       preLoaderRoute: typeof ApiInfraLatencyProbeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/system/backbone': {
+      id: '/api/system/backbone'
+      path: '/api/system/backbone'
+      fullPath: '/api/system/backbone'
+      preLoaderRoute: typeof ApiSystemBackboneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/telemetry/discord': {
@@ -932,8 +972,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
   ApiDeployProjectsRoute: ApiDeployProjectsRoute,
+  ApiDeploySiteRoute: ApiDeploySiteRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
+  ApiSystemBackboneRoute: ApiSystemBackboneRoute,
   ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
