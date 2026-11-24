@@ -75,8 +75,14 @@ if command -v docker >/dev/null 2>&1; then
     fi
   done
 
-  # 3. Verify all core containers are running
-  if [ "${USE_OVH}" -eq 1 ]; then
+  # 3. Verify all core containers are running (Traefik v3 mode when /etc/sparrowx/cf.env exists)
+  USE_TRAEFIK=0
+  if [ -f "/etc/sparrowx/cf.env" ] && [ -f "${INSTALL_DIR}/docker-compose.traefik.yml" ]; then
+    USE_TRAEFIK=1
+    REQUIRED_CONTAINERS="sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-traefik sparrowx-phpmyadmin"
+    APP_CNAME="sparrowx-app"
+    PROXY_CNAME="sparrowx-traefik"
+  elif [ "${USE_OVH}" -eq 1 ]; then
     REQUIRED_CONTAINERS="sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx"
     APP_CNAME="sparrowx-app"
     PROXY_CNAME="sparrowx-nginx"
@@ -94,15 +100,22 @@ if command -v docker >/dev/null 2>&1; then
     fi
   done
 
-  if [ "${MISSING}" -eq 1 ] && [ -f "${COMPOSE_FILE}" ]; then
-    log_wd "HEAL: Reconciling SparrowX container fleet (${COMPOSE_FILE})..."
-    docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans >/dev/null 2>&1 || true
-    sleep 4
+  if [ "${MISSING}" -eq 1 ]; then
+    if [ "${USE_TRAEFIK}" -eq 1 ]; then
+      log_wd "HEAL: Reconciling SparrowX Traefik v3 fleet..."
+      docker rm -f sparrowx-nginx >/dev/null 2>&1 || true
+      docker compose -f "${INSTALL_DIR}/docker-compose.yml" -f "${INSTALL_DIR}/docker-compose.traefik.yml" up -d traefik sparrowx phpmyadmin postgres postgrest >/dev/null 2>&1 || true
+      sleep 4
+    elif [ -f "${COMPOSE_FILE}" ]; then
+      log_wd "HEAL: Reconciling SparrowX container fleet (${COMPOSE_FILE})..."
+      docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans >/dev/null 2>&1 || true
+      sleep 4
+    fi
   fi
 
   # 4. Live HTTP Health Probe on Proxy & App
   PROXY_CODE="$(curl -kso /dev/null -w "%{http_code}" --max-time 5 "http://127.0.0.1:${HTTP_PORT}/api/v1/health" 2>/dev/null || echo "000")"
-  if ! echo "${PROXY_CODE}" | grep -qE "^(200|301|302)$"; then
+  if ! echo "${PROXY_CODE}" | grep -qE "^(200|301|302|308)$"; then
     log_wd "HEAL: Proxy health probe returned HTTP ${PROXY_CODE}. Restarting ${APP_CNAME} & ${PROXY_CNAME}..."
     docker restart "${APP_CNAME}" "${PROXY_CNAME}" >/dev/null 2>&1 || true
     sleep 3
