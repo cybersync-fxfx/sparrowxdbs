@@ -16,13 +16,14 @@ networks:
 
 services:
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3
     container_name: sparrowx-traefik
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     environment:
       CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN must be set in .env}
+      DOCKER_API_VERSION: "1.45"
       TZ: UTC
     ports:
       - "80:80/tcp"
