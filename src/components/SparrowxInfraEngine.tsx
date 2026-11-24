@@ -689,15 +689,6 @@ export function SparrowxInfraEngine() {
                     width={640}
                     height={640}
                   />
-
-                  {/* Hardware Telemetry Badge Below Image */}
-                  <div className="mt-3 p-3 rounded-xl bg-[#0B0E15]/90 border border-white/10 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 text-xs font-mono shadow-xl relative z-10">
-                    <div className="flex items-center gap-2">
-                      <span className="size-2 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-white font-semibold">Proxmox VE Cluster</span>
-                    </div>
-                    <span className="text-zinc-400">Ryzen 9 9950X &amp; Xeon Gold &bull; 10 Gbps</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1404,16 +1395,6 @@ export function SparrowxInfraEngine() {
                   width={512}
                   height={512}
                 />
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 border-t border-white/10 tabular-nums">
-                  {INFRA_REGIONS.map((r) => (
-                    <div key={r.id}>
-                      <div className="text-sm font-semibold text-white">{r.code}</div>
-                      <div className="text-xs text-zinc-400">{r.country}</div>
-                      <div className="text-xs text-sky-400 mt-0.5">{r.latencyHint}</div>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           </div>
