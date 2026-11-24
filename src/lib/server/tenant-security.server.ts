@@ -32,6 +32,7 @@ export const RESERVED_SUBDOMAINS = new Set<string>([
   "infra",
   "netsec",
   "gamesec",
+  "php",
 ]);
 
 /**
@@ -142,7 +143,8 @@ export function isNoIndexHost(rawHost: string): boolean {
     host === "panel.sparrowx.net" ||
     host === "api.sparrowx.net" ||
     host === "ingest.sec.sparrowx.net" ||
-    host === "ingest.dpdp.sparrowx.net"
+    host === "ingest.dpdp.sparrowx.net" ||
+    host === "php.sparrowx.net"
   ) {
     return true;
   }

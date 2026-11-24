@@ -1,7 +1,7 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Coins, ExternalLink, Gift, Loader2, LogOut, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import { Coins, Database, ExternalLink, Gift, Loader2, LogOut, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -111,6 +111,11 @@ function GameDashboard() {
             <span className="rounded-md bg-primary/20 px-2 py-0.5 font-mono text-[10px] text-sheen">CLIENT AREA</span>
           </Link>
           <div className="flex items-center gap-2">
+            <Button asChild variant="secondary" size="sm" className="hidden h-9 rounded-full px-3.5 sm:inline-flex">
+              <a href="https://php.sparrowx.net" target="_blank" rel="noreferrer">
+                <Database className="size-4 text-sky-400" /> phpMyAdmin <ExternalLink className="size-3.5" />
+              </a>
+            </Button>
             <Button asChild variant="secondary" size="sm" className="hidden h-9 rounded-full px-3.5 sm:inline-flex">
               <a href="/api/game/panel-sso?next=%2F" target="_blank" rel="noreferrer">
                 <ShieldCheck className="size-4 text-emerald-400" /> Panel Auto-Login <ExternalLink className="size-3.5" />

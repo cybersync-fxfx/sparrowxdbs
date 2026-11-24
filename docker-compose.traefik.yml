@@ -111,6 +111,31 @@ services:
     labels:
       - "traefik.enable=false"
 
+  phpmyadmin:
+    image: phpmyadmin:5-apache
+    container_name: sparrowx-phpmyadmin
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      PMA_HOST: ${PMA_HOST:-host.docker.internal}
+      PMA_PORT: ${PMA_PORT:-3306}
+      PMA_ARBITRARY: "0"
+      PMA_ABSOLUTE_URI: "https://php.sparrowx.net/"
+      UPLOAD_LIMIT: 128M
+    networks:
+      - sparrowx_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=sparrowx_net"
+      - "traefik.http.routers.spx-phpmyadmin.rule=Host(`php.sparrowx.net`)"
+      - "traefik.http.routers.spx-phpmyadmin.entrypoints=websecure"
+      - "traefik.http.routers.spx-phpmyadmin.priority=115"
+      - "traefik.http.routers.spx-phpmyadmin.tls=true"
+      - "traefik.http.routers.spx-phpmyadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.spx-phpmyadmin.middlewares=security-headers@file,noindex@file"
+      - "traefik.http.services.spx-phpmyadmin.loadbalancer.server.port=80"
+
   # Disable legacy Nginx when running the Traefik v3 edge stack so ports 80/443 never collide
   nginx:
     profiles:

@@ -349,6 +349,17 @@ http:
       tls:
         certResolver: letsencrypt
 
+    sparrowx-phpmyadmin:
+      rule: "Host(`php.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 110
+      middlewares:
+        - security-headers
+        - noindex
+      service: phpmyadmin-web
+      tls:
+        certResolver: letsencrypt
+
     sparrowx-api-v1:
       rule: "Host(`api.sparrowx.net`) && PathPrefix(`/v1`)"
       entryPoints: [websecure]
@@ -459,3 +470,9 @@ http:
           flushInterval: "-1"
         servers:
           - url: "http://host.docker.internal:8000"
+
+    phpmyadmin-web:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://sparrowx-phpmyadmin:80"
