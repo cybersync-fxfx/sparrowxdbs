@@ -1,10 +1,27 @@
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, Phone, X } from "lucide-react";
+import { Phone, X } from "lucide-react";
 import {
   buildWhatsAppSupportUrl,
   WHATSAPP_SUPPORT_DIGITS,
   WHATSAPP_SUPPORT_DISPLAY,
 } from "@/lib/whatsapp-support";
+
+export function WhatsAppLogo({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="currentColor"
+      aria-hidden="true"
+      className={className}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M16.002 3.2C8.94 3.2 3.2 8.94 3.2 16.002c0 2.256.59 4.458 1.71 6.4L3.1 29.01l6.78-1.778a12.74 12.74 0 0 0 6.122 1.56h.005c7.06 0 12.8-5.74 12.8-12.79 0-3.42-1.332-6.634-3.75-9.052A12.72 12.72 0 0 0 16.002 3.2Zm0 23.43h-.004a10.6 10.6 0 0 1-5.405-1.48l-.388-.23-4.024 1.056 1.074-3.922-.252-.402a10.58 10.58 0 0 1-1.627-5.65c0-5.86 4.768-10.628 10.63-10.628 2.838 0 5.506 1.106 7.512 3.114a10.56 10.56 0 0 1 3.112 7.516c-.002 5.86-4.77 10.626-10.628 10.626Zm5.828-7.956c-.32-.16-1.89-.932-2.182-1.038-.293-.107-.506-.16-.719.16-.213.32-.825 1.038-1.012 1.252-.186.213-.373.24-.692.08-.32-.16-1.35-.497-2.57-1.586-.95-.847-1.592-1.893-1.778-2.213-.186-.32-.02-.493.14-.652.144-.143.32-.373.48-.56.16-.186.213-.32.32-.533.106-.213.053-.4-.027-.56-.08-.16-.719-1.732-.985-2.371-.26-.623-.524-.539-.719-.549l-.612-.01c-.213 0-.56.08-.852.4-.293.32-1.118 1.093-1.118 2.665s1.145 3.091 1.305 3.304c.16.213 2.253 3.44 5.458 4.824.762.329 1.357.526 1.821.673.765.243 1.462.209 2.012.127.614-.092 1.89-.773 2.156-1.519.266-.746.266-1.386.186-1.519-.08-.133-.293-.213-.612-.373Z"
+      />
+    </svg>
+  );
+}
 
 const DISMISS_SESSION_KEY = "spx_whatsapp_toaster_dismissed";
 const PLAN_SELECTOR =
@@ -178,7 +195,7 @@ export function WhatsAppPlansToaster() {
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
             <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
           </span>
-          <MessageCircle className="size-3.5" />
+          <WhatsAppLogo className="size-4 text-[#25D366]" />
           <span>WhatsApp · {WHATSAPP_SUPPORT_DISPLAY}</span>
         </a>
       </div>
@@ -197,11 +214,11 @@ export function WhatsAppPlansToaster() {
 
         <div className="relative flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="relative grid size-10 shrink-0 place-items-center rounded-xl border border-emerald-400/40 bg-emerald-500/20 text-emerald-300">
-              <MessageCircle className="size-5" />
+            <span className="relative grid size-10 shrink-0 place-items-center rounded-xl bg-[#25D366] text-white shadow-[0_6px_18px_rgba(37,211,102,0.45)]">
+              <WhatsAppLogo className="size-6" />
               <span className="absolute -right-0.5 -top-0.5 flex size-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-80" />
-                <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400 ring-2 ring-[#081310]" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-80" />
+                <span className="relative inline-flex size-2.5 rounded-full bg-emerald-300 ring-2 ring-[#081310]" />
               </span>
             </span>
             <div>
@@ -245,9 +262,9 @@ export function WhatsAppPlansToaster() {
             href={whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-3.5 py-2 text-xs font-bold text-slate-950 transition-all hover:bg-emerald-400 shadow-[0_6px_20px_rgba(16,185,129,0.35)]"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-3.5 py-2 text-xs font-bold text-slate-950 transition-all hover:bg-[#2ee573] shadow-[0_6px_20px_rgba(37,211,102,0.35)]"
           >
-            <MessageCircle className="size-4" />
+            <WhatsAppLogo className="size-[18px]" />
             <span>Chat on WhatsApp Now</span>
           </a>
           <a

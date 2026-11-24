@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import {
   ArrowRight,
   Check,
@@ -6,13 +7,13 @@ import {
   Copy,
   ExternalLink,
   Loader2,
-  MessageCircle,
   QrCode,
   ShieldCheck,
   Smartphone,
   X,
 } from "lucide-react";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
+import { WhatsAppLogo } from "@/components/WhatsAppPlansToaster";
 
 export interface UpiCheckoutOrder {
   orderId: string;
@@ -449,7 +450,7 @@ export function UpiAutoPayModal({
                   rel="noopener noreferrer"
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition-colors duration-150"
                 >
-                  <MessageCircle className="size-4" aria-hidden="true" />
+                  <WhatsAppLogo className="size-4 text-[#25D366]" />
                   <span>Contact on WhatsApp ({WHATSAPP_SUPPORT_DISPLAY})</span>
                 </a>
 
@@ -460,24 +461,8 @@ export function UpiAutoPayModal({
                   </span>
                 </p>
 
-                {/* Legal & Strict Refund Notice */}
-                <div className="rounded-lg border border-[#FFA14A]/25 bg-[#FFA14A]/5 p-2.5 text-[11px] text-zinc-300 space-y-1">
-                  <div className="flex items-center gap-1.5 font-semibold text-[#FFA14A]">
-                    <ShieldCheck className="size-3.5 text-emerald-400" />
-                    <span>Sovereign Security &amp; No-Refund Notice</span>
-                  </div>
-                  <p className="text-zinc-400 leading-snug">
-                    By completing payment, you agree to the{" "}
-                    <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-white underline hover:text-[#FFA14A]">
-                      Terms of Service
-                    </a>{" "}
-                    and acknowledge our{" "}
-                    <a href="/refund" target="_blank" rel="noopener noreferrer" className="text-[#FFA14A] font-medium underline">
-                      Refund Policy
-                    </a>
-                    : once infrastructure is provisioned or deployed to your account, all sales are final and strictly non-refundable. Your data is 100% sovereign and encrypted.
-                  </p>
-                </div>
+                {/* Pre-Purchase Policy Notice */}
+                <PurchasePolicyNotice compact />
               </div>
             </div>
 
