@@ -58,9 +58,11 @@ import {
   ViralTrustBadgeAndOutreachSection,
 } from "@/components/GrowthAndMonetizationHub";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import {
   DEVELOPER_CONNECTION_EVENT,
   ensureDeveloperConnection,
+  fetchMasterSsoUser,
   getCachedDeveloperConnection,
   getNetsecSsoUrl,
   syncMasterSsoSession,
@@ -3453,6 +3455,25 @@ export function PortalLoginScreen({
   const [activeSection, setActiveSection] = useState("free-scanner");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
+  // Auto-hydrate verified Google / Master SSO cookie if already signed in
+  useEffect(() => {
+    let active = true;
+    void fetchMasterSsoUser().then((sso) => {
+      if (!active || !sso?.email) return;
+      onUserAuthenticated({
+        id: sso.id,
+        email: sso.email,
+        password: "",
+        fullName: sso.fullName || sso.email.split("@")[0] || "Operator",
+        admin: sso.role === "admin" ? "yes" : "no",
+        tenantId: sso.tenantId,
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [onUserAuthenticated]);
+
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -3678,9 +3699,19 @@ export function PortalLoginScreen({
           </div>
         </div>
 
+        {/* Google SSO Primary Action */}
+        <div className="mt-5 space-y-3">
+          <GoogleSignInButton nextPath="/?google_auth=1" label="Continue with Google" />
+          <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-500">
+            <span className="h-px flex-1 bg-[#262626]" />
+            <span>or sign in with email &amp; password</span>
+            <span className="h-px flex-1 bg-[#262626]" />
+          </div>
+        </div>
+
         {/* SIGN IN FORM */}
         {mode === "signin" ? (
-          <form className="mt-6 space-y-4" onSubmit={handleSignIn}>
+          <form className="mt-4 space-y-4" onSubmit={handleSignIn}>
             <div>
               <label
                 className="text-xs font-semibold text-zinc-200 block mb-2"

@@ -6,6 +6,34 @@ interface GoogleSignInButtonProps {
   className?: string;
 }
 
+/**
+ * Builds the canonical Google OAuth start URL.
+ * On any `*.sparrowx.net` subdomain, always initiates OAuth on `https://sparrowx.net/api/auth/google/login`
+ * with the full `https://<current-host><nextPath>` return URL so the OAuth state cookie is set on the
+ * exact same origin Google calls back to (`https://sparrowx.net/api/auth/google/callback`), eliminating
+ * cross-subdomain cookie loss.
+ */
+export function buildGoogleLoginHref(nextPath?: string): string {
+  if (typeof window === "undefined") {
+    return `/api/auth/google/login?next=${encodeURIComponent(nextPath || "/")}`;
+  }
+  const rawTarget =
+    nextPath ||
+    `${window.location.pathname}${window.location.search || ""}` ||
+    "/";
+
+  const host = window.location.hostname.toLowerCase();
+  const isSparrowxProd = host === "sparrowx.net" || host.endsWith(".sparrowx.net");
+  if (isSparrowxProd) {
+    const fullReturn = rawTarget.startsWith("http://") || rawTarget.startsWith("https://")
+      ? rawTarget
+      : `${window.location.origin}${rawTarget.startsWith("/") ? rawTarget : `/${rawTarget}`}`;
+    return `https://sparrowx.net/api/auth/google/login?next=${encodeURIComponent(fullReturn)}`;
+  }
+
+  return `/api/auth/google/login?next=${encodeURIComponent(rawTarget)}`;
+}
+
 export function GoogleSignInButton({
   nextPath,
   label = "Continue with Google",
@@ -13,11 +41,7 @@ export function GoogleSignInButton({
 }: GoogleSignInButtonProps) {
   const handleClick = () => {
     if (typeof window === "undefined") return;
-    const target =
-      nextPath ||
-      `${window.location.pathname}${window.location.search || ""}` ||
-      "/";
-    window.location.href = `/api/auth/google/login?next=${encodeURIComponent(target)}`;
+    window.location.href = buildGoogleLoginHref(nextPath);
   };
 
   return (

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/services";
 import { cn } from "@/lib/utils";
 import { GoogleGIcon, useSessionSummary } from "./Navbar";
+import { buildGoogleLoginHref } from "@/components/GoogleSignInButton";
 import type { InfraRegionId } from "@/lib/infra-plans";
 
 export function Pricing({ service }: { service: Service }) {
@@ -101,7 +102,7 @@ export function Pricing({ service }: { service: Service }) {
                 </Button>
               ) : (
                 <Button asChild variant={p.popular ? "svc" : "ivory"} size="xl" className="w-full">
-                  <a href={`/api/auth/google/login?next=${encodeURIComponent(`/game/dashboard?deploy=${p.id}`)}`}>
+                  <a href={buildGoogleLoginHref(`/game/dashboard?deploy=${p.id}`)}>
                     <GoogleGIcon className="size-4" /> Continue with Google
                   </a>
                 </Button>

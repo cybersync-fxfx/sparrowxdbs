@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getSessionSummary } from "@/lib/portal.functions";
 import { verifySessionToken } from "@/lib/advanced-features";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
+import { buildGoogleLoginHref } from "@/components/GoogleSignInButton";
 import type { ServiceId } from "@/lib/services";
 import { ServiceSwitcher } from "./ServiceSwitcher";
 
@@ -107,7 +108,7 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
             </Button>
           ) : (
             <Button asChild variant="ivory" size="sm" className="rounded-xl">
-              <a href={LOGIN_HREF}>
+              <a href={buildGoogleLoginHref("/game/dashboard")}>
                 <GoogleGIcon className="size-4" />
                 <span className="hidden sm:inline">Continue with Google</span>
                 <span className="sm:hidden">Sign In</span>

@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { buildMasterHref } from "@/lib/routing";
+import { SubdomainAuthChip } from "@/components/SubdomainAuthChip";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { AiGuardrailSandbox } from "@/components/AiGuardrailSandbox";
 import { SparrowxAiBrainCenter } from "@/components/SparrowxAiBrainCenter";
@@ -333,6 +334,7 @@ print(resp.choices[0].message.content)`,
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <SubdomainAuthChip nextPath="/ai" />
             <a
               href="https://agents.sparrowx.net"
               className="hidden sm:inline-flex min-h-[34px] items-center gap-1.5 rounded-md border border-[#262626] bg-[#0A0A0A] hover:bg-[#161616] px-3 text-xs font-medium text-zinc-200 hover:text-white transition-colors"

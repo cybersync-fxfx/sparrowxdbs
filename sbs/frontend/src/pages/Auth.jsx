@@ -422,7 +422,13 @@ export default function Auth({ setToken, initialTab = 'login' }) {
                   } catch {
                     // ignore storage errors
                   }
-                  window.location.href = '/api/auth/google/login';
+                  const host = window.location.hostname.toLowerCase();
+                  if (host === 'sparrowx.net' || host.endsWith('.sparrowx.net')) {
+                    const returnUrl = `${window.location.origin}/login?sso=master`;
+                    window.location.href = `https://sparrowx.net/api/auth/google/login?next=${encodeURIComponent(returnUrl)}`;
+                  } else {
+                    window.location.href = '/api/auth/google/login';
+                  }
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
