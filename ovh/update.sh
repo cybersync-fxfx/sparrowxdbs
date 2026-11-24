@@ -1879,14 +1879,19 @@ render_sparrowx_nginx_conf() {
         proxy_pass http://${docker_host_ip}:${PTERO_PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Connection \$connection_upgrade;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Forwarded-Host \$host;
         proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 300s;
         proxy_read_timeout 300s;
+        proxy_buffer_size 64k;
+        proxy_buffers 16 32k;
+        proxy_busy_buffers_size 64k;
     }"
   else
     ptero_backend="    location / {
@@ -1918,10 +1923,38 @@ render_sparrowx_nginx_conf() {
 
   cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 # ============================================================================
-# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (L7 DDOS SHIELD ENABLED)
+# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (HTTP/2 + GZIP + L7 DDOS SHIELD)
 # ============================================================================
-limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=45r/s;
-limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=25r/s;
+http2 on;
+
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 5;
+gzip_min_length 256;
+gzip_types
+    text/plain
+    text/css
+    text/xml
+    text/javascript
+    application/javascript
+    application/x-javascript
+    application/json
+    application/xml
+    application/rss+xml
+    application/wasm
+    image/svg+xml
+    font/ttf
+    font/otf
+    application/vnd.ms-fontobject;
+
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ''      '';
+}
+
+limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=120r/s;
+limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=60r/s;
 limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
 
 # 1. Master SparrowX Command Center & Default Fallback (${SPARROWX_DOMAIN})
@@ -1932,19 +1965,19 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
+    ssl_session_cache shared:SSL:20m;
+    ssl_session_timeout 1h;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 100;
+    limit_req zone=spx_edge_req burst=250 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2393,7 +2426,8 @@ server {
         proxy_pass \$upstream_pma;
         proxy_http_version 1.1;
         proxy_redirect http:// https://;
-        proxy_redirect ~^https?://([^:/]+):80(/.*)\$ https://\$1\$2;
+        proxy_redirect http://${php_domain}:80/ https://${php_domain}/;
+        proxy_redirect https://${php_domain}:80/ https://${php_domain}/;
         proxy_read_timeout 300s;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -2784,6 +2818,12 @@ fi
 
 PGRST_STATUS="$(curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/" >/dev/null 2>&1 && echo "ONLINE" || echo "STARTING")"
 EDGE_STATUS="$(curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${HTTP_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$" && echo "ONLINE" || echo "CHECK")"
+if [ -f "${INSTALL_DIR}/ovh/optimize-and-maintain.sh" ]; then
+  log_info "Applying SparrowX Performance Optimizations (BBR, PHP-FPM, OPcache, MariaDB, Laravel Cache) & 2-min Watchdog..."
+  bash "${INSTALL_DIR}/ovh/optimize-and-maintain.sh" --optimize || log_warn "Optimizer completed with non-fatal warnings."
+  bash "${INSTALL_DIR}/ovh/optimize-and-maintain.sh" --install-daemon || log_warn "Maintainer timer install had warnings."
+fi
+
 PTERO_STATUS="NOT INSTALLED"
 if is_pterodactyl_installed; then
   if [ -f "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" ]; then
