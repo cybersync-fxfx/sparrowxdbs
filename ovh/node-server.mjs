@@ -205,7 +205,9 @@ const server = createServer(async (req, res) => {
   try {
     const reqUrl = req.url || "/";
     const pathname = reqUrl.split("?")[0];
-    const rawHost = req.headers.host || `${HOST}:${PORT}`;
+    const forwardedHost = String(req.headers["x-forwarded-host"] || "").split(",")[0].trim();
+    const safeForwardedHost = /^[a-z0-9.-]+(?::\d{1,5})?$/i.test(forwardedHost) ? forwardedHost : "";
+    const rawHost = safeForwardedHost || req.headers.host || `${HOST}:${PORT}`;
     const host = rawHost.split(":")[0].toLowerCase();
     const isHealthRoute =
       pathname === "/health" || pathname === "/api/health" || pathname === "/api/v1/health";
@@ -619,6 +621,169 @@ const server = createServer(async (req, res) => {
         res.writeHead(302, { Location: redirectDest, ...SECURITY_HEADERS });
         res.end();
         return;
+      }
+    }
+
+    // Subdomain-Aware Wrong-Path & Typoed-Subdomain Auto-Correction (HTML browser GET only)
+    if (
+      (req.method === "GET" || req.method === "HEAD") &&
+      !pathname.startsWith("/api/") &&
+      !pathname.startsWith("/rest/v1") &&
+      !pathname.startsWith("/_serverFn") &&
+      !pathname.startsWith("/assets/") &&
+      !pathname.startsWith("/logos/") &&
+      !pathname.startsWith("/3d/") &&
+      !pathname.startsWith("/xdp/") &&
+      !pathname.startsWith("/f/") &&
+      !/\.[a-z0-9]{1,8}$/i.test(pathname) &&
+      (acceptsHtml || !req.headers["apikey"])
+    ) {
+      const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
+      const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+
+      // 1. Typoed *.sparrowx.net subdomains -> canonical subdomain redirect
+      if (host.endsWith(".sparrowx.net")) {
+        const sub = host.slice(0, -".sparrowx.net".length);
+        const canonicalSubMap = {
+          www: "sparrowx.net",
+          dbs: "db.sparrowx.net",
+          database: "db.sparrowx.net",
+          databases: "db.sparrowx.net",
+          studio: "db.sparrowx.net",
+          postgres: "db.sparrowx.net",
+          infr: "infra.sparrowx.net",
+          infar: "infra.sparrowx.net",
+          cloud: "infra.sparrowx.net",
+          vps: "infra.sparrowx.net",
+          metal: "infra.sparrowx.net",
+          sheild: "sec.sparrowx.net",
+          shield: "sec.sparrowx.net",
+          security: "sec.sparrowx.net",
+          waf: "sec.sparrowx.net",
+          games: "game.sparrowx.net",
+          gmae: "game.sparrowx.net",
+          play: "game.sparrowx.net",
+          files: "file.sparrowx.net",
+          fiel: "file.sparrowx.net",
+          drop: "file.sparrowx.net",
+          drops: "file.sparrowx.net",
+          vault: "file.sparrowx.net",
+          keys: "password.sparrowx.net",
+          pass: "password.sparrowx.net",
+          passwd: "password.sparrowx.net",
+          passwords: "password.sparrowx.net",
+          apis: "api.sparrowx.net",
+          rest: "api.sparrowx.net",
+          gateway: "api.sparrowx.net",
+        };
+        if (sub === "docs" || sub === "doc") {
+          const cleanP = pathname.replace(/\/+$/, "") || "/";
+          const docDest = cleanP === "/" ? "/docs" : cleanP.startsWith("/docs") ? cleanP : `/docs${cleanP}`;
+          res.writeHead(302, { Location: `${proto}://sparrowx.net${docDest}${qs}`, ...SECURITY_HEADERS });
+          res.end();
+          return;
+        }
+        if (canonicalSubMap[sub]) {
+          res.writeHead(302, { Location: `${proto}://${canonicalSubMap[sub]}${pathname}${qs}`, ...SECURITY_HEADERS });
+          res.end();
+          return;
+        }
+      }
+
+      // 2. Wrong / typoed path auto-correction respecting active subdomain
+      const validPaths = new Set([
+        "/", "/db", "/infra", "/infra/dashboard", "/game", "/game/dashboard", "/game/panel-launch",
+        "/shield", "/drop", "/keys", "/gateway", "/docs", "/docs/errors",
+        "/docs/db", "/docs/infra", "/docs/shield", "/docs/game", "/docs/drop", "/docs/keys", "/docs/api",
+        "/errors", "/story", "/terms", "/refund", "/security", "/deploy", "/ai", "/agents", "/dpdp", "/f",
+      ]);
+      const normPath = pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase() || "/";
+      if (!validPaths.has(normPath)) {
+        const lev = (a, b) => {
+          const m = a.length, n = b.length;
+          const dp = Array.from({ length: n + 1 }, (_, i) => i);
+          for (let i = 1; i <= m; i++) {
+            let prev = dp[0]; dp[0] = i;
+            for (let j = 1; j <= n; j++) {
+              const t = dp[j];
+              dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
+              prev = t;
+            }
+          }
+          return dp[n];
+        };
+        const activeDocs = isDbHost ? "/docs/db" : isInfraHost ? "/docs/infra" : isShieldHost ? "/docs/shield"
+          : (isGameWebHost || isGameDashHost) ? "/docs/game" : isDropHost ? "/docs/drop"
+          : isKeysHost ? "/docs/keys" : isApiHost ? "/docs/api" : "/docs";
+        const activeDash = isInfraHost ? "/infra/dashboard" : (isGameWebHost || isGameDashHost) ? "/game/dashboard"
+          : isDbHost ? "/db" : isShieldHost ? "/shield" : isDropHost ? "/drop"
+          : isKeysHost ? "/keys" : isApiHost ? "/gateway" : "/";
+        const activeHome = isGameDashHost ? "/game/dashboard" : isGameWebHost ? "/game" : isInfraHost ? "/infra"
+          : isDbHost ? "/db" : isShieldHost ? "/shield" : isDropHost ? "/drop"
+          : isKeysHost ? "/keys" : isApiHost ? "/gateway" : "/";
+
+        const segs = normPath.split("/").filter(Boolean);
+        const first = segs[0] || "";
+        const last = segs[segs.length - 1] || "";
+        const isDashLike = last.includes("dash") || last.includes("panel") || last.includes("console") || lev(last, "dashboard") <= 3;
+        const isDocLike = first === "doc" || first === "docs" || first === "documentation" || first === "guide" || first === "help" || lev(first, "docs") <= 1;
+
+        let fixedPath = null;
+        if (isDocLike) {
+          const docAliases = { db: "db", dbs: "db", database: "db", infra: "infra", vps: "infra", cloud: "infra", shield: "shield", sec: "shield", waf: "shield", game: "game", games: "game", drop: "drop", file: "drop", vault: "drop", keys: "keys", password: "keys", api: "api", gateway: "api", error: "errors", errors: "errors" };
+          if (!segs[1]) {
+            fixedPath = activeDocs;
+          } else if (docAliases[segs[1]]) {
+            fixedPath = `/docs/${docAliases[segs[1]]}`;
+          } else {
+            const docCands = Object.keys(docAliases);
+            let best = null, bestD = 3;
+            for (const c of docCands) { const d = lev(segs[1], c); if (d < bestD) { bestD = d; best = c; } }
+            fixedPath = best ? `/docs/${docAliases[best]}` : activeDocs;
+          }
+        } else if (activeHome !== "/" && isDashLike) {
+          fixedPath = activeDash;
+        } else if (activeHome !== "/" && (last.includes("err") || lev(last, "errors") <= 2)) {
+          fixedPath = "/docs/errors";
+        } else if (segs.length >= 2) {
+          const roots = ["infra", "game", "db", "shield", "drop", "keys", "gateway"];
+          let bestRoot = null, bestD = 3;
+          for (const r of roots) { const d = lev(first, r); if (d < bestD) { bestD = d; bestRoot = r; } }
+          if (bestRoot === "infra" && isDashLike) fixedPath = "/infra/dashboard";
+          else if (bestRoot === "game" && isDashLike) fixedPath = "/game/dashboard";
+          else if (bestRoot === "game" && (last.includes("ptero") || last.includes("panel") || last.includes("launch"))) fixedPath = "/game/panel-launch";
+          else if (bestRoot) fixedPath = `/${bestRoot}`;
+        }
+
+        if (!fixedPath) {
+          const pathMap = {
+            "/db": "/db", "/database": "/db", "/studio": "/db", "/postgres": "/db",
+            "/infra": "/infra", "/cloud": "/infra", "/vps": "/infra", "/infra-dashboard": "/infra/dashboard", "/hpanel": "/infra/dashboard",
+            "/shield": "/shield", "/sec": "/shield", "/security": "/security", "/waf": "/shield", "/soc": "/shield",
+            "/terms": "/terms", "/term": "/terms", "/tos": "/terms", "/refund": "/refund", "/refunds": "/refund",
+            "/game": "/game", "/games": "/game", "/game-dashboard": "/game/dashboard", "/ptero": "/game/panel-launch",
+            "/drop": "/drop", "/file": "/drop", "/files": "/drop", "/vault": "/drop",
+            "/keys": "/keys", "/password": "/keys", "/passwords": "/keys",
+            "/gateway": "/gateway", "/api": "/gateway",
+            "/errors": "/docs/errors", "/error": "/docs/errors", "/story": "/story", "/about": "/story",
+          };
+          if (pathMap[normPath]) {
+            fixedPath = pathMap[normPath];
+          } else {
+            let best = null, bestD = normPath.length >= 6 ? 3 : 2;
+            for (const cand of Object.keys(pathMap)) {
+              const d = lev(normPath, cand);
+              if (d < bestD) { bestD = d; best = cand; }
+            }
+            fixedPath = best ? pathMap[best] : activeHome;
+          }
+        }
+
+        if (fixedPath && fixedPath !== pathname) {
+          res.writeHead(302, { Location: `${fixedPath}${qs}`, ...SECURITY_HEADERS });
+          res.end();
+          return;
+        }
       }
     }
 

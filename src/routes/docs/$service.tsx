@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { ArrowLeft, ArrowUpRight, BookOpen, Check, Copy } from "lucide-react";
 import {
@@ -7,9 +7,20 @@ import {
   SERVICE_DOCS,
   type ServiceDocSpec,
 } from "@/lib/service-docs";
+import { resolveAutoCorrectedDocSlug } from "@/lib/route-autocorrect";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 export const Route = createFileRoute("/docs/$service")({
+  beforeLoad: ({ params }) => {
+    const raw = String(params.service || "").trim();
+    if (isValidServiceDocId(raw)) return;
+    const host = typeof window !== "undefined" ? window.location.hostname : "";
+    const fixed = resolveAutoCorrectedDocSlug(raw, host);
+    if (fixed === "errors") {
+      throw redirect({ to: "/docs/errors" });
+    }
+    throw redirect({ to: "/docs/$service", params: { service: fixed } });
+  },
   head: ({ params }) => {
     const doc = isValidServiceDocId(params.service) ? SERVICE_DOCS[params.service] : null;
     return {

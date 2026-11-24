@@ -8,31 +8,65 @@ import {
   Scripts,
   type ErrorComponentProps,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportSparrowxError } from "../lib/sparrowx-error-reporting";
 import { useServiceFavicon } from "../lib/service-favicon";
 import { clearSessionToken } from "../lib/advanced-features";
+import {
+  resolveAutoCorrectedPath,
+  resolveCanonicalSubdomainRedirect,
+} from "../lib/route-autocorrect";
 import { GlobalEmailVerificationHost } from "../components/EmailVerificationModal";
 import { SparrowxAmbientLogoBackdrop } from "../components/SparrowxAmbientLogoBackdrop";
 import { WhatsAppPlansToaster } from "../components/WhatsAppPlansToaster";
 
 function NotFoundComponent() {
+  const [targetPath, setTargetPath] = useState<string>("/");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const { hostname, pathname, search, protocol } = window.location;
+    const subdomainRedirect = resolveCanonicalSubdomainRedirect(
+      hostname,
+      pathname,
+      search,
+      protocol.replace(":", ""),
+    );
+    if (subdomainRedirect && subdomainRedirect !== window.location.href) {
+      setTargetPath(subdomainRedirect);
+      window.location.replace(subdomainRedirect);
+      return;
+    }
+
+    const corrected = resolveAutoCorrectedPath(pathname, hostname) || "/";
+    const fullTarget = `${corrected}${search}`;
+    setTargetPath(fullTarget);
+    if (corrected !== pathname) {
+      window.location.replace(fullTarget);
+    }
+  }, []);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold text-foreground">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
+      <div className="max-w-md text-center space-y-4">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-primary">
+          SparrowX Smart Route Recovery
         </p>
-        <div className="mt-6">
+        <h1 className="text-2xl font-bold text-foreground">
+          Redirecting you to the right page…
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Detected a mistyped path and auto-corrected it to{" "}
+          <span className="font-mono text-foreground">{targetPath}</span>.
+        </p>
+        <div className="pt-2">
           <Link
-            to="/"
+            to={targetPath.startsWith("/") ? targetPath : "/"}
             className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Go home
+            Continue now
           </Link>
         </div>
       </div>
