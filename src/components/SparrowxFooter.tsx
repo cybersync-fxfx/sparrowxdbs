@@ -31,34 +31,38 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
     serviceKey: "infra",
   },
   {
+    label: "Game Hosting",
+    sublabel: "sparrowx.net/game",
+    href: "/game",
+  },
+  {
     label: "Cloud Database",
     sublabel: "db.sparrowx.net",
-    href: "/db",
+    href: "https://db.sparrowx.net",
     serviceKey: "db",
   },
   {
     label: "Shield SOC & WAF",
     sublabel: "sec.sparrowx.net",
-    href: "/shield",
+    href: "https://sec.sparrowx.net",
     serviceKey: "sec",
+  },
+  {
+    label: "NetSec Guard",
+    sublabel: "netsec.sparrowx.net",
+    href: "https://netsec.sparrowx.net",
   },
   {
     label: "Drop File Vault",
     sublabel: "file.sparrowx.net",
-    href: "/drop",
+    href: "https://file.sparrowx.net",
     serviceKey: "file",
   },
   {
     label: "Password & Keys",
     sublabel: "password.sparrowx.net",
-    href: "/keys",
+    href: "https://password.sparrowx.net",
     serviceKey: "password",
-  },
-  {
-    label: "PostgREST API",
-    sublabel: "api.sparrowx.net",
-    href: "/gateway",
-    serviceKey: "api",
   },
 ];
 
@@ -175,7 +179,7 @@ export function SparrowxFooter({
                 </li>
                 <li className="min-w-0">
                   <a
-                    href={`${anchorPrefix}comparison`}
+                    href="/story"
                     className={LINK_CLASSES}
                   >
                     Why SparrowX

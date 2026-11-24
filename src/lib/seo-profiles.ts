@@ -44,7 +44,7 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
     description:
       "SparrowX Technologies: Sovereign cloud VPS & VDS, managed PostgreSQL databases, autonomous WAF/DDoS protection, game hosting, and encrypted tools.",
     keywords:
-      "sparrowx, sparrowx.net, developer toolkit, cloud development platform, ai automation, agentic ai security, managed postgresql, bare metal deployment, edge waf, ddos defense, sparrowx technologies",
+      "sparrowx, sparrowx.net, sparrowx technologies, sparrowx cloud, sparrowx client area, sparrowx login, sparrowx ecosystem",
     ogTitle: "SparrowX — Complete Developer Toolkit for Security, Cloud & AI Agentics",
     ogDescription:
       "All-in-one sovereign developer toolkit for security, cloud databases, REST APIs, bare-metal deployment, encrypted utilities, and AI automation.",

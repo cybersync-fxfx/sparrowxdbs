@@ -187,8 +187,11 @@ describe("App routing", () => {
     const errorRefLink = screen.getByRole("link", { name: /Error Reference/i });
     expect(errorRefLink.getAttribute("href")).toBe("/docs/errors");
 
-    const apiLink = screen.getByRole("link", { name: /PostgREST API/i });
-    expect(apiLink.getAttribute("href")).toBe("/gateway");
+    const dbLink = screen.getByRole("link", { name: /Cloud Database/i });
+    expect(dbLink.getAttribute("href")).toBe("https://db.sparrowx.net");
+
+    const gameLink = screen.getByRole("link", { name: /Game Hosting/i });
+    expect(gameLink.getAttribute("href")).toBe("/game");
 
     const allHrefs = screen
       .getAllByRole("link")
@@ -197,6 +200,7 @@ describe("App routing", () => {
     expect(allHrefs).not.toContain("/errors");
     expect(allHrefs).not.toContain("/game/dashboard");
     expect(allHrefs).not.toContain("https://game.panel.sparrowx.net");
-    expect(allHrefs).not.toContain("https://netsec.sparrowx.net");
+    expect(allHrefs).not.toContain("https://gamesec.sparrowx.net");
+    expect(allHrefs).not.toContain("https://php.sparrowx.net");
   });
 });

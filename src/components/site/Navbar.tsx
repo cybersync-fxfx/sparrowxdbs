@@ -84,7 +84,7 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
             Docs
           </a>
           <a
-            href="https://gamesec.sparrowx.net"
+            href="https://sec.sparrowx.net"
             className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             DDoS Defense

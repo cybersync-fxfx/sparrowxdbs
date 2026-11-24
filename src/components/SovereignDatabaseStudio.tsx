@@ -997,16 +997,6 @@ function TopologyClusterPanel({
             <span className="text-zinc-600">•</span>
             <span>{pingMs !== null ? `RTT ${pingMs}ms` : "Checking RTT"}</span>
           </div>
-
-          <a
-            href="https://php.sparrowx.net"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full inline-flex items-center justify-center gap-2 rounded-md border border-[#38BDF8]/35 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-3 py-1.5 text-[11px] font-mono font-semibold text-[#38BDF8] transition-colors"
-          >
-            <Database className="size-3.5" aria-hidden="true" />
-            <span>Open phpMyAdmin (php.sparrowx.net)</span>
-          </a>
         </div>
       </div>
 
@@ -4398,15 +4388,6 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href="https://php.sparrowx.net"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#38BDF8]/35 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 text-xs font-semibold text-[#38BDF8] transition-colors"
-                  >
-                    <Database className="size-3.5" aria-hidden="true" />
-                    <span>phpMyAdmin</span>
-                  </a>
                   <button
                     type="button"
                     onClick={() => navigateStudioSection("tables")}

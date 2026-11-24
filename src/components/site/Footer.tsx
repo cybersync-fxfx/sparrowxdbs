@@ -14,8 +14,8 @@ export function Footer() {
           <a href="#performance" className="hover:text-foreground">Performance</a>
           <a href="#pricing" className="hover:text-foreground">Pricing</a>
           <a href={LOGIN_HREF} className="hover:text-foreground">Sign In</a>
-          <a href="https://gamesec.sparrowx.net" className="hover:text-foreground">Game DDoS Defense</a>
-          <a href="/shield" className="hover:text-foreground">Web &amp; API Shield</a>
+          <a href="https://sec.sparrowx.net" className="hover:text-foreground">DDoS &amp; Web Shield</a>
+          <a href="https://netsec.sparrowx.net" className="hover:text-foreground">NetSec Guard</a>
           <a href="https://sparrowx.net" className="hover:text-foreground">SparrowX Cloud</a>
         </nav>
       </div>
