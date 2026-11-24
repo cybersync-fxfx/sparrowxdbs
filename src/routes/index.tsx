@@ -1758,52 +1758,64 @@ function Dashboard() {
     }
   };
 
-  // Dedicated Domain Ingress Routing (Applies whether unauthenticated or authenticated)
-  const isStudioDomainOrParam =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("db.") ||
-      window.location.hostname.startsWith("studio.") ||
-      window.location.hostname.startsWith("supabase.") ||
-      window.location.hostname.startsWith("sparrowbase.") ||
-      new URLSearchParams(window.location.search).get("studio") === "1" ||
-      new URLSearchParams(window.location.search).get("studio") === "true" ||
-      new URLSearchParams(window.location.search).get("sparrowbase") === "1" ||
-      new URLSearchParams(window.location.search).get("db") === "1");
+  // Dedicated Domain Ingress Routing (SSR-safe via Route loaderData so server & client hydrate identically)
+  const { seoKey } = Route.useLoaderData();
+  const [clientIngressOverride, setClientIngressOverride] = useState<{
+    studio: boolean;
+    api: boolean;
+    file: boolean;
+    password: boolean;
+    shield: boolean;
+  }>({ studio: false, api: false, file: false, password: false, shield: false });
 
-  const isApiDomainOrParam =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("api.") ||
-      window.location.hostname.startsWith("rest.") ||
-      new URLSearchParams(window.location.search).get("api") === "1");
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const h = window.location.hostname.toLowerCase();
+    const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash;
+    const path = window.location.pathname;
+    setClientIngressOverride({
+      studio:
+        h.startsWith("db.") ||
+        h.startsWith("studio.") ||
+        h.startsWith("supabase.") ||
+        h.startsWith("sparrowbase.") ||
+        params.get("studio") === "1" ||
+        params.get("studio") === "true" ||
+        params.get("sparrowbase") === "1" ||
+        params.get("db") === "1",
+      api: h.startsWith("api.") || h.startsWith("rest.") || params.get("api") === "1",
+      file:
+        h.startsWith("file.") ||
+        h.startsWith("drop.") ||
+        h.startsWith("share.") ||
+        params.get("file") === "1" ||
+        params.get("drop") === "1" ||
+        params.has("drop") ||
+        hash.includes("key=") ||
+        path.startsWith("/drop") ||
+        path.startsWith("/f/"),
+      password:
+        h.startsWith("password.") ||
+        h.startsWith("passwd.") ||
+        h.startsWith("pass.") ||
+        h.startsWith("keys.") ||
+        params.get("password") === "1" ||
+        params.get("passwd") === "1" ||
+        params.get("keys") === "1",
+      shield:
+        h.startsWith("shield.") ||
+        h.startsWith("sec.") ||
+        params.get("shield") === "1" ||
+        params.get("sec") === "1",
+    });
+  }, []);
 
-  const isFileDomainOrParam =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("file.") ||
-      window.location.hostname.startsWith("drop.") ||
-      window.location.hostname.startsWith("share.") ||
-      new URLSearchParams(window.location.search).get("file") === "1" ||
-      new URLSearchParams(window.location.search).get("drop") === "1" ||
-      new URLSearchParams(window.location.search).has("drop") ||
-      window.location.hash.includes("key=") ||
-      window.location.pathname.startsWith("/drop") ||
-      window.location.pathname.startsWith("/f/"));
-
-  const isPasswordDomainOrParam =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("password.") ||
-      window.location.hostname.startsWith("passwd.") ||
-      window.location.hostname.startsWith("pass.") ||
-      window.location.hostname.startsWith("keys.") ||
-      new URLSearchParams(window.location.search).get("password") === "1" ||
-      new URLSearchParams(window.location.search).get("passwd") === "1" ||
-      new URLSearchParams(window.location.search).get("keys") === "1");
-
-  const isShieldDomainOrParam =
-    typeof window !== "undefined" &&
-    (window.location.hostname.startsWith("shield.") ||
-      window.location.hostname.startsWith("sec.") ||
-      new URLSearchParams(window.location.search).get("shield") === "1" ||
-      new URLSearchParams(window.location.search).get("sec") === "1");
+  const isStudioDomainOrParam = seoKey === "db" || clientIngressOverride.studio;
+  const isApiDomainOrParam = seoKey === "gateway" || clientIngressOverride.api;
+  const isFileDomainOrParam = seoKey === "drop" || clientIngressOverride.file;
+  const isPasswordDomainOrParam = seoKey === "keys" || clientIngressOverride.password;
+  const isShieldDomainOrParam = seoKey === "shield" || clientIngressOverride.shield;
 
   useEffect(() => {
     if (typeof window === "undefined") return;

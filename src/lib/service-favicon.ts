@@ -73,26 +73,25 @@ export function resolveServiceFavicon(
 export function applyServiceFavicon(meta: ServiceFaviconMeta): void {
   if (typeof document === "undefined") return;
 
-  const existingLinks = document.head.querySelectorAll(
-    'link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]',
-  );
-  existingLinks.forEach((node) => node.remove());
+  // Update existing React-managed icon links in place instead of removing them,
+  // so React's <HeadContent /> reconciler never loses track of head nodes.
+  const upsertLink = (rel: string, type?: string) => {
+    let link = document.head.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = rel;
+      link.setAttribute("data-spx-favicon", "true");
+      document.head.appendChild(link);
+    }
+    if (type) link.type = type;
+    if (link.getAttribute("href") !== meta.href) {
+      link.href = meta.href;
+    }
+  };
 
-  const iconLink = document.createElement("link");
-  iconLink.rel = "icon";
-  iconLink.type = meta.type;
-  iconLink.href = meta.href;
-  document.head.appendChild(iconLink);
-
-  const shortcutLink = document.createElement("link");
-  shortcutLink.rel = "shortcut icon";
-  shortcutLink.href = meta.href;
-  document.head.appendChild(shortcutLink);
-
-  const appleLink = document.createElement("link");
-  appleLink.rel = "apple-touch-icon";
-  appleLink.href = meta.href;
-  document.head.appendChild(appleLink);
+  upsertLink("icon", meta.type);
+  upsertLink("shortcut icon");
+  upsertLink("apple-touch-icon");
 }
 
 export function useServiceFavicon(): void {

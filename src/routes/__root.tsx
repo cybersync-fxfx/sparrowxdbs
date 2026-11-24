@@ -130,6 +130,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "author", content: "SparrowX Technologies" },
       { name: "theme-color", content: "#090B0E" },
+      { name: "google-adsense-account", content: "ca-pub-5926090831336748" },
     ],
     links: [
       {
@@ -154,15 +155,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <head>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head suppressHydrationWarning>
         <HeadContent />
-        {/* Google AdSense */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5926090831336748"
-          crossOrigin="anonymous"
-        />
         <script
           src="/sparrowx-shield.js"
           data-site-id="TNT-3800"
@@ -170,15 +165,29 @@ function RootShell({ children }: { children: ReactNode }) {
           data-endpoint="https://db.sparrowx.net"
           data-auto-block="true"
           data-anti-bot="active"
-          async
+          defer
         />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
     </html>
   );
+}
+
+function useDeferredAdSense() {
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (document.querySelector('script[data-spx-adsense="true"]')) return;
+    const script = document.createElement("script");
+    script.async = true;
+    script.src =
+      "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5926090831336748";
+    script.crossOrigin = "anonymous";
+    script.setAttribute("data-spx-adsense", "true");
+    document.head.appendChild(script);
+  }, []);
 }
 
 function useGlobalScrollReveal() {
@@ -264,6 +273,7 @@ function useGlobalErrorWebhookCapture() {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   useServiceFavicon();
+  useDeferredAdSense();
   useGlobalScrollReveal();
   useGlobalErrorWebhookCapture();
 
