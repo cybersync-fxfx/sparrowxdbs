@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Activity,
   CheckCircle2,
@@ -34,30 +34,61 @@ interface SystemStatusSectionProps {
 export function SystemStatusSection({ onNavigateToDocs, showToast }: SystemStatusSectionProps) {
   const [healthData, setHealthData] = useState<SystemOverallHealth | null>(null);
   const [isProbing, setIsProbing] = useState(false);
+  const lastStatusRef = useRef<SubsystemStatus | null>(null);
 
-  const executeProbe = async () => {
+  const executeProbe = async (manual = false) => {
     setIsProbing(true);
     try {
       const data = await runSystemHealthProbe();
+      const prevStatus = lastStatusRef.current;
+      lastStatusRef.current = data.overallStatus;
       setHealthData(data);
-      if (data.overallStatus === "operational") {
-        showToast("System health probe passed — all 10 subsystems operational", "success");
-      } else if (data.overallStatus === "degraded") {
-        showToast("System health probe completed — elevated latency detected", "info");
-      } else {
-        showToast("System health probe detected service degradation or outages", "error");
+
+      const impacted = data.subsystems
+        .filter((s) => s.status !== "operational")
+        .map((s) => `${s.name} (${s.status.replace("_", " ")})`);
+
+      const statusWorsened =
+        prevStatus !== null &&
+        prevStatus === "operational" &&
+        data.overallStatus !== "operational";
+
+      if (manual) {
+        if (data.overallStatus === "operational") {
+          showToast(
+            `System health probe passed — all ${data.operationalCount} subsystems operational`,
+            "success",
+          );
+        } else if (data.overallStatus === "degraded") {
+          showToast(
+            `Degraded subsystems: ${impacted.join(", ") || "elevated latency detected"}`,
+            "info",
+          );
+        } else {
+          showToast(
+            `Outage detected in: ${impacted.join(", ") || "one or more subsystems"}`,
+            "error",
+          );
+        }
+      } else if (statusWorsened) {
+        showToast(
+          `Health status changed — affected: ${impacted.join(", ") || data.overallStatus}`,
+          "info",
+        );
       }
     } catch {
-      showToast("Health probe execution failed", "error");
+      if (manual) {
+        showToast("Health probe execution failed — check network connectivity", "error");
+      }
     } finally {
       setIsProbing(false);
     }
   };
 
   useEffect(() => {
-    void executeProbe();
+    void executeProbe(false);
     const interval = setInterval(() => {
-      void executeProbe();
+      void executeProbe(false);
     }, 45000);
     return () => clearInterval(interval);
   }, []);
@@ -122,7 +153,7 @@ export function SystemStatusSection({ onNavigateToDocs, showToast }: SystemStatu
           size="sm"
           variant="outline"
           disabled={isProbing}
-          onClick={executeProbe}
+          onClick={() => void executeProbe(true)}
           className="h-9 px-3.5 text-xs font-semibold gap-1.5"
         >
           <RefreshCw className={`size-3.5 ${isProbing ? "animate-spin text-primary" : ""}`} />
