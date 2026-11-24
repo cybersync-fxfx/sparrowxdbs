@@ -111,6 +111,11 @@ services:
     labels:
       - "traefik.enable=false"
 
+  # Disable legacy Nginx when running the Traefik v3 edge stack so ports 80/443 never collide
+  nginx:
+    profiles:
+      - legacy-nginx
+
   # ----------------------------------------------------------------------------
   # Reference Coolify Tenant Container Labels (*.ai.sparrowx.net & *.deploy.sparrowx.net)
   # ----------------------------------------------------------------------------
