@@ -2363,16 +2363,11 @@ function Dashboard() {
               {activeNav}
             </span>
 
-            {/* Operational Status Badge */}
-            {criticalOpenCount > 0 ? (
+            {/* Operational Alert Badge (only when critical incidents are open) */}
+            {criticalOpenCount > 0 && (
               <span className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[10px] font-semibold text-destructive animate-pulse">
                 <AlertTriangle className="size-3" />
                 <span>ALERT: {criticalOpenCount} CRITICAL</span>
-              </span>
-            ) : (
-              <span className="hidden xl:inline-flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2.5 py-0.5 text-[10px] font-semibold text-success">
-                <CheckCircle2 className="size-3" />
-                <span>SYSTEMS NOMINAL</span>
               </span>
             )}
           </div>
