@@ -40,6 +40,7 @@ import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
 import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
+import { Route as ApiDeployProjectsRouteImport } from './routes/api/deploy/projects'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
 import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
@@ -209,6 +210,11 @@ const ApiDbSummaryRoute = ApiDbSummaryRouteImport.update({
   path: '/api/db/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDeployProjectsRoute = ApiDeployProjectsRouteImport.update({
+  id: '/api/deploy/projects',
+  path: '/api/deploy/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
   id: '/api/game/panel-sso',
   path: '/api/game/panel-sso',
@@ -299,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
+  '/api/deploy/projects': typeof ApiDeployProjectsRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
@@ -343,6 +350,7 @@ export interface FileRoutesByTo {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
+  '/api/deploy/projects': typeof ApiDeployProjectsRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
+  '/api/deploy/projects': typeof ApiDeployProjectsRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
@@ -434,6 +443,7 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/deploy/projects'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/telemetry/discord'
@@ -478,6 +488,7 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/deploy/projects'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/telemetry/discord'
@@ -522,6 +533,7 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/deploy/projects'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/telemetry/discord'
@@ -567,6 +579,7 @@ export interface RootRouteChildren {
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
   ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
+  ApiDeployProjectsRoute: typeof ApiDeployProjectsRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
   ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
@@ -799,6 +812,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDbSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/deploy/projects': {
+      id: '/api/deploy/projects'
+      path: '/api/deploy/projects'
+      fullPath: '/api/deploy/projects'
+      preLoaderRoute: typeof ApiDeployProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/game/panel-sso': {
       id: '/api/game/panel-sso'
       path: '/api/game/panel-sso'
@@ -911,6 +931,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbProvisionRoute: ApiDbProvisionRoute,
   ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
+  ApiDeployProjectsRoute: ApiDeployProjectsRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
   ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,

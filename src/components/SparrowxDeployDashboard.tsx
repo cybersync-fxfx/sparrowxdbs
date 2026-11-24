@@ -58,7 +58,8 @@ export interface DeployProject {
   outputDir: string;
   rootDir: string;
   region: "Mumbai IN-1" | "Chennai IN-2" | "Singapore SG-1";
-  status: "Ready" | "Building" | "Queued";
+  status: "Ready" | "Building" | "Queued" | "Unreachable";
+  commitSha?: string;
   customDomain?: string;
   envVars: DeployEnvVar[];
   createdAt: string;
@@ -66,8 +67,6 @@ export interface DeployProject {
   commitMessage: string;
   logs: string[];
 }
-
-const STORAGE_KEY = "sparrowx_deploy_projects_v1";
 
 const FRAMEWORK_PRESETS: Record<
   DeployFramework,
@@ -129,30 +128,12 @@ function slugifyProjectName(input: string): string {
   return cleaned || "my-app";
 }
 
-function loadProjects(): DeployProject[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as DeployProject[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveProjects(projects: DeployProject[]) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-  } catch {
-    // ignore storage errors
-  }
-}
-
 export function SparrowxDeployDashboard() {
   const [activeTab, setActiveTab] = useState<DeployTab>("overview");
   const [projects, setProjects] = useState<DeployProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -179,18 +160,30 @@ export function SparrowxDeployDashboard() {
   const [newEnvVal, setNewEnvVal] = useState("");
   const [newEnvTarget, setNewEnvTarget] = useState<DeployEnvVar["target"]>("Production");
 
-  useEffect(() => {
-    const initial = loadProjects();
-    setProjects(initial);
-    if (initial.length > 0 && !selectedProjectId) {
-      setSelectedProjectId(initial[0]!.id);
+  const fetchServerProjects = async () => {
+    setLoadingProjects(true);
+    setApiError("");
+    try {
+      const res = await fetch("/api/deploy/projects", { credentials: "include" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `Server returned HTTP ${res.status}`);
+      }
+      const list = Array.isArray(data.projects) ? (data.projects as DeployProject[]) : [];
+      setProjects(list);
+      if (list.length > 0 && !selectedProjectId) {
+        setSelectedProjectId(list[0]!.id);
+      }
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to reach deploy backend API.");
+    } finally {
+      setLoadingProjects(false);
     }
-  }, []);
-
-  const persistProjects = (next: DeployProject[]) => {
-    setProjects(next);
-    saveProjects(next);
   };
+
+  useEffect(() => {
+    void fetchServerProjects();
+  }, []);
 
   const filteredProjects = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -236,114 +229,173 @@ export function SparrowxDeployDashboard() {
     setDraftEnvVal("");
   };
 
-  const handleCreateProject = (e: React.FormEvent) => {
+  const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanedName = projectName.trim() || slugifyProjectName(repoUrl);
-    if (!cleanedName) {
-      setImportError("Enter a project name or Git repository URL.");
+    const cleanedRepo = repoUrl.trim();
+    if (!cleanedRepo || !/^https?:\/\//i.test(cleanedRepo)) {
+      setImportError("Enter a valid https:// Git repository URL (e.g. https://github.com/user/repo).");
       return;
     }
-    const slug = slugifyProjectName(cleanedName);
-    const now = new Date().toISOString();
-    const newProj: DeployProject = {
-      id: `prj_${Date.now().toString(36)}`,
-      name: cleanedName,
-      slug,
-      repoUrl: repoUrl.trim() || `https://github.com/sparrowx/${slug}`,
-      branch: branch.trim() || "main",
-      framework,
-      buildCommand,
-      outputDir,
-      rootDir: rootDir.trim() || "./",
-      region,
-      status: "Ready",
-      envVars: draftEnvVars,
-      createdAt: now,
-      lastDeployedAt: now,
-      commitMessage: "Initial deployment configured on SparrowX Deploy",
-      logs: [
-        `[${new Date().toLocaleTimeString()}] Cloning ${repoUrl.trim() || `https://github.com/sparrowx/${slug}`} (branch: ${branch.trim() || "main"})...`,
-        `[${new Date().toLocaleTimeString()}] Detected preset: ${FRAMEWORK_PRESETS[framework].label} (${FRAMEWORK_PRESETS[framework].badge})`,
-        `[${new Date().toLocaleTimeString()}] Target Edge Region: ${region}`,
-        `[${new Date().toLocaleTimeString()}] Build command: ${buildCommand || "none (static)"} -> output: ${outputDir}`,
-        `[${new Date().toLocaleTimeString()}] Provisioned TLS endpoint: https://${slug}.deploy.sparrowx.net`,
-        `[${new Date().toLocaleTimeString()}] Deployment ready.`,
-      ],
-    };
-
-    const next = [newProj, ...projects];
-    persistProjects(next);
-    setSelectedProjectId(newProj.id);
-    setShowNewModal(false);
-    setRepoUrl("");
-    setProjectName("");
-    setDraftEnvVars([]);
+    setSubmitting(true);
     setImportError("");
-  };
-
-  const handleRedeploy = (projId: string) => {
-    const ts = new Date().toLocaleTimeString();
-    const next = projects.map((p) =>
-      p.id === projId
-        ? {
-            ...p,
-            status: "Ready" as const,
-            lastDeployedAt: new Date().toISOString(),
-            logs: [
-              ...p.logs,
-              `[${ts}] Triggered manual redeploy for ${p.slug}.deploy.sparrowx.net (${p.branch})`,
-              `[${ts}] Build succeeded & edge cache invalidated.`,
-            ],
-          }
-        : p,
-    );
-    persistProjects(next);
-  };
-
-  const handleDeleteProject = (projId: string) => {
-    const next = projects.filter((p) => p.id !== projId);
-    persistProjects(next);
-    if (selectedProjectId === projId) {
-      setSelectedProjectId(next[0]?.id ?? null);
+    try {
+      const res = await fetch("/api/deploy/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: projectName.trim() || slugifyProjectName(cleanedRepo),
+          repoUrl: cleanedRepo,
+          branch: branch.trim() || "main",
+          framework,
+          buildCommand,
+          outputDir,
+          rootDir: rootDir.trim() || "./",
+          region,
+          envVars: draftEnvVars.map((v) => ({ key: v.key, value: v.value, target: v.target })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok || !data.project) {
+        throw new Error(data?.error || `Deploy API failed (HTTP ${res.status})`);
+      }
+      const created = data.project as DeployProject;
+      setProjects((prev) => [created, ...prev]);
+      setSelectedProjectId(created.id);
+      setShowNewModal(false);
+      setRepoUrl("");
+      setProjectName("");
+      setDraftEnvVars([]);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Failed to create deployment.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleAttachDomain = (e: React.FormEvent) => {
+  const handleRedeploy = async (projId: string) => {
+    setApiError("");
+    try {
+      const res = await fetch("/api/deploy/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "redeploy", id: projId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok || !data.project) {
+        throw new Error(data?.error || "Redeploy failed");
+      }
+      const updated = data.project as DeployProject;
+      setProjects((prev) => prev.map((p) => (p.id === projId ? updated : p)));
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Redeploy request failed.");
+    }
+  };
+
+  const handleDeleteProject = async (projId: string) => {
+    setApiError("");
+    try {
+      const res = await fetch(`/api/deploy/projects?id=${encodeURIComponent(projId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || "Delete failed");
+      }
+      setProjects((prev) => {
+        const next = prev.filter((p) => p.id !== projId);
+        if (selectedProjectId === projId) {
+          setSelectedProjectId(next[0]?.id ?? null);
+        }
+        return next;
+      });
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Delete request failed.");
+    }
+  };
+
+  const handleAttachDomain = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeProject || !newDomainInput.trim()) return;
-    const cleaned = newDomainInput.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-    const next = projects.map((p) =>
-      p.id === activeProject.id ? { ...p, customDomain: cleaned } : p,
-    );
-    persistProjects(next);
-    setNewDomainInput("");
+    setApiError("");
+    try {
+      const res = await fetch("/api/deploy/projects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "attach-domain",
+          id: activeProject.id,
+          domain: newDomainInput.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok || !data.project) {
+        throw new Error(data?.error || "Failed to attach domain");
+      }
+      const updated = data.project as DeployProject;
+      setProjects((prev) => prev.map((p) => (p.id === activeProject.id ? updated : p)));
+      setNewDomainInput("");
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to attach domain.");
+    }
   };
 
-  const handleAddProjectEnv = (e: React.FormEvent) => {
+  const handleAddProjectEnv = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeProject || !newEnvKey.trim()) return;
-    const item: DeployEnvVar = {
-      id: `env-${Date.now()}`,
-      key: newEnvKey.trim(),
-      value: newEnvVal,
-      target: newEnvTarget,
-    };
-    const next = projects.map((p) =>
-      p.id === activeProject.id ? { ...p, envVars: [...p.envVars, item] } : p,
-    );
-    persistProjects(next);
-    setNewEnvKey("");
-    setNewEnvVal("");
+    setApiError("");
+    try {
+      const res = await fetch("/api/deploy/projects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "add-env",
+          id: activeProject.id,
+          key: newEnvKey.trim(),
+          value: newEnvVal,
+          target: newEnvTarget,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok || !data.project) {
+        throw new Error(data?.error || "Failed to save environment variable");
+      }
+      const updated = data.project as DeployProject;
+      setProjects((prev) => prev.map((p) => (p.id === activeProject.id ? updated : p)));
+      setNewEnvKey("");
+      setNewEnvVal("");
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to save environment variable.");
+    }
   };
 
-  const handleRemoveProjectEnv = (envId: string) => {
+  const handleRemoveProjectEnv = async (envId: string) => {
     if (!activeProject) return;
-    const next = projects.map((p) =>
-      p.id === activeProject.id
-        ? { ...p, envVars: p.envVars.filter((v) => v.id !== envId) }
-        : p,
-    );
-    persistProjects(next);
+    setApiError("");
+    try {
+      const res = await fetch("/api/deploy/projects", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "remove-env",
+          id: activeProject.id,
+          envId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok || !data.project) {
+        throw new Error(data?.error || "Failed to remove environment variable");
+      }
+      const updated = data.project as DeployProject;
+      setProjects((prev) => prev.map((p) => (p.id === activeProject.id ? updated : p)));
+    } catch (err) {
+      setApiError(err instanceof Error ? err.message : "Failed to remove environment variable.");
+    }
   };
 
   const copyText = (id: string, value: string) => {
@@ -440,6 +492,18 @@ export function SparrowxDeployDashboard() {
 
       {/* Main Content Canvas */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {apiError && (
+          <div className="mb-5 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs text-red-300 flex items-center justify-between gap-3">
+            <span>{apiError}</span>
+            <button
+              type="button"
+              onClick={() => void fetchServerProjects()}
+              className="rounded-md border border-red-400/40 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-red-500/20 cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
         {/* OVERVIEW TAB */}
         {activeTab === "overview" && (
           <div className="space-y-6">
@@ -1124,10 +1188,11 @@ export function SparrowxDeployDashboard() {
                 </button>
                 <button
                   type="submit"
-                  className="min-h-[44px] inline-flex items-center gap-2 rounded-lg bg-white hover:bg-zinc-200 text-black px-5 text-sm font-semibold cursor-pointer"
+                  disabled={submitting}
+                  className="min-h-[44px] inline-flex items-center gap-2 rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-60 text-black px-5 text-sm font-semibold cursor-pointer"
                 >
                   <Rocket className="size-4" aria-hidden="true" />
-                  <span>Deploy</span>
+                  <span>{submitting ? "Verifying & Deploying..." : "Deploy"}</span>
                 </button>
               </div>
             </form>
