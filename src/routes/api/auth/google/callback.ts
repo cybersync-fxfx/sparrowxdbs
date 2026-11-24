@@ -34,16 +34,21 @@ export const Route = createFileRoute("/api/auth/google/callback")({
 
         const reqUrl = new URL(request.url);
         const origin = resolveRequestOrigin(request);
+        const stateParam = reqUrl.searchParams.get("state") || "";
 
         const rawStateCookie = extractCookieValue(
           request.headers.get("cookie"),
           GOOGLE_OAUTH_STATE_COOKIE,
         );
-        const verifiedState = await verifyGoogleOAuthState(rawStateCookie);
+        const verifiedCookieState = await verifyGoogleOAuthState(rawStateCookie);
+        const verifiedParamState = await verifyGoogleOAuthState(stateParam);
+        const verifiedState = verifiedCookieState ?? verifiedParamState;
         const fallbackNext = sanitizeGoogleNextUrl(verifiedState?.next, origin);
 
         const failRedirect = (message: string) => {
           const dest = new URL(fallbackNext);
+          if (dest.pathname === "/game/dashboard") dest.pathname = "/game";
+          else if (dest.pathname === "/infra/dashboard") dest.pathname = "/infra";
           dest.searchParams.set("auth_error", message);
           const headers = new Headers();
           headers.set("Location", dest.toString());
@@ -58,13 +63,14 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         }
 
         const code = reqUrl.searchParams.get("code");
-        const stateParam = reqUrl.searchParams.get("state") || "";
-        if (
-          !code ||
-          !verifiedState ||
-          !stateParam ||
-          !timingSafeEqual(stateParam, verifiedState.nonce)
-        ) {
+        const stateMatchesCookie =
+          Boolean(verifiedCookieState && stateParam) &&
+          (timingSafeEqual(stateParam, verifiedCookieState!.nonce) ||
+            (Boolean(verifiedParamState) &&
+              timingSafeEqual(verifiedParamState!.nonce, verifiedCookieState!.nonce)));
+        const stateValid = stateMatchesCookie || Boolean(verifiedParamState);
+
+        if (!code || !verifiedState || !stateParam || !stateValid) {
           return failRedirect("Google sign-in session expired. Please try again.");
         }
 

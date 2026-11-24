@@ -33,6 +33,8 @@ export const Route = createFileRoute("/api/auth/google/login")({
         const { clientId, clientSecret } = googleOAuthCredentials();
         if (!clientId || !clientSecret) {
           const dest = new URL(nextUrl);
+          if (dest.pathname === "/game/dashboard") dest.pathname = "/game";
+          else if (dest.pathname === "/infra/dashboard") dest.pathname = "/infra";
           dest.searchParams.set("auth_error", "Google OAuth is not configured on this server.");
           return new Response(null, {
             status: 302,
@@ -60,7 +62,7 @@ export const Route = createFileRoute("/api/auth/google/login")({
         googleAuthUrl.searchParams.set("scope", "openid email profile");
         googleAuthUrl.searchParams.set("access_type", "online");
         googleAuthUrl.searchParams.set("prompt", "select_account");
-        googleAuthUrl.searchParams.set("state", nonce);
+        googleAuthUrl.searchParams.set("state", signedState);
 
         const headers = new Headers();
         headers.set("Location", googleAuthUrl.toString());

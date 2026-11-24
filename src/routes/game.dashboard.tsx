@@ -21,10 +21,11 @@ import { errorText, useDashboard, useRefreshAll, useServers } from "@/components
 
 export const Route = createFileRoute("/game/dashboard")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { deploy?: string | undefined } => ({
+  validateSearch: (s: Record<string, unknown>): { deploy?: string | undefined; auth_error?: string | undefined } => ({
     deploy: typeof s.deploy === "string" && /^[a-z0-9-]{1,40}$/.test(s.deploy) ? s.deploy : undefined,
+    auth_error: typeof s.auth_error === "string" ? s.auth_error.slice(0, 200) : undefined,
   }),
-  beforeLoad: async () => {
+  beforeLoad: async ({ search }) => {
     let me = await getSessionSummary().catch(() => null);
     if (!me) {
       const localToken = verifySessionToken();
@@ -47,7 +48,12 @@ export const Route = createFileRoute("/game/dashboard")({
         }
       }
     }
-    if (!me) throw redirect({ to: "/game", search: { auth_error: "Please sign in with Google first" } });
+    if (!me) {
+      throw redirect({
+        to: "/game",
+        search: { auth_error: search.auth_error || "Please sign in with Google first" },
+      });
+    }
   },
   head: () => ({
     meta: [
