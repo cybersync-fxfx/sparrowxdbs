@@ -2205,6 +2205,12 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   fi
 
   # Remove foreign Docker containers holding SparrowX ports (80, 443, 5432, 6543, 3000, 3001)
+  # Remove conflicting Traefik proxy container if present so sparrowx-nginx exclusively owns :80/:443
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+    log_fix "Removed conflicting sparrowx-traefik container competing for :80/:443"
+  fi
+
   free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
   free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
   free_docker_port_conflicts "${PG_HOST_PORT}" "${PG_CTR}"
@@ -2488,8 +2494,17 @@ render_sparrowx_nginx_conf() {
 # ============================================================================
 # SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (AUTO-HEALED + L7 DDOS SHIELD)
 # ============================================================================
-limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=45r/s;
-limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=25r/s;
+http2 on;
+
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 5;
+gzip_min_length 256;
+gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml image/svg+xml;
+
+limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=250r/s;
+limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=120r/s;
 limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
 
 # 1. Master Portal + Fallback Default (${SPARROWX_DOMAIN})
@@ -2503,16 +2518,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2583,16 +2598,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2665,16 +2680,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -3083,7 +3098,13 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     [ -n "${PGB_CTR}" ] && docker rm -f "${PGB_CTR}" >/dev/null 2>&1 || true
     [ -n "${REDIS_CTR}" ] && docker rm -f "${REDIS_CTR}" >/dev/null 2>&1 || true
     docker network rm sparrowx_default >/dev/null 2>&1 || true
-    free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
+    # Remove conflicting Traefik proxy container if present so sparrowx-nginx exclusively owns :80/:443
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+    log_fix "Removed conflicting sparrowx-traefik container competing for :80/:443"
+  fi
+
+  free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
     free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
     free_docker_port_conflicts "${PG_HOST_PORT}" "${PG_CTR}"
     free_docker_port_conflicts "${PGRST_HOST_PORT}" "${PGRST_CTR}"
@@ -3461,6 +3482,12 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
   done
 
   # Ensure nothing else on host is holding 80/443
+  # Remove conflicting Traefik proxy container if present so sparrowx-nginx exclusively owns :80/:443
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+    log_fix "Removed conflicting sparrowx-traefik container competing for :80/:443"
+  fi
+
   free_docker_port_conflicts "${HTTP_PORT}" "${EDGE_CTR}"
   free_docker_port_conflicts "${HTTPS_PORT}" "${EDGE_CTR}"
   for web_p in "${HTTP_PORT}" "${HTTPS_PORT}"; do

@@ -1967,8 +1967,8 @@ map \$http_upgrade \$connection_upgrade {
     ''      '';
 }
 
-limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=120r/s;
-limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=60r/s;
+limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=250r/s;
+limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=120r/s;
 limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
 
 # 1. Master SparrowX Command Center & Default Fallback (${SPARROWX_DOMAIN})
@@ -1990,8 +1990,8 @@ server {
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 100;
-    limit_req zone=spx_edge_req burst=250 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2060,16 +2060,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2140,16 +2140,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2366,8 +2366,8 @@ server {
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
