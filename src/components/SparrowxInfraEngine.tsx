@@ -22,6 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { Real3DProcessorChip } from "@/components/ui/Real3DProcessorChip";
 import {
   RyzenChipPinIcon,
   HardwarePinGridWatermark,
@@ -903,10 +904,9 @@ export function SparrowxInfraEngine() {
                     <div className="lg:col-span-4 flex justify-center lg:justify-end">
                       <div className="relative w-full max-w-[260px] sm:max-w-[300px]">
                         <div className="pointer-events-none absolute -inset-4 bg-gradient-to-r from-red-600/25 via-red-500/15 to-transparent blur-2xl rounded-3xl" />
-                        <Floating3DVisual
-                          src="/3d/amd-ryzen-processor.svg"
+                        <Real3DProcessorChip
+                          variant="ryzen"
                           alt="3D floating AMD Ryzen 9 9950X Zen 5 Processor"
-                          accent="crimson"
                           size="md"
                         />
                       </div>
