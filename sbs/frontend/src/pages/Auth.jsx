@@ -83,21 +83,32 @@ export default function Auth({ setToken, initialTab = 'login' }) {
         } catch {
           // ignore storage restrictions
         }
-        const res = await fetch('/api/auth/master-sso', {
+        let res = await fetch('/api/auth/master-sso', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify(explicitToken ? { ssoToken: explicitToken } : {}),
-        });
+        }).catch(() => null);
+        if (!res || res.status >= 500) {
+          const qs = explicitToken ? `?token=${encodeURIComponent(explicitToken)}` : '';
+          res = await fetch(`/api/auth/master-sso${qs}`, {
+            method: 'GET',
+            credentials: 'include',
+          });
+        }
         const data = await res.json().catch(() => ({}));
         if (res.ok && data?.token) {
           setToken(data.token);
           return true;
         }
-        setError(data?.error || 'Could not authorize SparrowX Master session.');
+        setError(data?.error || `Could not authorize SparrowX Master session (HTTP ${res.status}).`);
         return false;
-      } catch {
-        setError('Unable to reach NetSec SSO bridge. Please try manual sign-in.');
+      } catch (err) {
+        setError(
+          err instanceof Error && err.message
+            ? `NetSec SSO bridge error: ${err.message}`
+            : 'Unable to reach NetSec SSO bridge. Please try manual sign-in.'
+        );
         return false;
       } finally {
         setSsoLoading(false);

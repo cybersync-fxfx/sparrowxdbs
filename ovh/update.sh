@@ -546,6 +546,7 @@ ensure_netsec_dashboard_running() {
   if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
     mkdir -p "${netsec_dir}" "${netsec_dir}/frontend/public" "${netsec_dir}/frontend/src/components" "${netsec_dir}/frontend/src/pages" 2>/dev/null || true
     cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
+    cp -f "${local_sbs_src}/pg-compat.js" "${netsec_dir}/pg-compat.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
     cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
@@ -560,6 +561,9 @@ ensure_netsec_dashboard_running() {
         sbs_assets_changed="yes"
       fi
       if [ -f "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" "${netsec_dir}/frontend/src/pages/Dashboard.jsx" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/src/pages/Auth.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Auth.jsx" "${netsec_dir}/frontend/src/pages/Auth.jsx" 2>/dev/null; then
         sbs_assets_changed="yes"
       fi
       cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/public/" 2>/dev/null || true
