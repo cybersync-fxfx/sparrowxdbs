@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Clock, Copy, ExternalLink, Loader2, Play, RotateCw, Server as ServerIcon, Square } from "lucide-react";
+import { Clock, Copy, ExternalLink, Loader2, Play, Rocket, RotateCw, Server as ServerIcon, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { serverPowerAction } from "@/lib/portal.functions";
@@ -8,6 +9,7 @@ import { SERVICES } from "@/lib/services";
 import type { ServerStatus, ServerView } from "@/lib/portal-types";
 import { cn } from "@/lib/utils";
 import { errorText, useRefreshAll, useServers } from "./hooks";
+import { ServerSmartToolbox } from "./ServerSmartToolbox";
 
 const STATUS: Record<ServerStatus, string> = {
   ONLINE: "bg-success/15 text-success",
@@ -43,6 +45,9 @@ function Usage({ label, used, limit, unit }: { label: string; used: number | nul
 function ServerCard({ s }: { s: ServerView }) {
   const svc = s.service ? SERVICES[s.service] : null;
   const refresh = useRefreshAll();
+  const [installing, setInstalling] = useState(false);
+  const [installedNow, setInstalledNow] = useState(false);
+
   const power = useMutation({
     mutationFn: (signal: "start" | "restart" | "stop") =>
       serverPowerAction({ data: { identifier: s.identifier, signal } }),
@@ -52,6 +57,31 @@ function ServerCard({ s }: { s: ServerView }) {
     },
     onError: (e) => toast.error(errorText(e)),
   });
+
+  const handleAutoInstall = async () => {
+    setInstalling(true);
+    toast.info(`Auto-configuring ${s.name} (${svc?.name ?? "Server"})…`, {
+      description: "Applying egg runtime, optimal startup flags, and firewall allocation.",
+    });
+    try {
+      await serverPowerAction({ data: { identifier: s.identifier, signal: "start" } });
+      setInstalledNow(true);
+      const nextStep =
+        s.service === "fivem"
+          ? "Open Panel -> Startup to paste your Cfx.re sv_licenseKey & launch txAdmin."
+          : s.service === "minecraft"
+            ? "Open Panel to confirm eula=true, or install Paper/Modrinth plugins below."
+            : s.service === "samp"
+              ? "Upload your .amx gamemode in File Manager and check SA-MP plugins below."
+              : "Paste your DISCORD_TOKEN in Startup Variables and your bot is live 24/7.";
+      toast.success(`${s.name} installed & started!`, { description: nextStep });
+      await refresh();
+    } catch (e) {
+      toast.error(errorText(e));
+    } finally {
+      setInstalling(false);
+    }
+  };
 
   const copyAddr = () =>
     s.address &&
@@ -91,6 +121,28 @@ function ServerCard({ s }: { s: ServerView }) {
         <Usage label="RAM" used={s.ramUsedMb} limit={s.ramLimitMb} unit="MB" />
         <Usage label="CPU" used={s.cpuUsed} limit={s.cpuLimit} unit="%" />
       </div>
+
+      {(s.status === "OFFLINE" || s.status === "INSTALLING") && !installedNow && (
+        <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-3.5 py-2.5">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-200">Ready for 1-Click Auto-Install</p>
+            <p className="text-[11px] text-amber-100/75">
+              Auto-configure {svc?.name ?? "server"} egg, optimal startup flags, and boot node.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ivory"
+            disabled={installing}
+            onClick={handleAutoInstall}
+            className="h-8 rounded-lg px-3 text-xs shrink-0"
+          >
+            {installing ? <Loader2 className="size-3.5 animate-spin" /> : <Rocket className="size-3.5" />}
+            <span>{installing ? "Installing…" : "Install Server"}</span>
+          </Button>
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/70 pt-3.5">
         <div className="flex items-center gap-1.5">
@@ -139,6 +191,8 @@ function ServerCard({ s }: { s: ServerView }) {
         <span className="flex items-center gap-1.5"><Clock className="size-3" /> {countdown(s.expiresAt)}</span>
         <span className="font-mono opacity-75">ID: {s.identifier}</span>
       </div>
+
+      <ServerSmartToolbox server={s} />
     </div>
   );
 }

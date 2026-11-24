@@ -2781,6 +2781,10 @@ PGRST_STATUS="$(curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/" >/dev/null 2>&1
 EDGE_STATUS="$(curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${HTTP_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$" && echo "ONLINE" || echo "CHECK")"
 PTERO_STATUS="NOT INSTALLED"
 if is_pterodactyl_installed; then
+  if [ -f "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" ]; then
+    log_info "Syncing SparrowX Midnight Theme, Toast Bridge & Curated Game/Bot Eggs into Pterodactyl..."
+    bash "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" || log_warn "Pterodactyl eggs/theme sync had non-fatal warnings."
+  fi
   PTERO_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAME}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
   if ! echo "${PTERO_EDGE_CODE}" | grep -qE "^(200|301|302)$"; then
     heal_pterodactyl_host_nginx

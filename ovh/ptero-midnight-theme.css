@@ -1,0 +1,127 @@
+/* ============================================================================
+   SPARROWX PTERODACTYL MIDNIGHT BLACK THEME + PER-SERVER DYNAMIC ACCENTS
+   Injected into game.panel.sparrowx.net by ovh/ptero-eggs-sync.sh
+   ============================================================================ */
+:root {
+  color-scheme: dark;
+  --spx-bg: #000000;
+  --spx-surface: #07090f;
+  --spx-surface-elevated: #0d111a;
+  --spx-border: rgba(255, 255, 255, 0.09);
+  --spx-accent: #f96246;
+  --spx-accent-glow: rgba(249, 98, 70, 0.25);
+}
+
+/* Per-server dynamic themes */
+:root[data-spx-theme="minecraft"] {
+  --spx-accent: #84cc16;
+  --spx-accent-glow: rgba(132, 204, 22, 0.25);
+}
+:root[data-spx-theme="fivem"] {
+  --spx-accent: #ff6b00;
+  --spx-accent-glow: rgba(255, 107, 0, 0.28);
+}
+:root[data-spx-theme="samp"] {
+  --spx-accent: #f59e0b;
+  --spx-accent-glow: rgba(245, 158, 11, 0.26);
+}
+:root[data-spx-theme="discord"] {
+  --spx-accent: #6366f1;
+  --spx-accent-glow: rgba(99, 102, 241, 0.28);
+}
+
+html,
+body,
+#app {
+  background-color: var(--spx-bg) !important;
+  background-image: radial-gradient(
+    ellipse 70% 35% at 50% -8%,
+    var(--spx-accent-glow),
+    transparent 65%
+  ) !important;
+  color: #f4f6fa !important;
+}
+
+/* Override Pterodactyl default slate/neutral cards with Midnight Black glass */
+div[class*="GreyRowBox"],
+div[class*="TitledGreyBox"],
+div[class*="ContentBox"],
+nav[class*="NavigationBar"],
+div[class*="SubNavigation"] {
+  background-color: var(--spx-surface) !important;
+  border-color: var(--spx-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+div[class*="SubNavigation"] a.active,
+div[class*="SubNavigation"] a:hover {
+  border-bottom-color: var(--spx-accent) !important;
+  color: #ffffff !important;
+}
+
+/* SparrowX Floating Smart Suggestion Toaster */
+#spx-ptero-toast-root {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.spx-ptero-toast {
+  background: rgba(8, 10, 16, 0.94);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--spx-accent);
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #f8fafc;
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.92), 0 0 24px -6px var(--spx-accent-glow);
+  font-size: 12.5px;
+  line-height: 1.45;
+  animation: spxToastIn 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spx-ptero-toast-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: #ffffff;
+}
+
+.spx-ptero-toast-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: var(--spx-accent-glow);
+  color: var(--spx-accent);
+}
+
+.spx-ptero-toast-close {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+}
+
+@keyframes spxToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
