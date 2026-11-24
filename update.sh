@@ -1716,6 +1716,12 @@ fi
 # ==============================================================================
 draw_progress 4 7 "SSL & Multi-Domain Nginx"
 
+# Auto-sync Cloudflare DNS records (A records + _dmarc TXT) when CF_DNS_API_TOKEN is set in .env
+if [ -f "${INSTALL_DIR}/deploy/cf-dns-sync.sh" ]; then
+  chmod +x "${INSTALL_DIR}/deploy/cf-dns-sync.sh" 2>/dev/null || true
+  bash "${INSTALL_DIR}/deploy/cf-dns-sync.sh" || log_warn "Cloudflare DNS sync returned non-zero (continuing update)."
+fi
+
 mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/ovh/certbot-www/.well-known/acme-challenge" "${INSTALL_DIR}/data/users" "${INSTALL_DIR}/data/backups"
 
 SSL_CERT="${INSTALL_DIR}/ovh/ssl/fullchain.pem"
