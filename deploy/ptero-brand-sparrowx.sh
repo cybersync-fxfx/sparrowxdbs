@@ -232,16 +232,45 @@ nav,
   display: inline-block;
 }
 
-/* Subtle SparrowX Footer Credit */
-.spx-footer-badge {
+/* Subtle SparrowX Footer + WhatsApp Support Dock */
+.spx-footer-dock {
   position: fixed;
   right: 14px;
-  bottom: 10px;
+  bottom: 12px;
   z-index: 30;
   display: inline-flex;
   align-items: center;
+  gap: 8px;
+}
+
+.spx-whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 6px 12px;
+  border-radius: 9999px;
+  background: rgba(16, 185, 129, 0.16);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: #6ee7b7;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.spx-whatsapp-btn:hover {
+  background: #10b981;
+  border-color: #10b981;
+  color: #05060a;
+}
+
+.spx-footer-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
   border-radius: 9999px;
   background: rgba(9, 11, 17, 0.85);
   border: 1px solid var(--spx-border);
@@ -353,14 +382,27 @@ cat > "${BRAND_ASSET_DIR}/sparrowx-brand.js" <<'EOF'
   }
 
   function ensureFooterPill() {
-    if (document.querySelector(".spx-footer-badge")) return;
-    var a = document.createElement("a");
-    a.href = "https://sparrowx.net";
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.className = "spx-footer-badge";
-    a.innerHTML = '<img src="' + LOGO_URL + '" alt="" /><span>Powered by SparrowX Technologies</span>';
-    document.body.appendChild(a);
+    if (document.querySelector(".spx-footer-dock")) return;
+    var dock = document.createElement("div");
+    dock.className = "spx-footer-dock";
+
+    var wa = document.createElement("a");
+    wa.href = "https://wa.me/919025056678?text=Hi%20SparrowX%20Hosting%20Support%2C%20I%20need%20help%20with%20my%20game%20server.";
+    wa.target = "_blank";
+    wa.rel = "noopener noreferrer";
+    wa.className = "spx-whatsapp-btn";
+    wa.innerHTML = '<span>WhatsApp Support · +91 90250 56678</span>';
+
+    var brand = document.createElement("a");
+    brand.href = "https://sparrowx.net";
+    brand.target = "_blank";
+    brand.rel = "noopener noreferrer";
+    brand.className = "spx-footer-badge";
+    brand.innerHTML = '<img src="' + LOGO_URL + '" alt="" /><span>SparrowX Hosting</span>';
+
+    dock.appendChild(wa);
+    dock.appendChild(brand);
+    document.body.appendChild(dock);
   }
 
   function run() {
@@ -400,9 +442,9 @@ txt = re.sub(r"\n?<!-- SPARROWX-BRAND:START -->.*?<!-- SPARROWX-BRAND:END -->\n?
 
 snippet = """
 <!-- SPARROWX-BRAND:START -->
-<link rel="icon" type="image/png" href="/sparrowx/logo.png?v=2026b">
-<link rel="stylesheet" href="/sparrowx/sparrowx-theme.css?v=2026b">
-<script src="/sparrowx/sparrowx-brand.js?v=2026b" defer></script>
+<link rel="icon" type="image/png" href="/sparrowx/logo.png?v=2026c">
+<link rel="stylesheet" href="/sparrowx/sparrowx-theme.css?v=2026c">
+<script src="/sparrowx/sparrowx-brand.js?v=2026c" defer></script>
 <!-- SPARROWX-BRAND:END -->
 """
 
