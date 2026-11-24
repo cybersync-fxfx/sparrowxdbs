@@ -48,6 +48,9 @@ import { Route as ApiDeployProjectsRouteImport } from './routes/api/deploy/proje
 import { Route as ApiDeploySiteRouteImport } from './routes/api/deploy/site'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
+import { Route as ApiPayOrderRouteImport } from './routes/api/pay/order'
+import { Route as ApiPayUpiIngestRouteImport } from './routes/api/pay/upi-ingest'
+import { Route as ApiPayVerifyRouteImport } from './routes/api/pay/verify'
 import { Route as ApiSystemBackboneRouteImport } from './routes/api/system/backbone'
 import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
@@ -256,6 +259,21 @@ const ApiInfraLatencyProbeRoute = ApiInfraLatencyProbeRouteImport.update({
   path: '/api/infra/latency-probe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPayOrderRoute = ApiPayOrderRouteImport.update({
+  id: '/api/pay/order',
+  path: '/api/pay/order',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPayUpiIngestRoute = ApiPayUpiIngestRouteImport.update({
+  id: '/api/pay/upi-ingest',
+  path: '/api/pay/upi-ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPayVerifyRoute = ApiPayVerifyRouteImport.update({
+  id: '/api/pay/verify',
+  path: '/api/pay/verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSystemBackboneRoute = ApiSystemBackboneRouteImport.update({
   id: '/api/system/backbone',
   path: '/api/system/backbone',
@@ -349,6 +367,9 @@ export interface FileRoutesByFullPath {
   '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/pay/order': typeof ApiPayOrderRoute
+  '/api/pay/upi-ingest': typeof ApiPayUpiIngestRoute
+  '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
@@ -400,6 +421,9 @@ export interface FileRoutesByTo {
   '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/pay/order': typeof ApiPayOrderRoute
+  '/api/pay/upi-ingest': typeof ApiPayUpiIngestRoute
+  '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
@@ -452,6 +476,9 @@ export interface FileRoutesById {
   '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
+  '/api/pay/order': typeof ApiPayOrderRoute
+  '/api/pay/upi-ingest': typeof ApiPayUpiIngestRoute
+  '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
@@ -505,6 +532,9 @@ export interface FileRouteTypes {
     | '/api/deploy/site'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/pay/order'
+    | '/api/pay/upi-ingest'
+    | '/api/pay/verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/auth/google/callback'
@@ -556,6 +586,9 @@ export interface FileRouteTypes {
     | '/api/deploy/site'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/pay/order'
+    | '/api/pay/upi-ingest'
+    | '/api/pay/verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/auth/google/callback'
@@ -607,6 +640,9 @@ export interface FileRouteTypes {
     | '/api/deploy/site'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
+    | '/api/pay/order'
+    | '/api/pay/upi-ingest'
+    | '/api/pay/verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/auth/google/callback'
@@ -659,6 +695,9 @@ export interface RootRouteChildren {
   ApiDeploySiteRoute: typeof ApiDeploySiteRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
+  ApiPayOrderRoute: typeof ApiPayOrderRoute
+  ApiPayUpiIngestRoute: typeof ApiPayUpiIngestRoute
+  ApiPayVerifyRoute: typeof ApiPayVerifyRoute
   ApiSystemBackboneRoute: typeof ApiSystemBackboneRoute
   ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
@@ -946,6 +985,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiInfraLatencyProbeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/pay/order': {
+      id: '/api/pay/order'
+      path: '/api/pay/order'
+      fullPath: '/api/pay/order'
+      preLoaderRoute: typeof ApiPayOrderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pay/upi-ingest': {
+      id: '/api/pay/upi-ingest'
+      path: '/api/pay/upi-ingest'
+      fullPath: '/api/pay/upi-ingest'
+      preLoaderRoute: typeof ApiPayUpiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pay/verify': {
+      id: '/api/pay/verify'
+      path: '/api/pay/verify'
+      fullPath: '/api/pay/verify'
+      preLoaderRoute: typeof ApiPayVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/system/backbone': {
       id: '/api/system/backbone'
       path: '/api/system/backbone'
@@ -1059,6 +1119,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDeploySiteRoute: ApiDeploySiteRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
+  ApiPayOrderRoute: ApiPayOrderRoute,
+  ApiPayUpiIngestRoute: ApiPayUpiIngestRoute,
+  ApiPayVerifyRoute: ApiPayVerifyRoute,
   ApiSystemBackboneRoute: ApiSystemBackboneRoute,
   ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,

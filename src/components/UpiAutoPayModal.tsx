@@ -15,18 +15,26 @@ import {
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { WhatsAppLogo } from "@/components/WhatsAppPlansToaster";
 
+export type CheckoutPayMethod = "upi" | "binance_usdt_trc20" | "binance_usdt_bep20";
+
 export interface UpiCheckoutOrder {
   orderId: string;
-  service: "infra" | "game" | "db" | "shield" | "netsec" | "wallet";
+  method?: CheckoutPayMethod;
+  service: "infra" | "game" | "db" | "shield" | "netsec" | "wallet" | "drop" | "deploy";
   planId: string;
   planName: string;
   amountInr: number;
-  exactAmountInr: string;
-  upiId: string;
-  merchantName: string;
-  upiUri: string;
+  exactAmountInr?: string;
+  exactAmount?: string;
+  currency?: "INR" | "USDT";
+  upiId?: string;
+  merchantName?: string;
+  upiUri?: string;
+  network?: "TRC20" | "BEP20";
+  depositAddress?: string;
   status: "PENDING" | "PAID" | "EXPIRED";
   utr?: string;
+  verifiedRef?: string;
   confirmedVia?: string;
   provisionedServer?: {
     id: string;
@@ -113,8 +121,8 @@ export function UpiAutoPayModal({
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const titleId = useId();
 
+  const [payMethod, setPayMethod] = useState<CheckoutPayMethod>("upi");
   const [order, setOrder] = useState<UpiCheckoutOrder | null>(null);
-  const [gatewayMode, setGatewayMode] = useState<string>("hybrid_sandbox");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const [utrInput, setUtrInput] = useState("");
@@ -150,10 +158,11 @@ export function UpiAutoPayModal({
     setUtrInput("");
     setOrder(null);
 
-    void fetch("/api/payments/upi/create", {
+    void fetch("/api/pay/order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        method: payMethod,
         service,
         planId,
         planName,
@@ -163,17 +172,19 @@ export function UpiAutoPayModal({
       }),
     })
       .then((res) => res.json())
-      .then((json: { ok?: boolean; order?: UpiCheckoutOrder; mode?: string; error?: string }) => {
+      .then((json: { ok?: boolean; order?: UpiCheckoutOrder; error?: string }) => {
         if (!active) return;
         if (json.ok && json.order) {
-          setOrder(json.order);
-          if (json.mode) setGatewayMode(json.mode);
+          setOrder({
+            ...json.order,
+            exactAmountInr: json.order.exactAmountInr || json.order.exactAmount || `${amountInr}.00`,
+          });
         } else {
-          setError(json.error || "Unable to initialize UPI order.");
+          setError(json.error || "Unable to initialize SparrowX Pay order.");
         }
       })
       .catch(() => {
-        if (active) setError("Could not reach SparrowX UPI billing endpoint.");
+        if (active) setError("Could not reach SparrowX Pay backend endpoint.");
       })
       .finally(() => {
         if (active) setCreating(false);
@@ -182,28 +193,34 @@ export function UpiAutoPayModal({
     return () => {
       active = false;
     };
-  }, [open, service, planId, planName, amountInr, customerEmail, metadata]);
+  }, [open, payMethod, service, planId, planName, amountInr, customerEmail, metadata]);
 
-  // Automatic 2.5s status polling for instant webhook auto-confirmation
+  // Automatic 4s server-side status polling (UPI bank ledger + Binance Spot Read-Only API)
   useEffect(() => {
     if (!open || !order || order.status !== "PENDING") return;
     const timer = window.setInterval(() => {
-      void fetch(`/api/payments/upi/status?orderId=${encodeURIComponent(order.orderId)}`)
+      void fetch(`/api/pay/order?orderId=${encodeURIComponent(order.orderId)}`)
         .then((r) => r.json())
         .then((json: { ok?: boolean; order?: UpiCheckoutOrder }) => {
           if (json.ok && json.order && json.order.status === "PAID") {
-            setOrder(json.order);
-            onPaymentConfirmed?.(json.order);
+            const normalized = {
+              ...json.order,
+              exactAmountInr: json.order.exactAmountInr || json.order.exactAmount || `${amountInr}.00`,
+              utr: json.order.utr || json.order.verifiedRef,
+            };
+            setOrder(normalized);
+            onPaymentConfirmed?.(normalized);
           }
         })
         .catch(() => {});
-    }, 2500);
+    }, 4000);
     return () => window.clearInterval(timer);
-  }, [open, order, onPaymentConfirmed]);
+  }, [open, order, amountInr, onPaymentConfirmed]);
 
+  const qrPayload = order?.upiUri || order?.depositAddress || "";
   const qrMatrix = useMemo(
-    () => (order ? buildQrMatrix(order.upiUri, 25) : []),
-    [order],
+    () => (qrPayload ? buildQrMatrix(qrPayload, 25) : []),
+    [qrPayload],
   );
 
   const handleCopy = (val: string, field: string) => {
@@ -220,56 +237,31 @@ export function UpiAutoPayModal({
     setVerifyingUtr(true);
     setError("");
     try {
-      const res = await fetch("/api/payments/upi/verify-utr", {
+      const res = await fetch("/api/pay/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: order.orderId, utr: utrInput }),
       });
       const json = (await res.json()) as {
         ok?: boolean;
+        verified?: boolean;
         message?: string;
+        error?: string;
         order?: UpiCheckoutOrder;
       };
-      if (json.ok && json.order) {
-        setOrder(json.order);
-        onPaymentConfirmed?.(json.order);
+      if (json.ok && json.verified && json.order) {
+        const normalized = {
+          ...json.order,
+          exactAmountInr: json.order.exactAmountInr || json.order.exactAmount || `${amountInr}.00`,
+          utr: json.order.utr || json.order.verifiedRef,
+        };
+        setOrder(normalized);
+        onPaymentConfirmed?.(normalized);
       } else {
-        setError(json.message || "Unable to verify UTR yet.");
+        setError(json.message || json.error || "Not confirmed in bank/Binance ledger yet.");
       }
     } catch {
-      setError("Network error verifying UPI reference.");
-    } finally {
-      setVerifyingUtr(false);
-    }
-  };
-
-  const simulateWebhookAutoConfirm = async () => {
-    if (!order) return;
-    setVerifyingUtr(true);
-    setError("");
-    try {
-      const res = await fetch("/api/payments/upi/webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          orderId: order.orderId,
-          amountInr: Number(order.exactAmountInr),
-          utr: `4321${Date.now().toString().slice(-8)}`,
-        }),
-      });
-      const json = (await res.json()) as {
-        ok?: boolean;
-        message?: string;
-        order?: UpiCheckoutOrder;
-      };
-      if (json.ok && json.order) {
-        setOrder(json.order);
-        onPaymentConfirmed?.(json.order);
-      } else {
-        setError(json.message || "Webhook simulation rejected.");
-      }
-    } catch {
-      setError("Failed to trigger auto-confirmation webhook.");
+      setError("Network error verifying payment reference.");
     } finally {
       setVerifyingUtr(false);
     }
@@ -289,10 +281,10 @@ export function UpiAutoPayModal({
           </div>
           <div>
             <h2 id={titleId} className="text-base font-bold text-white">
-              SparrowX Unified UPI Checkout
+              SparrowX Pay — UPI &amp; Binance USDT
             </h2>
             <p className="text-xs text-zinc-400">
-              Instant auto-confirmation via GPay, PhonePe, Paytm or BHIM
+              Self-verified direct settlement · 0% gateway fee
             </p>
           </div>
         </div>
@@ -300,7 +292,7 @@ export function UpiAutoPayModal({
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close UPI checkout"
+          aria-label="Close SparrowX Pay checkout"
           className="size-8 rounded-lg border border-white/15 bg-[#0B0E15] hover:bg-white/10 grid place-items-center text-zinc-300 hover:text-white cursor-pointer"
         >
           <X className="size-4" aria-hidden="true" />
@@ -308,6 +300,31 @@ export function UpiAutoPayModal({
       </div>
 
       <div className="overflow-y-auto p-5 space-y-5">
+        {/* Payment Method Selector Tabs */}
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-[#06080D] p-1">
+          {(
+            [
+              { id: "upi", label: "UPI QR (INR)" },
+              { id: "binance_usdt_trc20", label: "USDT TRC20" },
+              { id: "binance_usdt_bep20", label: "USDT BEP20" },
+            ] as const
+          ).map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setPayMethod(m.id)}
+              className={`min-h-[38px] rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+                payMethod === m.id
+                  ? m.id === "upi"
+                    ? "bg-emerald-500 text-black"
+                    : "bg-amber-400 text-black"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
         {creating && (
           <div className="py-12 flex flex-col items-center gap-3 text-sm text-zinc-300">
             <Loader2 className="size-6 animate-spin text-sky-400" aria-hidden="true" />
@@ -374,22 +391,30 @@ export function UpiAutoPayModal({
                 </div>
               </div>
               <div className="text-right tabular-nums">
-                <div className="text-xl font-bold text-white">₹{order.exactAmountInr}</div>
+                <div className="text-xl font-bold text-white">
+                  {order.currency === "USDT"
+                    ? `${order.exactAmount} USDT`
+                    : `₹${order.exactAmountInr}`}
+                </div>
                 <div className="text-xs text-emerald-400 flex items-center justify-end gap-1">
                   <Loader2 className="size-3 animate-spin" aria-hidden="true" />
-                  <span>Listening for UPI</span>
+                  <span>
+                    {order.currency === "USDT"
+                      ? `Watching Binance (${order.network})`
+                      : "Watching Bank Ledger"}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Scannable QR + Direct UPI Details */}
+            {/* Scannable QR + Direct Payment Details */}
             <div className="grid grid-cols-1 sm:grid-cols-[190px_1fr] gap-5 items-center">
               <div className="mx-auto rounded-xl bg-white p-3 shadow-lg">
                 <svg
                   viewBox="0 0 25 25"
                   className="size-40 block"
                   role="img"
-                  aria-label={`UPI QR code for order ${order.orderId} amount ₹${order.exactAmountInr}`}
+                  aria-label={`Payment QR code for order ${order.orderId}`}
                 >
                   <rect width="25" height="25" fill="#ffffff" />
                   {qrMatrix.map((row, rIdx) =>
@@ -411,40 +436,51 @@ export function UpiAutoPayModal({
 
               <div className="space-y-3 text-xs">
                 <div className="space-y-1">
-                  <span className="text-zinc-400 block">Pay to Merchant UPI ID</span>
+                  <span className="text-zinc-400 block">
+                    {order.currency === "USDT"
+                      ? `Send EXACTLY ${order.exactAmount} USDT (${order.network}) to:`
+                      : `Pay EXACTLY ₹${order.exactAmountInr} to Merchant UPI ID`}
+                  </span>
                   <div className="flex items-center gap-2 rounded-lg border border-white/12 bg-[#06080D] px-3 py-2">
                     <code className="flex-1 truncate text-sm font-semibold text-white">
-                      {order.upiId}
+                      {order.currency === "USDT" ? order.depositAddress : order.upiId}
                     </code>
                     <button
                       type="button"
-                      onClick={() => handleCopy(order.upiId, "upi")}
+                      onClick={() =>
+                        handleCopy(
+                          (order.currency === "USDT" ? order.depositAddress : order.upiId) || "",
+                          "dest",
+                        )
+                      }
                       className="text-sky-400 hover:text-sky-300 inline-flex items-center gap-1 cursor-pointer shrink-0"
                     >
-                      {copiedField === "upi" ? (
+                      {copiedField === "dest" ? (
                         <Check className="size-3.5" aria-hidden="true" />
                       ) : (
                         <Copy className="size-3.5" aria-hidden="true" />
                       )}
-                      <span>{copiedField === "upi" ? "Copied" : "Copy"}</span>
+                      <span>{copiedField === "dest" ? "Copied" : "Copy"}</span>
                     </button>
                   </div>
                 </div>
 
-                {/* One-Tap Mobile UPI App Intent */}
-                <a
-                  href={order.upiUri}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3.5 py-2.5 text-xs font-semibold text-black transition-colors duration-150"
-                >
-                  <Smartphone className="size-4" aria-hidden="true" />
-                  <span>Pay ₹{order.exactAmountInr} in GPay / PhonePe / Paytm</span>
-                  <ExternalLink className="size-3.5" aria-hidden="true" />
-                </a>
+                {/* One-Tap Mobile UPI App Intent (UPI mode only) */}
+                {order.currency !== "USDT" && order.upiUri && (
+                  <a
+                    href={order.upiUri}
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3.5 py-2.5 text-xs font-semibold text-black transition-colors duration-150"
+                  >
+                    <Smartphone className="size-4" aria-hidden="true" />
+                    <span>Pay ₹{order.exactAmountInr} in GPay / PhonePe / Paytm</span>
+                    <ExternalLink className="size-3.5" aria-hidden="true" />
+                  </a>
+                )}
 
                 {/* Direct WhatsApp Subscription Contact */}
                 <a
                   href={buildWhatsAppSupportUrl(
-                    `Hi SparrowX, I am starting a subscription for ${order.planName} (₹${order.exactAmountInr}, Order: ${order.orderId}, Email: ${customerEmail}).`,
+                    `Hi SparrowX, I am paying for ${order.planName} (${order.currency === "USDT" ? `${order.exactAmount} USDT ${order.network}` : `₹${order.exactAmountInr}`}, Order: ${order.orderId}, Email: ${customerEmail}).`,
                   )}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -457,7 +493,7 @@ export function UpiAutoPayModal({
                 <p className="text-[11px] text-zinc-400 leading-relaxed flex items-start gap-1.5">
                   <ShieldCheck className="size-3.5 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
                   <span>
-                    Keep this window open. Payment auto-confirms within 2–3 seconds once your UPI app completes transfer.
+                    Send the exact amount shown above. Your order auto-confirms as soon as our server verifies the deposit.
                   </span>
                 </p>
 
@@ -466,52 +502,52 @@ export function UpiAutoPayModal({
               </div>
             </div>
 
-            {/* Instant 12-Digit UTR Auto-Match Form */}
+            {/* Server-Side Verification Form (UTR for UPI, or Check Now for Binance USDT) */}
             <form
               onSubmit={handleVerifyUtr}
               className="rounded-xl border border-white/10 bg-[#06080D] p-4 space-y-2.5"
             >
-              <label
-                htmlFor="spx-upi-utr"
-                className="text-xs font-medium text-zinc-300 block"
-              >
-                Already paid? Enter 12-digit UPI UTR / Reference Number for instant match
-              </label>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  id="spx-upi-utr"
-                  type="text"
-                  value={utrInput}
-                  onChange={(e) => setUtrInput(e.target.value)}
-                  placeholder="e.g. 432198765432"
-                  className="flex-1 rounded-lg border border-white/15 bg-[#0B0E15] px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-400 tabular-nums"
-                />
-                <button
-                  type="submit"
-                  disabled={verifyingUtr || !utrInput.trim()}
-                  className="rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-black cursor-pointer shrink-0"
-                >
-                  {verifyingUtr ? "Matching..." : "Verify UTR"}
-                </button>
-              </div>
+              {order.currency === "USDT" ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="text-xs text-zinc-300">
+                    Already sent {order.exactAmount} USDT ({order.network})?
+                  </span>
+                  <button
+                    type="submit"
+                    disabled={verifyingUtr}
+                    className="rounded-lg bg-amber-400 hover:bg-amber-300 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-black cursor-pointer shrink-0"
+                  >
+                    {verifyingUtr ? "Checking Binance..." : "Check Binance Deposit Now"}
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <label
+                    htmlFor="spx-upi-utr"
+                    className="text-xs font-medium text-zinc-300 block"
+                  >
+                    Already paid? Enter 12-digit UPI UTR to match against verified bank credits
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      id="spx-upi-utr"
+                      type="text"
+                      value={utrInput}
+                      onChange={(e) => setUtrInput(e.target.value)}
+                      placeholder="e.g. 432198765432"
+                      className="flex-1 rounded-lg border border-white/15 bg-[#0B0E15] px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-400 tabular-nums"
+                    />
+                    <button
+                      type="submit"
+                      disabled={verifyingUtr || !utrInput.trim()}
+                      className="rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-black cursor-pointer shrink-0"
+                    >
+                      {verifyingUtr ? "Verifying..." : "Verify UTR"}
+                    </button>
+                  </div>
+                </>
+              )}
             </form>
-
-            {/* Sandbox Test Button when live webhook secret is not configured yet */}
-            {gatewayMode === "hybrid_sandbox" && (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3.5 py-2.5 text-xs">
-                <span className="text-amber-200">
-                  Sandbox mode active (set <code className="font-mono">SPARROWX_UPI_BRIDGE_SECRET</code> or <code className="font-mono">RAZORPAY_WEBHOOK_SECRET</code> in <code className="font-mono">.env</code> for live bank auto-confirm).
-                </span>
-                <button
-                  type="button"
-                  onClick={simulateWebhookAutoConfirm}
-                  disabled={verifyingUtr}
-                  className="rounded-md bg-amber-400 hover:bg-amber-300 px-3 py-1.5 text-xs font-semibold text-black cursor-pointer shrink-0"
-                >
-                  Simulate Auto-Webhook
-                </button>
-              </div>
-            )}
           </>
         )}
 
