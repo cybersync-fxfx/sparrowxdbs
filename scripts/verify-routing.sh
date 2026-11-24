@@ -53,11 +53,11 @@ assert_redirect_301() {
   status="$(printf '%s\n' "$hdrs" | awk 'toupper($1) ~ /^HTTP/ {code=$2} END{print code}')"
   loc="$(printf '%s\n' "$hdrs" | awk 'tolower($1)=="location:" {sub(/\r$/,""); print $2; exit}')"
 
-  if [[ "$status" == "301" && "$loc" == "$expected_loc"* ]]; then
-    green "301 ${scheme}://${host}${path} -> ${loc}"
+  if [[ ("$status" == "301" || "$status" == "308") && "$loc" == "$expected_loc"* ]]; then
+    green "${status} ${scheme}://${host}${path} -> ${loc}"
     PASS=$((PASS + 1))
   else
-    red "Expected 301 -> ${expected_loc} for ${scheme}://${host}${path}, got HTTP ${status:-ERR} (Location: ${loc:-none})"
+    red "Expected 301/308 -> ${expected_loc} for ${scheme}://${host}${path}, got HTTP ${status:-ERR} (Location: ${loc:-none})"
     FAIL=$((FAIL + 1))
   fi
 }

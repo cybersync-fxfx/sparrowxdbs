@@ -438,7 +438,20 @@ http:
       tls:
         certResolver: letsencrypt
 
-    # === E. CATCH-ALL HOST ISOLATION ===
+    # === E. WILDCARD TENANT FALLBACK (NOINDEX) & CATCH-ALL HOST ISOLATION ===
+    # Ensures any unprovisioned *.ai.sparrowx.net or *.deploy.sparrowx.net host
+    # still carries X-Robots-Tag: noindex, nofollow before Coolify binds a container.
+    wildcard-tenant-noindex-fallback:
+      rule: "HostRegexp(`^[a-z0-9-]+\\.ai\\.sparrowx\\.net$`) || HostRegexp(`^[a-z0-9-]+\\.deploy\\.sparrowx\\.net$`)"
+      entryPoints: [websecure]
+      priority: 10
+      middlewares:
+        - tenant-security-headers
+        - noindex
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
+
     # 1. tls.options.default.sniStrict=true immediately aborts TLS handshakes for
     #    unknown SNI hostnames or direct OVH IP access (zero certificate leakage).
     # 2. Any forged/unmapped Host header on a valid TLS connection matches NO router,
