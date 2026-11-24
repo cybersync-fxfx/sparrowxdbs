@@ -219,10 +219,18 @@ run_maintain() {
   local web_code
   web_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 6 -H "Host: ${SPARROWX_DOMAIN}" "https://127.0.0.1:${HTTPS_PORT}/api/v1/health" 2>/dev/null || echo "000")"
   if ! echo "${web_code}" | grep -qE "^(200|301|302)$"; then
-    log_msg "HEAL" "Main site probe returned HTTP ${web_code} — restarting sparrowx-app & reloading sparrowx-nginx..."
-    docker restart sparrowx-app >/dev/null 2>&1 || true
+    log_msg "HEAL" "Main site probe returned HTTP ${web_code} — checking app & edge nginx..."
+    if systemctl is-active --quiet sparrowx-native.service 2>/dev/null; then
+      systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
+    else
+      docker restart sparrowx-app >/dev/null 2>&1 || true
+    fi
     sleep 3
-    docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    if docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
+      docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || true
+    else
+      docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    fi
     healed+=("web-probe:${web_code}")
   fi
 

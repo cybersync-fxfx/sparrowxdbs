@@ -516,7 +516,12 @@ export function maskSecretKey(secret: string | undefined | null, visiblePrefix =
 
 async function purgeLegacyDemoIncidentsOnce(): Promise<void> {
   if (!isSupabaseConfigured || !supabaseUrl) return;
-  if (typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEYS.demoPurged)) {
+  if (typeof window === "undefined") return;
+  if (window.localStorage.getItem(STORAGE_KEYS.demoPurged)) {
+    return;
+  }
+  // Never fire background DELETE mutations for unauthenticated landing-page visitors
+  if (!window.localStorage.getItem("sparrowx_auth_jwt_v1")) {
     return;
   }
   try {

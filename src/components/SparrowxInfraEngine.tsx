@@ -523,7 +523,7 @@ export function SparrowxInfraEngine() {
                   document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
                 }, 60);
               }}
-              className="text-red-400 font-semibold hover:text-red-300 transition-colors duration-150 cursor-pointer"
+              className="whitespace-nowrap text-red-400 font-semibold hover:text-red-300 transition-colors duration-150 cursor-pointer"
             >
               VPS &amp; VDS Plans
             </button>
@@ -536,41 +536,41 @@ export function SparrowxInfraEngine() {
                   document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
                 }, 60);
               }}
-              className="hover:text-white transition-colors duration-150 cursor-pointer"
+              className="whitespace-nowrap hover:text-white transition-colors duration-150 cursor-pointer"
             >
               Bare Metal
             </button>
             <a
               href="#architecture"
-              className="hover:text-white transition-colors duration-150"
+              className="whitespace-nowrap hover:text-white transition-colors duration-150"
             >
               Network &amp; DDoS
             </a>
             <a
               href="/docs/infra"
-              className="hover:text-white transition-colors duration-150"
+              className="whitespace-nowrap hover:text-white transition-colors duration-150"
             >
               Docs
             </a>
             <a
               href={buildMasterHref("/")}
-              className="hover:text-white transition-colors duration-150"
+              className="whitespace-nowrap hover:text-white transition-colors duration-150"
             >
               Ecosystem
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             <a
               href="/infra/dashboard"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-[#0B0E15] hover:bg-white hover:text-black px-3.5 py-2 text-sm font-semibold text-white transition-colors duration-150"
+              className="whitespace-nowrap inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-[#0B0E15] hover:bg-white hover:text-black px-3 py-2 text-xs sm:text-sm font-semibold text-white transition-colors duration-150"
             >
               <span>Dashboard</span>
               <ArrowUpRight className="size-4" aria-hidden="true" />
             </a>
             <a
               href="#catalog"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 px-4 py-2 text-sm font-semibold text-black transition-colors duration-150"
+              className="hidden lg:inline-flex whitespace-nowrap items-center gap-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 px-3.5 py-2 text-xs sm:text-sm font-semibold text-black transition-colors duration-150"
             >
               <span>Deploy server</span>
               <ArrowRight className="size-4" aria-hidden="true" />

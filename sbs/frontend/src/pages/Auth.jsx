@@ -347,13 +347,13 @@ export default function Auth({ setToken, initialTab = 'login' }) {
           >
             <BookOpen size={14} /> Docs
           </button>
-          <a href="https://gamesec.sparrowx.net" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.86rem', fontWeight: '500' }}>
+          <a href="https://gamesec.sparrowx.net" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: '0.84rem', fontWeight: '500', whiteSpace: 'nowrap' }}>
             GameSec L4
           </a>
-          <a href={masterUrl} style={{ color: 'var(--text-soft)', textDecoration: 'none', fontSize: '0.86rem', fontWeight: '600' }}>
+          <a href={masterUrl} style={{ color: 'var(--text-soft)', textDecoration: 'none', fontSize: '0.84rem', fontWeight: '600', whiteSpace: 'nowrap' }}>
             Master Portal
           </a>
-          <button type="button" onClick={scrollToAuth} style={{ padding: '9px 18px', fontSize: '0.84rem' }}>
+          <button type="button" onClick={scrollToAuth} style={{ padding: '8px 14px', fontSize: '0.82rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
             {tab === 'register' ? 'Create Account' : 'Operator Login'}
           </button>
         </div>

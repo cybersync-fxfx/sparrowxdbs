@@ -274,9 +274,12 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${INSTALL_DIR}/.env
 Environment=NODE_ENV=production
 Environment=HOST=0.0.0.0
 Environment=PORT=${app_p}
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=${PG_HOST_PORT:-5432}
 Environment=POSTGREST_HOST=127.0.0.1
 Environment=POSTGREST_PORT=${pgrst_p}
 Environment=POSTGREST_INTERNAL_URL=http://127.0.0.1:${pgrst_p}
@@ -292,9 +295,16 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF_NATIVE
     systemctl daemon-reload >/dev/null 2>&1 || true
-    systemctl enable --now sparrowx-native.service >/dev/null 2>&1 || systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
+    systemctl enable sparrowx-native.service >/dev/null 2>&1 || true
+    systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
   else
-    nohup env NODE_ENV=production HOST=0.0.0.0 PORT="${app_p}" POSTGREST_HOST=127.0.0.1 POSTGREST_PORT="${pgrst_p}" POSTGREST_INTERNAL_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DB_REST_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DATA_DIR="${INSTALL_DIR}/data" SPARROWX_DOMAIN="${SPARROWX_DOMAIN}" SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP}" "${node_bin}" "${INSTALL_DIR}/ovh/node-server.mjs" >"${INSTALL_DIR}/logs/sparrowx-native.log" 2>&1 &
+    nohup env NODE_ENV=production HOST=0.0.0.0 PORT="${app_p}" POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="${PG_HOST_PORT:-5432}" POSTGREST_HOST=127.0.0.1 POSTGREST_PORT="${pgrst_p}" POSTGREST_INTERNAL_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DB_REST_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DATA_DIR="${INSTALL_DIR}/data" SPARROWX_DOMAIN="${SPARROWX_DOMAIN}" SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP}" "${node_bin}" "${INSTALL_DIR}/ovh/node-server.mjs" >"${INSTALL_DIR}/logs/sparrowx-native.log" 2>&1 &
+  fi
+
+  # Ensure UFW allows Docker bridge -> host native fallback port (prevents 502 Bad Gateway when port shifts to 3010)
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow in from 172.16.0.0/12 to any port "${app_p}" proto tcp >/dev/null 2>&1 || true
+    ufw allow in from 127.0.0.1 to any port "${app_p}" proto tcp >/dev/null 2>&1 || true
   fi
 
   if [ "${HAS_DOCKER:-false}" = "true" ] && [ -n "${COMPOSE_FILE:-}" ] && [ -f "${COMPOSE_FILE}" ]; then
@@ -2653,6 +2663,10 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     APP_HOST_PORT="$(find_next_free_port 3010)"
     ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
     export APP_HOST_PORT
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+      ufw allow in from 172.16.0.0/12 to any port "${APP_HOST_PORT}" proto tcp >/dev/null 2>&1 || true
+    fi
+    render_sparrowx_nginx_conf
     log_warn "Shifted APP_HOST_PORT=${APP_HOST_PORT} to bypass port conflict"
   fi
 
