@@ -21,8 +21,10 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
+    env_file:
+      - path: /etc/sparrowx/cf.env
+        required: false
     environment:
-      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN must be set in .env}
       DOCKER_API_VERSION: "1.45"
       TZ: UTC
     ports:

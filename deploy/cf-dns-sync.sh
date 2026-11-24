@@ -18,7 +18,10 @@ green() { printf "\033[32m  [CF-DNS]\033[0m %s\n" "$1"; }
 info()  { printf "\033[36m  [CF-DNS]\033[0m %s\n" "$1"; }
 warn()  { printf "\033[33m  [CF-DNS]\033[0m %s\n" "$1"; }
 
-# Load CF_DNS_API_TOKEN, SPARROWX_DOMAIN, SPARROWX_PUBLIC_IP from .env if not already exported
+# Load CF_DNS_API_TOKEN from persistent /etc/sparrowx/cf.env first (immune to git reset), then .env
+if [[ -f "/etc/sparrowx/cf.env" ]]; then
+  CF_DNS_API_TOKEN="${CF_DNS_API_TOKEN:-$(grep -E '^CF_DNS_API_TOKEN=' /etc/sparrowx/cf.env | tail -n1 | cut -d= -f2- | tr -d '"\r\n' || true)}"
+fi
 if [[ -f "$ENV_FILE" ]]; then
   CF_DNS_API_TOKEN="${CF_DNS_API_TOKEN:-$(grep -E '^CF_DNS_API_TOKEN=' "$ENV_FILE" | tail -n1 | cut -d= -f2- | tr -d '"\r\n' || true)}"
   SPARROWX_DOMAIN="${SPARROWX_DOMAIN:-$(grep -E '^SPARROWX_DOMAIN=' "$ENV_FILE" | tail -n1 | cut -d= -f2- | tr -d '"\r\n' || true)}"
