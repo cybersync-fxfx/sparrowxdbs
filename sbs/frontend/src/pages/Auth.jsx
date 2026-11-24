@@ -475,24 +475,7 @@ export default function Auth({ setToken, initialTab = 'login' }) {
                     <ArrowRight size={15} />
                   </button>
                 </div>
-              ) : (
-                <div className="auth-sso-card muted">
-                  <div className="auth-sso-header">
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                      <Database size={14} /> SparrowX Master SSO Bridge
-                    </span>
-                    <a
-                      href={masterUrl}
-                      style={{ color: '#22d3ee', textDecoration: 'underline', textTransform: 'none', fontSize: '0.75rem' }}
-                    >
-                      Open Master Portal
-                    </a>
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: '1.45' }}>
-                    Have a SparrowX Master account? Sign in directly with your Master email &amp; password below to link your Developer Database and NetSec scrubbing panel.
-                  </div>
-                </div>
-              )}
+              ) : null}
 
               <h2 style={{ marginBottom: '18px', textAlign: 'center', color: 'var(--text-main)', fontSize: '1.35rem' }}>
                 {tab === 'login' ? 'Secure Portal Access' : 'Create Operator Account'}
