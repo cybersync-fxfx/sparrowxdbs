@@ -131,6 +131,27 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           dest.searchParams.delete("auth_error");
           dest.searchParams.set("google_auth", "1");
 
+          void import("@/lib/server/discord-webhook.server")
+            .then(({ sendDiscordTelemetry }) =>
+              sendDiscordTelemetry({
+                category: "auth",
+                severity: "info",
+                service: "SparrowX Google OAuth SSO",
+                title: `User Signed In — ${user.email}`,
+                ip,
+                userAgent: request.headers.get("user-agent") || undefined,
+                url: dest.toString(),
+                fields: {
+                  Email: user.email,
+                  Name: user.fullName,
+                  Role: user.role,
+                  "User ID": user.id,
+                  Destination: dest.hostname + dest.pathname,
+                },
+              }),
+            )
+            .catch(() => {});
+
           const headers = new Headers();
           headers.set("Location", dest.toString());
           headers.set("Cache-Control", "no-store");

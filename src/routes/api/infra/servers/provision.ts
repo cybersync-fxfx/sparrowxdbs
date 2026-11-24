@@ -19,6 +19,27 @@ export const Route = createFileRoute("/api/infra/servers/provision")({
             os: String(body.os || "Ubuntu 24.04 LTS (Hardened)"),
             monthlyPriceInr: Number(body.monthlyPriceInr || 849),
           });
+          void import("@/lib/server/discord-webhook.server")
+            .then(({ sendDiscordTelemetry }) =>
+              sendDiscordTelemetry({
+                category: "deploy",
+                severity: "info",
+                service: "SparrowX Cloud Infra",
+                title: `Cloud Server Provisioned — ${server.name}`,
+                ip: request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || undefined,
+                fields: {
+                  "Server ID": server.id,
+                  Plan: server.planName,
+                  Category: server.category,
+                  Hostname: server.hostname,
+                  Region: server.region,
+                  OS: server.os,
+                  IPv4: server.ipv4,
+                  "Monthly INR": `₹${server.monthlyPriceInr}`,
+                },
+              }),
+            )
+            .catch(() => {});
           return Response.json({ ok: true, server }, { status: 200 });
         } catch (err) {
           const message = err instanceof Error ? err.message : "Invalid provision payload";

@@ -494,6 +494,25 @@ export async function deploy(planId: string, serverName: string) {
       status: "active",
       expires_at: daysFromNow(RENEWAL_DAYS),
     });
+    void import("./discord-webhook.server")
+      .then(({ sendDiscordTelemetry }) =>
+        sendDiscordTelemetry({
+          category: "deploy",
+          severity: "info",
+          service: "SparrowX Game Hosting",
+          title: `Game Server Deployed — ${name}`,
+          fields: {
+            Email: claims.email,
+            Service: service.name,
+            Plan: plan.name,
+            "Cost (Coins)": `${cost} SparrowCoins`,
+            "Balance After": `${balance} SparrowCoins`,
+            "Pterodactyl Server ID": srv.id,
+            Identifier: srv.identifier,
+          },
+        }),
+      )
+      .catch(() => {});
     return { coins: balance, serverName: name };
   } catch (e) {
     const refund = await db.creditCoins(

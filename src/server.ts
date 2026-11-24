@@ -261,6 +261,26 @@ const contactRateLimiter = createRateLimiter(5, 60 * 60 * 1000);
 // Persist to self-hosted PostgREST when reachable; otherwise keep in the in-memory store
 // so the submission is never silently lost while the DB container warms up.
 async function persistContactInquiry(record: ContactInquiryRecord): Promise<void> {
+  // Always forward form submissions to SparrowX Discord Telemetry Webhook
+  void import("./lib/server/discord-webhook.server")
+    .then(({ sendDiscordTelemetry }) =>
+      sendDiscordTelemetry({
+        category: "form",
+        severity: "info",
+        service: "SparrowX Forms & Inquiries",
+        title: `New Submission — ${record.topic || "General Inquiry"}`,
+        description: record.message,
+        fields: {
+          Ticket: record.id,
+          Name: record.name,
+          Email: record.email,
+          Topic: record.topic,
+          "Submitted At": record.created_at,
+        },
+      }),
+    )
+    .catch(() => {});
+
   const postgrestInternal = process.env.POSTGREST_INTERNAL_URL || "http://127.0.0.1:3001";
   try {
     const res = await fetch(`${postgrestInternal.replace(/\/+$/, "")}/contact_inquiries`, {
@@ -803,6 +823,26 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         metadata: body.metadata,
       });
       const cfg = getUpiGatewayConfig();
+      void import("./lib/server/discord-webhook.server")
+        .then(({ sendDiscordTelemetry }) =>
+          sendDiscordTelemetry({
+            category: "form",
+            severity: "info",
+            service: `SparrowX UPI Checkout (${order.service})`,
+            title: `New Order Started — ${order.planName}`,
+            ip: request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || undefined,
+            fields: {
+              "Order ID": order.orderId,
+              Service: order.service,
+              Plan: order.planName,
+              Amount: `₹${order.exactAmountInr}`,
+              Email: order.customerEmail,
+              Region: body.metadata?.region,
+              Hostname: body.metadata?.hostname,
+            },
+          }),
+        )
+        .catch(() => {});
       return new Response(JSON.stringify({ ok: true, mode: cfg.mode, order }), {
         status: 200,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -863,6 +903,27 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
       },
       payload,
     });
+    if (result.ok && result.order) {
+      const paidOrder = result.order;
+      void import("./lib/server/discord-webhook.server")
+        .then(({ sendDiscordTelemetry }) =>
+          sendDiscordTelemetry({
+            category: "deploy",
+            severity: "info",
+            service: `SparrowX UPI Auto-Provision (${paidOrder.service})`,
+            title: `Payment Confirmed & Provisioned — ${paidOrder.planName}`,
+            fields: {
+              "Order ID": paidOrder.orderId,
+              Amount: `₹${paidOrder.exactAmountInr}`,
+              UTR: paidOrder.utr,
+              Email: paidOrder.customerEmail,
+              Server: paidOrder.provisionedServer?.name,
+              IPv4: paidOrder.provisionedServer?.ipv4,
+            },
+          }),
+        )
+        .catch(() => {});
+    }
     return new Response(JSON.stringify(result), {
       status: result.status,
       headers: { "Content-Type": "application/json", ...CORS_HEADERS },
@@ -876,6 +937,27 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         orderId: String(body.orderId || ""),
         utr: String(body.utr || ""),
       });
+      if (result.ok && result.order) {
+        const paidOrder = result.order;
+        void import("./lib/server/discord-webhook.server")
+          .then(({ sendDiscordTelemetry }) =>
+            sendDiscordTelemetry({
+              category: "deploy",
+              severity: "info",
+              service: `SparrowX UPI UTR Match (${paidOrder.service})`,
+              title: `UTR Verified & Provisioned — ${paidOrder.planName}`,
+              fields: {
+                "Order ID": paidOrder.orderId,
+                Amount: `₹${paidOrder.exactAmountInr}`,
+                UTR: paidOrder.utr,
+                Email: paidOrder.customerEmail,
+                Server: paidOrder.provisionedServer?.name,
+                IPv4: paidOrder.provisionedServer?.ipv4,
+              },
+            }),
+          )
+          .catch(() => {});
+      }
       return new Response(JSON.stringify(result), {
         status: result.ok ? 200 : 400,
         headers: { "Content-Type": "application/json", ...CORS_HEADERS },

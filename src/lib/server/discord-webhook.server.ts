@@ -6,6 +6,7 @@ export type DiscordTelemetryCategory =
   | "error"
   | "auth"
   | "form"
+  | "deploy"
   | "audit";
 
 export type DiscordTelemetrySeverity = "critical" | "high" | "medium" | "info";
@@ -36,6 +37,7 @@ const CATEGORY_META: Record<
   error: { color: 0xdc2626, prefix: "💥 RUNTIME ERROR" },
   auth: { color: 0x3b82f6, prefix: "🔐 AUTH EVENT" },
   form: { color: 0x10b981, prefix: "📩 FORM SUBMISSION" },
+  deploy: { color: 0x06b6d4, prefix: "🚀 SERVICE DEPLOYMENT" },
   audit: { color: 0xa855f7, prefix: "📋 AUDIT LOG" },
 };
 
@@ -107,13 +109,21 @@ export async function sendDiscordTelemetry(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(5000),
     });
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      console.error(
+        `[SparrowX Discord Webhook] HTTP ${res.status} for "${payload.title}": ${errBody.slice(0, 200)}`,
+      );
+    }
     return { ok: res.ok, status: res.status };
   } catch (err) {
+    const msg = err instanceof Error ? err.message : "Discord webhook dispatch failed";
+    console.error(`[SparrowX Discord Webhook] Dispatch error for "${payload.title}": ${msg}`);
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Discord webhook dispatch failed",
+      error: msg,
     };
   }
 }
