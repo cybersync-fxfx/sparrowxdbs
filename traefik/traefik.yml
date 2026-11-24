@@ -45,7 +45,6 @@ entryPoints:
           to: websecure
           scheme: https
           permanent: true
-          statusCode: 301
     forwardedHeaders:
       trustedIPs:
         # Localhost & Docker / WireGuard internal ranges
