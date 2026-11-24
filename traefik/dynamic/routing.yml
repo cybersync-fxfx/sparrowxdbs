@@ -501,7 +501,8 @@ http:
         responseForwarding:
           flushInterval: "-1"
         servers:
-          - url: "http://host.docker.internal:8080"
+          # Port 8090 is the Pterodactyl Panel host Nginx upstream (port 8080 is Wings HTTPS daemon)
+          - url: "http://host.docker.internal:8090"
 
     coolify-admin:
       loadBalancer:
