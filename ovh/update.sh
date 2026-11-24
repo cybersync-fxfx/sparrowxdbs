@@ -1214,6 +1214,10 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${netsec_domain}" "netsec"
   issue_le_cert_to_ovh_ssl "${infra_domain}" "infra"
   issue_le_cert_to_ovh_ssl "${php_domain}" "php"
+  local extra_sub
+  for extra_sub in ai deploy dpdp agents console admin; do
+    issue_le_cert_to_ovh_ssl "${extra_sub}.${SPARROWX_DOMAIN}" "${extra_sub}"
+  done
 }
 
 ensure_core_letsencrypt_ssl() {
@@ -2395,6 +2399,75 @@ server {
     }
 }
 EOF
+
+  # 11. Standalone Platform Subdomains (ai, deploy, dpdp, agents, console, admin)
+  local _sub _sub_dom _sub_cert _sub_key
+  for _sub in ai deploy dpdp agents console admin; do
+    _sub_dom="${_sub}.${SPARROWX_DOMAIN:-sparrowx.local}"
+    _sub_cert="/etc/nginx/ssl/fullchain.pem"
+    _sub_key="/etc/nginx/ssl/privkey.pem"
+    if [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-privkey.pem" ]; then
+      _sub_cert="/etc/nginx/ssl/${_sub}-fullchain.pem"
+      _sub_key="/etc/nginx/ssl/${_sub}-privkey.pem"
+    fi
+    cat >> "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
+
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${_sub_dom};
+    ssl_certificate ${_sub_cert};
+    ssl_certificate_key ${_sub_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    client_max_body_size 100M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-SparrowX-Shield "PROTECTED" always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+  done
 }
 
 render_sparrowx_nginx_conf
