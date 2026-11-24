@@ -272,19 +272,19 @@ export function UpiAutoPayModal({
       ref={dialogRef}
       aria-labelledby={titleId}
       {...({ closedby: "any" } as Record<string, string>)}
-      className="spx-native-dialog m-auto w-[min(560px,calc(100vw-2rem))] max-h-[92dvh] rounded-2xl border border-white/15 bg-[#0B0E15] p-0 text-[#F4F6FA] shadow-[0_32px_90px_rgba(0,0,0,0.88)] overflow-hidden"
+      className="spx-native-dialog m-auto w-[min(780px,calc(100vw-1.5rem))] max-h-[92dvh] rounded-2xl border border-white/15 bg-[#090C12] p-0 text-[#F4F6FA] shadow-[0_32px_90px_rgba(0,0,0,0.9)] overflow-hidden"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-[#101520] px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <div className="size-9 rounded-lg bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400">
+      <div className="flex items-center justify-between gap-4 border-b border-white/10 bg-[#0E131D] px-6 py-5">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400 shrink-0">
             <QrCode className="size-5" aria-hidden="true" />
           </div>
-          <div>
-            <h2 id={titleId} className="text-base font-bold text-white">
-              SparrowX Pay — UPI &amp; Binance USDT
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-lg font-bold text-white tracking-tight truncate">
+              SparrowX Pay
             </h2>
-            <p className="text-xs text-zinc-400">
-              Self-verified direct settlement · 0% gateway fee
+            <p className="text-xs text-zinc-400 truncate">
+              Direct UPI &amp; Binance USDT · Self-verified · 0% gateway fee
             </p>
           </div>
         </div>
@@ -293,15 +293,15 @@ export function UpiAutoPayModal({
           type="button"
           onClick={onClose}
           aria-label="Close SparrowX Pay checkout"
-          className="size-8 rounded-lg border border-white/15 bg-[#0B0E15] hover:bg-white/10 grid place-items-center text-zinc-300 hover:text-white cursor-pointer"
+          className="size-9 rounded-xl border border-white/15 bg-[#090C12] hover:bg-white/10 grid place-items-center text-zinc-300 hover:text-white cursor-pointer shrink-0 transition-colors"
         >
           <X className="size-4" aria-hidden="true" />
         </button>
       </div>
 
-      <div className="overflow-y-auto p-5 space-y-5">
+      <div className="overflow-y-auto overflow-x-hidden max-h-[calc(92dvh-82px)] p-5 sm:p-7 space-y-6">
         {/* Payment Method Selector Tabs */}
-        <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-[#06080D] p-1">
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-white/10 bg-[#05070B] p-1.5">
           {(
             [
               { id: "upi", label: "UPI QR (INR)" },
@@ -313,12 +313,12 @@ export function UpiAutoPayModal({
               key={m.id}
               type="button"
               onClick={() => setPayMethod(m.id)}
-              className={`min-h-[38px] rounded-lg px-2 py-1.5 text-xs font-semibold transition-colors cursor-pointer ${
+              className={`min-h-[42px] rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                 payMethod === m.id
                   ? m.id === "upi"
-                    ? "bg-emerald-500 text-black"
-                    : "bg-amber-400 text-black"
-                  : "text-zinc-400 hover:text-white"
+                    ? "bg-emerald-500 text-black shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+                    : "bg-amber-400 text-black shadow-[0_0_20px_rgba(251,191,36,0.3)]"
+                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
               {m.label}
@@ -381,23 +381,53 @@ export function UpiAutoPayModal({
         )}
 
         {!creating && order && order.status === "PENDING" && (
-          <>
-            {/* Order Summary Strip */}
-            <div className="flex items-center justify-between rounded-xl border border-white/10 bg-[#06080D] px-4 py-3 text-sm">
-              <div>
-                <div className="font-semibold text-white">{order.planName}</div>
-                <div className="text-xs text-zinc-400">
-                  Order Ref <span className="text-sky-400 font-mono">{order.orderId}</span>
+          <div className="space-y-6">
+            {/* Spacious 2-Column Checkout Layout (Zero Horizontal Overflow) */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
+              {/* Left Column: Elevated QR Code & Exact Amount Stage */}
+              <div className="md:col-span-5 rounded-2xl border border-white/10 bg-[#05070B] p-6 flex flex-col items-center justify-center text-center gap-4">
+                <div className="rounded-2xl bg-white p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.45)]">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=6&ecc=M&data=${encodeURIComponent(qrPayload)}`}
+                    alt={`Scannable payment QR code for order ${order.orderId}`}
+                    width={184}
+                    height={184}
+                    className="size-44 sm:size-48 block rounded-lg"
+                  />
                 </div>
-              </div>
-              <div className="text-right tabular-nums">
-                <div className="text-xl font-bold text-white">
-                  {order.currency === "USDT"
-                    ? `${order.exactAmount} USDT`
-                    : `₹${order.exactAmountInr}`}
+
+                <div className="space-y-1 tabular-nums">
+                  <div className="text-[11px] uppercase tracking-wider font-mono text-zinc-400">
+                    Pay Exact Amount
+                  </div>
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                      {order.currency === "USDT"
+                        ? `${order.exactAmount} USDT`
+                        : `₹${order.exactAmountInr}`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleCopy(
+                          (order.currency === "USDT" ? order.exactAmount : order.exactAmountInr) || "",
+                          "amt",
+                        )
+                      }
+                      aria-label="Copy exact amount"
+                      className="size-7 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 grid place-items-center text-zinc-300 hover:text-white cursor-pointer"
+                    >
+                      {copiedField === "amt" ? (
+                        <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
+                      ) : (
+                        <Copy className="size-3.5" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
                 </div>
-                <div className="text-xs text-emerald-400 flex items-center justify-end gap-1">
-                  <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-medium text-emerald-300">
+                  <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                   <span>
                     {order.currency === "USDT"
                       ? `Watching Binance (${order.network})`
@@ -405,29 +435,32 @@ export function UpiAutoPayModal({
                   </span>
                 </div>
               </div>
-            </div>
 
-            {/* Real Scannable QR + Direct Payment Details */}
-            <div className="grid grid-cols-1 sm:grid-cols-[190px_1fr] gap-5 items-center">
-              <div className="mx-auto rounded-xl bg-white p-3 shadow-lg">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=6&ecc=M&data=${encodeURIComponent(qrPayload)}`}
-                  alt={`Scannable payment QR code for order ${order.orderId}`}
-                  width={160}
-                  height={160}
-                  className="size-40 block rounded"
-                />
-              </div>
-
-              <div className="space-y-3 text-xs">
-                <div className="space-y-1">
-                  <span className="text-zinc-400 block">
-                    {order.currency === "USDT"
-                      ? `Send EXACTLY ${order.exactAmount} USDT (${order.network}) to:`
-                      : `Pay EXACTLY ₹${order.exactAmountInr} to Merchant UPI ID`}
+              {/* Right Column: Order Details, Copyable UPI/Address & Actions */}
+              <div className="md:col-span-7 min-w-0 flex flex-col justify-between gap-5">
+                {/* Order Info Card */}
+                <div className="rounded-xl border border-white/10 bg-[#0D1119] p-4 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{order.planName}</div>
+                    <div className="text-xs text-zinc-400 mt-0.5">
+                      Order Ref{" "}
+                      <span className="text-sky-400 font-mono font-semibold">{order.orderId}</span>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[11px] font-mono text-zinc-300">
+                    {order.currency === "USDT" ? order.network : "UPI Direct"}
                   </span>
-                  <div className="flex items-center gap-2 rounded-lg border border-white/12 bg-[#06080D] px-3 py-2">
-                    <code className="flex-1 truncate text-sm font-semibold text-white">
+                </div>
+
+                {/* Copyable UPI ID / Binance Address */}
+                <div className="space-y-2 min-w-0">
+                  <span className="text-xs font-medium text-zinc-400 block">
+                    {order.currency === "USDT"
+                      ? `Binance ${order.network} Deposit Address`
+                      : "Merchant UPI ID (GPay · PhonePe · Paytm · BHIM)"}
+                  </span>
+                  <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-[#05070B] px-3.5 py-3 min-w-0">
+                    <code className="flex-1 min-w-0 truncate text-xs sm:text-sm font-mono font-semibold text-white">
                       {order.currency === "USDT" ? order.depositAddress : order.upiId}
                     </code>
                     <button
@@ -438,10 +471,10 @@ export function UpiAutoPayModal({
                           "dest",
                         )
                       }
-                      className="text-sky-400 hover:text-sky-300 inline-flex items-center gap-1 cursor-pointer shrink-0"
+                      className="shrink-0 min-h-[32px] rounded-lg border border-sky-400/30 bg-sky-400/10 hover:bg-sky-400/20 px-3 text-xs font-semibold text-sky-300 inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       {copiedField === "dest" ? (
-                        <Check className="size-3.5" aria-hidden="true" />
+                        <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
                       ) : (
                         <Copy className="size-3.5" aria-hidden="true" />
                       )}
@@ -450,57 +483,55 @@ export function UpiAutoPayModal({
                   </div>
                 </div>
 
-                {/* One-Tap Mobile UPI App Intent (UPI mode only) */}
-                {order.currency !== "USDT" && order.upiUri && (
-                  <a
-                    href={order.upiUri}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 px-3.5 py-2.5 text-xs font-semibold text-black transition-colors duration-150"
-                  >
-                    <Smartphone className="size-4" aria-hidden="true" />
-                    <span>Pay ₹{order.exactAmountInr} in GPay / PhonePe / Paytm</span>
-                    <ExternalLink className="size-3.5" aria-hidden="true" />
-                  </a>
-                )}
-
-                {/* Direct WhatsApp Subscription Contact */}
-                <a
-                  href={buildWhatsAppSupportUrl(
-                    `Hi SparrowX, I am paying for ${order.planName} (${order.currency === "USDT" ? `${order.exactAmount} USDT ${order.network}` : `₹${order.exactAmountInr}`}, Order: ${order.orderId}, Email: ${customerEmail}).`,
+                {/* Primary & Secondary Actions */}
+                <div className="space-y-2.5">
+                  {order.currency !== "USDT" && order.upiUri && (
+                    <a
+                      href={order.upiUri}
+                      className="w-full min-h-[46px] inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 px-4 py-3 text-sm font-bold text-black transition-colors shadow-[0_6px_24px_rgba(16,185,129,0.28)]"
+                    >
+                      <Smartphone className="size-4 shrink-0" aria-hidden="true" />
+                      <span className="truncate">Open UPI App (₹{order.exactAmountInr})</span>
+                      <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+                    </a>
                   )}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 px-3.5 py-2 text-xs font-semibold text-emerald-300 transition-colors duration-150"
-                >
-                  <WhatsAppLogo className="size-4 text-[#25D366]" />
-                  <span>Contact on WhatsApp ({WHATSAPP_SUPPORT_DISPLAY})</span>
-                </a>
 
-                <p className="text-[11px] text-zinc-400 leading-relaxed flex items-start gap-1.5">
-                  <ShieldCheck className="size-3.5 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
+                  <a
+                    href={buildWhatsAppSupportUrl(
+                      `Hi SparrowX, I am paying for ${order.planName} (${order.currency === "USDT" ? `${order.exactAmount} USDT ${order.network}` : `₹${order.exactAmountInr}`}, Order: ${order.orderId}, Email: ${customerEmail}).`,
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full min-h-[42px] inline-flex items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/[0.03] hover:bg-emerald-500/10 hover:border-emerald-500/35 px-4 py-2.5 text-xs font-semibold text-zinc-200 hover:text-emerald-300 transition-colors"
+                  >
+                    <WhatsAppLogo className="size-4 text-[#25D366] shrink-0" />
+                    <span className="truncate">Need help? WhatsApp {WHATSAPP_SUPPORT_DISPLAY}</span>
+                  </a>
+                </div>
+
+                <p className="text-xs text-zinc-400 leading-relaxed flex items-start gap-2">
+                  <ShieldCheck className="size-4 text-emerald-400 shrink-0 mt-0.5" aria-hidden="true" />
                   <span>
-                    Send the exact amount shown above. Your order auto-confirms as soon as our server verifies the deposit.
+                    Send the exact amount shown. Your order confirms automatically once verified by our server.
                   </span>
                 </p>
-
-                {/* Pre-Purchase Policy Notice */}
-                <PurchasePolicyNotice compact />
               </div>
             </div>
 
-            {/* Server-Side Verification Form (UTR for UPI, or Check Now for Binance USDT) */}
+            {/* Full-Width Verification Bar */}
             <form
               onSubmit={handleVerifyUtr}
-              className="rounded-xl border border-white/10 bg-[#06080D] p-4 space-y-2.5"
+              className="rounded-2xl border border-white/10 bg-[#05070B] p-4 sm:p-5 space-y-3"
             >
               {order.currency === "USDT" ? (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span className="text-xs text-zinc-300">
-                    Already sent {order.exactAmount} USDT ({order.network})?
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <span className="text-xs sm:text-sm text-zinc-300">
+                    Already sent <strong className="text-white">{order.exactAmount} USDT</strong> ({order.network})?
                   </span>
                   <button
                     type="submit"
                     disabled={verifyingUtr}
-                    className="rounded-lg bg-amber-400 hover:bg-amber-300 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-black cursor-pointer shrink-0"
+                    className="min-h-[44px] rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-50 px-5 py-2.5 text-xs sm:text-sm font-bold text-black cursor-pointer shrink-0"
                   >
                     {verifyingUtr ? "Checking Binance..." : "Check Binance Deposit Now"}
                   </button>
@@ -511,21 +542,21 @@ export function UpiAutoPayModal({
                     htmlFor="spx-upi-utr"
                     className="text-xs font-medium text-zinc-300 block"
                   >
-                    Already paid? Enter 12-digit UPI UTR to match against verified bank credits
+                    Already paid? Enter your 12-digit UPI UTR to match immediately
                   </label>
-                  <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2.5">
                     <input
                       id="spx-upi-utr"
                       type="text"
                       value={utrInput}
                       onChange={(e) => setUtrInput(e.target.value)}
                       placeholder="e.g. 432198765432"
-                      className="flex-1 rounded-lg border border-white/15 bg-[#0B0E15] px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-sky-400 tabular-nums"
+                      className="flex-1 min-h-[44px] rounded-xl border border-white/15 bg-[#0B0E15] px-4 py-2.5 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-400 tabular-nums"
                     />
                     <button
                       type="submit"
                       disabled={verifyingUtr || !utrInput.trim()}
-                      className="rounded-lg bg-white hover:bg-zinc-200 disabled:opacity-50 px-4 py-2 text-xs font-semibold text-black cursor-pointer shrink-0"
+                      className="min-h-[44px] rounded-xl bg-white hover:bg-zinc-200 disabled:opacity-50 px-6 py-2.5 text-sm font-bold text-black cursor-pointer shrink-0 transition-colors"
                     >
                       {verifyingUtr ? "Verifying..." : "Verify UTR"}
                     </button>
@@ -533,7 +564,10 @@ export function UpiAutoPayModal({
                 </>
               )}
             </form>
-          </>
+
+            {/* Clean Footer Policy Notice */}
+            <PurchasePolicyNotice compact />
+          </div>
         )}
 
         {error && (
