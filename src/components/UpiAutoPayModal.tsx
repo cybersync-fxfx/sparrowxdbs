@@ -407,31 +407,16 @@ export function UpiAutoPayModal({
               </div>
             </div>
 
-            {/* Scannable QR + Direct Payment Details */}
+            {/* Real Scannable QR + Direct Payment Details */}
             <div className="grid grid-cols-1 sm:grid-cols-[190px_1fr] gap-5 items-center">
               <div className="mx-auto rounded-xl bg-white p-3 shadow-lg">
-                <svg
-                  viewBox="0 0 25 25"
-                  className="size-40 block"
-                  role="img"
-                  aria-label={`Payment QR code for order ${order.orderId}`}
-                >
-                  <rect width="25" height="25" fill="#ffffff" />
-                  {qrMatrix.map((row, rIdx) =>
-                    row.map((on, cIdx) =>
-                      on ? (
-                        <rect
-                          key={`${rIdx}-${cIdx}`}
-                          x={cIdx}
-                          y={rIdx}
-                          width="1"
-                          height="1"
-                          fill="#05060A"
-                        />
-                      ) : null,
-                    ),
-                  )}
-                </svg>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=6&ecc=M&data=${encodeURIComponent(qrPayload)}`}
+                  alt={`Scannable payment QR code for order ${order.orderId}`}
+                  width={160}
+                  height={160}
+                  className="size-40 block rounded"
+                />
               </div>
 
               <div className="space-y-3 text-xs">

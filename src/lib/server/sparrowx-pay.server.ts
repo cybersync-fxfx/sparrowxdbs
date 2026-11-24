@@ -97,8 +97,10 @@ function writeLedger(ledger: PayLedgerDisk): void {
   fs.renameSync(tmp, fp);
 }
 
+const DEFAULT_SPARROWX_UPI_ID = "bm.atchuthakrishna@okhdfcbank";
+
 export function getSparrowxPayPublicConfig() {
-  const upiId = (process.env.SPARROWX_UPI_ID || "").trim();
+  const upiId = (process.env.SPARROWX_UPI_ID || DEFAULT_SPARROWX_UPI_ID).trim();
   const merchantName = (process.env.SPARROWX_MERCHANT_NAME || "SparrowX Technologies").trim();
   const upiBridgeReady = Boolean(upiId && process.env.SPARROWX_UPI_BRIDGE_SECRET?.trim());
 
@@ -199,7 +201,7 @@ export function createSparrowxPayOrder(input: {
   let order: SparrowxPayOrder;
 
   if (input.method === "upi") {
-    const upiId = (process.env.SPARROWX_UPI_ID || "").trim();
+    const upiId = (process.env.SPARROWX_UPI_ID || DEFAULT_SPARROWX_UPI_ID).trim();
     if (!upiId) {
       throw new Error("UPI is not configured on this server yet (set SPARROWX_UPI_ID in .env).");
     }
