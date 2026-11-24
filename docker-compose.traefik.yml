@@ -1,0 +1,138 @@
+# ==============================================================================
+# SPARROWX TECHNOLOGIES — TRAEFIK v3 + COOLIFY PRODUCTION EDGE STACK (OVH 64GB)
+# ==============================================================================
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d
+#
+# Required .env variables (NEVER hardcode secrets):
+#   CF_DNS_API_TOKEN=<cloudflare-dns-edit-token>
+#   ADMIN_ALLOWED_IPS=10.66.0.0/16,127.0.0.1/32
+# ==============================================================================
+
+networks:
+  sparrowx_net:
+    name: sparrowx_net
+    driver: bridge
+
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: sparrowx-traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      CF_DNS_API_TOKEN: ${CF_DNS_API_TOKEN:?CF_DNS_API_TOKEN must be set in .env}
+      TZ: UTC
+    ports:
+      - "80:80/tcp"
+      - "443:443/tcp"
+      - "443:443/udp"   # HTTP/3 (QUIC)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - sparrowx_traefik_letsencrypt:/letsencrypt
+    networks:
+      - sparrowx_net
+    labels:
+      - "traefik.enable=true"
+      # Traefik dashboard strictly behind admin.sparrowx.net/traefik + ipAllowList + noindex
+      - "traefik.http.routers.traefik-dashboard.rule=Host(`admin.sparrowx.net`) && (PathPrefix(`/api`) || PathPrefix(`/dashboard`))"
+      - "traefik.http.routers.traefik-dashboard.entrypoints=websecure"
+      - "traefik.http.routers.traefik-dashboard.priority=140"
+      - "traefik.http.routers.traefik-dashboard.tls=true"
+      - "traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.traefik-dashboard.middlewares=admin-ip-allowlist@file,security-headers@file,noindex@file"
+      - "traefik.http.routers.traefik-dashboard.service=api@internal"
+
+  sparrowx:
+    networks:
+      - sparrowx_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=sparrowx_net"
+      # Public Marketing & Free Tools (Indexable)
+      - "traefik.http.routers.spx-public.rule=Host(`sparrowx.net`) || Host(`sec.sparrowx.net`) || Host(`dpdp.sparrowx.net`) || Host(`db.sparrowx.net`) || Host(`file.sparrowx.net`) || Host(`password.sparrowx.net`)"
+      - "traefik.http.routers.spx-public.entrypoints=websecure"
+      - "traefik.http.routers.spx-public.priority=105"
+      - "traefik.http.routers.spx-public.tls=true"
+      - "traefik.http.routers.spx-public.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.spx-public.middlewares=security-headers@file"
+      - "traefik.http.routers.spx-public.service=spx-web"
+      # Streaming-enabled Landing Pages (AI, Deploy, Agents)
+      - "traefik.http.routers.spx-streaming-public.rule=Host(`ai.sparrowx.net`) || Host(`deploy.sparrowx.net`) || Host(`agents.sparrowx.net`)"
+      - "traefik.http.routers.spx-streaming-public.entrypoints=websecure"
+      - "traefik.http.routers.spx-streaming-public.priority=105"
+      - "traefik.http.routers.spx-streaming-public.tls=true"
+      - "traefik.http.routers.spx-streaming-public.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.spx-streaming-public.middlewares=security-headers@file,streaming-headers@file"
+      - "traefik.http.routers.spx-streaming-public.service=spx-web-stream"
+      # Unified Customer Portal (NOINDEX + SSE Streaming + __Host- cookie isolation)
+      - "traefik.http.routers.spx-console.rule=Host(`console.sparrowx.net`)"
+      - "traefik.http.routers.spx-console.entrypoints=websecure"
+      - "traefik.http.routers.spx-console.priority=115"
+      - "traefik.http.routers.spx-console.tls=true"
+      - "traefik.http.routers.spx-console.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.spx-console.middlewares=security-headers@file,noindex@file,streaming-headers@file"
+      - "traefik.http.routers.spx-console.service=spx-web-stream"
+      # Control Plane API (/v1/*) on api.sparrowx.net (NOINDEX + strict CORS)
+      - "traefik.http.routers.spx-api-v1.rule=Host(`api.sparrowx.net`) && PathPrefix(`/v1`)"
+      - "traefik.http.routers.spx-api-v1.entrypoints=websecure"
+      - "traefik.http.routers.spx-api-v1.priority=135"
+      - "traefik.http.routers.spx-api-v1.tls=true"
+      - "traefik.http.routers.spx-api-v1.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.spx-api-v1.middlewares=security-headers@file,noindex@file,api-cors@file"
+      - "traefik.http.routers.spx-api-v1.service=spx-web"
+      # Backend service definitions
+      - "traefik.http.services.spx-web.loadbalancer.server.port=3000"
+      - "traefik.http.services.spx-web-stream.loadbalancer.server.port=3000"
+      - "traefik.http.services.spx-web-stream.loadbalancer.responseforwarding.flushinterval=-1"
+
+  postgrest:
+    networks:
+      - sparrowx_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=sparrowx_net"
+      - "traefik.http.routers.spx-postgrest.rule=Host(`api.sparrowx.net`)"
+      - "traefik.http.routers.spx-postgrest.entrypoints=websecure"
+      - "traefik.http.routers.spx-postgrest.priority=115"
+      - "traefik.http.routers.spx-postgrest.tls=true"
+      - "traefik.http.routers.spx-postgrest.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.spx-postgrest.middlewares=security-headers@file,noindex@file,api-cors@file"
+      - "traefik.http.services.spx-postgrest.loadbalancer.server.port=3001"
+
+  postgres:
+    networks:
+      - sparrowx_net
+    labels:
+      - "traefik.enable=false"
+
+  # ----------------------------------------------------------------------------
+  # Reference Coolify Tenant Container Labels (*.ai.sparrowx.net & *.deploy.sparrowx.net)
+  # ----------------------------------------------------------------------------
+  # Coolify injects these labels per isolated tenant container (validated via tenantSlugSchema):
+  #
+  #   # For *.ai.sparrowx.net (n8n / Dify / MCP):
+  #   traefik.enable=true
+  #   traefik.http.routers.tenant-ai-<slug>.rule=Host(`<slug>.ai.sparrowx.net`)
+  #   traefik.http.routers.tenant-ai-<slug>.entrypoints=websecure
+  #   traefik.http.routers.tenant-ai-<slug>.tls=true
+  #   traefik.http.routers.tenant-ai-<slug>.tls.certresolver=letsencrypt
+  #   traefik.http.routers.tenant-ai-<slug>.middlewares=tenant-security-headers@file,noindex@file,streaming-headers@file
+  #   traefik.http.services.tenant-ai-<slug>.loadbalancer.responseforwarding.flushinterval=-1
+  #
+  #   # For *.deploy.sparrowx.net (Vibe-Coder PaaS tenant web apps / bots):
+  #   traefik.enable=true
+  #   traefik.http.routers.tenant-deploy-<slug>.rule=Host(`<slug>.deploy.sparrowx.net`)
+  #   traefik.http.routers.tenant-deploy-<slug>.entrypoints=websecure
+  #   traefik.http.routers.tenant-deploy-<slug>.tls=true
+  #   traefik.http.routers.tenant-deploy-<slug>.tls.certresolver=letsencrypt
+  #   traefik.http.routers.tenant-deploy-<slug>.middlewares=tenant-security-headers@file,noindex@file,streaming-headers@file
+  #   traefik.http.services.tenant-deploy-<slug>.loadbalancer.responseforwarding.flushinterval=-1
+
+volumes:
+  sparrowx_traefik_letsencrypt:

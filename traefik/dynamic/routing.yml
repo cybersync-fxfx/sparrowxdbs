@@ -1,0 +1,461 @@
+# ==============================================================================
+# SPARROWX TECHNOLOGIES — TRAEFIK v3 DYNAMIC ROUTING, TLS & SECURITY MIDDLEWARES
+# ==============================================================================
+# Enforces:
+#   1. TLS 1.2+ (prefer TLS 1.3), modern AEAD ciphers only, SNI strict
+#   2. Single-hop HTTP 301 canonical redirects (zero chains)
+#   3. Strict host-isolation & catch-all default 404/drop for unknown hosts/IPs
+#   4. Zero-trust ipAllowList (403 Forbidden) on admin.sparrowx.net
+#   5. Automated X-Robots-Tag: noindex, nofollow on private & wildcard tenant hosts
+#   6. WebSocket / SSE streaming (flushInterval: -1) on console/ai/deploy/agents/panel
+#   7. Rate limits & body size limits on /auth/*, /webhooks/*, and ingest.*
+# ==============================================================================
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true
+      curvePreferences:
+        - X25519
+        - CurveP384
+        - CurveP256
+      cipherSuites:
+        - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+        - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+        - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+        - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
+
+http:
+  # ----------------------------------------------------------------------------
+  # MIDDLEWARES
+  # ----------------------------------------------------------------------------
+  middlewares:
+    # 1. Global security headers for SparrowX-owned domains (includes X-Frame-Options: DENY)
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: false
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    # 2. Tenant-safe security headers for *.deploy.sparrowx.net & *.ai.sparrowx.net
+    #    (Does NOT force X-Frame-Options: DENY so customer apps can embed when needed)
+    tenant-security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: false
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        referrerPolicy: "strict-origin-when-cross-origin"
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+        customResponseHeaders:
+          X-Powered-By: ""
+          Server: ""
+
+    # 3. Automated NOINDEX header for private portals, APIs, ingest, and wildcard tenants
+    noindex:
+      headers:
+        customResponseHeaders:
+          X-Robots-Tag: "noindex, nofollow"
+
+    # 4. Zero-Trust Admin IP Allowlist (Admin WireGuard / VPN IPs ONLY -> 403 Forbidden for all others)
+    admin-ip-allowlist:
+      ipAllowList:
+        sourceRange:
+          - "127.0.0.1/32"
+          - "10.66.0.0/16"      # SparrowX WireGuard Admin Mesh
+          - "100.64.0.0/10"     # Optional Tailscale / CGNAT Admin VPN
+        ipStrategy:
+          depth: 1
+          excludedIPs:
+            - "127.0.0.1/32"
+            - "172.16.0.0/12"
+
+    # 5. Strict CORS on api.sparrowx.net (NEVER wildcard '*' with credentials)
+    api-cors:
+      headers:
+        accessControlAllowOriginList:
+          - "https://console.sparrowx.net"
+          - "https://admin.sparrowx.net"
+        accessControlAllowMethods:
+          - "GET"
+          - "POST"
+          - "PUT"
+          - "PATCH"
+          - "DELETE"
+          - "OPTIONS"
+        accessControlAllowHeaders:
+          - "Authorization"
+          - "Content-Type"
+          - "X-Requested-With"
+          - "X-CSRF-Token"
+          - "X-SparrowX-API-Key"
+        accessControlAllowCredentials: true
+        accessControlMaxAge: 600
+        addVaryHeader: true
+
+    # 6. Rate Limiting & Request Body Size Limits
+    rate-limit-auth:
+      rateLimit:
+        average: 15
+        period: 1m
+        burst: 10
+
+    rate-limit-webhooks:
+      rateLimit:
+        average: 120
+        period: 1m
+        burst: 60
+
+    rate-limit-ingest:
+      rateLimit:
+        average: 240
+        period: 1m
+        burst: 100
+
+    ingest-body-limit:
+      buffering:
+        maxRequestBodyBytes: 2097152   # 2 MiB hard ceiling for WORM log ingestion
+        memRequestBodyBytes: 524288    # 512 KiB in-memory buffer
+
+    # 7. Single-Hop HTTP 301 Canonical Redirects
+    redirect-www-to-apex:
+      redirectRegex:
+        regex: "^https?://www\\.sparrowx\\.net/(.*)"
+        replacement: "https://sparrowx.net/${1}"
+        permanent: true
+
+    redirect-game-subdomain:
+      redirectRegex:
+        regex: "^https?://game\\.sparrowx\\.net/(.*)"
+        replacement: "https://sparrowx.net/game/${1}"
+        permanent: true
+
+    redirect-db-game-leak:
+      redirectRegex:
+        regex: "^https?://db\\.sparrowx\\.net/game.*"
+        replacement: "https://sparrowx.net/game"
+        permanent: true
+
+    redirect-sec-story-leak:
+      redirectRegex:
+        regex: "^https?://sec\\.sparrowx\\.net/story.*"
+        replacement: "https://sparrowx.net/story"
+        permanent: true
+
+    # 8. WebSocket & SSE streaming headers (prevent proxy buffering)
+    streaming-headers:
+      headers:
+        customResponseHeaders:
+          X-Accel-Buffering: "no"
+
+  # ----------------------------------------------------------------------------
+  # ROUTERS
+  # ----------------------------------------------------------------------------
+  routers:
+    # === A. STRICT SINGLE-HOP 301 REDIRECTS (High Priority) ===
+    www-redirect:
+      rule: "Host(`www.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 200
+      middlewares:
+        - redirect-www-to-apex
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
+
+    game-subdomain-redirect:
+      rule: "Host(`game.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 200
+      middlewares:
+        - redirect-game-subdomain
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
+
+    db-game-leak-redirect:
+      rule: "Host(`db.sparrowx.net`) && PathPrefix(`/game`)"
+      entryPoints: [websecure]
+      priority: 200
+      middlewares:
+        - redirect-db-game-leak
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
+
+    sec-story-leak-redirect:
+      rule: "Host(`sec.sparrowx.net`) && PathPrefix(`/story`)"
+      entryPoints: [websecure]
+      priority: 200
+      middlewares:
+        - redirect-sec-story-leak
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
+
+    # === B. PUBLIC MARKETING & FREE TOOLS (Indexable) ===
+    sparrowx-apex:
+      rule: "Host(`sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-auth-ratelimit:
+      rule: "(Host(`sparrowx.net`) || Host(`console.sparrowx.net`) || Host(`admin.sparrowx.net`)) && PathPrefix(`/auth`)"
+      entryPoints: [websecure]
+      priority: 150
+      middlewares:
+        - security-headers
+        - noindex
+        - rate-limit-auth
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-ai-landing:
+      rule: "Host(`ai.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+        - streaming-headers
+      service: sparrowx-web-streaming
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-deploy-landing:
+      rule: "Host(`deploy.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+        - streaming-headers
+      service: sparrowx-web-streaming
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-agents-landing:
+      rule: "Host(`agents.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+        - streaming-headers
+      service: sparrowx-web-streaming
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-agents-whatsapp-webhook:
+      rule: "Host(`agents.sparrowx.net`) && PathPrefix(`/webhooks/whatsapp`)"
+      entryPoints: [websecure]
+      priority: 160
+      middlewares:
+        - security-headers
+        - noindex
+        - rate-limit-webhooks
+        - streaming-headers
+      service: agents-orchestrator
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-sec-landing:
+      rule: "Host(`sec.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-dpdp-landing:
+      rule: "Host(`dpdp.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-db-landing:
+      rule: "Host(`db.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-file-drop:
+      rule: "Host(`file.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-password-keys:
+      rule: "Host(`password.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    # === C. UNIFIED CUSTOMER & GAME PORTALS (NOINDEX) ===
+    sparrowx-console:
+      rule: "Host(`console.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 110
+      middlewares:
+        - security-headers
+        - noindex
+        - streaming-headers
+      service: sparrowx-web-streaming
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-panel:
+      rule: "Host(`panel.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 110
+      middlewares:
+        - security-headers
+        - noindex
+        - streaming-headers
+      service: pterodactyl-panel
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-api-v1:
+      rule: "Host(`api.sparrowx.net`) && PathPrefix(`/v1`)"
+      entryPoints: [websecure]
+      priority: 130
+      middlewares:
+        - security-headers
+        - noindex
+        - api-cors
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-api-postgrest:
+      rule: "Host(`api.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 110
+      middlewares:
+        - security-headers
+        - noindex
+        - api-cors
+      service: postgrest-gateway
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-ingest-dpdp:
+      rule: "Host(`ingest.sec.sparrowx.net`) || Host(`ingest.dpdp.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 120
+      middlewares:
+        - security-headers
+        - noindex
+        - rate-limit-ingest
+        - ingest-body-limit
+      service: dpdp-ingest
+      tls:
+        certResolver: letsencrypt
+
+    # === D. RESTRICTED ADMIN & INFRASTRUCTURE (ZERO-TRUST / 403 / NOINDEX) ===
+    sparrowx-admin-ops:
+      rule: "Host(`admin.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 120
+      middlewares:
+        - admin-ip-allowlist
+        - security-headers
+        - noindex
+        - streaming-headers
+      service: coolify-admin
+      tls:
+        certResolver: letsencrypt
+
+    # === E. CATCH-ALL HOST ISOLATION ===
+    # 1. tls.options.default.sniStrict=true immediately aborts TLS handshakes for
+    #    unknown SNI hostnames or direct OVH IP access (zero certificate leakage).
+    # 2. Any forged/unmapped Host header on a valid TLS connection matches NO router,
+    #    so Traefik v3 cleanly returns HTTP 404 Not Found without touching any backend.
+
+  # ----------------------------------------------------------------------------
+  # SERVICES (With flushInterval: -1 on streaming backends for SSE & WebSockets)
+  # ----------------------------------------------------------------------------
+  services:
+    sparrowx-web:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://sparrowx-app:3000"
+
+    sparrowx-web-streaming:
+      loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "-1"
+        servers:
+          - url: "http://sparrowx-app:3000"
+
+    postgrest-gateway:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://sparrowx-postgrest:3001"
+
+    agents-orchestrator:
+      loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "-1"
+        servers:
+          - url: "http://sparrowx-agents-api:8000"
+
+    dpdp-ingest:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: "http://sparrowx-dpdp-ingest:8085"
+
+    pterodactyl-panel:
+      loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "-1"
+        servers:
+          - url: "http://host.docker.internal:8080"
+
+    coolify-admin:
+      loadBalancer:
+        passHostHeader: true
+        responseForwarding:
+          flushInterval: "-1"
+        servers:
+          - url: "http://host.docker.internal:8000"
