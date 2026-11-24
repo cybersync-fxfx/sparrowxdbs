@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DbRouteImport } from './routes/db'
+import { Route as DeployRouteImport } from './routes/deploy'
 import { Route as DropRouteImport } from './routes/drop'
 import { Route as ErrorsRouteImport } from './routes/errors'
 import { Route as GatewayRouteImport } from './routes/gateway'
@@ -59,6 +60,11 @@ const IndexRoute = IndexRouteImport.update({
 const DbRoute = DbRouteImport.update({
   id: '/db',
   path: '/db',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeployRoute = DeployRouteImport.update({
+  id: '/deploy',
+  path: '/deploy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DropRoute = DropRouteImport.update({
@@ -264,6 +270,7 @@ const ApiPublicRazorpayWebhookRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/db': typeof DbRoute
+  '/deploy': typeof DeployRoute
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
@@ -307,6 +314,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/db': typeof DbRoute
+  '/deploy': typeof DeployRoute
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/db': typeof DbRoute
+  '/deploy': typeof DeployRoute
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
@@ -396,6 +405,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/db'
+    | '/deploy'
     | '/drop'
     | '/errors'
     | '/gateway'
@@ -439,6 +449,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/db'
+    | '/deploy'
     | '/drop'
     | '/errors'
     | '/gateway'
@@ -482,6 +493,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/db'
+    | '/deploy'
     | '/drop'
     | '/errors'
     | '/gateway'
@@ -526,6 +538,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DbRoute: typeof DbRoute
+  DeployRoute: typeof DeployRoute
   DropRoute: typeof DropRoute
   ErrorsRoute: typeof ErrorsRoute
   GatewayRoute: typeof GatewayRoute
@@ -581,6 +594,13 @@ declare module '@tanstack/react-router' {
       path: '/db'
       fullPath: '/db'
       preLoaderRoute: typeof DbRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deploy': {
+      id: '/deploy'
+      path: '/deploy'
+      fullPath: '/deploy'
+      preLoaderRoute: typeof DeployRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/drop': {
@@ -862,6 +882,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DbRoute: DbRoute,
+  DeployRoute: DeployRoute,
   DropRoute: DropRoute,
   ErrorsRoute: ErrorsRoute,
   GatewayRoute: GatewayRoute,

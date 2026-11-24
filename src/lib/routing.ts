@@ -7,7 +7,8 @@ export type RootRedirectTarget = {
     | "/gateway"
     | "/game"
     | "/game/dashboard"
-    | "/infra";
+    | "/infra"
+    | "/deploy";
   search: Record<string, unknown>;
   hash?: string;
 };
@@ -21,7 +22,8 @@ export type SubdomainProduct =
   | "game"
   | "game-dash"
   | "game-panel"
-  | "infra";
+  | "infra"
+  | "deploy";
 
 /**
  * Prefix rules ordered from most-specific multi-label hosts (e.g. `game.dash.`)
@@ -36,6 +38,7 @@ const SUBDOMAIN_RULES: ReadonlyArray<{
   { prefixes: ["game.dash.", "game-dash."], product: "game-dash", route: "/game/dashboard" },
   { prefixes: ["game.", "game-"], product: "game", route: "/game" },
   { prefixes: ["infra.", "metal.", "vps.", "cloud."], product: "infra", route: "/infra" },
+  { prefixes: ["deploy."], product: "deploy", route: "/deploy" },
   { prefixes: ["db.", "studio.", "supabase.", "sparrowbase."], product: "db", route: "/db" },
   { prefixes: ["sec.", "shield."], product: "shield", route: "/shield" },
   { prefixes: ["file.", "drop.", "share."], product: "drop", route: "/drop" },

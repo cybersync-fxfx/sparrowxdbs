@@ -303,8 +303,7 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     tagline: "One-click full-stack web app, API & Discord bot deployments with instant custom subdomains.",
     domain: "deploy.sparrowx.net",
     prodUrl: "https://deploy.sparrowx.net",
-    url: "https://deploy.sparrowx.net",
-    external: true,
+    url: "/deploy",
     badge: "PaaS",
   },
   {
