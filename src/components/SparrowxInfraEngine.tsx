@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/ProcessorChipPinIcons";
 import { IntelXeonGoldPricingSection } from "@/components/infra/IntelXeonGoldPricingSection";
 import { UpiAutoPayModal } from "@/components/UpiAutoPayModal";
+import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
 import {
@@ -345,19 +346,19 @@ export function SparrowxInfraEngine() {
   }, []);
 
   const openConfigurator = (plan: InfraServerPlan) => {
-    setSelectedPlan(plan);
-    setConfigRegion(plan.regions.includes(region) ? region : (plan.regions[0] ?? "in-mum"));
-    setConfigOs("ubuntu-24-04");
-    setExtraIpv4(0);
-    setEnableWireguardMesh(true);
-    setEnableNightlyBackup(false);
-    setHostnameInput(`${plan.id}.sparrowx.local`);
-    setOrderError("");
-    setOrderReceipt(null);
-    const dialog = dialogRef.current;
-    if (dialog && !dialog.open) {
-      dialog.showModal();
+    const targetRegion = plan.regions.includes(region) ? region : (plan.regions[0] ?? "in-mum");
+    if (typeof window !== "undefined") {
+      const qs = new URLSearchParams({
+        plan: plan.id,
+        region: targetRegion,
+        cycle: billingCycle,
+        currency,
+      });
+      window.location.assign(`/infra/configure?${qs.toString()}`);
+      return;
     }
+    setSelectedPlan(plan);
+    setConfigRegion(targetRegion);
   };
 
   const closeConfigurator = () => {
@@ -1628,24 +1629,8 @@ export function SparrowxInfraEngine() {
                     </p>
                   )}
 
-                  {/* Legal & No-Refund Notice */}
-                  <div className="w-full text-xs text-zinc-400 bg-white/[0.03] border border-white/10 rounded-lg p-3 space-y-1 mt-2">
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-[#FFA14A]">
-                      <ShieldCheck className="size-3.5 text-emerald-400" />
-                      <span>Sovereign Data Security &amp; Strict No-Refund Notice</span>
-                    </div>
-                    <p className="text-[11px] text-zinc-400 leading-snug">
-                      By proceeding, you agree to our{" "}
-                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-white underline hover:text-[#FFA14A]">
-                        Terms of Service
-                      </a>{" "}
-                      and{" "}
-                      <a href="/refund" target="_blank" rel="noopener noreferrer" className="text-[#FFA14A] font-medium underline">
-                        Refund Policy
-                      </a>
-                      . Once physical compute threads, NVMe Gen5 blocks, and public IPs are provisioned to your account, there is strictly no refund. Your data is 100% sovereign and encrypted.
-                    </p>
-                  </div>
+                  {/* Pre-Purchase Policy Notice */}
+                  <PurchasePolicyNotice className="mt-2" />
 
                   {/* Order Summary Footer */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-white/10">

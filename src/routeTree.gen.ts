@@ -33,6 +33,7 @@ import { Route as GameIndexRouteImport } from './routes/game.index'
 import { Route as GameDashboardRouteImport } from './routes/game.dashboard'
 import { Route as GamePanelLaunchRouteImport } from './routes/game.panel-launch'
 import { Route as InfraIndexRouteImport } from './routes/infra.index'
+import { Route as InfraConfigureRouteImport } from './routes/infra.configure'
 import { Route as InfraDashboardRouteImport } from './routes/infra.dashboard'
 import { Route as ApiAuthMasterSsoRouteImport } from './routes/api/auth/master-sso'
 import { Route as ApiAuthVerifyEmailRouteImport } from './routes/api/auth/verify-email'
@@ -176,6 +177,11 @@ const GamePanelLaunchRoute = GamePanelLaunchRouteImport.update({
 const InfraIndexRoute = InfraIndexRouteImport.update({
   id: '/infra/',
   path: '/infra/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfraConfigureRoute = InfraConfigureRouteImport.update({
+  id: '/infra/configure',
+  path: '/infra/configure',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InfraDashboardRoute = InfraDashboardRouteImport.update({
@@ -324,6 +330,7 @@ export interface FileRoutesByFullPath {
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
+  '/infra/configure': typeof InfraConfigureRoute
   '/infra/dashboard': typeof InfraDashboardRoute
   '/docs/': typeof DocsIndexRoute
   '/f/': typeof FIndexRoute
@@ -374,6 +381,7 @@ export interface FileRoutesByTo {
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
+  '/infra/configure': typeof InfraConfigureRoute
   '/infra/dashboard': typeof InfraDashboardRoute
   '/docs': typeof DocsIndexRoute
   '/f': typeof FIndexRoute
@@ -425,6 +433,7 @@ export interface FileRoutesById {
   '/f/$id': typeof FIdRoute
   '/game/dashboard': typeof GameDashboardRoute
   '/game/panel-launch': typeof GamePanelLaunchRoute
+  '/infra/configure': typeof InfraConfigureRoute
   '/infra/dashboard': typeof InfraDashboardRoute
   '/docs/': typeof DocsIndexRoute
   '/f/': typeof FIndexRoute
@@ -477,6 +486,7 @@ export interface FileRouteTypes {
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
+    | '/infra/configure'
     | '/infra/dashboard'
     | '/docs/'
     | '/f/'
@@ -527,6 +537,7 @@ export interface FileRouteTypes {
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
+    | '/infra/configure'
     | '/infra/dashboard'
     | '/docs'
     | '/f'
@@ -577,6 +588,7 @@ export interface FileRouteTypes {
     | '/f/$id'
     | '/game/dashboard'
     | '/game/panel-launch'
+    | '/infra/configure'
     | '/infra/dashboard'
     | '/docs/'
     | '/f/'
@@ -628,6 +640,7 @@ export interface RootRouteChildren {
   FIdRoute: typeof FIdRoute
   GameDashboardRoute: typeof GameDashboardRoute
   GamePanelLaunchRoute: typeof GamePanelLaunchRoute
+  InfraConfigureRoute: typeof InfraConfigureRoute
   InfraDashboardRoute: typeof InfraDashboardRoute
   DocsIndexRoute: typeof DocsIndexRoute
   FIndexRoute: typeof FIndexRoute
@@ -828,6 +841,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InfraIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/infra/configure': {
+      id: '/infra/configure'
+      path: '/infra/configure'
+      fullPath: '/infra/configure'
+      preLoaderRoute: typeof InfraConfigureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/infra/dashboard': {
       id: '/infra/dashboard'
       path: '/infra/dashboard'
@@ -1020,6 +1040,7 @@ const rootRouteChildren: RootRouteChildren = {
   FIdRoute: FIdRoute,
   GameDashboardRoute: GameDashboardRoute,
   GamePanelLaunchRoute: GamePanelLaunchRoute,
+  InfraConfigureRoute: InfraConfigureRoute,
   InfraDashboardRoute: InfraDashboardRoute,
   DocsIndexRoute: DocsIndexRoute,
   FIndexRoute: FIndexRoute,

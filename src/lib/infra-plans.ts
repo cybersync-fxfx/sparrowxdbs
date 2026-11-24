@@ -66,19 +66,183 @@ export const INFRA_REGIONS: InfraRegion[] = [
   },
 ];
 
+export type InfraOsIconKey =
+  | "ubuntu"
+  | "debian"
+  | "almalinux"
+  | "rockylinux"
+  | "fedora"
+  | "centos"
+  | "archlinux"
+  | "alpinelinux"
+  | "kalilinux"
+  | "freebsd"
+  | "windows"
+  | "proxmox"
+  | "docker";
+
 export interface InfraOsImage {
   id: string;
   label: string;
-  family: "Linux" | "Hypervisor" | "Windows";
+  version: string;
+  family: "Linux" | "Hypervisor" | "Windows" | "Apps";
+  iconKey: InfraOsIconKey;
+  brandColor: string;
+  tagline: string;
   monthlyAddonUsd: number;
 }
 
 export const INFRA_OS_IMAGES: InfraOsImage[] = [
-  { id: "ubuntu-24-04", label: "Ubuntu 24.04 LTS (Hardened)", family: "Linux", monthlyAddonUsd: 0 },
-  { id: "debian-12", label: "Debian 12 Bookworm", family: "Linux", monthlyAddonUsd: 0 },
-  { id: "rocky-9", label: "Rocky Linux 9 Enterprise", family: "Linux", monthlyAddonUsd: 0 },
-  { id: "proxmox-8", label: "Proxmox VE 8.2 Hypervisor", family: "Hypervisor", monthlyAddonUsd: 0 },
-  { id: "windows-2022", label: "Windows Server 2022 Standard", family: "Windows", monthlyAddonUsd: 24 },
+  {
+    id: "ubuntu-24-04",
+    label: "Ubuntu",
+    version: "24.04 LTS",
+    family: "Linux",
+    iconKey: "ubuntu",
+    brandColor: "#E95420",
+    tagline: "Hardened LTS · Cloud-init ready",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "ubuntu-22-04",
+    label: "Ubuntu",
+    version: "22.04 LTS",
+    family: "Linux",
+    iconKey: "ubuntu",
+    brandColor: "#E95420",
+    tagline: "Battle-tested LTS for production",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "debian-12",
+    label: "Debian",
+    version: "12 Bookworm",
+    family: "Linux",
+    iconKey: "debian",
+    brandColor: "#D70A53",
+    tagline: "Minimal, rock-solid server base",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "almalinux-9",
+    label: "AlmaLinux",
+    version: "9.4 Enterprise",
+    family: "Linux",
+    iconKey: "almalinux",
+    brandColor: "#38BDF8",
+    tagline: "RHEL-compatible · cPanel/Plesk ready",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "rocky-9",
+    label: "Rocky Linux",
+    version: "9 Enterprise",
+    family: "Linux",
+    iconKey: "rockylinux",
+    brandColor: "#10B981",
+    tagline: "1:1 Enterprise Linux binary compatible",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "fedora-41",
+    label: "Fedora Server",
+    version: "41 Latest",
+    family: "Linux",
+    iconKey: "fedora",
+    brandColor: "#51A2DA",
+    tagline: "Modern kernel & Cockpit web UI",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "centos-9",
+    label: "CentOS Stream",
+    version: "9 Rolling",
+    family: "Linux",
+    iconKey: "centos",
+    brandColor: "#A855F7",
+    tagline: "Upstream Enterprise Linux stream",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "arch-latest",
+    label: "Arch Linux",
+    version: "Rolling",
+    family: "Linux",
+    iconKey: "archlinux",
+    brandColor: "#1793D1",
+    tagline: "Lightweight rolling release for power users",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "alpine-3-21",
+    label: "Alpine Linux",
+    version: "3.21 Minimal",
+    family: "Linux",
+    iconKey: "alpinelinux",
+    brandColor: "#0EA5E9",
+    tagline: "Ultra-lean musl security-focused OS",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "kali-latest",
+    label: "Kali Linux",
+    version: "2026 Rolling",
+    family: "Linux",
+    iconKey: "kalilinux",
+    brandColor: "#60A5FA",
+    tagline: "Security auditing & pentest toolkit",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "freebsd-14",
+    label: "FreeBSD",
+    version: "14.2 Release",
+    family: "Linux",
+    iconKey: "freebsd",
+    brandColor: "#EF4444",
+    tagline: "ZFS & high-throughput networking",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "windows-2022",
+    label: "Windows Server",
+    version: "2022 Standard",
+    family: "Windows",
+    iconKey: "windows",
+    brandColor: "#00A4EF",
+    tagline: "Full RDP access · Licensed image",
+    monthlyAddonUsd: 24,
+  },
+  {
+    id: "windows-2025",
+    label: "Windows Server",
+    version: "2025 Datacenter",
+    family: "Windows",
+    iconKey: "windows",
+    brandColor: "#38BDF8",
+    tagline: "Latest Windows Server + RDP",
+    monthlyAddonUsd: 28,
+  },
+  {
+    id: "proxmox-8",
+    label: "Proxmox VE",
+    version: "8.2 Hypervisor",
+    family: "Hypervisor",
+    iconKey: "proxmox",
+    brandColor: "#F97316",
+    tagline: "Bare-metal KVM & LXC virtualization",
+    monthlyAddonUsd: 0,
+  },
+  {
+    id: "docker-ubuntu",
+    label: "Docker + Ubuntu",
+    version: "24.04 + Compose",
+    family: "Apps",
+    iconKey: "docker",
+    brandColor: "#2496ED",
+    tagline: "Pre-installed Docker Engine & Compose",
+    monthlyAddonUsd: 0,
+  },
 ];
 
 export interface InfraServerPlan {
