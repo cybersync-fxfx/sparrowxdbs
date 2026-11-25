@@ -16,8 +16,8 @@ export default function BrainInsight({ token }) {
         const json = await res.json();
         setData(json);
       }
-    } catch (err) {
-      console.error('Failed to fetch brain insight:', err);
+    } catch {
+      // silent fail
     } finally {
       setLoading(false);
     }

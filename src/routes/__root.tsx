@@ -75,13 +75,10 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
-  console.error("Root Error Boundary caught:", error);
   const router = useRouter();
   useEffect(() => {
     reportSparrowxError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
-
-  const errorMessage = error instanceof Error ? error.message : String(error || "Unknown error");
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
@@ -97,12 +94,6 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
         <p className="text-sm text-muted-foreground">
           The browser encountered an interrupted session state while rendering the dashboard.
         </p>
-
-        {errorMessage && (
-          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-left font-mono text-xs text-destructive overflow-x-auto max-h-32">
-            <code>{errorMessage}</code>
-          </div>
-        )}
 
         <div className="pt-2 flex flex-wrap justify-center gap-2.5">
           <button
@@ -192,15 +183,6 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark" suppressHydrationWarning>
       <head suppressHydrationWarning>
         <HeadContent />
-        <script
-          src="/sparrowx-shield.js"
-          data-site-id="TNT-3800"
-          data-api-key="spx_tenant••••••••850c"
-          data-endpoint="https://db.sparrowx.net"
-          data-auto-block="true"
-          data-anti-bot="active"
-          defer
-        />
       </head>
       <body suppressHydrationWarning>
         {children}
@@ -208,6 +190,34 @@ function RootShell({ children }: { children: ReactNode }) {
       </body>
     </html>
   );
+}
+
+function useSilentProductionConsole() {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!import.meta.env.PROD) return;
+    const noop = () => {};
+    const methods = [
+      "log",
+      "info",
+      "debug",
+      "warn",
+      "error",
+      "trace",
+      "table",
+      "dir",
+      "group",
+      "groupCollapsed",
+      "groupEnd",
+    ] as const;
+    for (const m of methods) {
+      try {
+        (window.console as unknown as Record<string, unknown>)[m] = noop;
+      } catch {
+        // ignore read-only console properties
+      }
+    }
+  }, []);
 }
 
 function useDeferredAdSense() {
@@ -306,6 +316,7 @@ function useGlobalErrorWebhookCapture() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useSilentProductionConsole();
   useServiceFavicon();
   useDeferredAdSense();
   useGlobalScrollReveal();

@@ -189,7 +189,7 @@ function getPgAdminConfig() {
   const password =
     process.env.POSTGRES_PASSWORD ||
     process.env.PGPASSWORD ||
-    "sparrowx_ovh_secret_2026";
+    "";
   const database =
     process.env.POSTGRES_DB || process.env.PGDATABASE || "sparrowx_db";
 

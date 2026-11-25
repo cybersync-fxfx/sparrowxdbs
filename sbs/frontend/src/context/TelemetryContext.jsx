@@ -99,7 +99,6 @@ export function TelemetryProvider({ token, user, children }) {
 
   useEffect(() => {
     if (user && user.role !== 'admin' && viewMode !== 'agent') {
-      console.warn('[Telemetry] Non-admin tried to access global view. Reverting to agent mode.');
       setViewMode('agent');
     }
   }, [user, viewMode]);

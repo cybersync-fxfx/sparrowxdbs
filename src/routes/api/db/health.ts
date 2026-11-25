@@ -24,10 +24,10 @@ export const Route = createFileRoute("/api/db/health")({
             {
               ok: false,
               engine: "PostgreSQL Sovereign Cluster",
-              error: message,
+              error: "Database cluster temporarily unavailable",
               checkedAt: new Date().toISOString(),
             },
-            { status: 503 },
+            { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
       },

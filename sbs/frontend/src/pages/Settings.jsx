@@ -19,8 +19,8 @@ export default function Settings({ token, user }) {
       });
       const data = await res.json();
       if (res.ok && Array.isArray(data)) setUsers(data);
-    } catch (e) {
-      console.error('Failed to fetch users:', e);
+    } catch {
+      // silent fail
     } finally {
       setLoadingUsers(false);
     }

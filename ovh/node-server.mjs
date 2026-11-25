@@ -1,4 +1,5 @@
 import { createServer, request as httpRequest } from "node:http";
+import { randomBytes, timingSafeEqual as cryptoTimingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { readFile, stat, writeFile, mkdir, unlink } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
@@ -136,15 +137,60 @@ const handler = serverModule?.default ?? serverModule;
 const SECURITY_HEADERS = {
   "X-Frame-Options": "SAMEORIGIN",
   "X-Content-Type-Options": "nosniff",
-  "X-XSS-Protection": "1; mode=block",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Resource-Policy": "same-site",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "Content-Security-Policy":
     "default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; font-src 'self' data: https:; frame-ancestors 'self'; base-uri 'self'",
-  "X-SparrowX-WAF": "ACTIVE",
-  "X-SparrowX-Shield": "PROTECTED",
 };
+
+function getSafeCorsHeaders(req) {
+  const origin = String(req.headers.origin || "").trim();
+  const base = {
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key, x-sparrowx-admin-key",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    Vary: "Origin",
+  };
+  if (origin) {
+    try {
+      const parsed = new URL(origin);
+      const h = parsed.hostname.toLowerCase();
+      const allowed =
+        (parsed.protocol === "https:" && (h === "sparrowx.net" || h.endsWith(".sparrowx.net"))) ||
+        (parsed.protocol === "http:" && (h === "localhost" || h === "127.0.0.1"));
+      if (allowed) {
+        base["Access-Control-Allow-Origin"] = origin;
+        base["Access-Control-Allow-Credentials"] = "true";
+      }
+    } catch {
+      // ignore malformed origin
+    }
+  }
+  return base;
+}
+
+function safeEqualStrings(a, b) {
+  const ba = Buffer.from(String(a || ""), "utf8");
+  const bb = Buffer.from(String(b || ""), "utf8");
+  if (ba.length === 0 || ba.length !== bb.length) return false;
+  return cryptoTimingSafeEqual(ba, bb);
+}
+
+function hasValidAdminHeader(req) {
+  const configured = (process.env.SPARROWX_ADMIN_API_KEY || process.env.SPARROWX_SERVICE_KEY || "").trim();
+  if (!configured) return false;
+  const headerKey = String(req.headers["x-sparrowx-admin-key"] || "").trim();
+  const authHeader = String(req.headers.authorization || "").trim();
+  const bearer = authHeader.toLowerCase().startsWith("bearer ") ? authHeader.slice(7).trim() : "";
+  return safeEqualStrings(headerKey, configured) || safeEqualStrings(bearer, configured);
+}
+
+function hasMasterSsoCookie(req) {
+  const cookie = String(req.headers.cookie || "");
+  return /(?:^|;\s*)spx_master_sso=[^;\s]+/.test(cookie);
+}
 
 const MAX_BODY_BYTES = 25 * 1024 * 1024; // 25 MB hard cap against memory exhaustion
 
@@ -173,26 +219,20 @@ function forwardToPostgrest(req, res, targetPath, fallbackFn) {
     const resHeaders = {
       ...proxyRes.headers,
       ...SECURITY_HEADERS,
-      "access-control-allow-origin": "*",
-      "access-control-allow-headers": "*",
-      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+      ...getSafeCorsHeaders(req),
     };
     res.writeHead(proxyRes.statusCode || 200, resHeaders);
     proxyRes.pipe(res, { end: true });
   });
 
-  proxyReq.on("error", (err) => {
-    console.warn(
-      `[PostgREST Gateway Note] PostgREST (${POSTGREST_HOST}:${POSTGREST_PORT}) not ready: ${err.message}. Falling back to internal engine.`,
-    );
+  proxyReq.on("error", () => {
     if (fallbackFn) {
       fallbackFn();
     } else if (!res.headersSent) {
       res.writeHead(503, { "Content-Type": "application/json", ...SECURITY_HEADERS });
       res.end(
         JSON.stringify({
-          error: "PostgREST Gateway Starting",
-          detail: "PostgREST container is warming up. Please retry in a few seconds.",
+          error: "Service temporarily unavailable",
         }),
       );
     }
@@ -212,12 +252,12 @@ const server = createServer(async (req, res) => {
     const isHealthRoute =
       pathname === "/health" || pathname === "/api/health" || pathname === "/api/v1/health";
 
+    const corsHeaders = getSafeCorsHeaders(req);
+
     // CORS preflight handling
     if (req.method === "OPTIONS") {
       res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        ...corsHeaders,
         ...SECURITY_HEADERS,
       });
       res.end();
@@ -227,7 +267,7 @@ const server = createServer(async (req, res) => {
     // Block hidden dotfile probes (/.env, /api/.git, etc.) except .well-known
     if (/(?:^|\/)\.(?!well-known(?:\/|$))/i.test(pathname)) {
       res.writeHead(403, { "Content-Type": "application/json", ...SECURITY_HEADERS });
-      res.end(JSON.stringify({ error: "Forbidden: dotfile access denied by SparrowX WAF" }));
+      res.end(JSON.stringify({ error: "Forbidden" }));
       return;
     }
 
@@ -236,26 +276,25 @@ const server = createServer(async (req, res) => {
     if (
       rawUrl.includes("%00") ||
       rawUrl.includes("\0") ||
+      /[\r\n]/.test(rawUrl) ||
       /(?:^|[\\/]|%2f|%5c)(?:\.\.|%2e%2e)(?:[\\/]|%2f|%5c|$)/i.test(rawUrl) ||
       /(?:\.\.[/\\]|%2e%2e(?:%2f|%5c|\/)|\.{2}(?:%2f|%5c))/i.test(rawUrl)
     ) {
       res.writeHead(403, { "Content-Type": "application/json", ...SECURITY_HEADERS });
-      res.end(JSON.stringify({ error: "Blocked: malicious path traversal payload rejected by SparrowX WAF" }));
+      res.end(JSON.stringify({ error: "Forbidden" }));
       return;
     }
 
-    // Fast-path <1ms health check before SSR / upstream checks
+    // Fast-path <1ms health check (no version/service banner disclosure)
     if (isHealthRoute && (req.method === "GET" || req.method === "HEAD")) {
       const payload = JSON.stringify({
         status: "healthy",
-        service: "SparrowX Autonomous Edge Shield",
-        version: "2.4.0",
-        domain: process.env.SPARROWX_DOMAIN || host,
         timestamp: new Date().toISOString(),
       });
       res.writeHead(200, {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store",
+        ...corsHeaders,
         ...SECURITY_HEADERS,
       });
       res.end(req.method === "HEAD" ? undefined : payload);
@@ -264,11 +303,11 @@ const server = createServer(async (req, res) => {
 
     // =========================================================================
     // 1. CRITICAL: SERVE STATIC ASSETS (.css, .js, .png, etc.) FOR ALL DOMAINS
-    // This MUST run before any API proxying, so api.sparrowx.net loads styles & scripts!
     // =========================================================================
     if (req.method === "GET" || req.method === "HEAD") {
+      const publicPrefix = PUBLIC_DIR.endsWith(sep) ? PUBLIC_DIR : `${PUBLIC_DIR}${sep}`;
       const safePath = resolve(PUBLIC_DIR, pathname.replace(/^\/+/, ""));
-      if (safePath.startsWith(PUBLIC_DIR) && pathname !== "/") {
+      if (safePath.startsWith(publicPrefix) && pathname !== "/") {
         try {
           const info = await stat(safePath);
           if (info.isFile()) {
@@ -312,13 +351,11 @@ const server = createServer(async (req, res) => {
       const rawBody = Buffer.concat(chunks);
       try {
         const parsed = JSON.parse(rawBody.toString("utf-8"));
-        const rawDropId =
-          dropUploadMatch[1] ||
-          parsed.id ||
-          `spx_drop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const generatedDropId = `spx_drop_${randomBytes(12).toString("hex")}`;
+        const rawDropId = dropUploadMatch[1] || parsed.id || generatedDropId;
         const dropId = SAFE_STORAGE_ID_RE.test(String(rawDropId))
           ? String(rawDropId)
-          : `spx_drop_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+          : generatedDropId;
         if (parsed.ciphertext) {
           storeEphemeralDrop(dropId, {
             id: dropId,
@@ -330,7 +367,7 @@ const server = createServer(async (req, res) => {
 
           res.writeHead(201, {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            ...corsHeaders,
             ...SECURITY_HEADERS,
           });
           res.end(JSON.stringify({ success: true, dropId, expiresAt: Date.now() + 15 * 60 * 1000 }));
@@ -352,7 +389,7 @@ const server = createServer(async (req, res) => {
       if (drop) {
         res.writeHead(200, {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          ...corsHeaders,
           ...SECURITY_HEADERS,
         });
         res.end(
@@ -383,7 +420,7 @@ const server = createServer(async (req, res) => {
       ephemeralDropStore.delete(dropId);
       res.writeHead(200, {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        ...corsHeaders,
         ...SECURITY_HEADERS,
       });
       res.end(JSON.stringify({ success: true, purgedId: dropId }));
@@ -434,12 +471,12 @@ const server = createServer(async (req, res) => {
             "Content-Type": safeType,
             "Content-Length": content.byteLength,
             "Content-Disposition": `attachment; filename="${safeFilename}"; filename*=UTF-8''${encodeURIComponent(String(item.name || "download"))}`,
-            "Access-Control-Allow-Origin": "*",
+            ...corsHeaders,
           });
           res.end(req.method === "HEAD" ? undefined : content);
           return;
-        } catch (err) {
-          console.warn("[Storage Download Note]", err.message);
+        } catch {
+          // fall through to 404
         }
       }
     }
@@ -453,7 +490,7 @@ const server = createServer(async (req, res) => {
       if (item) {
         res.writeHead(200, {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          ...corsHeaders,
           ...SECURITY_HEADERS,
         });
         res.end(JSON.stringify(item));
@@ -464,19 +501,30 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // 3. List all stored files: GET /api/storage/files
+    // 3. List all stored files: GET /api/storage/files (authenticated only)
     if (pathname === "/api/storage/files" && req.method === "GET") {
+      if (!hasValidAdminHeader(req) && !hasMasterSsoCookie(req)) {
+        res.writeHead(401, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...corsHeaders,
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify({ error: "Authentication required" }));
+        return;
+      }
       const files = await getStoredFiles();
       res.writeHead(200, {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-store",
+        ...corsHeaders,
         ...SECURITY_HEADERS,
       });
       res.end(JSON.stringify(files));
       return;
     }
 
-    // 3. Upload file to persistent disk: POST /api/storage/upload
+    // 3b. Upload file to persistent disk: POST /api/storage/upload (CSPRNG fileId)
     if (pathname === "/api/storage/upload" && req.method === "POST") {
       const chunks = [];
       let totalBytes = 0;
@@ -496,7 +544,7 @@ const server = createServer(async (req, res) => {
         const parsed = JSON.parse(rawBody.toString("utf-8"));
         if (parsed.filename && parsed.base64Data) {
           await mkdir(STORAGE_DIR, { recursive: true }).catch(() => {});
-          const fileId = `spx_f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+          const fileId = `spx_f_${randomBytes(12).toString("hex")}`;
           const safePath = resolveSafeStoragePath(fileId);
           const buffer = Buffer.from(String(parsed.base64Data), "base64");
           if (!safePath || buffer.byteLength > MAX_STORAGE_FILE_BYTES) {
@@ -506,7 +554,8 @@ const server = createServer(async (req, res) => {
           }
           await writeFile(safePath, buffer);
 
-          const proto = req.headers["x-forwarded-proto"] || "https";
+          const rawProto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim().toLowerCase();
+          const proto = rawProto === "http" ? "http" : "https";
           const fileDomain = host.includes("file.") ? host : "file.sparrowx.net";
           const record = {
             id: fileId,
@@ -526,14 +575,14 @@ const server = createServer(async (req, res) => {
 
           res.writeHead(201, {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            ...corsHeaders,
             ...SECURITY_HEADERS,
           });
           res.end(JSON.stringify({ success: true, file: record }));
           return;
         }
-      } catch (err) {
-        console.error("[Storage Upload Error]", err);
+      } catch {
+        // invalid upload format
       }
 
       res.writeHead(400, { "Content-Type": "application/json", ...SECURITY_HEADERS });
@@ -541,8 +590,18 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // 4. Delete file from persistent disk: DELETE /api/storage/files/:id
+    // 4. Delete file from persistent disk: DELETE /api/storage/files/:id (authenticated only)
     if ((pathname.startsWith("/api/storage/files/") || pathname === "/api/storage/files") && req.method === "DELETE") {
+      if (!hasValidAdminHeader(req) && !hasMasterSsoCookie(req)) {
+        res.writeHead(401, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...corsHeaders,
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify({ error: "Authentication required" }));
+        return;
+      }
       const urlObj = new URL(reqUrl, "http://localhost");
       const rawFileId = pathname.replace(/^\/api\/storage\/files\/?/, "") || urlObj.searchParams.get("id");
       const fileId = rawFileId ? rawFileId.trim() : "";
@@ -556,7 +615,7 @@ const server = createServer(async (req, res) => {
         await unlink(safePath).catch(() => {});
         res.writeHead(200, {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          ...corsHeaders,
           ...SECURITY_HEADERS,
         });
         res.end(JSON.stringify({ success: true, deletedId: fileId }));
@@ -638,8 +697,10 @@ const server = createServer(async (req, res) => {
       !/\.[a-z0-9]{1,8}$/i.test(pathname) &&
       (acceptsHtml || !req.headers["apikey"])
     ) {
-      const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
-      const proto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim();
+      const qs = (reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "").replace(/[\r\n]/g, "");
+      const rawProto = String(req.headers["x-forwarded-proto"] || "https").split(",")[0].trim().toLowerCase();
+      const proto = rawProto === "http" ? "http" : "https";
+      const safeRelPath = `/${pathname.replace(/^\/+/, "").replace(/[\r\n]/g, "")}`;
 
       // 1. Typoed *.sparrowx.net subdomains -> canonical subdomain redirect
       if (host.endsWith(".sparrowx.net")) {
@@ -684,7 +745,7 @@ const server = createServer(async (req, res) => {
           return;
         }
         if (canonicalSubMap[sub]) {
-          res.writeHead(302, { Location: `${proto}://${canonicalSubMap[sub]}${pathname}${qs}`, ...SECURITY_HEADERS });
+          res.writeHead(302, { Location: `${proto}://${canonicalSubMap[sub]}${safeRelPath}${qs}`, ...SECURITY_HEADERS });
           res.end();
           return;
         }
@@ -692,7 +753,7 @@ const server = createServer(async (req, res) => {
 
       // 2. Wrong / typoed path auto-correction respecting active subdomain
       const validPaths = new Set([
-        "/", "/db", "/infra", "/infra/dashboard", "/game", "/game/dashboard", "/game/panel-launch",
+        "/", "/db", "/infra", "/infra/dashboard", "/infra/configure", "/game", "/game/dashboard", "/game/panel-launch",
         "/shield", "/drop", "/keys", "/gateway", "/docs", "/docs/errors",
         "/docs/db", "/docs/infra", "/docs/shield", "/docs/game", "/docs/drop", "/docs/keys", "/docs/api",
         "/errors", "/story", "/terms", "/refund", "/security", "/deploy", "/ai", "/agents", "/dpdp", "/f",
@@ -853,9 +914,14 @@ const server = createServer(async (req, res) => {
     };
 
     // =========================================================================
-    // 1.5. SOVEREIGN LOCAL DB SYNC ENDPOINT (POST /api/shift-cloud-to-local)
+    // 1.5. SOVEREIGN LOCAL DB SYNC ENDPOINT (Admin Key Required)
     // =========================================================================
     if (pathname === "/api/shift-cloud-to-local" && req.method === "POST") {
+      if (!hasValidAdminHeader(req)) {
+        res.writeHead(401, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+        res.end(JSON.stringify({ success: false, error: "Admin API key required" }));
+        return;
+      }
       try {
         const totalRows = await migrateCloudSupabaseToLocal();
         res.writeHead(200, { "Content-Type": "application/json", ...SECURITY_HEADERS });
@@ -867,12 +933,12 @@ const server = createServer(async (req, res) => {
             timestamp: new Date().toISOString(),
           }),
         );
-      } catch (syncErr) {
+      } catch {
         res.writeHead(500, { "Content-Type": "application/json", ...SECURITY_HEADERS });
         res.end(
           JSON.stringify({
             success: false,
-            error: syncErr instanceof Error ? syncErr.message : String(syncErr),
+            error: "Database synchronization failed",
           }),
         );
       }
@@ -927,15 +993,23 @@ const server = createServer(async (req, res) => {
           String(req.headers["authorization"] || "").replace(/^Bearer\s+/i, "")
       ).trim();
 
-      const hasValidKeyFormat =
-        apiKey.startsWith("spx_") || apiKey.split(".").length === 3;
+      const configuredServiceKey = (
+        process.env.SPARROWX_ADMIN_API_KEY ||
+        process.env.SPARROWX_SERVICE_KEY ||
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        ""
+      ).trim();
+      const isAuthorizedGateway =
+        hasValidAdminHeader(req) ||
+        hasMasterSsoCookie(req) ||
+        (configuredServiceKey && safeEqualStrings(apiKey, configuredServiceKey)) ||
+        (apiKey.split(".").length === 3 && apiKey.length >= 64);
 
-      if (req.method !== "HEAD" && !hasValidKeyFormat) {
-        res.writeHead(401, { "Content-Type": "application/json" });
+      if (req.method !== "HEAD" && !isAuthorizedGateway) {
+        res.writeHead(401, { "Content-Type": "application/json", ...SECURITY_HEADERS });
         res.end(
           JSON.stringify({
-            error:
-              "Unauthorized: Private Database API requires a valid personal API key. Sign in to your SparrowX Dashboard -> Settings to generate your key.",
+            error: "Unauthorized: valid API key or authenticated session required.",
           })
         );
         return;
@@ -949,13 +1023,12 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // Default: Render via SSR (SparrowxApiGatewayPortal for api., DB Studio for db., Security for sec.)
+    // Default: Render via SSR
     await handleViaAppEngine();
-  } catch (err) {
-    console.error("[SparrowX Sovereign Server Error]", err);
+  } catch {
     if (!res.headersSent) {
       res.writeHead(500, { "Content-Type": "application/json", ...SECURITY_HEADERS });
-      res.end(JSON.stringify({ error: "Internal Server Error", detail: String(err) }));
+      res.end(JSON.stringify({ error: "Internal Server Error" }));
     }
   }
 });

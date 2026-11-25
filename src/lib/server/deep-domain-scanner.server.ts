@@ -87,7 +87,9 @@ function isPrivateOrReservedIp(ip: string): boolean {
     clean === "::" ||
     clean === "0.0.0.0" ||
     /^fe[89ab][0-9a-f]:/.test(clean) ||
-    /^f[cd][0-9a-f]{2}:/.test(clean)
+    /^f[cd][0-9a-f]{2}:/.test(clean) ||
+    /^ff[0-9a-f]{2}:/.test(clean) ||
+    /^::ffff:[0-9a-f]{1,4}:[0-9a-f]{1,4}$/.test(clean)
   ) {
     return true;
   }
@@ -95,11 +97,15 @@ function isPrivateOrReservedIp(ip: string): boolean {
   const ipv4Candidate = v4Mapped ? v4Mapped[1]! : clean;
   const parts = ipv4Candidate.split(".").map(Number);
   if (parts.length === 4 && parts.every((n) => !Number.isNaN(n) && n >= 0 && n <= 255)) {
-    const [a, b] = parts as [number, number, number, number];
-    if (a === 10 || a === 127 || a === 0) return true;
+    const [a, b, c] = parts as [number, number, number, number];
+    if (a === 10 || a === 127 || a === 0 || a >= 224) return true;
     if (a === 169 && b === 254) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 192 && b === 168) return true;
+    if (a === 192 && b === 0 && (c === 0 || c === 2)) return true;
+    if (a === 198 && (b === 18 || b === 19)) return true;
+    if (a === 198 && b === 51 && c === 100) return true;
+    if (a === 203 && b === 0 && c === 113) return true;
     if (a === 100 && b >= 64 && b <= 127) return true;
   }
   return false;

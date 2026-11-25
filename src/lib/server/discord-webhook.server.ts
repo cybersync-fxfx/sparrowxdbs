@@ -23,10 +23,11 @@ export interface DiscordTelemetryPayload {
   url?: string | undefined;
 }
 
-const DEFAULT_WEBHOOK_URL =
-  "https://discord.com/api/webhooks/1571155240747536484/SRH2ShHvjM0n9NVXf0oqqWeI7_3R-jR-1-eOE3Z600-XlHOgFopyVkKsdUTxa1pttlWh";
-
 const REDACT_KEY_RE = /(pass|secret|token|apikey|api_key|authorization|cookie|cvv|card)/i;
+
+function neutralizeMentions(input: string): string {
+  return input.replace(/@(everyone|here)/gi, "@\u200b$1").replace(/<@!?\d+>|<@&\d+>/g, "[mention]");
+}
 
 const CATEGORY_META: Record<
   DiscordTelemetryCategory,
@@ -69,7 +70,7 @@ export async function sendDiscordTelemetry(
     return { ok: true, status: 204 };
   }
 
-  const webhookUrl = env("SPARROWX_DISCORD_WEBHOOK_URL") || DEFAULT_WEBHOOK_URL;
+  const webhookUrl = env("SPARROWX_DISCORD_WEBHOOK_URL") || "";
   if (!webhookUrl || !webhookUrl.startsWith("https://discord.com/api/webhooks/")) {
     return { ok: false, error: "Discord webhook URL not configured" };
   }
@@ -82,18 +83,25 @@ export async function sendDiscordTelemetry(
     ...(payload.url ? { Page: payload.url } : {}),
     ...(payload.fields ?? {}),
     ...(payload.userAgent ? { "User-Agent": payload.userAgent.slice(0, 140) } : {}),
-  });
+  }).map((f) => ({
+    ...f,
+    name: neutralizeMentions(f.name),
+    value: neutralizeMentions(f.value),
+  }));
 
   const body = {
     username: "SparrowX SOC & Telemetry",
+    allowed_mentions: { parse: [] as string[] },
     content:
       payload.category === "emergency"
-        ? "@here **URGENT: UNDER ATTACK EMERGENCY REPORT**"
+        ? "**URGENT: UNDER ATTACK EMERGENCY REPORT**"
         : undefined,
     embeds: [
       {
-        title: `${meta.prefix} — ${String(payload.title || "Event").slice(0, 180)}`,
-        description: payload.description ? String(payload.description).slice(0, 2000) : undefined,
+        title: `${meta.prefix} — ${neutralizeMentions(String(payload.title || "Event")).slice(0, 180)}`,
+        description: payload.description
+          ? neutralizeMentions(String(payload.description)).slice(0, 2000)
+          : undefined,
         color: meta.color,
         fields: embedFields,
         footer: {
@@ -111,19 +119,11 @@ export async function sendDiscordTelemetry(
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(5000),
     });
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      console.error(
-        `[SparrowX Discord Webhook] HTTP ${res.status} for "${payload.title}": ${errBody.slice(0, 200)}`,
-      );
-    }
     return { ok: res.ok, status: res.status };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "Discord webhook dispatch failed";
-    console.error(`[SparrowX Discord Webhook] Dispatch error for "${payload.title}": ${msg}`);
+  } catch {
     return {
       ok: false,
-      error: msg,
+      error: "Discord webhook dispatch failed",
     };
   }
 }

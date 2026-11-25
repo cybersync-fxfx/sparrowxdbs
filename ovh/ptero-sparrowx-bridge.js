@@ -52,16 +52,25 @@
     root.textContent = "";
     const el = document.createElement("div");
     el.className = "spx-ptero-toast";
-    el.innerHTML = `
-      <div class="spx-ptero-toast-head">
-        <span>${guide.title}</span>
-        <span class="spx-ptero-toast-badge">${guide.badge}</span>
-        <button class="spx-ptero-toast-close" aria-label="Dismiss">&times;</button>
-      </div>
-      <div>${guide.body}</div>
-    `;
-    const closeBtn = el.querySelector(".spx-ptero-toast-close");
-    if (closeBtn) closeBtn.addEventListener("click", () => el.remove(), { once: true });
+    const head = document.createElement("div");
+    head.className = "spx-ptero-toast-head";
+    const titleSpan = document.createElement("span");
+    titleSpan.textContent = String(guide.title || "");
+    const badgeSpan = document.createElement("span");
+    badgeSpan.className = "spx-ptero-toast-badge";
+    badgeSpan.textContent = String(guide.badge || "");
+    const closeBtn = document.createElement("button");
+    closeBtn.className = "spx-ptero-toast-close";
+    closeBtn.setAttribute("aria-label", "Dismiss");
+    closeBtn.textContent = "\u00d7";
+    closeBtn.addEventListener("click", () => el.remove(), { once: true });
+    head.appendChild(titleSpan);
+    head.appendChild(badgeSpan);
+    head.appendChild(closeBtn);
+    const bodyDiv = document.createElement("div");
+    bodyDiv.textContent = String(guide.body || "");
+    el.appendChild(head);
+    el.appendChild(bodyDiv);
     root.appendChild(el);
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.remove(), 12000);

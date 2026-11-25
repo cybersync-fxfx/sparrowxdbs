@@ -33,7 +33,13 @@ async function probeHttp(url: string, timeoutMs = 2000): Promise<{ ok: boolean; 
 export const Route = createFileRoute("/api/system/backbone")({
   server: {
     handlers: {
-      GET: async () => {
+      GET: async ({ request }) => {
+        const { readMasterSsoFromRequest } = await import("@/lib/server/master-sso.server");
+        const { hasValidAdminKey } = await import("@/lib/server/db-auth.server");
+        const isAdminKey = hasValidAdminKey(request);
+        const claims = await readMasterSsoFromRequest(request);
+        const isAdmin = isAdminKey || claims?.role === "admin";
+
         const pgHost = process.env.POSTGRES_HOST || "127.0.0.1";
         const pgPort = Number(process.env.POSTGRES_PORT || 5432);
         const postgrestUrl = process.env.POSTGREST_INTERNAL_URL || "http://127.0.0.1:3001";
@@ -53,20 +59,40 @@ export const Route = createFileRoute("/api/system/backbone")({
           process.env.GOOGLE_CLIENT_ID?.trim() && process.env.GOOGLE_CLIENT_SECRET?.trim(),
         );
 
-        return Response.json({
-          ok: true,
-          timestamp: new Date().toISOString(),
-          backbone: {
-            postgres: { connected: pgUp, host: `${pgHost}:${pgPort}` },
-            postgrest: { connected: postgrest.ok, status: postgrest.status },
-            phpmyadmin: { connected: pma.ok, status: pma.status },
-            smtp: { connected: smtpUp, host: `${smtpHost}:${smtpPort}` },
-            proxmox: { configured: Boolean(pveUrl && process.env.PVE_TOKEN_ID) },
-            pterodactyl: { configured: Boolean(pteroUrl && process.env.PTERO_APPLICATION_API_KEY) },
-            googleOAuth: { configured: googleOAuthConfigured },
-            deployRunner: { active: true, storage: process.env.SPARROWX_DATA_DIR || "./data" },
+        // Non-admin callers only see high-level operational booleans (never internal hostnames/ports/paths)
+        if (!isAdmin) {
+          return Response.json(
+            {
+              ok: true,
+              timestamp: new Date().toISOString(),
+              backbone: {
+                postgres: { connected: pgUp },
+                postgrest: { connected: postgrest.ok },
+                smtp: { connected: smtpUp },
+                googleOAuth: { configured: googleOAuthConfigured },
+              },
+            },
+            { headers: { "Cache-Control": "no-store" } },
+          );
+        }
+
+        return Response.json(
+          {
+            ok: true,
+            timestamp: new Date().toISOString(),
+            backbone: {
+              postgres: { connected: pgUp, host: `${pgHost}:${pgPort}` },
+              postgrest: { connected: postgrest.ok, status: postgrest.status },
+              phpmyadmin: { connected: pma.ok, status: pma.status },
+              smtp: { connected: smtpUp, host: `${smtpHost}:${smtpPort}` },
+              proxmox: { configured: Boolean(pveUrl && process.env.PVE_TOKEN_ID) },
+              pterodactyl: { configured: Boolean(pteroUrl && process.env.PTERO_APPLICATION_API_KEY) },
+              googleOAuth: { configured: googleOAuthConfigured },
+              deployRunner: { active: true },
+            },
           },
-        });
+          { headers: { "Cache-Control": "no-store" } },
+        );
       },
     },
   },

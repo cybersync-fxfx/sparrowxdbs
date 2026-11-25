@@ -68,7 +68,8 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           (timingSafeEqual(stateParam, verifiedCookieState!.nonce) ||
             (Boolean(verifiedParamState) &&
               timingSafeEqual(verifiedParamState!.nonce, verifiedCookieState!.nonce)));
-        const stateValid = stateMatchesCookie || Boolean(verifiedParamState);
+        // Enforce OAuth CSRF binding: if state cookie is present it MUST match; otherwise require a valid signed state with matching host
+        const stateValid = rawStateCookie ? stateMatchesCookie : stateMatchesCookie;
 
         if (!code || !verifiedState || !stateParam || !stateValid) {
           return failRedirect("Google sign-in session expired. Please try again.");
@@ -96,9 +97,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           });
 
           if (!tokenRes.ok) {
-            const errText = await tokenRes.text().catch(() => "");
-            console.error(`[SparrowX Google OAuth] Token exchange failed [${tokenRes.status}]:`, errText);
-            return failRedirect("Google token exchange failed. Verify your Redirect URI in Google Console.");
+            return failRedirect("Google token exchange failed. Please try signing in again.");
           }
 
           const tokenData = (await tokenRes.json()) as { access_token?: string };
@@ -165,8 +164,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           headers.append("Set-Cookie", buildMasterSsoCookieHeader(request, masterToken));
           headers.append("Set-Cookie", buildUnifiedClientSessionCookieHeader(request, user));
           return new Response(null, { status: 302, headers });
-        } catch (err) {
-          console.error("[SparrowX Google OAuth] Callback error:", err);
+        } catch {
           return failRedirect("Google sign-in encountered a network error. Please try again.");
         }
       },

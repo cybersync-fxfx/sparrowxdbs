@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
@@ -9,15 +10,11 @@ import {
   type ContactInquiryRecord,
 } from "./lib/contact-inquiry";
 import {
-  createServerConsoleSession,
-  executeServerAction,
-  listManagedInfraServers,
-  provisionServerFromPaidOrder,
-} from "./lib/server/proxmox.server";
-import {
-  generateSparrowxBackupBundle,
-  generateSparrowxBackupScript,
-} from "./lib/server/sparrowx-backup.server";
+  authorizeDbRequest,
+  checkDbRateLimit,
+  extractClientIp,
+} from "./lib/server/db-auth.server";
+import { timingSafeEqual } from "./lib/server/crypto.server";
 import {
   createUpiOrder,
   getUpiGatewayConfig,
@@ -47,12 +44,68 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-// CORS Headers for client SDK integrations & self-hosted PostgREST API
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key",
-};
+// Strict origin-validated CORS headers (no wildcard '*' on authenticated APIs)
+function buildCorsHeaders(request: Request): Record<string, string> {
+  const origin = (request.headers.get("origin") || "").trim();
+  const base: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key, x-sparrowx-admin-key",
+    Vary: "Origin",
+  };
+  if (origin) {
+    try {
+      const parsed = new URL(origin);
+      const h = parsed.hostname.toLowerCase();
+      const allowed =
+        (parsed.protocol === "https:" && (h === "sparrowx.net" || h.endsWith(".sparrowx.net"))) ||
+        (parsed.protocol === "http:" && (h === "localhost" || h === "127.0.0.1"));
+      if (allowed) {
+        base["Access-Control-Allow-Origin"] = origin;
+        base["Access-Control-Allow-Credentials"] = "true";
+      }
+    } catch {
+      // ignore malformed origin
+    }
+  }
+  return base;
+}
+
+const SENSITIVE_REST_TABLES = new Set([
+  "app_users",
+  "client_tenants",
+  "contact_inquiries",
+  "provisioned_databases",
+  "provisioned_db_backups",
+  "provisioned_db_audit_logs",
+  "email_verification_codes",
+  "tenant_ips",
+  "incidents",
+]);
+
+function stripSecretColumns(row: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(row)) {
+    const lk = k.toLowerCase();
+    if (lk === "password" || lk === "password_hash" || lk === "token_hash" || lk === "tokenhash") {
+      continue;
+    }
+    clean[k] = v;
+  }
+  return clean;
+}
+
+function findVerifiedTenantByApiKey(rawKey: string): Record<string, unknown> | null {
+  const cleaned = rawKey.replace(/^Bearer\s+/i, "").trim();
+  if (!cleaned || cleaned.length < 16) return null;
+  const tenants = getTableRows("client_tenants");
+  for (const t of tenants) {
+    const storedKey = String(t.api_key ?? "").trim();
+    if (storedKey && timingSafeEqual(cleaned, storedKey)) {
+      return t;
+    }
+  }
+  return null;
+}
 
 // Sovereign Built-in Table Store (used when POSTGREST_INTERNAL_URL is not configured or as fast cache)
 const sovereignTableStore = new Map<string, Array<Record<string, unknown>>>();
@@ -95,6 +148,19 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
   const match = url.pathname.match(/^\/rest\/v1\/([a-zA-Z0-9_]+)$/);
   if (!match) return null;
   const tableName = match[1]!;
+  const corsHeaders = buildCorsHeaders(request);
+
+  // Enforce authentication for ALL mutations and ALL sensitive table reads
+  const isMutation = request.method !== "GET" && request.method !== "HEAD";
+  const requiresAuth = isMutation || SENSITIVE_REST_TABLES.has(tableName);
+  const auth = requiresAuth ? await authorizeDbRequest(request) : null;
+  if (requiresAuth && (!auth || !auth.authorized)) {
+    return new Response(JSON.stringify({ error: "Authentication required." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+    });
+  }
+
   const rows = getTableRows(tableName);
 
   // If running alongside self-hosted PostgREST container on OVH Ubuntu, sync & merge with PostgREST
@@ -139,7 +205,34 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
       // PostgREST container not reachable; use in-memory + migratedSeedData store
     }
 
-    let result = combinedRows.filter((row) => matchesPostgrestFilters(row, url.searchParams));
+    // Strict account/tenant row isolation for non-admin callers
+    if (auth && !auth.isAdmin) {
+      const actorEmail = (auth.actorEmail || "").toLowerCase();
+      const actorTenant = auth.tenantId || "";
+      if (tableName === "app_users") {
+        combinedRows = combinedRows.filter(
+          (r) => actorEmail && String(r.email ?? "").toLowerCase() === actorEmail,
+        );
+      } else if (tableName === "client_tenants") {
+        combinedRows = combinedRows.filter(
+          (r) =>
+            (actorEmail && String(r.contact_email ?? "").toLowerCase() === actorEmail) ||
+            (actorTenant && String(r.id ?? "") === actorTenant),
+        );
+      } else if (tableName === "contact_inquiries") {
+        combinedRows = combinedRows.filter(
+          (r) => actorEmail && String(r.email ?? "").toLowerCase() === actorEmail,
+        );
+      } else if (tableName === "incidents" || tableName === "tenant_ips") {
+        combinedRows = combinedRows.filter(
+          (r) => actorTenant && String(r.tenant_id ?? r.tenantId ?? "") === actorTenant,
+        );
+      }
+    }
+
+    let result = combinedRows
+      .filter((row) => matchesPostgrestFilters(row, url.searchParams))
+      .map(stripSecretColumns);
     const orderParam = url.searchParams.get("order");
     if (orderParam) {
       const [col, dir] = orderParam.split(".");
@@ -158,8 +251,19 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
     }
     return new Response(JSON.stringify(result), {
       status: 200,
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
     });
+  }
+
+  // Prevent privilege escalation on app_users by non-admin callers
+  if (tableName === "app_users" && auth && !auth.isAdmin) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden: account mutations must use /api/auth/master-sso." }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+      },
+    );
   }
 
   // Forward write operations (POST / PATCH / DELETE) to PostgREST in background/parallel while updating memory store
@@ -198,21 +302,21 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
           if (existingIdx >= 0) {
             const merged = { ...rows[existingIdx], ...record };
             rows[existingIdx] = merged;
-            inserted.push(merged);
+            inserted.push(stripSecretColumns(merged));
             continue;
           }
         }
         rows.unshift(record);
-        inserted.push(record);
+        inserted.push(stripSecretColumns(record));
       }
       return new Response(JSON.stringify(inserted), {
         status: 201,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       });
-    } catch (err) {
-      return new Response(JSON.stringify({ error: "Invalid JSON payload", detail: String(err) }), {
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid JSON payload" }), {
         status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
   }
@@ -226,33 +330,39 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
         if (row && matchesPostgrestFilters(row, url.searchParams)) {
           const merged = { ...row, ...patch };
           rows[i] = merged;
-          updated.push(merged);
+          updated.push(stripSecretColumns(merged));
         }
       }
       return new Response(JSON.stringify(updated), {
         status: 200,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       });
-    } catch (err) {
-      return new Response(JSON.stringify({ error: "Invalid PATCH payload", detail: String(err) }), {
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid PATCH payload" }), {
         status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
   }
 
   if (request.method === "DELETE") {
+    if (auth && !auth.isAdmin && url.searchParams.toString() === "") {
+      return new Response(JSON.stringify({ error: "Forbidden: bulk delete requires filter or admin." }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", ...corsHeaders },
+      });
+    }
     const remaining = rows.filter((row) => !matchesPostgrestFilters(row, url.searchParams));
     sovereignTableStore.set(tableName, remaining);
     return new Response(JSON.stringify({ deleted: rows.length - remaining.length }), {
       status: 200,
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
     });
   }
 
   return new Response(JSON.stringify({ error: "Method not allowed" }), {
     status: 405,
-    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+    headers: { "Content-Type": "application/json", ...corsHeaders },
   });
 }
 
@@ -298,10 +408,11 @@ async function persistContactInquiry(record: ContactInquiryRecord): Promise<void
 // Real Ingestion & Handshake Endpoints for External Client Services
 async function handleSparrowxApi(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
+  const corsHeaders = buildCorsHeaders(request);
 
   // Handle CORS preflight
   if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   // 0. Sovereign PostgREST-Compatible Endpoint (/rest/v1/:table)
@@ -315,30 +426,20 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     return handleContactRequest(request, {
       persist: persistContactInquiry,
       limiter: contactRateLimiter,
-      corsHeaders: CORS_HEADERS,
+      corsHeaders,
     });
   }
 
-  // 1. Health Probe
+  // 1. Minimal Health Probe (zero internal IP / nameserver / version disclosure)
   if (url.pathname === "/api/v1/health" || url.pathname === "/api/health") {
     return new Response(
       JSON.stringify({
         status: "healthy",
-        service: "SparrowX Autonomous Edge Shield",
-        version: "2.4.0",
-        domain: process.env.SPARROWX_DOMAIN || url.hostname,
-        publicIp: process.env.SPARROWX_PUBLIC_IP || "127.0.0.1",
-        nameservers: [
-          process.env.SPARROWX_NS1 || `ns1.${url.hostname}`,
-          process.env.SPARROWX_NS2 || `ns2.${url.hostname}`,
-        ],
-        edgeNodesOnline: 42,
-        avgLatencyMs: 11,
         timestamp: new Date().toISOString(),
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       },
     );
   }
@@ -353,11 +454,20 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed. Use POST." }), {
         status: 405,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
-    const key = request.headers.get("x-sparrowx-key") || request.headers.get("authorization");
+    const ip = extractClientIp(request);
+    const rate = checkDbRateLimit(`verify:${ip}`, 30, 60_000);
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
+    const key = request.headers.get("x-sparrowx-key") || request.headers.get("authorization") || "";
     let bodyData: Record<string, unknown> = {};
     try {
       bodyData = (await request.json()) as Record<string, unknown>;
@@ -368,34 +478,42 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     const pathTenantMatch = url.pathname.match(/\/api\/v1\/tenant\/([^/]+)\/verify/);
     const tenantId = (pathTenantMatch ? pathTenantMatch[1] : (bodyData.tenantId as string)) || "";
     const apiKey = key || (bodyData.apiKey as string) || "";
-    const isValidKey =
-      apiKey.includes("spx_live_") || apiKey.includes("spx_tenant_") || apiKey.length >= 10;
+    const matchedTenant = findVerifiedTenantByApiKey(apiKey);
+    const ssoAuth = !matchedTenant ? await authorizeDbRequest(request, tenantId ? { targetTenantId: tenantId } : {}) : null;
+    const isValidKey = Boolean(
+      (matchedTenant && (!tenantId || String(matchedTenant.id ?? "") === tenantId)) ||
+        ssoAuth?.authorized,
+    );
 
     return new Response(
       JSON.stringify({
         verified: isValidKey,
-        tenantId: tenantId || "default",
-        databasePartition: tenantId ? `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}` : "spx_db_default",
-        ipTableName: tenantId ? `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}_ips` : "spx_db_default_ips",
+        tenantId: isValidKey ? tenantId || String(matchedTenant?.id ?? "default") : "",
         status: isValidKey ? "Connected & Active" : "Key Verification Failed",
         message: isValidKey
-          ? "SparrowX sovereign connector handshake established. Dedicated database partition online."
+          ? "SparrowX connector handshake established."
           : "Invalid or missing SparrowX Ingestion Key.",
-        latencyMs: 9,
         timestamp: new Date().toISOString(),
       }),
       {
         status: isValidKey ? 200 : 401,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       },
     );
   }
 
-  // 2b. Tenant Database Dedicated IPs Table API
+  // 2b. Tenant Database Dedicated IPs Table API (authenticated & tenant-scoped)
   const tenantIpsMatch = url.pathname.match(/^\/api\/v1\/tenant\/([^/]+)\/ips(?:\/([^/]+))?$/);
   if (tenantIpsMatch) {
     const tenantId = tenantIpsMatch[1] ?? "";
     const ipRecordId = tenantIpsMatch[2];
+    const auth = await authorizeDbRequest(request, { targetTenantId: tenantId });
+    if (!auth.authorized) {
+      return new Response(JSON.stringify({ error: "Authentication required." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+      });
+    }
     const dbPartition = `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`;
     const ipTableName = `${dbPartition}_ips`;
     const ipRows = getTableRows("tenant_ips");
@@ -407,13 +525,11 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
       return new Response(
         JSON.stringify({
           tenantId,
-          databaseName: dbPartition,
-          tableName: ipTableName,
           status: "online",
           records: tenantRecords,
           timestamp: new Date().toISOString(),
         }),
-        { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders } },
       );
     }
 
@@ -427,14 +543,14 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         if (!cleanIp || (!ipv4Pattern.test(cleanIp) && !ipv6Pattern.test(cleanIp))) {
           return new Response(
             JSON.stringify({
-              error: `Invalid IP address format "${cleanIp}". Must be a valid IPv4, CIDR, or IPv6 address.`,
+              error: "Invalid IP address format. Must be a valid IPv4, CIDR, or IPv6 address.",
             }),
-            { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+            { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
           );
         }
 
         const newRecord = {
-          id: `ip_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          id: `ip_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
           tenantId,
           tenant_id: tenantId,
           databaseName: dbPartition,
@@ -443,13 +559,13 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
           table_name: ipTableName,
           ipAddress: cleanIp,
           ip_address: cleanIp,
-          label: body.label?.trim() || "Server Origin Host",
+          label: body.label?.trim().slice(0, 80) || "Server Origin Host",
           type: body.type || "server_wan",
           status: "Active",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           lastProbeStatus: "Pending",
-          notes: body.notes?.trim() || undefined,
+          notes: body.notes?.trim().slice(0, 240) || undefined,
         };
 
         ipRows.unshift(newRecord);
@@ -457,42 +573,50 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         return new Response(
           JSON.stringify({
             success: true,
-            message: `IP ${cleanIp} added to database table ${ipTableName} successfully.`,
+            message: `IP ${cleanIp} added successfully.`,
             record: newRecord,
           }),
-          { status: 201, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+          { status: 201, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders } },
         );
-      } catch (err) {
+      } catch {
         return new Response(
-          JSON.stringify({ error: "Invalid JSON payload", detail: String(err) }),
-          { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+          JSON.stringify({ error: "Invalid JSON payload" }),
+          { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
         );
       }
     }
 
     if (request.method === "DELETE") {
       if (ipRecordId) {
-        const remaining = ipRows.filter((r) => String(r.id ?? "") !== ipRecordId);
+        const remaining = ipRows.filter(
+          (r) => !(String(r.id ?? "") === ipRecordId && String(r.tenantId ?? r.tenant_id ?? "") === tenantId),
+        );
         sovereignTableStore.set("tenant_ips", remaining);
       }
       return new Response(
         JSON.stringify({
           success: true,
-          message: `IP record ${ipRecordId || "specified"} removed from table ${ipTableName}.`,
           tenantId,
         }),
-        { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders } },
       );
     }
   }
 
-  // 2c. Tenant API Credentials Reset Endpoint
+  // 2c. Tenant API Credentials Reset Endpoint (authenticated + CSPRNG)
   const tenantResetMatch = url.pathname.match(/^\/api\/v1\/tenant\/([^/]+)\/reset-(?:credentials|keys)$/);
   if (tenantResetMatch && request.method === "POST") {
     const tenantId = tenantResetMatch[1] ?? "";
+    const auth = await authorizeDbRequest(request, { targetTenantId: tenantId });
+    if (!auth.authorized) {
+      return new Response(JSON.stringify({ error: "Authentication required." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+      });
+    }
     const rawId = tenantId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 8);
-    const randKey = Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-    const randCid = Math.random().toString(36).substring(2, 8);
+    const randKey = crypto.randomBytes(16).toString("hex");
+    const randCid = crypto.randomBytes(8).toString("hex");
 
     const newApiKey = `spx_live_${rawId}_${randKey}`;
     const newApiClientId = `spx_cid_${rawId.toLowerCase()}_${randCid}`;
@@ -503,14 +627,14 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         tenantId,
         newApiKey,
         newApiClientId,
-        message: "API Client ID and Dashboard API Key reset successfully. Previous credentials invalidated.",
+        message: "API credentials rotated successfully. Previous credentials invalidated.",
         timestamp: new Date().toISOString(),
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+      { status: 200, headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders } },
     );
   }
 
-  // 3. Real Telemetry & Threat Ingestion Endpoint (Supports Sovereign Tenant Isolation)
+  // 3. Real Telemetry & Threat Ingestion Endpoint (authenticated + rate-limited)
   const isTelemetryRoute =
     url.pathname === "/api/v1/telemetry" ||
     url.pathname === "/api/v1/telemetry/ingest" ||
@@ -522,15 +646,26 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed. Use POST." }), {
         status: 405,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
 
+    const ip = extractClientIp(request);
+    const rate = checkDbRateLimit(`telemetry-ingest:${ip}`, 30, 60_000);
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
+
     const key = request.headers.get("x-sparrowx-key") || request.headers.get("authorization") || "";
-    if (!key && !request.headers.get("content-type")?.includes("application/json")) {
-      return new Response(JSON.stringify({ error: "Missing x-sparrowx-key header" }), {
+    const matchedTenant = findVerifiedTenantByApiKey(key);
+    const ssoAuth = !matchedTenant ? await authorizeDbRequest(request) : null;
+    if (!matchedTenant && !ssoAuth?.authorized) {
+      return new Response(JSON.stringify({ error: "Valid x-sparrowx-key or session required." }), {
         status: 401,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       });
     }
 
@@ -543,39 +678,32 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         summary?: string;
         tenantId?: string;
         service_id?: string;
-        apiKey?: string;
       };
 
-      const pathTenantMatch = url.pathname.match(/\/api\/v1\/tenant\/([^/]+)\/telemetry/);
-      const tenantId =
-        (pathTenantMatch ? pathTenantMatch[1] : payload.tenantId || payload.service_id) ||
-        "default";
-
-      const incidentId = `INC-${Date.now().toString().slice(-4)}`;
+      const tenantId = String(matchedTenant?.id || ssoAuth?.tenantId || "default");
+      const incidentId = `INC-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
       const incidentRecord = {
         id: incidentId,
-        title: payload.title || "External Telemetry Event",
-        source: payload.source || payload.domain || "Customer Client Endpoint",
+        title: String(payload.title || "External Telemetry Event").slice(0, 140),
+        source: String(payload.source || payload.domain || "Client Endpoint").slice(0, 120),
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        severity: payload.severity || "High",
+        severity: ["Critical", "High", "Medium", "Low"].includes(String(payload.severity))
+          ? payload.severity
+          : "High",
         status: "Open",
         assignee: "Autonomous Edge Shield",
-        summary: payload.summary || "Real-time telemetry event received via /api/v1/telemetry.",
+        summary: String(payload.summary || "Telemetry event received.").slice(0, 400),
         playbook: "Automated Edge Containment Playbook",
         affected_assets: 1,
         tenant_id: tenantId,
       };
 
-      // Persist directly in sovereign server store & self-hosted PostgREST if configured
       getTableRows("incidents").unshift({
         ...incidentRecord,
         created_at: new Date().toISOString(),
       });
 
-      const postgrestTarget =
-        process.env.POSTGREST_INTERNAL_URL ||
-        (process.env.VITE_SUPABASE_URL ? `${process.env.VITE_SUPABASE_URL.replace(/\/+$/, "")}/rest/v1` : "");
-
+      const postgrestTarget = process.env.POSTGREST_INTERNAL_URL || "";
       if (postgrestTarget) {
         void fetch(`${postgrestTarget.replace(/\/+$/, "")}/incidents`, {
           method: "POST",
@@ -584,215 +712,88 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
             Prefer: "resolution=merge-duplicates,return=minimal",
           },
           body: JSON.stringify(incidentRecord),
-        }).catch(() => {
-          // Ignore background fetch error
-        });
+        }).catch(() => {});
       }
 
       return new Response(
         JSON.stringify({
           status: "ingested",
           tenantId,
-          databasePartition: `spx_db_${tenantId.toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
           incidentId,
-          shieldAction: "BLOCKED",
-          rule: "SPX_EDGE_DEFENSE",
-          latencyMs: 11,
           timestamp: new Date().toISOString(),
         }),
         {
           status: 200,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
         },
       );
-    } catch (err) {
+    } catch {
       return new Response(
-        JSON.stringify({ error: "Invalid JSON telemetry payload", detail: String(err) }),
-        { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        JSON.stringify({ error: "Invalid JSON telemetry payload" }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
   }
 
-  // 4. Centralized Diagnostics Telemetry Ingest
+  // 4. Centralized Diagnostics Telemetry Ingest (rate-limited)
   if (url.pathname === "/api/v1/diagnostics") {
     if (request.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed. Use POST." }), {
         status: 405,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
+    }
+
+    const ip = extractClientIp(request);
+    const rate = checkDbRateLimit(`diagnostics:${ip}`, 20, 60_000);
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
     }
 
     try {
       const payload = (await request.json()) as {
         referenceId?: string;
         code?: string;
-        module?: string;
-        message?: string;
       };
 
-      const refId = payload.referenceId || `SPX-ERR-${Date.now()}`;
+      const refId = String(payload.referenceId || `SPX-ERR-${Date.now()}`).slice(0, 64);
       return new Response(
         JSON.stringify({
           status: "received",
           referenceId: refId,
-          code: payload.code || "UNKNOWN",
+          code: String(payload.code || "UNKNOWN").slice(0, 32),
           timestamp: new Date().toISOString(),
         }),
         {
           status: 200,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
         },
       );
     } catch {
       return new Response(
         JSON.stringify({ error: "Invalid JSON diagnostics payload" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...CORS_HEADERS } },
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } },
       );
     }
   }
 
-  // =========================================================================
-  // SPARROWX CLOUD INFRA — PROXMOX VE CONTROL PLANE API
-  // =========================================================================
-  if (url.pathname === "/api/infra/servers" && request.method === "GET") {
-    const payload = await listManagedInfraServers();
-    return new Response(JSON.stringify({ ok: true, ...payload }), {
-      status: 200,
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-    });
-  }
-
-  if (url.pathname === "/api/infra/servers/provision" && request.method === "POST") {
-    try {
-      const body = (await request.json()) as Parameters<typeof provisionServerFromPaidOrder>[0];
-      const server = provisionServerFromPaidOrder({
-        orderId: String(body.orderId || `SPX-${Date.now().toString(36).toUpperCase()}`),
-        planId: String(body.planId || "vps-starter"),
-        planName: String(body.planName || "VPS-Builder NVMe"),
-        category: body.category || "vps",
-        hostname: String(body.hostname || "node-01.sparrowx.net"),
-        region: String(body.region || "Mumbai IN-1"),
-        os: String(body.os || "Ubuntu 24.04 LTS (Hardened)"),
-        monthlyPriceInr: Number(body.monthlyPriceInr || 849),
-      });
-      return new Response(JSON.stringify({ ok: true, server }), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    } catch {
-      return new Response(JSON.stringify({ ok: false, message: "Invalid provision payload" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    }
-  }
-
-  if (url.pathname === "/api/infra/servers/action" && request.method === "POST") {
-    try {
-      const body = (await request.json()) as Parameters<typeof executeServerAction>[0];
-      const result = await executeServerAction(body);
-      return new Response(JSON.stringify(result), {
-        status: result.ok ? 200 : 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    } catch {
-      return new Response(JSON.stringify({ ok: false, message: "Invalid JSON payload" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    }
-  }
-
-  if (url.pathname === "/api/infra/servers/console" && request.method === "POST") {
-    try {
-      const body = (await request.json()) as { serverId?: string };
-      const result = await createServerConsoleSession(String(body.serverId || ""));
-      return new Response(JSON.stringify(result), {
-        status: result.ok ? 200 : 404,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    } catch {
-      return new Response(JSON.stringify({ ok: false, error: "Invalid JSON payload" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    }
-  }
-
-  // =========================================================================
-  // SPARROWX BACKUP SYSTEM — PORTABLE SELF-RESTORING SH BUNDLE API
-  // =========================================================================
-  if (url.pathname === "/api/infra/servers/backup" && (request.method === "GET" || request.method === "POST")) {
-    try {
-      const serverId = url.searchParams.get("serverId") || "default";
-      const download = url.searchParams.get("download");
-      const list = await listManagedInfraServers();
-      const server = list.servers.find((s) => s.id === serverId) || list.servers[0] || {
-        id: serverId,
-        vmid: 401,
-        node: "pve-in-mum",
-        name: "Ryzen 9 9950X (401)",
-        hostname: "spx-ryzen9-mum01.sparrowx.net",
-        category: "vps" as const,
-        planId: "vps-ryzen-9950x-16gb",
-        planName: "Ryzen 9 9950X — 16GB",
-        region: "Tier IV Mumbai Node",
-        os: "Ubuntu 24.04 LTS (Hardened)",
-        status: "running" as const,
-        ipv4: "103.189.45.142",
-        extraIpv4s: [],
-        ipv6: "2401:4900:8a12:401::/64",
-        rdns: "spx-ryzen9-mum01.sparrowx.net",
-        sshUser: "root",
-        sshPort: 22,
-        sshKeys: [],
-        wireguardEnabled: true,
-        wireguardIp: "10.66.1.142/24",
-        ddosMode: "XDP/eBPF Always-On" as const,
-        cpuCores: 8,
-        cpuUsagePct: 18,
-        ramTotalGb: 16,
-        ramUsedGb: 4.2,
-        diskTotalGb: 250,
-        diskUsedGb: 34,
-        bandwidthUsedTb: 1.2,
-        bandwidthQuotaTb: 100,
-        uptimeSeconds: 123456,
-        monthlyPriceInr: 2599,
-        nextDueDate: "2026-12-22",
-        proxmoxBacked: true,
-        snapshots: [],
-      };
-
-      if (download === "script" || download === "sh") {
-        const script = generateSparrowxBackupScript(server);
-        return new Response(script, {
-          status: 200,
-          headers: {
-            "Content-Type": "application/x-sh; charset=utf-8",
-            "Content-Disposition": `attachment; filename="sparrowx-restore-${server.hostname.split(".")[0]}.sh"`,
-            ...CORS_HEADERS,
-          },
-        });
-      }
-
-      const bundle = generateSparrowxBackupBundle(server);
-      return new Response(JSON.stringify({ ok: true, bundle }), {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    } catch (err) {
-      return new Response(JSON.stringify({ ok: false, error: String(err) }), {
-        status: 500,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-      });
-    }
-  }
+  // Note: /api/infra/servers/* requests fall through to authenticated TanStack Start route handlers in src/routes/api/infra/servers/*
 
   // =========================================================================
   // SPARROWX UNIFIED UPI AUTO-CONFIRMATION PAYMENT API (ALL SERVICES)
   // =========================================================================
   if (url.pathname === "/api/payments/upi/create" && request.method === "POST") {
+    const ip = extractClientIp(request);
+    const rate = checkDbRateLimit(`upi-create:${ip}`, 15, 60_000);
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
     try {
       const body = (await request.json()) as {
         service?: "infra" | "game" | "db" | "shield" | "netsec" | "wallet";
@@ -808,10 +809,10 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         };
       };
       const amount = Number(body.amountInr || 0);
-      if (!Number.isFinite(amount) || amount < 1) {
-        return new Response(JSON.stringify({ ok: false, error: "Amount must be at least ₹1." }), {
+      if (!Number.isFinite(amount) || amount < 1 || amount > 500_000) {
+        return new Response(JSON.stringify({ ok: false, error: "Amount must be between ₹1 and ₹500,000." }), {
           status: 400,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+          headers: { "Content-Type": "application/json", ...corsHeaders },
         });
       }
       const order = createUpiOrder({
@@ -830,7 +831,7 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
             severity: "info",
             service: `SparrowX UPI Checkout (${order.service})`,
             title: `New Order Started — ${order.planName}`,
-            ip: request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for") || undefined,
+            ip,
             fields: {
               "Order ID": order.orderId,
               Service: order.service,
@@ -845,32 +846,59 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
         .catch(() => {});
       return new Response(JSON.stringify({ ok: true, mode: cfg.mode, order }), {
         status: 200,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       });
     } catch {
       return new Response(JSON.stringify({ ok: false, error: "Invalid UPI create payload" }), {
         status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
   }
 
   if (url.pathname === "/api/payments/upi/status" && request.method === "GET") {
+    const ip = extractClientIp(request);
+    const rate = checkDbRateLimit(`upi-status:${ip}`, 40, 60_000);
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
     const orderId = url.searchParams.get("orderId") || "";
     const order = getUpiOrder(orderId);
     if (!order) {
       return new Response(JSON.stringify({ ok: false, error: "UPI order not found" }), {
         status: 404,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
-    return new Response(JSON.stringify({ ok: true, order }), {
+    const auth = await authorizeDbRequest(request);
+    const isOwnerOrAdmin =
+      auth.authorized &&
+      (auth.isAdmin ||
+        (auth.actorEmail &&
+          auth.actorEmail.toLowerCase() === order.customerEmail.toLowerCase()));
+    const safeOrder = isOwnerOrAdmin
+      ? order
+      : {
+          ...order,
+          customerEmail: "***",
+        };
+    return new Response(JSON.stringify({ ok: true, order: safeOrder }), {
       status: 200,
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
     });
   }
 
   if (url.pathname === "/api/payments/upi/orders" && request.method === "GET") {
+    const auth = await authorizeDbRequest(request, { requireAdmin: true });
+    if (!auth.authorized) {
+      return new Response(JSON.stringify({ ok: false, error: "Admin authentication required." }), {
+        status: 401,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+      });
+    }
     return new Response(
       JSON.stringify({
         ok: true,
@@ -879,7 +907,7 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       },
     );
   }
@@ -892,7 +920,7 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     } catch {
       return new Response(JSON.stringify({ ok: false, message: "Invalid webhook JSON" }), {
         status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
     const result = processUpiAutoWebhook({
@@ -926,11 +954,19 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
     }
     return new Response(JSON.stringify(result), {
       status: result.status,
-      headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
     });
   }
 
   if (url.pathname === "/api/payments/upi/verify-utr" && request.method === "POST") {
+    const ip = extractClientIp(request);
+    const rate = checkDbRateLimit(`upi-verify-utr:${ip}`, 12, 60_000);
+    if (!rate.allowed) {
+      return new Response(
+        JSON.stringify({ ok: false, message: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` }),
+        { status: 429, headers: { "Content-Type": "application/json", ...corsHeaders } },
+      );
+    }
     try {
       const body = (await request.json()) as { orderId?: string; utr?: string };
       const result = verifyUpiUtr({
@@ -960,12 +996,12 @@ async function handleSparrowxApi(request: Request): Promise<Response | null> {
       }
       return new Response(JSON.stringify(result), {
         status: result.ok ? 200 : 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
       });
     } catch {
       return new Response(JSON.stringify({ ok: false, message: "Invalid UTR payload" }), {
         status: 400,
-        headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       });
     }
   }

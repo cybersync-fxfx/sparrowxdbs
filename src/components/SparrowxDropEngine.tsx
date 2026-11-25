@@ -286,8 +286,6 @@ export function SparrowxDropEngine() {
           setPersistentFiles((prev) => [json.file, ...prev]);
         }
       } else {
-        const errorText = await res.text().catch(() => "");
-        console.warn("[Storage Upload Server Note]", res.status, errorText);
         // Client resilient fallback (stores base64Data so recipient in this browser can view and download)
         const fileId = `spx_f_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
         const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
@@ -307,8 +305,7 @@ export function SparrowxDropEngine() {
           return updated;
         });
       }
-    } catch (err) {
-      console.warn("[Storage Upload Catch Note]", err);
+    } catch {
       const fileId = `spx_f_${Date.now().toString(36)}`;
       const origin = typeof window !== "undefined" ? window.location.origin : "https://file.sparrowx.net";
       const newRecord: PersistentFile = {
@@ -547,8 +544,8 @@ export function SparrowxDropEngine() {
             size: rawFile.size,
           }),
         });
-      } catch (err) {
-        console.warn("[Drop Relay Warning]", err);
+      } catch {
+        // Silent fallback to local encrypted session cache
       }
 
       // Also cache in sessionStorage so same-browser / local tab always succeeds
@@ -593,9 +590,8 @@ export function SparrowxDropEngine() {
       setDirectShareLink(currentHostLink);
       setSessionActive(true);
       setTtlSeconds(15 * 60);
-    } catch (err) {
-      console.error("Encryption error", err);
-      setBurnNotice("Failed to encrypt file in browser memory: " + String(err));
+    } catch {
+      setBurnNotice("Failed to encrypt file in browser memory.");
     } finally {
       setEncrypting(false);
     }
@@ -622,8 +618,8 @@ export function SparrowxDropEngine() {
             const data = await res.json();
             base64Ciphertext = data.ciphertext;
           }
-        } catch (e) {
-          console.warn("Relay fetch error", e);
+        } catch {
+          // Silent fallback to local cache
         }
       }
 
@@ -694,7 +690,6 @@ export function SparrowxDropEngine() {
 
       setDownloadSuccess(true);
     } catch (err: unknown) {
-      console.error("Decryption failed", err);
       const msg = err instanceof Error ? err.message : "";
       setDecryptError(msg || "Failed to decrypt file. Key mismatch or corrupted bytes.");
     } finally {

@@ -18,9 +18,20 @@ export function redirect302(location: string): Response {
 }
 
 /**
- * Resolves the external request origin, honoring reverse-proxy headers
- * (`X-Forwarded-Proto`, `X-Forwarded-Host`, `Host`) when present.
+ * Resolves the external request origin safely against Host Header Injection.
+ * Only honors reverse-proxy headers for allowlisted SparrowX / loopback hosts.
  */
+function isAllowedOriginHost(rawHost: string): boolean {
+  if (!/^[a-z0-9.-]+(?::\d{1,5})?$/i.test(rawHost)) return false;
+  const hostname = rawHost.split(":")[0]?.toLowerCase() ?? "";
+  return (
+    hostname === "sparrowx.net" ||
+    hostname.endsWith(".sparrowx.net") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1"
+  );
+}
+
 export function resolveRequestOrigin(request: Request): string {
   const url = new URL(request.url);
   const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
@@ -28,13 +39,22 @@ export function resolveRequestOrigin(request: Request): string {
     request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
     request.headers.get("host")?.split(",")[0]?.trim();
 
-  if (forwardedHost && /^[a-z0-9.-]+(:\d+)?$/i.test(forwardedHost)) {
-    const proto = forwardedProto === "http" || forwardedProto === "https"
-      ? forwardedProto
-      : url.protocol.replace(":", "");
+  if (forwardedHost && isAllowedOriginHost(forwardedHost)) {
+    const isLocal =
+      forwardedHost.toLowerCase().startsWith("localhost") ||
+      forwardedHost.toLowerCase().startsWith("127.0.0.1");
+    const proto =
+      forwardedProto === "https" || (forwardedProto === "http" && isLocal)
+        ? forwardedProto
+        : isLocal
+          ? url.protocol.replace(":", "")
+          : "https";
     return `${proto}://${forwardedHost}`;
   }
-  return url.origin;
+  if (isAllowedOriginHost(url.host)) {
+    return url.origin;
+  }
+  return "https://sparrowx.net";
 }
 
 /**

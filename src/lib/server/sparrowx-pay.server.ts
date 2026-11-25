@@ -188,8 +188,8 @@ export function createSparrowxPayOrder(input: {
   const ledger = readLedger();
   expireStaleOrders(ledger);
 
-  const cleanInr = Math.max(1, Math.round(Number(input.amountInr) || 1));
-  const suffix = crypto.randomBytes(3).toString("hex").toUpperCase();
+  const cleanInr = Math.min(500_000, Math.max(1, Math.round(Number(input.amountInr) || 1)));
+  const suffix = crypto.randomBytes(6).toString("hex").toUpperCase();
   const orderId = `SPX${suffix}`;
   const now = Date.now();
   const expiresMs = input.method === "upi" ? 15 * 60_000 : 30 * 60_000;
@@ -290,21 +290,22 @@ async function finalizePaidOrder(
   ledger.usedRefs.push(normalizedRef);
   order.status = "PAID";
   order.verifiedRef = normalizedRef;
-  order.confirmedVia = confirmedVia;
+  if (confirmedVia !== undefined) {
+    order.confirmedVia = confirmedVia;
+  }
   order.paidAt = new Date().toISOString();
 
   if (order.service === "infra" && !order.provisionedServer) {
     try {
-      const server = await provisionServerFromPaidOrder({
+      const server = provisionServerFromPaidOrder({
         orderId: order.orderId,
         planId: order.planId,
         planName: order.planName,
         category: order.metadata?.category ?? "vps",
-        hostname: order.metadata?.hostname ?? `${order.planId}.sparrowx.internal`,
+        hostname: order.metadata?.hostname ?? `${order.planId}.sparrowx.net`,
         region: order.metadata?.region ?? "Mumbai IN-1",
         os: order.metadata?.os ?? "Ubuntu 24.04 LTS",
-        customerEmail: order.customerEmail,
-        utr: normalizedRef,
+        monthlyPriceInr: order.amountInr,
       });
       order.provisionedServer = server;
     } catch {

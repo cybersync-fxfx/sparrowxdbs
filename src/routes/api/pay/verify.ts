@@ -10,6 +10,16 @@ export const Route = createFileRoute("/api/pay/verify")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
+          const ip = extractClientIp(request);
+          const rate = checkDbRateLimit(`pay-verify:${ip}`, 12, 60_000);
+          if (!rate.allowed) {
+            return Response.json(
+              { ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
+              { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+            );
+          }
+
           const body = (await request.json()) as Record<string, unknown>;
           const orderId = typeof body.orderId === "string" ? body.orderId : "";
           const utr = typeof body.utr === "string" ? body.utr : "";
@@ -25,14 +35,22 @@ export const Route = createFileRoute("/api/pay/verify")({
 
           if (existing.currency === "USDT") {
             const check = await mod.pollBinanceDepositForOrder(orderId);
-            return Response.json({ ok: check.verified, ...check });
+            return Response.json(
+              { ok: check.verified, ...check },
+              { headers: { "Cache-Control": "no-store" } },
+            );
           }
 
           const check = await mod.verifySubmittedUtr(orderId, utr);
-          return Response.json({ ok: check.verified, ...check });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Verification failed";
-          return Response.json({ ok: false, error: message }, { status: 400 });
+          return Response.json(
+            { ok: check.verified, ...check },
+            { headers: { "Cache-Control": "no-store" } },
+          );
+        } catch {
+          return Response.json(
+            { ok: false, error: "Verification failed" },
+            { status: 400, headers: { "Cache-Control": "no-store" } },
+          );
         }
       },
     },

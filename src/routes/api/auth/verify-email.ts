@@ -18,13 +18,17 @@ export const Route = createFileRoute("/api/auth/verify-email")({
 
         try {
           if (statusOnly) {
-            const verified = email ? await isEmailVerifiedInDb(email) : false;
+            const { readMasterSsoFromRequest } = await import("@/lib/server/master-sso.server");
+            const claims = await readMasterSsoFromRequest(request);
+            const canCheck =
+              Boolean(claims) &&
+              (claims!.role === "admin" || claims!.email.toLowerCase() === email);
+            const verified = canCheck && email ? await isEmailVerifiedInDb(email) : false;
             return Response.json(
               {
                 ok: true,
-                email,
+                email: canCheck ? email : "",
                 verified,
-                smtpConfigured: getSmtpConfig().configured,
               },
               { headers: { "Cache-Control": "no-store" } },
             );
@@ -34,7 +38,7 @@ export const Route = createFileRoute("/api/auth/verify-email")({
             const res = await verifyEmailCodeOrToken({ email, token });
             const target = res.verified
               ? `${origin}/?email_verified=1&email=${encodeURIComponent(email)}`
-              : `${origin}/?email_verified=0&error=${encodeURIComponent(res.error || "Invalid or expired verification link")}`;
+              : `${origin}/?email_verified=0&error=${encodeURIComponent("Invalid or expired verification link")}`;
             return new Response(null, {
               status: 302,
               headers: {
@@ -48,19 +52,18 @@ export const Route = createFileRoute("/api/auth/verify-email")({
             { ok: false, error: "Provide ?status=1&email=... or ?email=...&token=..." },
             { status: 400 },
           );
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Verification service temporarily unavailable.";
+        } catch {
           if (email && token) {
             return new Response(null, {
               status: 302,
               headers: {
-                Location: `${origin}/?email_verified=0&error=${encodeURIComponent(message)}`,
+                Location: `${origin}/?email_verified=0&error=${encodeURIComponent("Verification service temporarily unavailable.")}`,
                 "Cache-Control": "no-store",
               },
             });
           }
           return Response.json(
-            { ok: false, error: message },
+            { ok: false, error: "Verification service temporarily unavailable." },
             { status: 500, headers: { "Cache-Control": "no-store" } },
           );
         }
@@ -144,7 +147,7 @@ export const Route = createFileRoute("/api/auth/verify-email")({
           return Response.json(
             {
               ok: false,
-              error: message,
+              error: "Email verification request failed. Please try again.",
             },
             { status: 500, headers: { "Cache-Control": "no-store" } },
           );

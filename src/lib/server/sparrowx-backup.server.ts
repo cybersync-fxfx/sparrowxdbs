@@ -20,15 +20,38 @@ export interface SparrowxBackupBundle {
   defaultWireguardConfig: string;
 }
 
+function sanitizeShellHost(raw: string, fallback = "node-01.sparrowx.net"): string {
+  const cleaned = String(raw || "").trim().toLowerCase().replace(/[^a-z0-9.-]/g, "");
+  return cleaned || fallback;
+}
+
+function sanitizeShellLabel(raw: string, fallback = "SparrowX"): string {
+  const cleaned = String(raw || "").trim().replace(/[^a-zA-Z0-9 ._()/-]/g, "").slice(0, 64);
+  return cleaned || fallback;
+}
+
+function sanitizeIpField(raw: string, fallback: string): string {
+  const cleaned = String(raw || "").trim().replace(/[^0-9a-fA-F.:/]/g, "").slice(0, 64);
+  return cleaned || fallback;
+}
+
 export function generateSparrowxBackupScript(server: ManagedInfraServer): string {
-  const hostShort = server.hostname.split(".")[0] || "sparrowx-vps";
+  const safeHostname = sanitizeShellHost(server.hostname);
+  const safeRdns = sanitizeShellHost(server.rdns, safeHostname);
+  const safeName = sanitizeShellLabel(server.name, safeHostname);
+  const safeRegion = sanitizeShellLabel(server.region, "Tier IV Mumbai Node");
+  const safeOs = sanitizeShellLabel(server.os, "Ubuntu 24.04 LTS");
+  const safeIpv4 = sanitizeIpField(server.ipv4, "127.0.0.1");
+  const safeIpv6 = sanitizeIpField(server.ipv6, "::1/128");
+  const safeWireguardIp = sanitizeIpField(server.wireguardIp, "10.66.1.10/24");
+  const hostShort = (safeHostname.split(".")[0] || "sparrowx-vps").replace(/[^a-z0-9-]/g, "") || "sparrowx-vps";
   const nowIso = new Date().toISOString();
 
   return `#!/usr/bin/env bash
 # ==============================================================================
 #   SPARROWX BACKUP SYSTEM — AUTONOMOUS MASTER RESTORE ENGINE
-#   Server: ${server.hostname} (${server.name})
-#   Datacenter: ${server.region}
+#   Server: ${safeHostname} (${safeName})
+#   Datacenter: ${safeRegion}
 #   Generated At: ${nowIso}
 #   System: Proxmox KVM / Cloud VPS Sovereign Engine
 # ==============================================================================
@@ -115,17 +138,16 @@ else
 server {
     listen 80;
     listen [::]:80;
-    server_name ${server.hostname} ${server.rdns} localhost;
+    server_name ${safeHostname} ${safeRdns} localhost;
 
     root /var/www/html;
     index index.html index.htm index.nginx-debian.html;
 
     # SparrowX Edge Armor & Reverse Proxy Hardening
+    server_tokens off;
     add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header X-Powered-By "SparrowX-Infra-Shield" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
     location / {
         try_files $uri $uri/ =404;
@@ -134,7 +156,7 @@ server {
     location /sparrowx-health {
         access_log off;
         default_type text/plain;
-        return 200 "OK - SparrowX Managed VPS Node: ${server.hostname}\\n";
+        return 200 "OK - SparrowX Managed VPS Node: ${safeHostname}\\n";
     }
 }
 NGINX_CONF
@@ -146,7 +168,7 @@ if [ ! -f /etc/ssl/sparrowx/sparrowx-selfsigned.crt ]; then
   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
     -keyout /etc/ssl/sparrowx/sparrowx-selfsigned.key \\
     -out /etc/ssl/sparrowx/sparrowx-selfsigned.crt \\
-    -subj "/C=IN/ST=Maharashtra/L=Mumbai/O=SparrowX/CN=${server.hostname}" >/dev/null 2>&1 || true
+    -subj "/C=IN/ST=Maharashtra/L=Mumbai/O=SparrowX/CN=${safeHostname}" >/dev/null 2>&1 || true
 fi
 
 # Disable conflicting default Ubuntu/Debian sites if custom sites exist
@@ -190,7 +212,7 @@ if [ -f "\${BACKUP_DIR}/wireguard/wg0.conf" ]; then
 else
   cat << 'WG_CONF' > /etc/wireguard/wg0.conf
 [Interface]
-Address = ${server.wireguardIp}
+Address = ${safeWireguardIp}
 PrivateKey = REPLACE_WITH_OPERATOR_PRIVATE_KEY
 ListenPort = 51820
 SaveConfig = false
@@ -223,7 +245,7 @@ else
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>${server.hostname} — SparrowX Cloud</title>
+  <title>${safeHostname} — SparrowX Cloud</title>
   <style>
     body { background: #06080D; color: #F4F6FA; font-family: system-ui, sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; }
     .card { background: #0C1018; border: 1px solid rgba(255,255,255,0.1); border-radius: 1rem; padding: 2.5rem; max-width: 480px; text-align: center; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
@@ -235,7 +257,7 @@ else
 <body>
   <div class="card">
     <div class="badge">SparrowX Backup System · Restored</div>
-    <h1>${server.hostname}</h1>
+    <h1>${safeHostname}</h1>
     <p>This node was restored and hardened automatically by the SparrowX Master Backup Engine. All services and Nginx routing are operational.</p>
   </div>
 </body>
@@ -273,13 +295,13 @@ echo ""
 echo -e "\${ORANGE}==============================================================================\${NC}"
 echo -e "\${GREEN}★ SPARROWX BACKUP SYSTEM — RESTORE PROCESS COMPLETED SUCCESSFULLY!\${NC}"
 echo -e "\${ORANGE}==============================================================================\${NC}"
-echo -e " Node Hostname:       \${GREEN}${server.hostname}\${NC}"
-echo -e " Datacenter Region:   ${server.region}"
-echo -e " Operating System:    ${server.os}"
+echo -e " Node Hostname:       \${GREEN}${safeHostname}\${NC}"
+echo -e " Datacenter Region:   ${safeRegion}"
+echo -e " Operating System:    ${safeOs}"
 echo -e " Nginx Status:        \${GREEN}Running (HTTP local check returned \${HTTP_STATUS})\${NC}"
-echo -e " WireGuard Mesh:      ${server.wireguardIp} (/etc/wireguard/wg0.conf)"
-echo -e " Primary IPv4:        ${server.ipv4}"
-echo -e " IPv6 Subnet:         ${server.ipv6}"
+echo -e " WireGuard Mesh:      ${safeWireguardIp} (/etc/wireguard/wg0.conf)"
+echo -e " Primary IPv4:        ${safeIpv4}"
+echo -e " IPv6 Subnet:         ${safeIpv6}"
 echo -e "\${ORANGE}==============================================================================\${NC}"
 echo -e "\${GREEN}All configurations, Nginx virtual hosts, and networking have been autonomously resolved.\${NC}"
 `;
@@ -320,17 +342,21 @@ export function generateSparrowxBackupBundle(server: ManagedInfraServer): Sparro
     ],
   };
 
+  const safeHostname = sanitizeShellHost(server.hostname);
+  const safeRdns = sanitizeShellHost(server.rdns, safeHostname);
+  const safeWireguardIp = sanitizeIpField(server.wireguardIp, "10.66.1.10/24");
+
   const defaultNginxConfig = `server {
     listen 80;
     listen [::]:80;
-    server_name ${server.hostname} ${server.rdns} localhost;
+    server_name ${safeHostname} ${safeRdns} localhost;
 
     root /var/www/html;
     index index.html;
 
+    server_tokens off;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Powered-By "SparrowX-Infra-Shield" always;
 
     location / {
         try_files $uri $uri/ =404;
@@ -338,7 +364,7 @@ export function generateSparrowxBackupBundle(server: ManagedInfraServer): Sparro
 }`;
 
   const defaultWireguardConfig = `[Interface]
-Address = ${server.wireguardIp}
+Address = ${safeWireguardIp}
 PrivateKey = REPLACE_WITH_YOUR_PRIVATE_KEY
 ListenPort = 51820
 

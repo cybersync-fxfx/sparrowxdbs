@@ -74,7 +74,7 @@ export function createUpiOrder(input: {
 }): UpiPaymentOrder {
   const cfg = getUpiGatewayConfig();
   const cleanAmount = Math.max(1, Math.round(Number(input.amountInr) || 1));
-  const suffix = crypto.randomBytes(3).toString("hex").toUpperCase();
+  const suffix = crypto.randomBytes(6).toString("hex").toUpperCase();
   const orderId = `SPX${suffix}`;
   // Add deterministic unique paise (0.01..0.99) in Direct UPI Bridge mode so incoming bank credits match 100% unambiguously
   const uniquePaise = (parseInt(suffix.slice(0, 2), 16) % 97) + 1;
@@ -195,11 +195,8 @@ export function processUpiAutoWebhook(input: {
     } else {
       return { ok: false, status: 401, message: "Invalid SparrowX UPI Bridge secret." };
     }
-  } else if (!rzpSecret && !bridgeSecret) {
-    // Allow sandbox verification when no live secrets are configured yet
-    verifiedSource = "sandbox_instant";
   } else {
-    return { ok: false, status: 401, message: "Missing webhook authentication signature." };
+    return { ok: false, status: 401, message: "Missing or unconfigured webhook authentication signature." };
   }
 
   const orderId = String(input.payload.orderId || input.payload.tr || "")
@@ -266,7 +263,7 @@ export function verifyUpiUtr(input: {
   }
 
   const receipt = unmatchedBridgeReceipts.get(cleanUtr);
-  if (receipt) {
+  if (receipt && receipt.amountInr.toFixed(2) === order.exactAmountInr) {
     unmatchedBridgeReceipts.delete(cleanUtr);
     const finalized = finalizePaidOrder(order, cleanUtr, "utr_auto_match");
     return {
@@ -276,19 +273,9 @@ export function verifyUpiUtr(input: {
     };
   }
 
-  const cfg = getUpiGatewayConfig();
-  if (!cfg.liveWebhookConfigured) {
-    const finalized = finalizePaidOrder(order, cleanUtr, "sandbox_instant");
-    return {
-      ok: true,
-      message: `Sandbox UPI verification accepted (${cleanUtr}). Configure RAZORPAY_WEBHOOK_SECRET or SPARROWX_UPI_BRIDGE_SECRET in .env for live bank matching.`,
-      order: finalized,
-    };
-  }
-
   return {
     ok: false,
     message:
-      "Waiting for bank credit alert for this UTR. Keep this window open — auto-confirmation completes within seconds once UPI settles.",
+      "Waiting for verified bank credit confirmation for this UTR. Keep this window open — auto-confirmation completes once UPI settles.",
   };
 }

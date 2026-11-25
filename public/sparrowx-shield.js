@@ -65,9 +65,8 @@
     blockedThreatsCount: 0,
 
     init: function () {
-      if (!this.apiKey && !this.tenantId) {
-        console.warn('[SparrowX Shield] Missing data-spx-key or data-spx-tenant. Obtain your connector key from SparrowX Settings.');
-        this.status = 'Missing Credentials';
+      if (!this.apiKey || !this.tenantId) {
+        this.status = 'Standby';
         return;
       }
 
@@ -108,20 +107,17 @@
             self.handshakeLatencyMs = Date.now() - startTime;
             if (xhr.status >= 200 && xhr.status < 300) {
               self.connected = true;
-              self.status = 'Active & Guarding';
-              console.log('[SparrowX Shield] Autonomous Defense Active on ' + self.domain + ' (' + self.handshakeLatencyMs + 'ms)');
+              self.status = 'Active';
             } else {
               self.connected = false;
-              self.status = 'Connection Failed (' + xhr.status + ')';
-              console.warn('[SparrowX Shield] Ingestion Handshake Failed with status ' + xhr.status);
+              self.status = 'Inactive';
             }
           }
         };
 
         xhr.onerror = function () {
           self.connected = false;
-          self.status = 'Network Error';
-          console.warn('[SparrowX Shield] Unable to reach ingestion endpoint.');
+          self.status = 'Inactive';
         };
 
         xhr.send(JSON.stringify(payload));
@@ -192,8 +188,7 @@
     }
   };
 
-  // Expose global SparrowX instance
-  window.SparrowX = SparrowX;
+  // Keep shield state private inside closure (never expose keys or config on window)
 
   // Auto-initialize when DOM is interactive
   if (document.readyState === 'loading') {

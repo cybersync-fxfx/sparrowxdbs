@@ -63,7 +63,6 @@ export default function ThreatRadar({ token }) {
         setLoading(false);
       })
       .catch((e) => {
-        console.error(e);
         setError(e.message || 'Threat Radar failed to load.');
         setSetupRequired(Boolean(e.setupRequired));
         setData({ recent: [], liveScores: [], stats: { scannedToday: 0, blockedToday: 0, guardBlockedIps: 0 }, radar: null });
@@ -122,8 +121,6 @@ export default function ThreatRadar({ token }) {
       
       const contentType = res.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        const text = await res.text();
-        console.error('[Radar] Non-JSON response:', text.substring(0, 200));
         throw new Error(`Server returned unexpected format (${res.status}). The panel might be restarting or build is out of sync.`);
       }
 

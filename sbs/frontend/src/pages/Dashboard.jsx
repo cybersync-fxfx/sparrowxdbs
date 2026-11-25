@@ -35,7 +35,6 @@ export default function Dashboard({ token, user }) {
 
   const fetchTunnelStatus = () => {
     if (!token) return;
-    console.log('[Tunnel] Fetching status...');
     fetch('/api/agent/tunnel/status', { headers: { Authorization: `Bearer ${token}` } })
       .then(async (r) => {
         const data = await r.json();
@@ -43,12 +42,10 @@ export default function Dashboard({ token, user }) {
         return data;
       })
       .then(d => {
-        console.log('[Tunnel] Status received:', d);
         setTunnelStatus(d.status || 'inactive');
         setTunnelMeta(d);
       })
-      .catch((err) => {
-        console.error('[Tunnel] Status fetch failed:', err);
+      .catch(() => {
         setTunnelStatus('inactive');
         setTunnelMeta(null);
       });
@@ -176,7 +173,6 @@ export default function Dashboard({ token, user }) {
   ];
 
   const handleCreateTunnel = async () => {
-    console.log('[Tunnel] Initiate creation command');
     try {
       const res = await fetch('/api/me/tunnel/create', {
         method: 'POST',
@@ -186,7 +182,6 @@ export default function Dashboard({ token, user }) {
         }
       });
       const data = await res.json();
-      console.log('[Tunnel] Creation response:', res.status, data);
 
       if (res.ok) {
         setTunnelNotice({
@@ -200,8 +195,7 @@ export default function Dashboard({ token, user }) {
           text: 'Tunnel provisioning failed: ' + (data.error || 'Unknown error'),
         });
       }
-    } catch (e) {
-      console.error('[Tunnel] Creation error:', e);
+    } catch {
       setTunnelNotice({
         type: 'err',
         text: 'Network error while connecting to the scrubbing controller.',

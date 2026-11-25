@@ -30,7 +30,7 @@ export default function ThreatMap({ token }) {
             });
           }
         })
-        .catch(console.error);
+        .catch(() => {});
     };
     fetchStats();
     const id = setInterval(fetchStats, 3000);
