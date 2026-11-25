@@ -33,7 +33,7 @@ import {
   issueSignedSessionToken,
   clearSessionToken,
 } from "@/lib/advanced-features";
-import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { buildMasterHref, buildProductHref } from "@/lib/routing";
@@ -396,117 +396,13 @@ print(response.json())`;
             </div>
 
             <div className="space-y-3">
-              <GoogleSignInButton nextPath="/gateway" label="Continue with Google" />
-              <div className="flex items-center gap-3 text-[11px] font-mono text-[#64748B]">
-                <span className="h-px flex-1 bg-white/10" />
-                <span>OR ACCOUNT EMAIL</span>
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
+              <OAuthSignInButtons nextPath="/gateway" />
+              <p className="text-[11px] text-center text-[#94A3B8] leading-relaxed">
+                Passwordless Google &amp; GitHub OAuth SSO — your isolated database API credentials unlock automatically.
+              </p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="flex items-center gap-2 border-b border-white/[0.08] pb-3 font-mono text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("signin");
-                    setLoginError(null);
-                  }}
-                  className={`px-3 py-1 rounded font-bold transition-colors cursor-pointer ${
-                    authMode === "signin" ? "bg-white text-black" : "text-[#9CA3AF] hover:text-white"
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode("register");
-                    setLoginError(null);
-                  }}
-                  className={`px-3 py-1 rounded font-bold transition-colors cursor-pointer ${
-                    authMode === "register" ? "bg-emerald-500 text-black" : "text-[#9CA3AF] hover:text-white"
-                  }`}
-                >
-                  Create API Account
-                </button>
-              </div>
-
-              {loginError && (
-                <div className="p-3 rounded bg-red-500/10 border border-red-500/30 text-xs text-red-400 font-mono">
-                  {loginError}
-                </div>
-              )}
-
-              {authMode === "register" && (
-                <div className="space-y-1.5">
-                  <label htmlFor="api-gw-fullname" className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
-                    Full Name
-                  </label>
-                  <input
-                    id="api-gw-fullname"
-                    name="fullName"
-                    type="text"
-                    autoComplete="name"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Turner"
-                    className="w-full h-10 rounded border border-white/10 bg-[#08090C] px-3 text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-emerald-500/50"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <label htmlFor="api-gw-email" className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
-                  Account Email
-                </label>
-                <input
-                  id="api-gw-email"
-                  name="email"
-                  type="email"
-                  autoComplete="username"
-                  spellCheck={false}
-                  required
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className="w-full h-10 rounded border border-white/10 bg-[#08090C] px-3 text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-emerald-500/50"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label htmlFor="api-gw-password" className="text-[11px] font-mono text-[#9CA3AF] uppercase block">
-                  Password (min 6 chars)
-                </label>
-                <input
-                  id="api-gw-password"
-                  name="password"
-                  type="password"
-                  autoComplete={authMode === "signin" ? "current-password" : "new-password"}
-                  required
-                  minLength={6}
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full h-10 rounded border border-white/10 bg-[#08090C] px-3 text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-emerald-500/50"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loggingIn}
-                className="w-full h-10 rounded bg-white text-black font-semibold text-xs hover:bg-neutral-200 transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {loggingIn
-                  ? "Verifying Credentials..."
-                  : authMode === "signin"
-                    ? "Sign In to Access Your DB API"
-                    : "Create API Account & Generate Key"}
-              </button>
-            </form>
-
-            <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-[#64748B]">
+            <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-[#94A3B8]">
               <a
                 href={buildMasterHref("/")}
                 className="hover:text-white transition-colors"

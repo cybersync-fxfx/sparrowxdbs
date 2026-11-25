@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
-import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import {
   AlertTriangle,
   ArrowRight,
@@ -330,74 +330,20 @@ export function SparrowxShieldEngine({
 
             <div className="space-y-1">
               <DialogTitle className="text-xl font-medium text-[#F4F6FA] tracking-tight">
-                {socAuthMode === "signin"
-                  ? "Sign In to Shield Client Area"
-                  : "Register Shield Operator"}
+                Sign In to Shield Client Area
               </DialogTitle>
-              <DialogDescription className="text-[13px] text-[#F4F6FA]/60 leading-relaxed">
-                {socAuthMode === "signin"
-                  ? "Sign in to access your Client Area, manage domain keys, and launch the Security + SOC Dashboard."
-                  : "Provision your SparrowX Shield Client Area operator account."}
+              <DialogDescription className="text-[13px] text-[#CBD5E1] leading-relaxed">
+                Continue with Google or GitHub to access your Client Area, manage domain keys, and launch the Security + SOC Dashboard.
               </DialogDescription>
             </div>
           </DialogHeader>
 
           {selectedPlanForAuth && (
             <div className="mx-6 mb-3 flex items-center justify-between rounded-xl border border-[#F9103A]/35 bg-[#F9103A]/10 px-3.5 py-2 text-xs">
-              <span className="text-[#F4F6FA]/75">Selected Plan</span>
+              <span className="text-[#F4F6FA]/85">Selected Plan</span>
               <span className="font-mono font-semibold text-[#FFEBB9]">{selectedPlanForAuth}</span>
             </div>
           )}
-
-          <div
-            role="tablist"
-            aria-label="Operator authentication mode"
-            className="mx-6 mb-4 grid grid-cols-2 gap-1 rounded-xl bg-[#06080E] border border-[#F4F6FA]/[0.07] p-1 text-xs"
-          >
-            <button
-              type="button"
-              role="tab"
-              aria-selected={socAuthMode === "signin"}
-              onClick={() => {
-                setSocAuthMode("signin");
-                setAuthError("");
-              }}
-              className={`py-2 px-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                socAuthMode === "signin"
-                  ? "bg-[#F9103A] text-[#F4F6FA]"
-                  : "text-[#F4F6FA]/55 hover:text-[#F4F6FA]"
-              }`}
-            >
-              <Lock className="size-3.5" />
-              <span>Sign In</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={socAuthMode === "register"}
-              onClick={() => {
-                setSocAuthMode("register");
-                setAuthError("");
-              }}
-              className={`py-2 px-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                socAuthMode === "register"
-                  ? "bg-[#F9103A] text-[#F4F6FA]"
-                  : "text-[#F4F6FA]/55 hover:text-[#F4F6FA]"
-              }`}
-            >
-              <User className="size-3.5" />
-              <span>Register</span>
-            </button>
-          </div>
-
-          <div className="px-6 pb-3 space-y-2.5">
-            <GoogleSignInButton nextPath="/shield" label="Continue with Google" />
-            <div className="flex items-center gap-3 text-[11px] text-[#F4F6FA]/45">
-              <span className="h-px flex-1 bg-white/10" />
-              <span>or operator credentials</span>
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
-          </div>
 
           {authError && (
             <div className="mx-6 mb-4 rounded-xl bg-[#F9103A]/10 border border-[#F9103A]/30 px-3.5 py-2.5 text-[#FFEBB9] text-xs flex items-start gap-2.5">
@@ -406,163 +352,18 @@ export function SparrowxShieldEngine({
             </div>
           )}
 
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setAuthLoading(true);
-              setAuthError("");
-              const emailClean = authEmail.trim().toLowerCase();
-              try {
-                if (socAuthMode === "signin") {
-                  const res = await authenticateAppUserFromBackend(
-                    authEmail.trim(),
-                    authPassword,
-                  );
-                  if (res.user) {
-                    await syncMasterSsoSession({
-                      email: res.user.email,
-                      password: authPassword,
-                      mode: "signin",
-                      id: res.user.id,
-                      fullName: res.user.fullName,
-                      tenantId: res.user.tenantId,
-                    });
-                    void ensureDeveloperConnection({
-                      id: res.user.id,
-                      email: res.user.email,
-                      fullName: res.user.fullName,
-                      tenantId: res.user.tenantId,
-                    });
-                    completeAuthTransition(res.user);
-                  } else {
-                    setAuthError(res.error || "Invalid sign-in credentials.");
-                  }
-                } else {
-                  if (!emailClean || authPassword.length < 6) {
-                    setAuthError("Provide a valid email and a password of at least 6 characters.");
-                    return;
-                  }
-                  const existing = await fetchAppUserByEmailFromBackend(emailClean);
-                  if (existing) {
-                    setAuthError("An account with this email already exists. Please sign in instead.");
-                    return;
-                  }
-                  const newUser: AppUser = {
-                    id: `USR-${Date.now().toString().slice(-4)}`,
-                    email: emailClean,
-                    password: authPassword,
-                    fullName: socFullName.trim() || emailClean.split("@")[0] || "Operator",
-                    admin: "no",
-                    tenantId: `TENANT-SHIELD-${Date.now().toString().slice(-4)}`,
-                  };
-                  await persistAppUserToBackend(newUser);
-                  await syncMasterSsoSession({
-                    email: emailClean,
-                    password: authPassword,
-                    mode: "register",
-                    id: newUser.id,
-                    fullName: newUser.fullName,
-                    tenantId: newUser.tenantId,
-                  });
-                  void ensureDeveloperConnection({
-                    id: newUser.id,
-                    email: emailClean,
-                    fullName: newUser.fullName,
-                    tenantId: newUser.tenantId,
-                  });
-                  requestGlobalEmailVerification({
-                    email: newUser.email,
-                    fullName: newUser.fullName,
-                    serviceName: "SparrowX Shield SOC & WAF",
-                  });
-                  completeAuthTransition({ ...newUser, password: "" });
-                }
-              } catch {
-                setAuthError("Auth gateway offline.");
-              } finally {
-                setAuthLoading(false);
-              }
-            }}
-            className="px-6 pb-5 space-y-4"
-          >
-            {socAuthMode === "register" && (
-              <div className="space-y-1.5 text-left">
-                <label className="text-xs font-medium text-[#F4F6FA]/75 block">Operator Name</label>
-                <div className="relative">
-                  <User className="size-4 text-[#F4F6FA]/40 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    required
-                    value={socFullName}
-                    onChange={(e) => setSocFullName(e.target.value)}
-                    placeholder="Your Name"
-                    className="w-full rounded-xl border border-[#F4F6FA]/[0.10] bg-[#06080E]/90 pl-10 pr-3.5 py-2.5 text-sm text-[#F4F6FA] placeholder-[#F4F6FA]/35 focus:outline-none focus:border-[#F9103A] transition-colors"
-                  />
-                </div>
-              </div>
-            )}
+          <div className="px-6 pb-6 space-y-4">
+            <OAuthSignInButtons nextPath="/shield" />
+            <p className="text-[11px] text-center text-[#94A3B8] leading-relaxed">
+              Passwordless Google &amp; GitHub OAuth SSO — your operator workspace provisions automatically.
+            </p>
+          </div>
 
-            <div className="space-y-1.5 text-left">
-              <label className="text-xs font-medium text-[#F4F6FA]/75 block">Operator Email</label>
-              <div className="relative">
-                <Mail className="size-4 text-[#F4F6FA]/40 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  required
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="admin@yourdomain.com"
-                  className="w-full rounded-xl border border-[#F4F6FA]/[0.10] bg-[#06080E]/90 pl-10 pr-3.5 py-2.5 text-sm text-[#F4F6FA] placeholder-[#F4F6FA]/35 focus:outline-none focus:border-[#F9103A] transition-colors"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5 text-left">
-              <label className="text-xs font-medium text-[#F4F6FA]/75 block">Password</label>
-              <div className="relative">
-                <Lock className="size-4 text-[#F4F6FA]/40 pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type={showAuthPassword ? "text" : "password"}
-                  required
-                  minLength={socAuthMode === "register" ? 6 : undefined}
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                  placeholder="••••••••••••••••"
-                  className="w-full rounded-xl border border-[#F4F6FA]/[0.10] bg-[#06080E]/90 pl-10 pr-10 py-2.5 text-sm text-[#F4F6FA] placeholder-[#F4F6FA]/35 focus:outline-none focus:border-[#F9103A] transition-colors font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowAuthPassword((prev) => !prev)}
-                  aria-label={showAuthPassword ? "Hide password" : "Show password"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#F4F6FA]/45 hover:text-[#F4F6FA] transition-colors cursor-pointer p-1"
-                >
-                  {showAuthPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={authLoading}
-              className="w-full h-11 rounded-xl bg-[#F9103A] hover:bg-[#F9103A]/90 text-[#F4F6FA] font-medium text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors disabled:opacity-50 cursor-pointer mt-1"
-            >
-              {authLoading ? <RefreshCw className="size-4 animate-spin" /> : <Shield className="size-4" />}
-              <span>{socAuthMode === "signin" ? "Enter Client Area" : "Create Account & Enter Client Area"}</span>
-              {!authLoading && <ArrowRight className="size-4" />}
-            </button>
-          </form>
-
-          <div className="bg-[#06080E]/90 border-t border-[#F4F6FA]/[0.06] px-6 py-3.5 flex items-center justify-between text-xs text-[#F4F6FA]/55">
-            <button
-              type="button"
-              onClick={() => {
-                setSocAuthMode(socAuthMode === "signin" ? "register" : "signin");
-                setAuthError("");
-              }}
-              className="hover:text-[#F4F6FA] transition-colors cursor-pointer"
-            >
-              {socAuthMode === "signin" ? "Need access? Register operator" : "Already registered? Sign in"}
-            </button>
+          <div className="bg-[#06080E]/90 border-t border-[#F4F6FA]/[0.08] px-6 py-3.5 flex items-center justify-between text-xs text-[#94A3B8]">
+            <span className="inline-flex items-center gap-2 text-[#CBD5E1]">
+              <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+              Google &amp; GitHub SSO Only
+            </span>
             <button
               type="button"
               onClick={() => setSocModalOpen(false)}

@@ -32,7 +32,7 @@ import { INFRA_OS_IMAGES } from "@/lib/infra-plans";
 import { buildMasterHref } from "@/lib/routing";
 import { UpiAutoPayModal, type UpiCheckoutOrder } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
-import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import { DashboardSubscriptionLock } from "@/components/DashboardSubscriptionLock";
 import {
   clearMasterSsoSession,
@@ -396,10 +396,12 @@ export function SparrowxInfraDashboard() {
                 </button>
               </div>
             ) : (
-              <GoogleSignInButton
+              <OAuthSignInButtons
                 nextPath="/infra/dashboard"
-                label="Google Sign-In"
-                className="!w-auto !py-1.5 !px-3 !text-xs"
+                layout="row"
+                compact
+                googleLabel="Google"
+                githubLabel="GitHub"
               />
             )}
           </div>

@@ -53,6 +53,8 @@ import { Route as ApiPayUpiIngestRouteImport } from './routes/api/pay/upi-ingest
 import { Route as ApiPayVerifyRouteImport } from './routes/api/pay/verify'
 import { Route as ApiSystemBackboneRouteImport } from './routes/api/system/backbone'
 import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
+import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github/callback'
+import { Route as ApiAuthGithubLoginRouteImport } from './routes/api/auth/github/login'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
 import { Route as ApiInfraServersIndexRouteImport } from './routes/api/infra/servers/index'
@@ -284,6 +286,16 @@ const ApiTelemetryDiscordRoute = ApiTelemetryDiscordRouteImport.update({
   path: '/api/telemetry/discord',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthGithubCallbackRoute = ApiAuthGithubCallbackRouteImport.update({
+  id: '/api/auth/github/callback',
+  path: '/api/auth/github/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthGithubLoginRoute = ApiAuthGithubLoginRouteImport.update({
+  id: '/api/auth/github/login',
+  path: '/api/auth/github/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthGoogleCallbackRoute = ApiAuthGoogleCallbackRouteImport.update({
   id: '/api/auth/google/callback',
   path: '/api/auth/google/callback',
@@ -372,6 +384,8 @@ export interface FileRoutesByFullPath {
   '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
+  '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/auth/github/login': typeof ApiAuthGithubLoginRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
@@ -426,6 +440,8 @@ export interface FileRoutesByTo {
   '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
+  '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/auth/github/login': typeof ApiAuthGithubLoginRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
@@ -481,6 +497,8 @@ export interface FileRoutesById {
   '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
+  '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
+  '/api/auth/github/login': typeof ApiAuthGithubLoginRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
@@ -537,6 +555,8 @@ export interface FileRouteTypes {
     | '/api/pay/verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
+    | '/api/auth/github/callback'
+    | '/api/auth/github/login'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/infra/servers/action'
@@ -591,6 +611,8 @@ export interface FileRouteTypes {
     | '/api/pay/verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
+    | '/api/auth/github/callback'
+    | '/api/auth/github/login'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/infra/servers/action'
@@ -645,6 +667,8 @@ export interface FileRouteTypes {
     | '/api/pay/verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
+    | '/api/auth/github/callback'
+    | '/api/auth/github/login'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
     | '/api/infra/servers/action'
@@ -700,6 +724,8 @@ export interface RootRouteChildren {
   ApiPayVerifyRoute: typeof ApiPayVerifyRoute
   ApiSystemBackboneRoute: typeof ApiSystemBackboneRoute
   ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
+  ApiAuthGithubCallbackRoute: typeof ApiAuthGithubCallbackRoute
+  ApiAuthGithubLoginRoute: typeof ApiAuthGithubLoginRoute
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
   ApiInfraServersActionRoute: typeof ApiInfraServersActionRoute
@@ -1020,6 +1046,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelemetryDiscordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/github/callback': {
+      id: '/api/auth/github/callback'
+      path: '/api/auth/github/callback'
+      fullPath: '/api/auth/github/callback'
+      preLoaderRoute: typeof ApiAuthGithubCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/github/login': {
+      id: '/api/auth/github/login'
+      path: '/api/auth/github/login'
+      fullPath: '/api/auth/github/login'
+      preLoaderRoute: typeof ApiAuthGithubLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/google/callback': {
       id: '/api/auth/google/callback'
       path: '/api/auth/google/callback'
@@ -1124,6 +1164,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPayVerifyRoute: ApiPayVerifyRoute,
   ApiSystemBackboneRoute: ApiSystemBackboneRoute,
   ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,
+  ApiAuthGithubCallbackRoute: ApiAuthGithubCallbackRoute,
+  ApiAuthGithubLoginRoute: ApiAuthGithubLoginRoute,
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
   ApiInfraServersActionRoute: ApiInfraServersActionRoute,

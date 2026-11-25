@@ -7,7 +7,11 @@ import { formatInr, formatRam, planCostCoins, type Service } from "@/lib/service
 import { cn } from "@/lib/utils";
 import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { GoogleGIcon, useSessionSummary } from "./Navbar";
-import { buildGoogleLoginHref } from "@/components/GoogleSignInButton";
+import {
+  buildGoogleLoginHref,
+  buildGithubLoginHref,
+  GitHubBrandIcon,
+} from "@/components/GoogleSignInButton";
 import type { InfraRegionId } from "@/lib/infra-plans";
 
 export function Pricing({ service }: { service: Service }) {
@@ -23,7 +27,11 @@ export function Pricing({ service }: { service: Service }) {
 
   return (
     <section id="pricing" className="relative mx-auto max-w-7xl scroll-mt-24 px-5 py-24">
-      <div className="pointer-events-none absolute left-1/2 top-24 -z-10 h-72 w-[60%] -translate-x-1/2 rounded-full bg-svc/15 blur-[120px]" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-16 -z-10 h-96 w-[70%] -translate-x-1/2 rounded-full"
+        style={{ background: "radial-gradient(ellipse at center, color-mix(in oklab, var(--svc) 16%, transparent), transparent 68%)" }}
+      />
       <div className="text-center">
         <p className="font-mono text-xs uppercase tracking-[0.25em] text-svc">{service.name} plans</p>
         <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Pick your node. Deploy in seconds.</h2>
@@ -102,11 +110,23 @@ export function Pricing({ service }: { service: Service }) {
                   <Link to="/game/dashboard" search={{ deploy: p.id }}>Deploy in Client Area</Link>
                 </Button>
               ) : (
-                <Button asChild variant={p.popular ? "svc" : "ivory"} size="xl" className="w-full">
-                  <a href={buildGoogleLoginHref(`/game/dashboard?deploy=${p.id}`)}>
-                    <GoogleGIcon className="size-4" /> Continue with Google
-                  </a>
-                </Button>
+                <div className="space-y-2">
+                  <Button asChild variant={p.popular ? "svc" : "ivory"} size="xl" className="w-full">
+                    <a href={buildGoogleLoginHref(`/game/dashboard?deploy=${p.id}`)}>
+                      <GoogleGIcon className="size-4" /> Continue with Google
+                    </a>
+                  </Button>
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="xl"
+                    className="w-full border-white/15 bg-[#161B22] text-white hover:bg-[#1F2630]"
+                  >
+                    <a href={buildGithubLoginHref(`/game/dashboard?deploy=${p.id}`)}>
+                      <GitHubBrandIcon className="size-4" /> Continue with GitHub
+                    </a>
+                  </Button>
+                </div>
               )}
             </div>
           ))}

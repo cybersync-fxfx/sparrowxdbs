@@ -5,7 +5,11 @@ import { Button } from "@/components/ui/button";
 import { getSessionSummary } from "@/lib/portal.functions";
 import { verifySessionToken } from "@/lib/advanced-features";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
-import { buildGoogleLoginHref } from "@/components/GoogleSignInButton";
+import {
+  buildGoogleLoginHref,
+  buildGithubLoginHref,
+  GitHubBrandIcon,
+} from "@/components/GoogleSignInButton";
 import { buildMasterHref, buildProductHref } from "@/lib/routing";
 import type { ServiceId } from "@/lib/services";
 import { ServiceSwitcher } from "./ServiceSwitcher";
@@ -108,13 +112,26 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
               </Link>
             </Button>
           ) : (
-            <Button asChild variant="ivory" size="sm" className="rounded-xl">
-              <a href={buildGoogleLoginHref("/game/dashboard")}>
-                <GoogleGIcon className="size-4" />
-                <span className="hidden sm:inline">Continue with Google</span>
-                <span className="sm:hidden">Sign In</span>
-              </a>
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button asChild variant="ivory" size="sm" className="rounded-xl">
+                <a href={buildGoogleLoginHref("/game/dashboard")}>
+                  <GoogleGIcon className="size-4" />
+                  <span className="hidden sm:inline">Google</span>
+                  <span className="sm:hidden">Sign In</span>
+                </a>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="sm"
+                className="hidden sm:inline-flex rounded-xl border-white/15 bg-[#161B22] text-white hover:bg-[#1F2630]"
+              >
+                <a href={buildGithubLoginHref("/game/dashboard")}>
+                  <GitHubBrandIcon className="size-4" />
+                  <span>GitHub</span>
+                </a>
+              </Button>
+            </div>
           )}
         </div>
       </div>

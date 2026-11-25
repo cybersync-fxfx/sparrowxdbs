@@ -29,11 +29,34 @@ export function resolveCanonicalGoogleRedirectUri(origin: string): string {
   return `${origin.replace(/\/+$/, "")}/api/auth/google/callback`;
 }
 
+export function githubOAuthCredentials(): { clientId: string; clientSecret: string } {
+  const clientId = env("GITHUB_CLIENT_ID") ?? "";
+  const clientSecret = env("GITHUB_CLIENT_SECRET") ?? "";
+  return { clientId, clientSecret };
+}
+
+export function resolveCanonicalGithubRedirectUri(origin: string): string {
+  const explicit = env("GITHUB_REDIRECT_URI");
+  if (explicit) return explicit;
+  try {
+    const parsed = new URL(origin);
+    const host = parsed.hostname.toLowerCase();
+    if (host === "sparrowx.net" || host.endsWith(".sparrowx.net")) {
+      return "https://sparrowx.net/api/auth/github/callback";
+    }
+  } catch {
+    // ignore URL parse error
+  }
+  return `${origin.replace(/\/+$/, "")}/api/auth/github/callback`;
+}
+
 export function integrations() {
   const googleCreds = googleOAuthCredentials();
+  const githubCreds = githubOAuthCredentials();
   return {
     database: !!(env("POSTGREST_URL") || env("POSTGREST_INTERNAL_URL") || env("SPARROWX_DB_REST_URL")),
     google: !!(googleCreds.clientId && googleCreds.clientSecret),
+    github: !!(githubCreds.clientId && githubCreds.clientSecret),
     pterodactyl: !!(env("PTERO_URL") && env("PTERO_APPLICATION_API_KEY")),
     pteroLiveUsage: !!env("PTERO_CLIENT_API_KEY"),
     razorpay: !!(env("RAZORPAY_KEY_ID") && env("RAZORPAY_KEY_SECRET")),

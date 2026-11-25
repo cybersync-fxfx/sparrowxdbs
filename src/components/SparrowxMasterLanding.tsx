@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import {
   AlertCircle,
@@ -258,192 +258,26 @@ function OperatorLoginDialog({
 
           <div className="space-y-1">
             <DialogTitle className="text-xl font-bold text-white tracking-tight font-sans">
-              {authTab === "signin" ? "Access Developer Workspace" : "Create SparrowX Account"}
+              Sign In to SparrowX
             </DialogTitle>
-            <DialogDescription className="text-[13px] text-zinc-400 leading-relaxed font-sans">
-              {authTab === "signin"
-                ? "Sign in with your verified credentials to manage your databases, shields, and vault."
-                : "Provision an isolated database tenant, API key, and encrypted vault account."}
+            <DialogDescription className="text-[13px] text-zinc-300 leading-relaxed font-sans">
+              Continue with Google or GitHub for instant Single Sign-On across all SparrowX platforms.
             </DialogDescription>
           </div>
         </DialogHeader>
 
-        {/* Segmented Mode Switcher Below Header (Zero Close-Button Overlap) */}
-        <div className="mx-6 mb-4 grid grid-cols-2 gap-1 rounded-xl bg-[#05060A] border border-white/20 p-1 text-xs">
-          <button
-            type="button"
-            onClick={() => {
-              setAuthTab("signin");
-              setError("");
-            }}
-            className={`py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              authTab === "signin"
-                ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Lock className="size-3.5" aria-hidden="true" />
-            <span>Sign In</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAuthTab("register");
-              setError("");
-            }}
-            className={`py-2 px-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              authTab === "register"
-                ? "bg-white text-black shadow-[0_2px_12px_rgba(255,255,255,0.2)]"
-                : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <User className="size-3.5" aria-hidden="true" />
-            <span>Create Account</span>
-          </button>
+        <div className="px-6 pb-6 space-y-4">
+          <OAuthSignInButtons nextPath="/" />
+          <p className="text-[11px] text-center text-zinc-400 leading-relaxed">
+            Passwordless OAuth 2.0 SSO — your isolated workspace, database, and vault provision automatically on first sign-in.
+          </p>
         </div>
-
-        {error && (
-          <div
-            role="alert"
-            aria-live="polite"
-            className="mx-6 mb-4 rounded-xl bg-white/10 border border-white/35 px-3.5 py-2.5 text-zinc-100 text-xs flex items-start gap-2.5"
-          >
-            <AlertCircle className="size-4 shrink-0 text-white mt-0.5" aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="px-6 pb-3 space-y-3">
-          <GoogleSignInButton label="Continue with Google" />
-          <div className="flex items-center gap-3 text-[11px] text-zinc-500">
-            <span className="h-px flex-1 bg-white/10" />
-            <span>or use email &amp; password</span>
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
-        </div>
-
-        <form onSubmit={authTab === "signin" ? handleSignIn : handleRegister} className="px-6 pb-5 space-y-4">
-          {authTab === "register" && (
-            <>
-              <div className="space-y-1.5 text-left">
-                <label htmlFor="spx-master-fullname" className="text-xs font-medium text-zinc-200 block">Full Name</label>
-                <div className="relative group">
-                  <User className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-                  <input
-                    id="spx-master-fullname"
-                    name="name"
-                    type="text"
-                    required
-                    autoComplete="name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Turner"
-                    className="w-full rounded-xl border border-white/25 bg-[#05060A] hover:border-white/50 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5 text-left">
-                <label htmlFor="spx-master-org" className="text-xs font-medium text-zinc-200 block">
-                  Workspace / Organization <span className="text-zinc-400">(Optional)</span>
-                </label>
-                <div className="relative group">
-                  <Building2 className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-                  <input
-                    id="spx-master-org"
-                    name="organization"
-                    type="text"
-                    autoComplete="organization"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="Acme Cloud Lab"
-                    className="w-full rounded-xl border border-white/25 bg-[#05060A] hover:border-white/50 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all"
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          <div className="space-y-1.5 text-left">
-            <label htmlFor="spx-master-email" className="text-xs font-medium text-zinc-200 block">Account Email</label>
-            <div className="relative group">
-              <Mail className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-              <input
-                id="spx-master-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                inputMode="email"
-                spellCheck={false}
-                autoCapitalize="none"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@yourdomain.com"
-                className="w-full rounded-xl border border-white/25 bg-[#05060A] hover:border-white/50 pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-1.5 text-left">
-            <label htmlFor="spx-master-password" className="text-xs font-medium text-zinc-200 block">
-              Password <span className="text-zinc-400">(min 6 chars)</span>
-            </label>
-            <div className="relative group">
-              <Lock className="size-4 text-zinc-400 group-focus-within:text-white transition-colors pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-              <input
-                id="spx-master-password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                minLength={6}
-                autoComplete={authTab === "signin" ? "current-password" : "new-password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="w-full rounded-xl border border-white/25 bg-[#05060A] hover:border-white/50 pl-10 pr-10 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-white focus:ring-2 focus:ring-white/25 transition-all font-mono"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white transition-colors cursor-pointer p-1"
-              >
-                {showPassword ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
-              </button>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-11 rounded-xl font-bold text-xs sm:text-sm tracking-tight flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer mt-1 bg-white hover:bg-zinc-200 text-black shadow-[0_4px_20px_rgba(255,255,255,0.2)]"
-          >
-            {loading ? <RefreshCw className="size-4 animate-spin" aria-hidden="true" /> : <Lock className="size-4" aria-hidden="true" />}
-            <span>
-              {loading
-                ? "Verifying..."
-                : authTab === "signin"
-                  ? "Sign In"
-                  : "Create Account"}
-            </span>
-            {!loading && <ArrowRight className="size-4" aria-hidden="true" />}
-          </button>
-        </form>
 
         {/* Subtle Security Footer Strip */}
         <div className="bg-[#05060A] border-t border-white/15 px-6 py-3.5 flex items-center justify-between text-xs text-zinc-400">
           <div className="flex items-center gap-2">
-            <span className="size-1.5 rounded-full bg-white" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={() => {
-                setAuthTab(authTab === "signin" ? "register" : "signin");
-                setError("");
-              }}
-              className="text-zinc-300 hover:text-white transition-colors cursor-pointer"
-            >
-              {authTab === "signin" ? "New to SparrowX? Create account" : "Have an account? Sign in"}
-            </button>
+            <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+            <span className="text-zinc-300">Google &amp; GitHub SSO Only</span>
           </div>
           <button
             type="button"

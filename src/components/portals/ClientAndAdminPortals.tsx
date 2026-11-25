@@ -58,7 +58,7 @@ import {
   ViralTrustBadgeAndOutreachSection,
 } from "@/components/GrowthAndMonetizationHub";
 import { PaymentGatewayModal } from "@/components/PaymentGatewayModal";
-import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import {
   DEVELOPER_CONNECTION_EVENT,
   ensureDeveloperConnection,
@@ -120,68 +120,9 @@ import {
   saveStoredBrainChat,
   type SparrowxBrainModel,
 } from "@/lib/sparrowx-ai-brain";
+import { SERVICE_MODULES } from "@/lib/service-modules";
 
-export const SERVICE_MODULES: Array<{
-  id: ServiceModuleId;
-  navLabel: string;
-  shortLabel: string;
-  title: string;
-  description: string;
-  features: string[];
-}> = [
-  {
-    id: "web_security",
-    navLabel: "Web & WAF Security",
-    shortLabel: "Web Security",
-    title: "Web App & Website Security",
-    description:
-      "Edge WAF, SQLi/XSS payload blocking, DDoS & bot rate-limiting, and SSL/TLS health monitoring.",
-    features: [
-      "Edge WAF (SQLi / XSS / CSRF block)",
-      "Bot & DDoS velocity rate-limiting",
-      "SSL/TLS certificate & header enforcement",
-    ],
-  },
-  {
-    id: "ai_shield",
-    navLabel: "AI Agent & LLM Shield",
-    shortLabel: "AI Shield",
-    title: "AI Agent & LLM Guardrails",
-    description:
-      "Prompt Injection Shield, MCP Tool-Call Firewall, PII/Secret redaction, and token-drain protection.",
-    features: [
-      "System prompt override & jailbreak shield",
-      "MCP SQL & shell tool-call firewall",
-      "Real-time PII & API secret redaction",
-    ],
-  },
-  {
-    id: "cloud_security",
-    navLabel: "Cloud & Endpoint Security",
-    shortLabel: "Cloud & Endpoints",
-    title: "Cloud API & Infrastructure Security",
-    description:
-      "API Gateway telemetry, Kubernetes & server host isolation, and CVE vulnerability patching.",
-    features: [
-      "One-click host & container network isolation",
-      "API Gateway schema & token validation",
-      "Continuous CVE & package vulnerability tracking",
-    ],
-  },
-  {
-    id: "compliance",
-    navLabel: "Compliance & Evidence",
-    shortLabel: "Compliance",
-    title: "Automated Compliance & Audit",
-    description:
-      "Continuous SOC 2 Type II, ISO 27001, and NIST CSF evidence collection and one-click auditor exports.",
-    features: [
-      "Automated SOC 2 Type II control checks",
-      "ISO 27001 Annex A remediation evidence",
-      "One-click CSV/audit bundle generation",
-    ],
-  },
-];
+export { SERVICE_MODULES };
 
 export interface SparrowxCatalogService {
   id: string;
@@ -3543,24 +3484,32 @@ export function PortalLoginScreen({
   }, [onUserAuthenticated]);
 
   useEffect(() => {
+    let rafId = 0;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20);
-      const sections = ["free-scanner", "world-threats", "defense-grid", "pricing", "how-it-works"];
-      const scrollPos = window.scrollY + 180;
-      for (const sId of sections) {
-        const el = document.getElementById(sId);
-        if (el) {
-          const top = el.offsetTop;
-          const height = el.offsetHeight;
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(sId);
-            break;
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        setScrolled(window.scrollY > 20);
+        const sections = ["free-scanner", "world-threats", "defense-grid", "pricing", "how-it-works"];
+        const scrollPos = window.scrollY + 180;
+        for (const sId of sections) {
+          const el = document.getElementById(sId);
+          if (el) {
+            const top = el.offsetTop;
+            const height = el.offsetHeight;
+            if (scrollPos >= top && scrollPos < top + height) {
+              setActiveSection(sId);
+              break;
+            }
           }
         }
-      }
+      });
     };
     window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
+      window.removeEventListener("scroll", handleScroll);
+    };
   }, []);
 
   const toggleModule = (id: ServiceModuleId) => {
@@ -3716,379 +3665,28 @@ export function PortalLoginScreen({
     <div className="relative w-full">
       <div className="pointer-events-none absolute -inset-1.5 rounded-3xl bg-gradient-to-b from-primary/25 via-orange-500/10 to-emerald-500/5 blur-2xl opacity-80" />
       <div className="relative rounded-2xl bg-[#0A0A0A]/95 p-6 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.95)] border border-[#222222] backdrop-blur-xl">
-        {/* Top Full-Width 2-Tab Mode Switcher (Never Wraps) */}
-        <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-[#222222] bg-black p-1.5 mb-6">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("signin");
-              setLoginError("");
-            }}
-            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              mode === "signin"
-                ? "bg-gradient-to-r from-primary to-orange-500 text-white shadow-md shadow-primary/30"
-                : "text-zinc-400 hover:text-white hover:bg-[#111111]"
-            }`}
-          >
-            <LockKeyhole className="size-3.5 shrink-0" />
-            <span>Sign In to Console</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("signup");
-              setSignupError("");
-            }}
-            className={`flex items-center justify-center gap-2 rounded-lg py-2.5 px-3 text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
-              mode === "signup"
-                ? "bg-gradient-to-r from-primary to-orange-500 text-white shadow-md shadow-primary/30"
-                : "text-zinc-400 hover:text-white hover:bg-[#111111]"
-            }`}
-          >
-            <Sparkles className="size-3.5 shrink-0" />
-            <span>Create Workspace</span>
-          </button>
-        </div>
-
         {/* Clean Identity Header */}
         <div className="flex items-start justify-between gap-4 border-b border-[#1F1F1F] pb-5">
           <div className="flex items-center gap-3.5">
             <img src="/sparrowx-logo.png" alt="SparrowX Autonomous Cybersecurity Operations Center" width={44} height={44} className="size-11 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]" />
             <div>
               <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
-                {mode === "signin" ? "Welcome back to SparrowX" : "Launch Your Protected Workspace"}
+                Welcome to SparrowX
               </h2>
-              <p className="mt-0.5 text-xs text-zinc-400">
-                {mode === "signin"
-                  ? "Authenticate to access your live SOC telemetry, SIEM rules, and SparrowX AI Brain."
-                  : "Deploy autonomous Edge WAF, AI guardrails, and ownership verification in 60s."}
+              <p className="mt-0.5 text-xs text-zinc-300">
+                Sign in with Google or GitHub to access your live SOC telemetry, SIEM rules, databases, and protected workspaces.
               </p>
             </div>
           </div>
         </div>
 
-        {/* Google SSO Primary Action */}
-        <div className="mt-5 space-y-3">
-          <GoogleSignInButton nextPath="/?google_auth=1" label="Continue with Google" />
-          <div className="flex items-center gap-3 text-[11px] font-mono text-zinc-500">
-            <span className="h-px flex-1 bg-[#262626]" />
-            <span>or sign in with email &amp; password</span>
-            <span className="h-px flex-1 bg-[#262626]" />
-          </div>
+        {/* Google & GitHub OAuth Only */}
+        <div className="mt-6 space-y-4">
+          <OAuthSignInButtons nextPath="/?google_auth=1" />
+          <p className="text-[11px] text-center text-zinc-400 leading-relaxed">
+            Passwordless OAuth 2.0 Single Sign-On — manual email/password sign-in is disabled across all SparrowX services.
+          </p>
         </div>
-
-        {/* SIGN IN FORM */}
-        {mode === "signin" ? (
-          <form className="mt-4 space-y-4" onSubmit={handleSignIn}>
-            <div>
-              <label
-                className="text-xs font-semibold text-zinc-200 block mb-2"
-                htmlFor="login-email"
-              >
-                Work Email Address
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                  <Mail className="size-4" />
-                </span>
-                <input
-                  id="login-email"
-                  type="email"
-                  required
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="alex.rivera@acme.io"
-                  className="h-11 w-full rounded-xl border border-[#262626] bg-black pl-10 pr-3.5 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-semibold text-zinc-200" htmlFor="login-password">
-                  Password
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotNotice(!showForgotNotice)}
-                    className="text-[11px] font-medium text-primary hover:underline cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-              </div>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-500">
-                  <LockKeyhole className="size-4" />
-                </span>
-                <input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="h-11 w-full rounded-xl border border-[#262626] bg-black pl-10 pr-10 text-sm text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-zinc-500 hover:text-white cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-
-            {showForgotNotice && (
-              <div className="rounded-xl border border-primary/30 bg-primary/10 p-3.5 text-xs text-primary space-y-1.5">
-                <div className="font-semibold flex items-center gap-1.5 text-white">
-                  <ShieldCheck className="size-3.5 text-primary" />
-                  <span>Password Reset Protocol</span>
-                </div>
-                <p className="text-[11px] text-zinc-300 leading-relaxed">
-                  Contact your organization administrator or email <strong className="text-primary">security@sparrowx.net</strong> to verify identity and issue a temporary sign-in credential.
-                </p>
-              </div>
-            )}
-
-            {loginError && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 text-xs text-red-300 flex items-start gap-2.5">
-                <ShieldAlert className="size-4 shrink-0 mt-0.5 text-red-400" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSigningIn}
-              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-bold text-sm text-white shadow-[0_0_25px_rgba(240,90,40,0.35)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4 cursor-pointer"
-            >
-              <ShieldCheck className="size-4 shrink-0" />
-              <span>{isSigningIn ? "Authenticating Session..." : "Sign In to Command Center"}</span>
-              <ArrowRight className="size-4 shrink-0" />
-            </button>
-
-            <div className="pt-3 border-t border-[#1F1F1F] text-center text-xs text-zinc-400">
-              Need protection for a new app or startup?{" "}
-              <button
-                type="button"
-                onClick={() => setMode("signup")}
-                className="font-bold text-primary hover:underline cursor-pointer"
-              >
-                Create your protected workspace →
-              </button>
-            </div>
-          </form>
-        ) : (
-          /* CREATE ACCOUNT / ONBOARDING FORM */
-          <form className="mt-5 space-y-4" onSubmit={handleSignUp}>
-            <div className="grid gap-3.5 sm:grid-cols-2">
-              <div>
-                <label
-                  className="text-xs font-semibold text-zinc-200 block mb-1.5"
-                  htmlFor="signup-name"
-                >
-                  Full Name
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
-                    <User className="size-3.5" />
-                  </span>
-                  <input
-                    id="signup-name"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Alex Rivera"
-                    className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-3 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label
-                  className="text-xs font-semibold text-zinc-200 block mb-1.5"
-                  htmlFor="signup-email"
-                >
-                  Work Email
-                </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
-                    <Mail className="size-3.5" />
-                  </span>
-                  <input
-                    id="signup-email"
-                    type="email"
-                    required
-                    value={signupEmail}
-                    onChange={(e) => setSignupEmail(e.target.value)}
-                    placeholder="alex@acme.io"
-                    className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-3 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label
-                className="text-xs font-semibold text-zinc-200 block mb-1.5"
-                htmlFor="signup-password"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-zinc-500">
-                  <LockKeyhole className="size-3.5" />
-                </span>
-                <input
-                  id="signup-password"
-                  type={showSignupPassword ? "text" : "password"}
-                  required
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  placeholder="At least 6 characters"
-                  className="h-10 w-full rounded-xl border border-[#262626] bg-black pl-9 pr-9 text-xs text-white outline-none transition-all placeholder:text-zinc-600 focus:border-primary focus:ring-2 focus:ring-primary/20"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSignupPassword(!showSignupPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-500 hover:text-white cursor-pointer"
-                >
-                  {showSignupPassword ? (
-                    <EyeOff className="size-3.5" />
-                  ) : (
-                    <Eye className="size-3.5" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Optional Service Target */}
-            <div className="rounded-xl border border-[#1F1F1F] bg-black/70 p-3.5 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-300">
-                  First Asset to Protect (Optional)
-                </span>
-                <span className="text-[10px] text-zinc-500 font-mono">Can also register later</span>
-              </div>
-              <div className="grid gap-2.5 sm:grid-cols-2">
-                <div>
-                  <input
-                    id="signup-org"
-                    value={orgName}
-                    onChange={(e) => setOrgName(e.target.value)}
-                    placeholder="Service Name (e.g. Acme API)"
-                    className="h-9 w-full rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <input
-                    id="signup-domain"
-                    value={primaryDomain}
-                    onChange={(e) => setPrimaryDomain(e.target.value)}
-                    placeholder="Domain (https://api.yourdomain.com)"
-                    className="h-9 w-full rounded-lg border border-[#262626] bg-black px-3 text-xs text-white outline-none placeholder:text-zinc-600 focus:border-primary"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Plan Tier Selection */}
-            <div>
-              <label
-                className="text-xs font-semibold text-zinc-200 block mb-1.5"
-                htmlFor="signup-plan"
-              >
-                Protection Tier
-              </label>
-              <select
-                id="signup-plan"
-                value={planTier}
-                onChange={(e) => setPlanTier(e.target.value as PlanTier)}
-                className="h-10 w-full rounded-xl border border-[#262626] bg-black px-3 text-xs text-white outline-none focus:border-primary"
-              >
-                <option value="Starter">Starter — Indie Builders & Early Prototypes</option>
-                <option value="Growth">Growth — Startups & Production Apps</option>
-                <option value="Enterprise">Enterprise — Multi-Cluster SOC & Dedicated SLA</option>
-              </select>
-            </div>
-
-            {/* Modular Protection Selection */}
-            <div>
-              <div className="flex items-center justify-between text-xs font-semibold text-zinc-200 mb-1.5">
-                <span>Active Defense Modules</span>
-                <span className="text-[10px] font-mono text-primary">
-                  Customizes your workspace
-                </span>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {SERVICE_MODULES.map((mod) => {
-                  const checked = selectedModules.includes(mod.id);
-                  return (
-                    <button
-                      key={mod.id}
-                      type="button"
-                      onClick={() => toggleModule(mod.id)}
-                      className={`flex items-start gap-2.5 rounded-xl border p-2.5 text-left transition-all cursor-pointer ${
-                        checked
-                          ? "border-primary bg-primary/10 shadow-[0_0_15px_rgba(240,90,40,0.12)] ring-1 ring-primary/30"
-                          : "border-[#262626] bg-black hover:border-zinc-700"
-                      }`}
-                    >
-                      <span
-                        className={`mt-0.5 grid size-4 shrink-0 place-items-center rounded border text-[10px] transition-all ${
-                          checked
-                            ? "border-primary bg-primary text-white"
-                            : "border-zinc-700 bg-zinc-900"
-                        }`}
-                      >
-                        {checked && <Check className="size-3" />}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold text-white truncate">
-                          {mod.shortLabel}
-                        </div>
-                        <div className="text-[10px] text-zinc-400 truncate">{mod.title}</div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {signupError && (
-              <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-3.5 text-xs text-red-300 flex items-start gap-2.5">
-                <ShieldAlert className="size-4 shrink-0 mt-0.5 text-red-400" />
-                <span>{signupError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSigningUp}
-              className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary to-orange-500 font-bold text-sm text-white shadow-[0_0_25px_rgba(240,90,40,0.35)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-50 whitespace-nowrap px-4 cursor-pointer"
-            >
-              <Sparkles className="size-4 shrink-0" />
-              <span>
-                {isSigningUp ? "Provisioning SOC Workspace..." : "Create Account & Launch Shield"}
-              </span>
-              <ArrowRight className="size-4 shrink-0" />
-            </button>
-
-            <div className="pt-3 border-t border-[#1F1F1F] text-center text-xs text-zinc-400">
-              Already have a workspace?{" "}
-              <button
-                type="button"
-                onClick={() => setMode("signin")}
-                className="font-bold text-primary hover:underline cursor-pointer"
-              >
-                Sign In
-              </button>
-            </div>
-          </form>
-        )}
       </div>
     </div>
   );
