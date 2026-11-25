@@ -131,6 +131,16 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             googleSub: profile.sub || null,
           });
 
+          // Proactively provision/link Pterodactyl Game Panel user on sign-in
+          await import("@/lib/server/portal.server")
+            .then(({ syncPteroAccountOnSignIn }) =>
+              Promise.race([
+                syncPteroAccountOnSignIn(user),
+                new Promise((resolve) => setTimeout(resolve, 2500)),
+              ]),
+            )
+            .catch(() => {});
+
           const masterToken = await createMasterSsoToken(user);
           const dest = new URL(fallbackNext);
           dest.searchParams.delete("auth_error");

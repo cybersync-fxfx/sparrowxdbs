@@ -9,20 +9,62 @@ export class PteroError extends Error {
   }
 }
 
+async function fetchPteroEndpoint(
+  path: string,
+  init: RequestInit,
+  authKey: string,
+  apiPrefix: "/api/application" | "/api/client",
+): Promise<Response> {
+  const publicBase = panelUrl();
+  const internalBase = env("PTERO_INTERNAL_URL")?.replace(/\/+$/, "") || "";
+  const publicHost = (() => {
+    try {
+      return new URL(publicBase).host;
+    } catch {
+      return "game.panel.sparrowx.net";
+    }
+  })();
+
+  const baseHeaders: Record<string, string> = {
+    Authorization: `Bearer ${authKey}`,
+    Accept: "Application/vnd.pterodactyl.v1+json",
+    "Content-Type": "application/json",
+  };
+
+  // Prefer direct internal bridge when configured (avoids OVH Docker hairpin NAT issues)
+  if (internalBase) {
+    try {
+      const res = await fetch(`${internalBase}${apiPrefix}${path}`, {
+        ...init,
+        headers: {
+          ...baseHeaders,
+          Host: publicHost,
+          "X-Forwarded-Host": publicHost,
+          "X-Forwarded-Proto": "https",
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.status !== 502 && res.status !== 503 && res.status !== 504) {
+        return res;
+      }
+    } catch {
+      // Fall back to public HTTPS panel URL
+    }
+  }
+
+  return fetch(`${publicBase}${apiPrefix}${path}`, {
+    ...init,
+    headers: baseHeaders,
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
 async function app<T>(path: string, init: RequestInit = {}): Promise<T> {
   const key = env("PTERO_APPLICATION_API_KEY");
   if (!key) throw new Error("PTERO_APPLICATION_API_KEY is not configured");
-  const res = await fetch(`${panelUrl()}/api/application${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${key}`,
-      Accept: "Application/vnd.pterodactyl.v1+json",
-      "Content-Type": "application/json",
-    },
-  });
+  const res = await fetchPteroEndpoint(path, init, key, "/api/application");
   const text = await res.text();
   if (!res.ok) {
-    console.error(`Pterodactyl ${init.method ?? "GET"} ${path} [${res.status}]: ${text}`);
     throw new PteroError(res.status, text);
   }
   return (text ? JSON.parse(text) : null) as T;
@@ -58,17 +100,46 @@ export async function findUserByEmail(email: string) {
 }
 
 export async function createUser(input: { email: string; username: string; firstName: string; password: string }) {
-  const r = await app<PUser>(`/users`, {
-    method: "POST",
-    body: JSON.stringify({
-      email: input.email.trim().toLowerCase(),
-      username: input.username,
-      first_name: input.firstName.slice(0, 50) || "Sparrow",
-      last_name: "Client",
-      password: input.password,
-    }),
-  });
-  return r.attributes;
+  const cleanEmail = input.email.trim().toLowerCase();
+  const cleanFirst = input.firstName.trim().replace(/[^a-zA-Z0-9 ._-]/g, "").slice(0, 50) || "Sparrow";
+  let candidateUsername = input.username
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "")
+    .replace(/^[^a-z0-9]+/, "")
+    .replace(/[^a-z0-9]+$/, "")
+    .slice(0, 24) || `player_${Math.floor(1000 + Math.random() * 9000)}`;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await app<PUser>(`/users`, {
+        method: "POST",
+        body: JSON.stringify({
+          email: cleanEmail,
+          username: candidateUsername,
+          first_name: cleanFirst,
+          last_name: "Client",
+          password: input.password,
+        }),
+      });
+      return r.attributes;
+    } catch (err) {
+      if (err instanceof PteroError && err.status === 422) {
+        // If email already exists in Pterodactyl, return the existing account cleanly
+        if (/email/i.test(err.body) && /taken|already|exists/i.test(err.body)) {
+          const existing = await findUserByEmail(cleanEmail).catch(() => null);
+          if (existing) return existing;
+        }
+        // If username collided or failed format, retry with a unique suffix
+        const randHex = Array.from(crypto.getRandomValues(new Uint8Array(2)), (b) =>
+          b.toString(16).padStart(2, "0"),
+        ).join("");
+        candidateUsername = `${candidateUsername.slice(0, 18).replace(/[^a-z0-9]+$/, "") || "player"}_${randHex}`;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Unable to provision Pterodactyl user after username retries.");
 }
 
 export async function setUserPassword(userId: number, password: string) {

@@ -827,6 +827,59 @@ heal_pterodactyl_host_nginx() {
       fi
     fi
 
+    # Auto-provision Pterodactyl Application API Key (ptla_...) if missing so Client Area creates Panel users automatically
+    local current_ptero_key="${PTERO_APPLICATION_API_KEY:-}"
+    if [ -z "${current_ptero_key}" ] && [ -f "${INSTALL_DIR}/.env" ]; then
+      current_ptero_key="$(awk -F= '/^PTERO_APPLICATION_API_KEY=/{sub(/^[^=]*=/,""); print; exit}' "${INSTALL_DIR}/.env" 2>/dev/null | tr -d "\"'\r[:space:]" || true)"
+    fi
+    if [ -z "${current_ptero_key}" ]; then
+      local generated_ptero_key=""
+      generated_ptero_key="$("${php_bin}" -r '
+        require "/var/www/pterodactyl/vendor/autoload.php";
+        $app = require "/var/www/pterodactyl/bootstrap/app.php";
+        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        $admin = Pterodactyl\Models\User::where("root_admin", 1)->orderBy("id")->first();
+        if (!$admin) { exit(0); }
+        $existing = Pterodactyl\Models\ApiKey::where("user_id", $admin->id)
+          ->where("key_type", Pterodactyl\Models\ApiKey::TYPE_APPLICATION)
+          ->where("memo", "SparrowX Client Area Auto-Sync")
+          ->orderByDesc("id")
+          ->first();
+        $encrypter = $app->make(Illuminate\Contracts\Encryption\Encrypter::class);
+        if ($existing) {
+          echo $existing->identifier . $encrypter->decrypt($existing->token);
+          exit(0);
+        }
+        $svc = $app->make(Pterodactyl\Services\Api\KeyCreationService::class);
+        $svc->setKeyType(Pterodactyl\Models\ApiKey::TYPE_APPLICATION);
+        $model = $svc->handle(
+          [
+            "user_id" => $admin->id,
+            "memo" => "SparrowX Client Area Auto-Sync",
+            "allowed_ips" => [],
+          ],
+          [
+            "r_users" => 3,
+            "r_servers" => 3,
+            "r_allocations" => 3,
+            "r_nests" => 1,
+            "r_eggs" => 1,
+            "r_locations" => 1,
+            "r_nodes" => 1,
+            "r_database_hosts" => 1,
+            "r_server_databases" => 3,
+          ]
+        );
+        echo $model->identifier . $encrypter->decrypt($model->token);
+      ' 2>/dev/null | tr -d '\r\n[:space:]' || true)"
+      if [ -n "${generated_ptero_key}" ] && [ "${#generated_ptero_key}" -ge 24 ]; then
+        PTERO_APPLICATION_API_KEY="${generated_ptero_key}"
+        ensure_env_key "PTERO_APPLICATION_API_KEY" "${PTERO_APPLICATION_API_KEY}"
+        export PTERO_APPLICATION_API_KEY
+        log_ok "Auto-provisioned Pterodactyl Application API Key into ${INSTALL_DIR}/.env"
+      fi
+    fi
+
     (cd "${ptero_dir}" && "${php_bin}" artisan config:clear >/dev/null 2>&1 || true)
     (cd "${ptero_dir}" && "${php_bin}" artisan cache:clear >/dev/null 2>&1 || true)
     (cd "${ptero_dir}" && "${php_bin}" artisan view:clear >/dev/null 2>&1 || true)

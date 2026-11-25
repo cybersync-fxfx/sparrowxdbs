@@ -23,6 +23,7 @@ type DirectPteroCacheEntry = {
 // Process-level fallback cache so Pterodactyl auto-sync, reveal & password reset
 // keep working seamlessly even when PostgREST is offline or unconfigured.
 const directPteroCache = new Map<string, DirectPteroCacheEntry>();
+const lastPteroSyncErrors = new Map<string, string>();
 
 export class PortalError extends Error {
   constructor(
@@ -118,7 +119,13 @@ async function syncLivePteroUser(
   email: string;
   passwordEnc: string | null;
 } | null> {
-  if (!integrations().pterodactyl) return null;
+  if (!integrations().pterodactyl) {
+    lastPteroSyncErrors.set(
+      claims.email.trim().toLowerCase(),
+      "PTERO_APPLICATION_API_KEY is not configured on the server yet. Run ovh/update.sh to auto-sync the Game Panel API key.",
+    );
+    return null;
+  }
 
   const email = claims.email.trim().toLowerCase();
   const displayName = claims.fullName || email.split("@")[0] || "player";
@@ -177,6 +184,7 @@ async function syncLivePteroUser(
       email: liveUser.email,
       passwordEnc,
     });
+    lastPteroSyncErrors.delete(email);
 
     return {
       client: updatedClient,
@@ -186,7 +194,11 @@ async function syncLivePteroUser(
       passwordEnc,
     };
   } catch (err) {
-    console.warn("[SparrowX Game Portal] Live Pterodactyl user sync failed:", err);
+    const msg =
+      err instanceof ptero.PteroError
+        ? `Game Panel API returned HTTP ${err.status}. Verify PTERO_APPLICATION_API_KEY permissions (Users Read+Write).`
+        : "Unable to reach Pterodactyl Game Panel API.";
+    lastPteroSyncErrors.set(email, msg);
     return null;
   }
 }
@@ -569,6 +581,35 @@ export async function creditTopup(clientId: string, coins: number, paymentId: st
   );
 }
 
+/**
+ * Proactively provisions/links the Pterodactyl Game Panel user immediately upon
+ * signup or sign-in (Google OAuth or Master SSO) so the account already exists
+ * in game.panel.sparrowx.net before the user opens the dashboard or panel bridge.
+ */
+export async function syncPteroAccountOnSignIn(user: {
+  id: string;
+  email: string;
+  fullName: string;
+  role: "admin" | "client";
+  tenantId: string | null;
+}): Promise<void> {
+  if (!integrations().pterodactyl) return;
+  const nowSec = Math.floor(Date.now() / 1000);
+  const claims: MasterSsoClaims = {
+    sub: user.id,
+    email: user.email.trim().toLowerCase(),
+    fullName: user.fullName || user.email.split("@")[0] || "Player",
+    role: user.role,
+    tenantId: user.tenantId,
+    iat: nowSec,
+    exp: nowSec + 3600,
+  };
+  const client = await resolveLiveClient(claims).catch(() => null);
+  if (!client?.ptero_user_id) {
+    await ensureDirectPteroAccount(claims).catch(() => null);
+  }
+}
+
 export async function getPanelSsoIdentity(
   request?: Request,
 ): Promise<null | { mode: "live"; pteroUserId: number | null; username: string; email: string }> {
@@ -582,11 +623,15 @@ export async function getPanelSsoIdentity(
   if (!claims) return null;
 
   const client = await resolveLiveClient(claims);
+  const direct = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
+  const pteroUserId = client?.ptero_user_id ?? direct?.pteroUserId ?? null;
+  const pteroUsername =
+    client?.ptero_username ?? direct?.pteroUsername ?? claims.email.split("@")[0] ?? "player";
   return {
     mode: "live",
-    pteroUserId: client?.ptero_user_id ?? null,
-    username: client?.ptero_username ?? claims.email.split("@")[0] ?? "player",
-    email: client?.email ?? claims.email,
+    pteroUserId,
+    username: pteroUsername,
+    email: client?.email ?? direct?.email ?? claims.email,
   };
 }
 
@@ -594,13 +639,26 @@ export async function getPanelLaunchInfo() {
   const claims = await requireGoogleUser();
   const { isPteroSsoReady } = await import("./ptero-sso.server");
   const base = panelUrl();
+  const ints = integrations();
+  const email = claims.email.trim().toLowerCase();
   const client = await resolveLiveClient(claims);
-  const ssoReady = client?.ptero_user_id ? await isPteroSsoReady(base) : false;
+  const direct = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
+  const cachedDirect = directPteroCache.get(email) ?? direct;
+  const pteroUserId = client?.ptero_user_id ?? cachedDirect?.pteroUserId ?? null;
+  const pteroUsername = client?.ptero_username ?? cachedDirect?.pteroUsername ?? null;
+  const hasPassword = Boolean(
+    (await tryDecrypt(cachedDirect?.passwordEnc)) || (await tryDecrypt(client?.ptero_password_enc)),
+  );
+  const ssoReady = pteroUserId ? await isPteroSsoReady(base) : false;
   return {
     mode: "live" as const,
     panelUrl: base,
-    username: client?.ptero_username ?? null,
-    email: client?.email ?? claims.email,
+    username: pteroUsername,
+    email: client?.email ?? cachedDirect?.email ?? claims.email,
+    pteroLinked: Boolean(pteroUserId),
+    pteroConfigured: ints.pterodactyl,
+    hasPassword,
+    syncError: pteroUserId ? null : (lastPteroSyncErrors.get(email) ?? null),
     ssoReady,
   };
 }

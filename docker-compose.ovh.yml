@@ -64,6 +64,8 @@ services:
     restart: unless-stopped
     depends_on:
       - postgrest
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -103,6 +105,7 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
       PTERO_URL: ${PTERO_URL:-https://game.panel.sparrowx.net}
+      PTERO_INTERNAL_URL: ${PTERO_INTERNAL_URL:-http://host.docker.internal:${PTERO_PORT:-8090}}
       PTERO_SSO_SECRET: ${PTERO_SSO_SECRET:-}
       PTERO_APPLICATION_API_KEY: ${PTERO_APPLICATION_API_KEY:-}
       PTERO_CLIENT_API_KEY: ${PTERO_CLIENT_API_KEY:-}

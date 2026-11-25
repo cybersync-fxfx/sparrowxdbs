@@ -123,6 +123,16 @@ export const Route = createFileRoute("/api/auth/master-sso")({
           },
         });
 
+        // Proactively provision/link Pterodactyl Game Panel user on signup / sign-in
+        await import("@/lib/server/portal.server")
+          .then(({ syncPteroAccountOnSignIn }) =>
+            Promise.race([
+              syncPteroAccountOnSignIn(authResult.user!),
+              new Promise((resolve) => setTimeout(resolve, 2500)),
+            ]),
+          )
+          .catch(() => {});
+
         const ssoToken = await createMasterSsoToken(authResult.user);
         const postHeaders = new Headers();
         postHeaders.set("Cache-Control", "no-store");

@@ -64,13 +64,19 @@ export function timingSafeEqual(a: string, b: string): boolean {
   return r === 0;
 }
 
-/** Pterodactyl usernames: lowercase letters, digits, dot, dash, underscore; must start alphanumeric. */
-export function sanitizeUsername(name: string, discordId: string): string {
+/** Pterodactyl usernames: lowercase letters, digits, dot, dash, underscore; must start & end alphanumeric. */
+export function sanitizeUsername(name: string, seed: string): string {
   const base = name
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[^a-z0-9._-]/g, "")
     .replace(/^[^a-z0-9]+/, "")
-    .slice(0, 20);
-  return `${base || "player"}_${discordId.slice(-4)}`;
+    .replace(/[^a-z0-9]+$/, "")
+    .slice(0, 18);
+  const cleanSeed = seed
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "")
+    .slice(-4);
+  const suffix = cleanSeed.length >= 2 ? cleanSeed : randomToken(2);
+  return `${base || "player"}_${suffix}`;
 }

@@ -75,6 +75,7 @@ function PanelLaunchPage() {
   });
 
   const info = infoQ.data;
+  const pteroLinked = info?.pteroLinked ?? Boolean(syncedUsername);
   const displayUsername = syncedUsername ?? info?.username ?? info?.email ?? "";
   const targetPanelUrl = info ? `${info.panelUrl}${safeNext === "/" ? "" : safeNext}` : "https://game.panel.sparrowx.net";
 
@@ -143,7 +144,20 @@ function PanelLaunchPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-xs text-white/55">Panel Username</span>
+                  <span className="text-xs text-white/55">Panel Account Status</span>
+                  {pteroLinked ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[11px] text-emerald-300">
+                      <Check className="size-3" /> Linked in Game Panel
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/35 bg-amber-500/10 px-2.5 py-0.5 font-mono text-[11px] text-amber-300">
+                      Not Created in Panel Yet
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs text-white/55">Panel Username / Email</span>
                   <div className="flex items-center gap-2">
                     <code className="rounded bg-white/[0.06] px-2.5 py-1 font-mono text-xs text-white select-all">
                       {displayUsername}
@@ -166,7 +180,7 @@ function PanelLaunchPage() {
                   </span>
                   <div className="flex items-center gap-2">
                     <code className="rounded bg-white/[0.06] px-2.5 py-1 font-mono text-xs text-white break-all select-all">
-                      {revealedPass ?? "••••••••••••••••"}
+                      {revealedPass ?? (pteroLinked ? "••••••••••••••••" : "Pending panel sync")}
                     </code>
                     <Button
                       type="button"
@@ -237,6 +251,13 @@ function PanelLaunchPage() {
                   </>
                 )}
               </div>
+
+              {!pteroLinked && info.syncError && (
+                <div className="flex items-start gap-2.5 rounded-xl border border-red-500/30 bg-red-500/10 p-3.5 text-xs text-red-200/95">
+                  <RefreshCw className="mt-0.5 size-4 shrink-0 text-red-300" />
+                  <span>{info.syncError}</span>
+                </div>
+              )}
 
               {!info.ssoReady && info.mode === "live" && (
                 <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3.5 text-xs text-amber-200/90">
