@@ -58,6 +58,7 @@ export interface ShieldSocDashboardViewProps {
   onIncidentsUpdated: (next: Incident[]) => void;
   onResolveIncident: (id: string) => Promise<void> | void;
   onToggleAssetIsolation: (id: string) => Promise<void> | void;
+  onConnectDomain?: () => void;
   onBackToClientArea: () => void;
   onSignOut: () => void;
 }
@@ -70,6 +71,7 @@ export function ShieldSocDashboardView({
   onIncidentsUpdated,
   onResolveIncident,
   onToggleAssetIsolation,
+  onConnectDomain,
   onBackToClientArea,
   onSignOut,
 }: ShieldSocDashboardViewProps) {
@@ -293,7 +295,7 @@ export function ShieldSocDashboardView({
               <span>Back to Client Area</span>
             </button>
             <div className="flex items-center gap-2.5">
-              <img src="/logos/sparrowx-silver.png" alt="SparrowX Shield" width={28} height={28} className="size-7 object-contain" />
+              <img src="/logos/sparrowx-shield.png" alt="SparrowX Shield" width={28} height={28} className="size-7 object-contain" />
               <div>
                 <span className="text-sm sm:text-base font-semibold tracking-tight text-[#F4F6FA] block leading-tight">
                   Autonomous SOC Workbench
@@ -303,6 +305,16 @@ export function ShieldSocDashboardView({
                 </span>
               </div>
             </div>
+            {onConnectDomain && (
+              <button
+                type="button"
+                onClick={onConnectDomain}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[#F9103A]/45 bg-[#F9103A]/15 hover:bg-[#F9103A]/25 px-3 py-1.5 text-xs font-semibold text-white transition-colors cursor-pointer"
+              >
+                <Plus className="size-3.5 text-[#FF6B84]" aria-hidden="true" />
+                <span>Connect Domain</span>
+              </button>
+            )}
           </div>
 
           <nav aria-label="SOC Dashboard Sections" className="hidden md:flex items-center gap-5 text-xs text-[#9EA7B8]">

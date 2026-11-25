@@ -46,6 +46,7 @@ import {
 import { ShieldLandingView } from "./shield/ShieldLandingView";
 import { ShieldClientAreaView } from "./shield/ShieldClientAreaView";
 import { ShieldSocDashboardView } from "./shield/ShieldSocDashboardView";
+import { ShieldWafOnboardingView } from "./shield/ShieldWafOnboardingView";
 
 export interface SparrowxShieldEngineProps {
   currentUser?: AppUser | null;
@@ -55,7 +56,7 @@ export interface SparrowxShieldEngineProps {
   initialStage?: ShieldStage;
 }
 
-export type ShieldStage = "landing" | "client-area" | "dashboard";
+export type ShieldStage = "landing" | "client-area" | "onboarding" | "dashboard";
 
 function readInitialShieldUser(propUser?: AppUser | null): AppUser | null {
   if (propUser) return propUser;
@@ -112,6 +113,7 @@ export function SparrowxShieldEngine({
   const [services, setServices] = useState<ProtectedService[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [bypassedWafOnboarding, setBypassedWafOnboarding] = useState(false);
 
   // Auth dialog state
   const [socModalOpen, setSocModalOpen] = useState(false);
@@ -260,17 +262,55 @@ export function SparrowxShieldEngine({
     setViewStage("client-area");
   };
 
-  const handleEnterDashboard = () => {
-    if (!activeUser) {
-      openAuthModal("signin");
+  const openWorkbenchOrOnboarding = () => {
+    const hasConnectedDomain = tenants.length > 0 || assets.length > 0;
+    if (!hasConnectedDomain && !bypassedWafOnboarding) {
+      setViewStage("onboarding");
       return;
     }
     setViewStage("dashboard");
   };
 
+  const handleEnterDashboard = () => {
+    if (!activeUser) {
+      openAuthModal("signin");
+      return;
+    }
+    openWorkbenchOrOnboarding();
+  };
+
+  const shouldShowWafOnboarding =
+    Boolean(activeUser) &&
+    (viewStage === "onboarding" ||
+      (viewStage === "dashboard" &&
+        tenants.length === 0 &&
+        assets.length === 0 &&
+        !bypassedWafOnboarding));
+
   return (
     <>
-      {viewStage === "dashboard" && activeUser ? (
+      {shouldShowWafOnboarding && activeUser ? (
+        <ShieldWafOnboardingView
+          activeUser={activeUser}
+          onDomainConnected={({ tenant, service, asset }) => {
+            setTenants((prev) => [tenant, ...prev]);
+            setServices((prev) => [service, ...prev]);
+            setAssets((prev) => [asset, ...prev]);
+          }}
+          onLaunchWorkbench={() => {
+            setBypassedWafOnboarding(true);
+            setViewStage("dashboard");
+          }}
+          onBackToClientArea={() => {
+            if (onOpenClientArea) {
+              onOpenClientArea();
+            } else {
+              setViewStage("client-area");
+            }
+          }}
+          onSignOut={handleShieldSignOut}
+        />
+      ) : viewStage === "dashboard" && activeUser ? (
         <ShieldSocDashboardView
           activeUser={activeUser}
           tenants={tenants}
@@ -279,6 +319,7 @@ export function SparrowxShieldEngine({
           onIncidentsUpdated={setIncidents}
           onResolveIncident={handleResolveIncident}
           onToggleAssetIsolation={handleToggleAssetIsolation}
+          onConnectDomain={() => setViewStage("onboarding")}
           onBackToClientArea={() => {
             if (onOpenClientArea) {
               onOpenClientArea();
@@ -296,7 +337,7 @@ export function SparrowxShieldEngine({
           incidents={incidents}
           onTenantsUpdated={setTenants}
           onServicesUpdated={setServices}
-          onOpenDashboard={() => setViewStage("dashboard")}
+          onOpenDashboard={openWorkbenchOrOnboarding}
           onBackToLanding={() => {
             if (onOpenClientArea) {
               onOpenClientArea();
