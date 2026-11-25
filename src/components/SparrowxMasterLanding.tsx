@@ -658,60 +658,66 @@ export function SparrowxMasterLanding({
             <div className="relative">
               <button
                 type="button"
+                aria-expanded={productDropdownOpen}
+                aria-haspopup="menu"
                 onClick={() => setProductDropdownOpen(!productDropdownOpen)}
                 className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer text-white font-medium"
               >
                 <span>Products</span>
-                <ChevronDown className="size-3.5 text-zinc-400" aria-hidden="true" />
+                <ChevronDown className={`size-3.5 text-zinc-400 transition-transform duration-150 ${productDropdownOpen ? "rotate-180" : ""}`} aria-hidden="true" />
               </button>
 
               {productDropdownOpen && (
                 <div
-                  className="absolute left-0 mt-3 w-64 rounded-lg bg-[#090B10] border border-white/20 p-2 shadow-2xl z-50 space-y-1 font-sans text-xs"
+                  role="menu"
+                  className="vibe-glass-panel absolute left-0 mt-3 w-72 rounded-xl p-2 z-50 space-y-1 font-sans text-xs"
                   onMouseLeave={() => setProductDropdownOpen(false)}
                 >
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => {
                       setProductDropdownOpen(false);
                       handleLaunch("db", "https://db.sparrowx.net", "db");
                     }}
-                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-[#A3E635]/30" />
+                    <img src="/logos/sparrowx-db.png" alt="SparrowX Cloud DB — Managed PostgreSQL and pgvector Studio" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-[#A3E635]/30 bg-[#070B08] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Cloud DB</div>
-                      <div className="text-[11px] text-zinc-400">PostgreSQL &amp; Vector Studio</div>
+                      <div className="text-[11px] text-zinc-300">PostgreSQL &amp; Vector Studio</div>
                     </div>
                   </button>
 
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => {
                       setProductDropdownOpen(false);
                       handleLaunch("file", "https://file.sparrowx.net", "file");
                     }}
-                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted File Transfer and 10GB Cloud Vault" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-purple-500/30" />
+                    <img src="/logos/sparrowx-drop.png" alt="SparrowX Drop — Encrypted File Transfer and 10GB Cloud Vault" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-purple-500/35 bg-[#090612] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Drop</div>
-                      <div className="text-[11px] text-zinc-400">Ephemeral Drop &amp; 10GB Vault</div>
+                      <div className="text-[11px] text-zinc-300">Ephemeral Drop &amp; 10GB Vault</div>
                     </div>
                   </button>
 
                   <button
                     type="button"
+                    role="menuitem"
                     onClick={() => {
                       setProductDropdownOpen(false);
                       handleLaunch("password", "https://password.sparrowx.net", "password");
                     }}
-                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                    className="w-full text-left p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-2.5 text-white cursor-pointer"
                   >
-                    <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — 100% Offline Cryptographic Password Generator" width={24} height={24} className="size-6 rounded object-cover shrink-0 border border-amber-500/30" />
+                    <img src="/logos/sparrowx-keys.png" alt="SparrowX Keys — 100% Offline Cryptographic Password Generator" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-amber-500/35 bg-[#0E0B06] p-0.5" />
                     <div>
                       <div className="font-semibold text-xs">SparrowX Keys</div>
-                      <div className="text-[11px] text-zinc-400">Offline Key Generator</div>
+                      <div className="text-[11px] text-zinc-300">Offline Key Generator</div>
                     </div>
                   </button>
 
@@ -880,12 +886,12 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded-md overflow-hidden border border-[#A3E635]/30 bg-[#050B07] shrink-0">
-                  <img src="/logos/sparrowx-db.jpg" alt="SparrowX Cloud DB — Managed PostgreSQL" width={32} height={32} className="size-full object-cover scale-110" />
+                <div className="size-8 rounded-md overflow-hidden border border-[#A3E635]/30 bg-[#050B07] p-1 shrink-0">
+                  <img src="/logos/sparrowx-db.png" alt="SparrowX Cloud DB — Managed PostgreSQL" width={28} height={28} className="size-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Cloud DB</div>
-                  <div className="text-[10px] text-zinc-400 truncate">Managed PostgreSQL &amp; Vector Studio</div>
+                  <div className="text-[10px] text-zinc-300 truncate">Managed PostgreSQL &amp; Vector Studio</div>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">db.sparrowx.net</span>
               </button>
@@ -898,12 +904,12 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded-md overflow-hidden border border-purple-500/35 bg-[#090612] shrink-0">
-                  <img src="/logos/sparrowx-drop.jpg" alt="SparrowX Drop — Encrypted File Vault" width={32} height={32} className="size-full object-cover scale-110" />
+                <div className="size-8 rounded-md overflow-hidden border border-purple-500/35 bg-[#090612] p-1 shrink-0">
+                  <img src="/logos/sparrowx-drop.png" alt="SparrowX Drop — Encrypted File Vault" width={28} height={28} className="size-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Drop</div>
-                  <div className="text-[10px] text-zinc-400 truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
+                  <div className="text-[10px] text-zinc-300 truncate">Zero-Disk Drop &amp; 10GB Cloud Vault</div>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">file.sparrowx.net</span>
               </button>
@@ -916,12 +922,12 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded-md overflow-hidden border border-amber-500/30 bg-[#0A0E17] shrink-0">
-                  <img src="/logos/sparrowx-keys.jpg" alt="SparrowX Keys — Offline Password Generator" width={32} height={32} className="size-full object-cover scale-110" />
+                <div className="size-8 rounded-md overflow-hidden border border-amber-500/30 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-keys.png" alt="SparrowX Keys — Offline Password Generator" width={28} height={28} className="size-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Keys (Free)</div>
-                  <div className="text-[10px] text-zinc-400 truncate">Offline Cryptographic Generator (No Login)</div>
+                  <div className="text-[10px] text-zinc-300 truncate">Offline Cryptographic Generator (No Login)</div>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-300 shrink-0">password.sparrowx.net</span>
               </button>
@@ -934,8 +940,8 @@ export function SparrowxMasterLanding({
                 }}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
               >
-                <div className="size-8 rounded-md overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] shrink-0">
-                  <img src="/logos/sparrowx-shield.jpg" alt="SparrowX Shield — Edge WAF & DDoS Defense" width={32} height={32} className="size-full object-cover scale-110" />
+                <div className="size-8 rounded-md overflow-hidden border border-[#F9103A]/30 bg-[#0D0F16] p-1 shrink-0">
+                  <img src="/logos/sparrowx-shield.png" alt="SparrowX Shield — Edge WAF & DDoS Defense" width={28} height={28} className="size-full object-contain" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-white">SparrowX Shield</div>

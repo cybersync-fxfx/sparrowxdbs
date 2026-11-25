@@ -294,15 +294,15 @@ export function SparrowxKeysEngine() {
           </div>
 
           {/* Telemetry Indicator */}
-          <div className="flex items-center gap-3 font-mono text-[10px] text-[#9CA3AF]">
-            <div className="flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <div className="flex items-center gap-3 font-mono text-[11px] text-zinc-300">
+            <div className="flex items-center gap-1.5 border border-white/12 bg-[#14171F] px-2.5 py-1 rounded-md">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
               <span className="text-white font-semibold tabular-nums">{networkDispatched}</span>
-              <span className="text-[#64748B]">NETWORK CALLS</span>
+              <span className="text-zinc-300">NETWORK CALLS</span>
             </div>
-            <div className="hidden sm:flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] px-2.5 py-1 rounded-sm text-[#64748B]">
+            <div className="hidden sm:flex items-center gap-1.5 border border-white/12 bg-[#14171F] px-2.5 py-1 rounded-md text-zinc-300">
               <span>RNG:</span>
-              <span className="text-[#9CA3AF]">window.crypto</span>
+              <span className="text-amber-300 font-medium">window.crypto</span>
             </div>
           </div>
         </div>
@@ -371,9 +371,9 @@ export function SparrowxKeysEngine() {
             </button>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 text-[10px] font-mono text-[#64748B] pr-2">
+          <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-zinc-300 pr-2">
             <span>PRESS</span>
-            <kbd className="px-1.5 py-0.5 bg-[#14171F] border border-white/[0.08] text-[#9CA3AF] rounded text-[9px]">
+            <kbd className="px-2 py-0.5 bg-[#14171F] border border-white/15 text-amber-300 rounded text-[10px]">
               SPACEBAR
             </kbd>
             <span>TO REGENERATE</span>
@@ -381,12 +381,12 @@ export function SparrowxKeysEngine() {
         </div>
 
         {/* OVERSIZED MONOSPACE READOUT SCREEN */}
-        <div className="border border-white/[0.08] bg-[#0E1015] rounded-md overflow-hidden relative shadow-md">
+        <div className="vibe-glass-panel rounded-xl overflow-hidden relative">
           {/* Top readout status bar */}
-          <div className="border-b border-white/[0.08] bg-[#14171F] px-4 py-2 flex items-center justify-between text-xs font-mono">
+          <div className="border-b border-white/10 bg-[#14171F]/90 px-4 py-2.5 flex items-center justify-between text-xs font-mono">
             <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[#9CA3AF] text-[11px] uppercase tracking-wider">
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse" aria-hidden="true" />
+              <span className="text-zinc-200 text-[11px] uppercase tracking-wider">
                 {mode === "password"
                   ? `Cryptographic Output [${pwdLength} Chars]`
                   : mode === "diceware"
@@ -399,13 +399,13 @@ export function SparrowxKeysEngine() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[#9CA3AF] hover:text-white transition-colors flex items-center gap-1 text-[11px]"
+                  className="text-zinc-300 hover:text-white transition-colors flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md hover:bg-white/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                 >
-                  {showPassword ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                  {showPassword ? <EyeOff className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
                   <span>{showPassword ? "Mask" : "Reveal"}</span>
                 </button>
               )}
-              <span className="text-[10px] text-[#64748B] tabular-nums">GEN #{generationCount}</span>
+              <span className="text-[11px] text-zinc-400 tabular-nums">GEN #{generationCount}</span>
             </div>
           </div>
 

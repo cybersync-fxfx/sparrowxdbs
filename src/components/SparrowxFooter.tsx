@@ -110,7 +110,7 @@ const PRODUCT_LINKS: ProductLinkItem[] = [
 ];
 
 const LINK_CLASSES =
-  "min-h-6 inline-flex items-center gap-2 text-sm text-[#F4F6FA]/70 hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm cursor-pointer";
+  "min-h-8 inline-flex items-center gap-2 text-sm text-[#CBD5E1] hover:text-white transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm cursor-pointer";
 
 export function SparrowxFooter({
   onLaunchService,
@@ -145,7 +145,11 @@ export function SparrowxFooter({
   };
 
   return (
-    <footer className="font-soc relative z-10 mt-auto border-t border-[#F4F6FA]/[0.08] bg-[#07090F] text-[#F4F6FA]">
+    <footer className="font-soc relative z-10 mt-auto border-t border-white/10 bg-[#06080E] text-[#F4F6FA]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+      />
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-14">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-12">
           {/* Brand Summary & Status Column */}
@@ -167,7 +171,7 @@ export function SparrowxFooter({
               </span>
             </a>
 
-            <p className="text-sm text-[#F4F6FA]/60 leading-relaxed max-w-[38ch]">
+            <p className="text-sm text-[#CBD5E1]/85 leading-relaxed max-w-[38ch]">
               Independent cloud infrastructure for developers and teams.
               Predictable PostgreSQL databases, L7 DDoS defense, encrypted file
               transfer, and client-side key tooling.
@@ -176,7 +180,7 @@ export function SparrowxFooter({
             <div>
               <a
                 href={statusHref}
-                className={LINK_CLASSES}
+                className="min-h-9 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-500/15 hover:border-emerald-400/40 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 cursor-pointer"
               >
                 <span
                   className="size-2 rounded-full bg-[#10B981] shrink-0"
@@ -206,7 +210,7 @@ export function SparrowxFooter({
                       className={`${LINK_CLASSES} max-w-full`}
                     >
                       <span className="shrink-0">{item.label}</span>
-                      <span className="text-xs text-[#F4F6FA]/40 truncate">
+                      <span className="text-xs font-mono text-[#94A3B8] truncate">
                         {item.sublabel}
                       </span>
                     </a>
@@ -277,7 +281,7 @@ export function SparrowxFooter({
                     className={`${LINK_CLASSES} text-emerald-300/90 hover:text-emerald-200`}
                   >
                     <span>WhatsApp Support</span>
-                    <span className="text-xs text-[#F4F6FA]/45 font-mono">
+                    <span className="text-xs text-[#94A3B8] font-mono">
                       {WHATSAPP_SUPPORT_DISPLAY}
                     </span>
                   </a>
@@ -319,7 +323,7 @@ export function SparrowxFooter({
         </div>
 
         {/* Bottom Copyright & Direct Domain Strip */}
-        <div className="mt-12 pt-6 border-t border-[#F4F6FA]/[0.08] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-[#F4F6FA]/50">
+        <div className="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-sm text-[#94A3B8]">
           <p className="min-w-0">
             &copy; {new Date().getFullYear()} SparrowX Technologies. Built for
             developers, startups, and privacy-conscious builders.

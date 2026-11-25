@@ -714,24 +714,34 @@ export function SparrowxInfraEngine() {
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {CATEGORY_PILLARS.map((pillar) => {
               const isSelected = selectedIsolation === pillar.id;
+              const selectPillar = () => {
+                setSelectedIsolation(pillar.id);
+                setCategory(pillar.id);
+                if (pillar.id === "vps" || pillar.id === "vds") {
+                  setRyzenTab(pillar.id);
+                }
+                setTimeout(() => {
+                  document
+                    .getElementById("workload-plans-panel")
+                    ?.scrollIntoView({ behavior: "smooth" });
+                }, 60);
+              };
               return (
                 <article
                   key={pillar.id}
-                  onClick={() => {
-                    setSelectedIsolation(pillar.id);
-                    setCategory(pillar.id);
-                    if (pillar.id === "vps" || pillar.id === "vds") {
-                      setRyzenTab(pillar.id);
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onClick={selectPillar}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      selectPillar();
                     }
-                    setTimeout(() => {
-                      document
-                        .getElementById("workload-plans-panel")
-                        ?.scrollIntoView({ behavior: "smooth" });
-                    }, 60);
                   }}
-                  className={`group rounded-2xl border p-6 flex flex-col justify-between gap-6 transition-all duration-200 cursor-pointer ${
+                  className={`vibe-feature-card group rounded-2xl border p-6 flex flex-col justify-between gap-6 transition-all duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#020307] ${
                     isSelected
-                      ? "border-sky-400 bg-[#0F1624] shadow-[0_0_32px_rgba(56,189,248,0.2)]"
+                      ? "border-sky-400 bg-[#0F1624] shadow-[0_0_32px_rgba(56,189,248,0.22)]"
                       : "border-white/12 bg-[#0B0E15] hover:border-white/30"
                   }`}
                 >
