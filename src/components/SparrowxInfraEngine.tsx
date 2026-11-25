@@ -346,6 +346,44 @@ export function SparrowxInfraEngine() {
     return () => dialog.removeEventListener("close", onClose);
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash.toLowerCase();
+    if (!hash) return;
+    if (hash === "#catalog" || hash === "#ryzen-plans" || hash === "#vps") {
+      setSelectedIsolation("vps");
+      setCategory("vps");
+      setRyzenTab("vps");
+      setTimeout(() => {
+        document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
+      }, 120);
+    } else if (hash === "#vds") {
+      setSelectedIsolation("vds");
+      setCategory("vds");
+      setRyzenTab("vds");
+      setTimeout(() => {
+        document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
+      }, 120);
+    } else if (hash === "#bare-metal" || hash === "#dedicated") {
+      setSelectedIsolation("bare-metal");
+      setCategory("bare-metal");
+      setTimeout(() => {
+        document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
+      }, 120);
+    }
+  }, []);
+
+  const openWorkloadPlans = (target: "vps" | "vds" | "bare-metal") => {
+    setSelectedIsolation(target);
+    setCategory(target);
+    if (target === "vps" || target === "vds") {
+      setRyzenTab(target);
+    }
+    setTimeout(() => {
+      document.getElementById("workload-plans-panel")?.scrollIntoView({ behavior: "smooth" });
+    }, 60);
+  };
+
   const openConfigurator = (plan: InfraServerPlan) => {
     const targetRegion = plan.regions.includes(region) ? region : (plan.regions[0] ?? "in-mum");
     if (typeof window !== "undefined") {
@@ -443,7 +481,7 @@ export function SparrowxInfraEngine() {
             monthlyPriceInr: selectedPlan.priceMonthlyInr,
           }),
         }),
-        fetch("/api/contact", {
+        fetch("/api/v1/contact", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -549,7 +587,7 @@ export function SparrowxInfraEngine() {
               Network &amp; DDoS
             </a>
             <a
-              href="/docs/infra"
+              href={buildMasterHref("/docs/infra")}
               className="whitespace-nowrap hover:text-white transition-colors duration-150"
             >
               Docs
@@ -570,13 +608,14 @@ export function SparrowxInfraEngine() {
               <span>Dashboard</span>
               <ArrowUpRight className="size-4" aria-hidden="true" />
             </a>
-            <a
-              href="#catalog"
-              className="hidden lg:inline-flex whitespace-nowrap items-center gap-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 px-3.5 py-2 text-xs sm:text-sm font-semibold text-black transition-colors duration-150"
+            <button
+              type="button"
+              onClick={() => openWorkloadPlans(selectedIsolation ?? "vps")}
+              className="hidden lg:inline-flex whitespace-nowrap items-center gap-1.5 rounded-lg bg-sky-400 hover:bg-sky-300 px-3.5 py-2 text-xs sm:text-sm font-semibold text-black transition-colors duration-150 cursor-pointer"
             >
               <span>Deploy server</span>
               <ArrowRight className="size-4" aria-hidden="true" />
-            </a>
+            </button>
 
             <button
               type="button"
@@ -601,28 +640,41 @@ export function SparrowxInfraEngine() {
               onClick={() => setMobileMenuOpen(false)}
               className="block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10"
             >
-              Offerings
+              Workloads
             </a>
-            <a
-              href="#ryzen-plans"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2.5 text-orange-400 font-semibold hover:bg-white/10"
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                openWorkloadPlans("vps");
+              }}
+              className="w-full text-left block rounded-lg px-3 py-2.5 text-orange-400 font-semibold hover:bg-white/10 cursor-pointer"
             >
               VPS &amp; VDS Plans
-            </a>
-            <a
-              href="#catalog"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10"
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                openWorkloadPlans("bare-metal");
+              }}
+              className="w-full text-left block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10 cursor-pointer"
             >
-              Server catalog
-            </a>
+              Bare Metal Catalog
+            </button>
             <a
               href="#architecture"
               onClick={() => setMobileMenuOpen(false)}
               className="block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10"
             >
               Network &amp; DDoS
+            </a>
+            <a
+              href={buildMasterHref("/docs/infra")}
+              onClick={() => setMobileMenuOpen(false)}
+              className="block rounded-lg px-3 py-2.5 text-zinc-200 hover:bg-white/10"
+            >
+              Docs
             </a>
             <a
               href="/infra/dashboard"

@@ -142,6 +142,24 @@ export function SparrowxFooter({
       onLaunchService(item.serviceKey, item.href, item.serviceKey);
       return;
     }
+    const host = window.location.hostname.toLowerCase();
+    if ((host === "localhost" || host === "127.0.0.1") && item.serviceKey) {
+      const localMap: Record<SparrowxServiceKey, string> = {
+        db: "/db",
+        sec: "/shield",
+        file: "/drop",
+        password: "/keys",
+        api: "/gateway",
+        infra: "/infra",
+        deploy: "/deploy",
+        ai: "/ai",
+        agents: "/agents",
+        dpdp: "/dpdp",
+        game: "/game",
+      };
+      e.preventDefault();
+      window.location.assign(localMap[item.serviceKey]);
+    }
   };
 
   return (
@@ -312,7 +330,7 @@ export function SparrowxFooter({
                       Operator sign in
                     </button>
                   ) : (
-                    <a href="/" className={LINK_CLASSES}>
+                    <a href={masterHomeHref} className={LINK_CLASSES}>
                       Workspace portal
                     </a>
                   )}
@@ -330,25 +348,25 @@ export function SparrowxFooter({
           </p>
           <div className="flex flex-wrap items-center gap-6 min-w-0">
             <a
-              href="/terms"
+              href={buildMasterHref("/terms")}
               className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
               Terms of Service
             </a>
             <a
-              href="/refund"
+              href={buildMasterHref("/refund")}
               className="min-h-6 inline-flex items-center text-[#FFA14A] hover:text-[#FFA14A]/80 font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
               Refund Policy
             </a>
             <a
-              href="/security"
+              href={buildMasterHref("/security")}
               className="min-h-6 inline-flex items-center text-emerald-400 hover:text-emerald-300 font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
               Data Security
             </a>
             <a
-              href="/story"
+              href={buildMasterHref("/story")}
               className="min-h-6 inline-flex items-center hover:text-[#F4F6FA] transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
             >
               Our Story

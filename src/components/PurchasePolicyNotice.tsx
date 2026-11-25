@@ -1,5 +1,6 @@
 import React from "react";
 import { ShieldCheck } from "lucide-react";
+import { buildMasterHref } from "@/lib/routing";
 
 interface PurchasePolicyNoticeProps {
   className?: string;
@@ -27,7 +28,7 @@ export function PurchasePolicyNotice({
       <p className="leading-relaxed">
         Before purchasing, we request you to read our{" "}
         <a
-          href="/terms"
+          href={buildMasterHref("/terms")}
           target="_blank"
           rel="noopener noreferrer"
           className="text-white font-medium underline underline-offset-2 hover:text-sky-300 transition-colors"
@@ -36,7 +37,7 @@ export function PurchasePolicyNotice({
         </a>{" "}
         and{" "}
         <a
-          href="/refund"
+          href={buildMasterHref("/refund")}
           target="_blank"
           rel="noopener noreferrer"
           className="text-white font-medium underline underline-offset-2 hover:text-sky-300 transition-colors"

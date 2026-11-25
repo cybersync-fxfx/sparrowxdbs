@@ -8,6 +8,7 @@ import { routeTree } from "@/routeTree.gen";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import {
   buildMasterHref,
+  buildProductHref,
   isProductSubdomain,
   matchProductSubdomain,
   resolveRootRedirectTarget,
@@ -30,7 +31,25 @@ describe("App routing", () => {
       "/keys",
       "/shield",
       "/gateway",
+      "/infra",
+      "/infra/configure",
+      "/infra/dashboard",
+      "/deploy",
+      "/ai",
+      "/agents",
+      "/dpdp",
       "/story",
+      "/terms",
+      "/refund",
+      "/security",
+      "/docs",
+      "/docs/db",
+      "/docs/infra",
+      "/docs/shield",
+      "/docs/game",
+      "/docs/drop",
+      "/docs/keys",
+      "/docs/api",
       "/docs/errors",
       "/errors",
       "/f",
@@ -184,6 +203,27 @@ describe("App routing", () => {
     expect(
       buildMasterHref("/#vps", { hostname: "localhost", protocol: "http:", port: "3000" }),
     ).toBe("/#vps");
+
+    // buildProductHref resolves cleanly across prod subdomains and localhost without leaking hostnames
+    expect(
+      buildProductHref("db", "", { hostname: "api.sparrowx.net", protocol: "https:", port: "" }),
+    ).toBe("https://db.sparrowx.net");
+    expect(
+      buildProductHref("infra", "/infra/dashboard", {
+        hostname: "sparrowx.net",
+        protocol: "https:",
+        port: "",
+      }),
+    ).toBe("https://infra.sparrowx.net/infra/dashboard");
+    expect(
+      buildProductHref("game", "", { hostname: "sec.sparrowx.net", protocol: "https:", port: "" }),
+    ).toBe("https://sparrowx.net/game");
+    expect(
+      buildProductHref("db", "", { hostname: "localhost", protocol: "http:", port: "3000" }),
+    ).toBe("/db");
+    expect(
+      buildProductHref("api", "", { hostname: "127.0.0.1", protocol: "http:", port: "3000" }),
+    ).toBe("/gateway");
   });
 
   it("renders valid routes in SparrowxFooter without broken /errors or /db-for-api links", () => {

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { SparrowxInfraConfigurator } from "@/components/SparrowxInfraConfigurator";
 import { BackgroundEngineToaster } from "@/components/BackgroundEngineToaster";
@@ -40,6 +41,14 @@ export const Route = createFileRoute("/infra/configure")({
 
 function SparrowxInfraConfigureRoute() {
   const { plan, region, cycle, currency } = Route.useSearch();
+  useEffect(() => {
+    const host = window.location.hostname.toLowerCase();
+    if (host === "sparrowx.net" || host === "www.sparrowx.net") {
+      window.location.replace(
+        `https://infra.sparrowx.net/infra/configure${window.location.search}${window.location.hash}`,
+      );
+    }
+  }, []);
   return (
     <>
       <SparrowxInfraConfigurator

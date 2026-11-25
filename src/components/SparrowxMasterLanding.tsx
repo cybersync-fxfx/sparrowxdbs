@@ -794,6 +794,30 @@ export function SparrowxMasterLanding({
                   </a>
 
                   <a
+                    href={resolveServiceHref("api", "https://api.sparrowx.net")}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <img src="/logos/sparrowx-network.png" alt="SparrowX API Gateway" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-sky-500/30 bg-[#0A0E17] p-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX API Gateway</div>
+                      <div className="text-[11px] text-zinc-400">Hosted PostgREST &amp; SDKs</div>
+                    </div>
+                  </a>
+
+                  <a
+                    href={resolveServiceHref("game", "https://sparrowx.net/game")}
+                    onClick={() => setProductDropdownOpen(false)}
+                    className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
+                  >
+                    <img src="/logos/sparrowx-main.png" alt="SparrowX Game Hosting" width={24} height={24} className="size-6 rounded object-contain shrink-0 border border-orange-500/30 bg-[#0A0E17] p-0.5" />
+                    <div>
+                      <div className="font-semibold text-xs">SparrowX Game Hosting</div>
+                      <div className="text-[11px] text-zinc-400">FiveM, Minecraft &amp; SA-MP</div>
+                    </div>
+                  </a>
+
+                  <a
                     href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
                     onClick={() => setProductDropdownOpen(false)}
                     className="w-full text-left p-2 rounded-md hover:bg-white/10 flex items-center gap-2.5 text-white cursor-pointer"
@@ -966,6 +990,96 @@ export function SparrowxMasterLanding({
               </a>
 
               <a
+                href={resolveServiceHref("deploy", "https://deploy.sparrowx.net")}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded-md overflow-hidden border border-white/20 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-network.png" alt="SparrowX Deploy" width={28} height={28} className="size-full object-contain" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Deploy</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Git-to-Edge Cloud PaaS &amp; Builds</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">deploy.sparrowx.net</span>
+              </a>
+
+              <a
+                href={resolveServiceHref("ai", "https://ai.sparrowx.net")}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded-md overflow-hidden border border-violet-500/30 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-main.png" alt="SparrowX AI Gateway" width={28} height={28} className="size-full object-contain" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX AI Gateway</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Model Playground &amp; Prompt Guardrails</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">ai.sparrowx.net</span>
+              </a>
+
+              <a
+                href={resolveServiceHref("agents", "https://agents.sparrowx.net")}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded-md overflow-hidden border border-emerald-500/30 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-main.png" alt="SparrowX Agents" width={28} height={28} className="size-full object-contain" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Agents</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Autonomous AI Fleet &amp; Live Traces</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">agents.sparrowx.net</span>
+              </a>
+
+              <a
+                href={resolveServiceHref("dpdp", "https://dpdp.sparrowx.net")}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded-md overflow-hidden border border-emerald-500/30 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-shield.png" alt="SparrowX DPDP" width={28} height={28} className="size-full object-contain" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX DPDP</div>
+                  <div className="text-[10px] text-zinc-400 truncate">India DPDP 2023 Consent &amp; DSAR</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">dpdp.sparrowx.net</span>
+              </a>
+
+              <a
+                href={resolveServiceHref("api", "https://api.sparrowx.net")}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded-md overflow-hidden border border-sky-500/30 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-network.png" alt="SparrowX API Gateway" width={28} height={28} className="size-full object-contain" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX API Gateway</div>
+                  <div className="text-[10px] text-zinc-400 truncate">Instant PostgREST API &amp; SDKs</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">api.sparrowx.net</span>
+              </a>
+
+              <a
+                href={resolveServiceHref("game", "https://sparrowx.net/game")}
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
+              >
+                <div className="size-8 rounded-md overflow-hidden border border-orange-500/30 bg-[#0A0E17] p-1 shrink-0">
+                  <img src="/logos/sparrowx-main.png" alt="SparrowX Game Hosting" width={28} height={28} className="size-full object-contain" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="font-bold text-xs text-white">SparrowX Game Hosting</div>
+                  <div className="text-[10px] text-zinc-400 truncate">FiveM, Minecraft, SA-MP &amp; Bots</div>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-300 shrink-0">sparrowx.net/game</span>
+              </a>
+
+              <a
                 href={getNetsecSsoUrl({ autoSso: Boolean(sessionUser) })}
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full text-left p-2.5 rounded-lg bg-[#090B10] border border-white/15 hover:border-white/40 flex items-center gap-3 text-white cursor-pointer min-h-[48px]"
@@ -983,11 +1097,20 @@ export function SparrowxMasterLanding({
 
             <div className="pt-2 border-t border-white/15 flex flex-col gap-2 font-mono text-xs">
               <a
-                href="#comparison"
+                href="#products"
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-2.5 rounded bg-[#090B10] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
               >
-                <span>Comparison</span>
+                <span>Platforms</span>
+                <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
+              </a>
+
+              <a
+                href="/docs"
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2.5 rounded bg-[#090B10] border border-white/15 text-zinc-300 hover:text-white flex items-center justify-between"
+              >
+                <span>Documentation</span>
                 <ArrowRight className="size-3.5 text-white" aria-hidden="true" />
               </a>
 
@@ -1096,7 +1219,7 @@ export function SparrowxMasterLanding({
                 </button>
               )}
               <a
-                href="/db"
+                href={resolveServiceHref("db", "https://db.sparrowx.net")}
                 className="px-3 py-1.5 rounded-md border border-white/20 bg-[#05060A] hover:border-white/50 text-[11px] font-mono text-white inline-flex items-center gap-1.5 transition-colors"
               >
                 <Database className="size-3.5" aria-hidden="true" />

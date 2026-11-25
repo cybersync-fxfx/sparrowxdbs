@@ -436,7 +436,7 @@ export function SparrowxDeployDashboard() {
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <SubdomainAuthChip nextPath="/deploy" />
             <a
-              href="/docs"
+              href={buildMasterHref("/docs")}
               className="hidden sm:inline-flex min-h-[36px] items-center rounded-md border border-[#262626] bg-transparent hover:bg-[#141414] px-3 text-xs font-medium text-zinc-300 hover:text-white transition-colors"
             >
               Docs

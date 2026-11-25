@@ -16,6 +16,7 @@ import {
   Globe2,
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { buildMasterHref } from "@/lib/routing";
 
 export type LegalTabKey = "terms" | "refund" | "security" | "services";
 
@@ -37,7 +38,7 @@ export function SparrowxLegalCenter({
       <header className="border-b border-white/10 bg-[#0B0E17]/80 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <a
-            href="/"
+            href={buildMasterHref("/")}
             className="flex items-center gap-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFA14A] rounded-lg"
           >
             <img
@@ -54,7 +55,7 @@ export function SparrowxLegalCenter({
 
           <div className="flex items-center gap-3">
             <a
-              href="/"
+              href={buildMasterHref("/")}
               className="text-xs text-zinc-400 hover:text-white transition-colors flex items-center gap-1"
             >
               &larr; Back to Platform

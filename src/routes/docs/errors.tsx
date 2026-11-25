@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ErrorDocumentationCenter } from "@/components/ErrorDocumentationCenter";
 import { BackgroundEngineToaster, emitEngineToast } from "@/components/BackgroundEngineToaster";
+import { buildMasterHref } from "@/lib/routing";
 
 export const Route = createFileRoute("/docs/errors")({
   head: () => ({
@@ -63,6 +64,8 @@ export const Route = createFileRoute("/docs/errors")({
 function DocsErrorsPage() {
   const { code, ref } = Route.useSearch();
   const navigate = useNavigate();
+  const masterHomeHref = buildMasterHref("/");
+  const docsHubHref = buildMasterHref("/docs");
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -70,7 +73,7 @@ function DocsErrorsPage() {
       <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur-md sm:px-8">
         <div className="flex items-center gap-3">
           <a
-            href="/"
+            href={masterHomeHref}
             className="flex items-center gap-2.5 font-display text-base font-bold text-white hover:opacity-90"
           >
             <img src="/logos/sparrowx-silver.png" alt="SparrowX Silver Logo Emblem" width={24} height={24} className="size-6 object-contain" />
@@ -86,13 +89,13 @@ function DocsErrorsPage() {
 
         <div className="flex items-center gap-2">
           <a
-            href="/docs"
+            href={docsHubHref}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
           >
             <span>Service Docs</span>
           </a>
           <a
-            href="/"
+            href={masterHomeHref}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
           >
             <span>← Back to SparrowX</span>
@@ -104,7 +107,13 @@ function DocsErrorsPage() {
         <ErrorDocumentationCenter
           initialCode={code}
           initialReferenceId={ref}
-          onNavigateBack={() => navigate({ to: "/" })}
+          onNavigateBack={() => {
+            if (masterHomeHref.startsWith("http") && typeof window !== "undefined") {
+              window.location.assign(masterHomeHref);
+              return;
+            }
+            navigate({ to: "/" });
+          }}
           showToast={(msg, type) => emitEngineToast(msg, type || "info")}
         />
       </main>

@@ -545,23 +545,29 @@ ensure_netsec_dashboard_running() {
   local sbs_assets_changed="no"
   if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
     mkdir -p "${netsec_dir}" "${netsec_dir}/frontend/public" "${netsec_dir}/frontend/src/components" "${netsec_dir}/frontend/src/pages" 2>/dev/null || true
+    for _sbs_check in \
+      "server.js" \
+      "pg-compat.js" \
+      "radar-scanner.js" \
+      "frontend/public/logo.png" \
+      "frontend/index.html" \
+      "frontend/src/App.jsx" \
+      "frontend/src/index.css" \
+      "frontend/src/pages/Landing.jsx" \
+      "frontend/src/pages/Auth.jsx" \
+      "frontend/src/pages/Dashboard.jsx" \
+      "frontend/src/pages/Docs.jsx"; do
+      if [ -f "${local_sbs_src}/${_sbs_check}" ] && ! cmp -s "${local_sbs_src}/${_sbs_check}" "${netsec_dir}/${_sbs_check}" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+    done
     cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
+    [ -f "${local_sbs_src}/pg-compat.js" ] && cp -f "${local_sbs_src}/pg-compat.js" "${netsec_dir}/pg-compat.js" 2>/dev/null || true
+    [ -f "${local_sbs_src}/radar-scanner.js" ] && cp -f "${local_sbs_src}/radar-scanner.js" "${netsec_dir}/radar-scanner.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
     cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
     if [ -d "${local_sbs_src}/frontend" ]; then
-      if [ -f "${local_sbs_src}/frontend/public/logo.png" ] && ! cmp -s "${local_sbs_src}/frontend/public/logo.png" "${netsec_dir}/frontend/public/logo.png" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-      if [ -f "${local_sbs_src}/frontend/index.html" ] && ! cmp -s "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-      if [ -f "${local_sbs_src}/frontend/src/pages/Landing.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Landing.jsx" "${netsec_dir}/frontend/src/pages/Landing.jsx" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-      if [ -f "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" "${netsec_dir}/frontend/src/pages/Dashboard.jsx" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
       cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/public/" 2>/dev/null || true
       [ -f "${local_sbs_src}/frontend/index.html" ] && cp -f "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null || true
       [ -d "${local_sbs_src}/frontend/src" ] && cp -rf "${local_sbs_src}/frontend/src/." "${netsec_dir}/frontend/src/" 2>/dev/null || true
@@ -569,6 +575,11 @@ ensure_netsec_dashboard_running() {
         cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/dist/" 2>/dev/null || true
       fi
     fi
+  fi
+
+  # Clear any false-positive visitor auto-bans created by legacy TIME-WAIT radar scoring
+  if command -v nft >/dev/null 2>&1; then
+    nft flush set inet detroit_guard blacklist >/dev/null 2>&1 || true
   fi
 
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then
@@ -1184,6 +1195,7 @@ ensure_game_letsencrypt_ssl() {
   local gamesec_domain="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN}}"
   local infra_domain="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
+  local php_domain="${DOMAIN_PHP:-php.${SPARROWX_DOMAIN}}"
   local webroot="${INSTALL_DIR}/ovh/certbot-www"
   local ssl_dir="${INSTALL_DIR}/ovh/ssl"
 
@@ -1212,6 +1224,11 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${gamesec_domain}" "gamesec"
   issue_le_cert_to_ovh_ssl "${netsec_domain}" "netsec"
   issue_le_cert_to_ovh_ssl "${infra_domain}" "infra"
+  issue_le_cert_to_ovh_ssl "${php_domain}" "php"
+  local extra_sub
+  for extra_sub in ai deploy dpdp agents console admin; do
+    issue_le_cert_to_ovh_ssl "${extra_sub}.${SPARROWX_DOMAIN}" "${extra_sub}"
+  done
 }
 
 ensure_core_letsencrypt_ssl() {
@@ -1737,6 +1754,12 @@ fi
 # ==============================================================================
 draw_progress 4 7 "SSL & Multi-Domain Nginx"
 
+# Auto-sync Cloudflare DNS records (A records + _dmarc TXT) when CF_DNS_API_TOKEN is set in .env
+if [ -f "${INSTALL_DIR}/deploy/cf-dns-sync.sh" ]; then
+  chmod +x "${INSTALL_DIR}/deploy/cf-dns-sync.sh" 2>/dev/null || true
+  bash "${INSTALL_DIR}/deploy/cf-dns-sync.sh" || log_warn "Cloudflare DNS sync returned non-zero (continuing update)."
+fi
+
 mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/ovh/certbot-www/.well-known/acme-challenge" "${INSTALL_DIR}/data/users" "${INSTALL_DIR}/data/backups"
 
 SSL_CERT="${INSTALL_DIR}/ovh/ssl/fullchain.pem"
@@ -1843,6 +1866,13 @@ render_sparrowx_nginx_conf() {
   if [ -s "${INSTALL_DIR}/ovh/ssl/infra-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/infra-privkey.pem" ]; then
     infra_ssl_cert="/etc/nginx/ssl/infra-fullchain.pem"
     infra_ssl_key="/etc/nginx/ssl/infra-privkey.pem"
+  fi
+  local php_domain="${DOMAIN_PHP:-php.${SPARROWX_DOMAIN:-sparrowx.local}}"
+  local php_ssl_cert="/etc/nginx/ssl/fullchain.pem"
+  local php_ssl_key="/etc/nginx/ssl/privkey.pem"
+  if [ -s "${INSTALL_DIR}/ovh/ssl/php-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/php-privkey.pem" ]; then
+    php_ssl_cert="/etc/nginx/ssl/php-fullchain.pem"
+    php_ssl_key="/etc/nginx/ssl/php-privkey.pem"
   fi
   local netsec_domain="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN:-sparrowx.local}}"
   local netsec_p="${NETSEC_PORT:-3006}"
@@ -2386,7 +2416,119 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 }
+
+# 10. phpMyAdmin Database Console (${php_domain})
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${php_domain};
+    ssl_certificate ${php_ssl_cert};
+    ssl_certificate_key ${php_ssl_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    client_max_body_size 128M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Robots-Tag "noindex, nofollow" always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_pma http://sparrowx-phpmyadmin:80;
+        proxy_pass \$upstream_pma;
+        proxy_http_version 1.1;
+        proxy_redirect http:// https://;
+        proxy_redirect http://${php_domain}:80/ https://${php_domain}/;
+        proxy_redirect https://${php_domain}:80/ https://${php_domain}/;
+        proxy_read_timeout 300s;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Port 443;
+    }
+}
 EOF
+
+  # 11. Standalone Platform Subdomains (ai, deploy, dpdp, agents, console, admin)
+  local _sub _sub_dom _sub_cert _sub_key
+  for _sub in ai deploy dpdp agents console admin; do
+    _sub_dom="${_sub}.${SPARROWX_DOMAIN:-sparrowx.local}"
+    _sub_cert="/etc/nginx/ssl/fullchain.pem"
+    _sub_key="/etc/nginx/ssl/privkey.pem"
+    if [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-privkey.pem" ]; then
+      _sub_cert="/etc/nginx/ssl/${_sub}-fullchain.pem"
+      _sub_key="/etc/nginx/ssl/${_sub}-privkey.pem"
+    fi
+    cat >> "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
+
+server {
+    listen 80;
+    listen 443 ssl;
+    server_name ${_sub_dom};
+    ssl_certificate ${_sub_cert};
+    ssl_certificate_key ${_sub_key};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    client_max_body_size 100M;
+    server_tokens off;
+    resolver 127.0.0.11 valid=5s ipv6=off;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-SparrowX-Shield "PROTECTED" always;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+        default_type "text/plain";
+        allow all;
+    }
+
+    location / {
+        set \$upstream_app http://sparrowx:3000;
+        proxy_pass \$upstream_app;
+        proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_intercept_errors on;
+        error_page 502 503 504 = @sparrowx_host_fallback;
+    }
+
+    location @sparrowx_host_fallback {
+        set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
+        proxy_pass \$fallback_app;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+  done
 }
 
 render_sparrowx_nginx_conf

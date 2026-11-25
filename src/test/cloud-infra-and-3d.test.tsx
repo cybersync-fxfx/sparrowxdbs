@@ -133,6 +133,8 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     expect(order.status).toBe("PENDING");
     expect(order.upiUri).toContain("upi://pay?");
 
+    const prevSecret = process.env.SPARROWX_UPI_BRIDGE_SECRET;
+    process.env.SPARROWX_UPI_BRIDGE_SECRET = "test_upi_bridge_secret_2026";
     const rawBody = JSON.stringify({
       orderId: order.orderId,
       amountInr: 849,
@@ -140,9 +142,11 @@ describe("SparrowX Cloud Infra (infra.sparrowx.net) & 3D Floating Visuals", () =
     });
     const hookRes = processUpiAutoWebhook({
       rawBody,
-      headers: {},
+      headers: { "x-sparrowx-upi-secret": "test_upi_bridge_secret_2026" },
       payload: JSON.parse(rawBody),
     });
+    if (prevSecret === undefined) delete process.env.SPARROWX_UPI_BRIDGE_SECRET;
+    else process.env.SPARROWX_UPI_BRIDGE_SECRET = prevSecret;
     expect(hookRes.ok).toBe(true);
     expect(hookRes.order?.status).toBe("PAID");
     expect(hookRes.order?.provisionedServer?.hostname).toBe("auto-vps-01.sparrowx.net");

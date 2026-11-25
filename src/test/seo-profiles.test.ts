@@ -90,6 +90,35 @@ describe("Zero-Collision Multi-Subdomain SEO Architecture", () => {
     expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/infra", "")).toBe(
       "https://infra.sparrowx.net/",
     );
+    expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/infra/configure", "?plan=vps-1")).toBe(
+      "https://infra.sparrowx.net/infra/configure?plan=vps-1",
+    );
+    expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/deploy", "")).toBe(
+      "https://deploy.sparrowx.net/",
+    );
+    expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/ai", "")).toBe(
+      "https://ai.sparrowx.net/",
+    );
+    expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/agents", "")).toBe(
+      "https://agents.sparrowx.net/",
+    );
+    expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/dpdp", "")).toBe(
+      "https://dpdp.sparrowx.net/",
+    );
+    expect(resolveCanonicalSubdomainRedirect("sparrowx.net", "/gateway", "")).toBe(
+      "https://api.sparrowx.net/",
+    );
+    // Strict cross-subdomain leak protection
+    expect(resolveCanonicalSubdomainRedirect("db.sparrowx.net", "/infra", "")).toBe(
+      "https://infra.sparrowx.net/",
+    );
+    expect(resolveCanonicalSubdomainRedirect("sec.sparrowx.net", "/story", "")).toBe(
+      "https://sparrowx.net/story",
+    );
+    expect(resolveCanonicalSubdomainRedirect("api.sparrowx.net", "/db", "")).toBe(
+      "https://db.sparrowx.net/",
+    );
+    expect(resolveCanonicalSubdomainRedirect("infra.sparrowx.net", "/infra/configure", "")).toBeNull();
     expect(resolveCanonicalSubdomainRedirect("www.sparrowx.net", "/game", "")).toBe(
       "https://sparrowx.net/game",
     );

@@ -33,7 +33,7 @@ const PLANS = [
     billing_period: 'mo',
     specs: { ram_gb: 8, cpu_cores: 4, disk_gb: 100, scrub_tbps: '4.8+ Tbps' },
     features: { backups: 5, databases: 5, protocols: 'Dedicated Anycast VIP + Custom eBPF Maps' },
-    targetUrl: 'https://sparrowx.net/infra',
+    targetUrl: 'https://infra.sparrowx.net',
     ctaLabel: 'DEPLOY CLOUD INFRA',
   },
 ];

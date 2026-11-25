@@ -55,6 +55,21 @@ const SparrowxKeysEngine = lazy(() =>
 const SparrowxShieldEngine = lazy(() =>
   import("@/components/SparrowxShieldEngine").then((m) => ({ default: m.SparrowxShieldEngine })),
 );
+const SparrowxInfraEngine = lazy(() =>
+  import("@/components/SparrowxInfraEngine").then((m) => ({ default: m.SparrowxInfraEngine })),
+);
+const SparrowxDeployDashboard = lazy(() =>
+  import("@/components/SparrowxDeployDashboard").then((m) => ({ default: m.SparrowxDeployDashboard })),
+);
+const SparrowxAiPlatform = lazy(() =>
+  import("@/components/SparrowxAiPlatform").then((m) => ({ default: m.SparrowxAiPlatform })),
+);
+const SparrowxAgentsPlatform = lazy(() =>
+  import("@/components/SparrowxAgentsPlatform").then((m) => ({ default: m.SparrowxAgentsPlatform })),
+);
+const SparrowxDpdpPlatform = lazy(() =>
+  import("@/components/SparrowxDpdpPlatform").then((m) => ({ default: m.SparrowxDpdpPlatform })),
+);
 
 const lazyEngineFallback = (
   <div className="min-h-screen bg-[#05060A] text-zinc-400 flex items-center justify-center font-mono text-xs">
@@ -63,7 +78,7 @@ const lazyEngineFallback = (
 );
 import { hasVerifiedPaidSubscription } from "@/lib/sparrowx-plans";
 import { Suspense, lazy, useEffect, useMemo, useState, useRef } from "react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import {
   Activity,
   AlertCircle,
@@ -1781,7 +1796,15 @@ function Dashboard() {
   };
 
   // Dedicated Domain Ingress Routing (SSR-safe via Route loaderData so server & client hydrate identically)
-  const { seoKey } = Route.useLoaderData();
+  const router = useRouter({ warn: false });
+  const routeLoaderData = router?.state?.matches?.find((m) => m.routeId === "/")?.loaderData as
+    | { seoKey?: SeoProfileKey }
+    | undefined;
+  const seoKey: SeoProfileKey =
+    routeLoaderData?.seoKey ??
+    (typeof window !== "undefined"
+      ? resolveSeoProfileKeyForHost(window.location.hostname)
+      : "master");
   const [clientIngressOverride, setClientIngressOverride] = useState<{
     studio: boolean;
     api: boolean;
@@ -1838,6 +1861,11 @@ function Dashboard() {
   const isFileDomainOrParam = seoKey === "drop" || clientIngressOverride.file;
   const isPasswordDomainOrParam = seoKey === "keys" || clientIngressOverride.password;
   const isShieldDomainOrParam = seoKey === "shield" || clientIngressOverride.shield;
+  const isInfraDomain = seoKey === "infra";
+  const isDeployDomain = seoKey === "deploy";
+  const isAiDomain = seoKey === "ai";
+  const isAgentsDomain = seoKey === "agents";
+  const isDpdpDomain = seoKey === "dpdp";
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -2122,6 +2150,48 @@ function Dashboard() {
             onUserAuthenticated={handleUserAuthenticated}
             onSignOut={handleSignOut}
           />
+          <BackgroundEngineToaster />
+        </Suspense>
+      );
+    }
+
+    // 5b. Dedicated SSR-safe subdomain landings (zero Master Landing flash on SSR)
+    if (isInfraDomain) {
+      return (
+        <Suspense fallback={lazyEngineFallback}>
+          <SparrowxInfraEngine />
+          <BackgroundEngineToaster />
+        </Suspense>
+      );
+    }
+    if (isDeployDomain) {
+      return (
+        <Suspense fallback={lazyEngineFallback}>
+          <SparrowxDeployDashboard />
+          <BackgroundEngineToaster />
+        </Suspense>
+      );
+    }
+    if (isAiDomain) {
+      return (
+        <Suspense fallback={lazyEngineFallback}>
+          <SparrowxAiPlatform />
+          <BackgroundEngineToaster />
+        </Suspense>
+      );
+    }
+    if (isAgentsDomain) {
+      return (
+        <Suspense fallback={lazyEngineFallback}>
+          <SparrowxAgentsPlatform />
+          <BackgroundEngineToaster />
+        </Suspense>
+      );
+    }
+    if (isDpdpDomain) {
+      return (
+        <Suspense fallback={lazyEngineFallback}>
+          <SparrowxDpdpPlatform />
           <BackgroundEngineToaster />
         </Suspense>
       );

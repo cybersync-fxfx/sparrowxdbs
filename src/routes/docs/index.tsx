@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, ShieldAlert } from "lucide-react";
 import { SERVICE_DOC_LIST } from "@/lib/service-docs";
+import { buildMasterHref } from "@/lib/routing";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 export const Route = createFileRoute("/docs/")({
@@ -18,12 +19,13 @@ export const Route = createFileRoute("/docs/")({
 });
 
 function DocsHubPage() {
+  const masterHomeHref = buildMasterHref("/");
   return (
     <div className="min-h-screen bg-[#05060A] text-white flex flex-col">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#05060A]/90 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <a href="/" className="flex items-center gap-2.5 font-bold text-sm text-white hover:opacity-90">
+            <a href={masterHomeHref} className="flex items-center gap-2.5 font-bold text-sm text-white hover:opacity-90">
               <img src="/logos/sparrowx-main.png" alt="SparrowX" width={28} height={28} className="size-7 object-contain" />
               <span>SparrowX</span>
             </a>
@@ -34,7 +36,7 @@ function DocsHubPage() {
             </span>
           </div>
           <a
-            href="/"
+            href={masterHomeHref}
             className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-200 transition-colors"
           >
             ← Back to SparrowX

@@ -23,7 +23,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { buildMasterHref } from "@/lib/routing";
+import { buildMasterHref, buildProductHref } from "@/lib/routing";
 import { SubdomainAuthChip } from "@/components/SubdomainAuthChip";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
@@ -349,7 +349,7 @@ export function SparrowxAgentsPlatform() {
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <SubdomainAuthChip nextPath="/agents" />
             <a
-              href="https://ai.sparrowx.net"
+              href={buildProductHref("ai")}
               className="hidden sm:inline-flex min-h-[34px] items-center gap-1.5 rounded-md border border-[#262626] bg-[#0A0A0A] hover:bg-[#161616] px-3 text-xs font-medium text-zinc-200 hover:text-white transition-colors"
             >
               <Sparkles className="size-3.5 text-violet-400" />

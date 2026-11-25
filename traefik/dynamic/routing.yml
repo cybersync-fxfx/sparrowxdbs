@@ -138,8 +138,14 @@ http:
 
     redirect-game-subdomain:
       redirectRegex:
-        regex: "^https?://game\\.sparrowx\\.net/(.*)"
+        regex: "^https?://game\\.sparrowx\\.net/(?:game/)?(.*)"
         replacement: "https://sparrowx.net/game/${1}"
+        permanent: true
+
+    redirect-game-dash-subdomain:
+      redirectRegex:
+        regex: "^https?://game\\.dash\\.sparrowx\\.net/(.*)"
+        replacement: "https://sparrowx.net/game/dashboard"
         permanent: true
 
     redirect-db-game-leak:
@@ -190,6 +196,16 @@ http:
       tls:
         certResolver: letsencrypt
 
+    game-dash-redirect:
+      rule: "Host(`game.dash.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 200
+      middlewares:
+        - redirect-game-dash-subdomain
+      service: noop@internal
+      tls:
+        certResolver: letsencrypt
+
     db-game-leak-redirect:
       rule: "Host(`db.sparrowx.net`) && PathPrefix(`/game`)"
       entryPoints: [websecure]
@@ -230,6 +246,17 @@ http:
         - security-headers
         - noindex
         - rate-limit-auth
+      service: sparrowx-web
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-infra-landing:
+      rule: "Host(`infra.sparrowx.net`) || Host(`metal.sparrowx.net`)"
+      entryPoints: [websecure]
+      priority: 100
+      middlewares:
+        - security-headers
+        - compress
       service: sparrowx-web
       tls:
         certResolver: letsencrypt
@@ -400,6 +427,18 @@ http:
         certResolver: letsencrypt
 
     sparrowx-api-postgrest:
+      rule: "Host(`api.sparrowx.net`) && PathPrefix(`/rest/v1`)"
+      entryPoints: [websecure]
+      priority: 130
+      middlewares:
+        - security-headers
+        - noindex
+        - api-cors
+      service: postgrest-gateway
+      tls:
+        certResolver: letsencrypt
+
+    sparrowx-api-portal:
       rule: "Host(`api.sparrowx.net`)"
       entryPoints: [websecure]
       priority: 110
@@ -407,7 +446,7 @@ http:
         - security-headers
         - noindex
         - api-cors
-      service: postgrest-gateway
+      service: sparrowx-web
       tls:
         certResolver: letsencrypt
 

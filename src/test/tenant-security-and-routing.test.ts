@@ -168,9 +168,13 @@ describe("Traefik v3 Config & Verification Script Integrity", () => {
     expect(routingYml).toContain("admin-ip-allowlist:");
     expect(routingYml).toContain("X-Robots-Tag: \"noindex, nofollow\"");
     expect(routingYml).toContain("flushInterval: \"-1\"");
+    expect(routingYml).toContain("Host(`infra.sparrowx.net`)");
+    expect(routingYml).toContain("Host(`game.dash.sparrowx.net`)");
     expect(routingYml).toContain("Host(`dpdp.sparrowx.net`)");
     expect(routingYml).toContain("Host(`ingest.dpdp.sparrowx.net`)");
     expect(routingYml).toContain("Host(`ingest.sec.sparrowx.net`)");
+    expect(routingYml).toContain("Host(`api.sparrowx.net`) && PathPrefix(`/rest/v1`)");
+    expect(routingYml).toContain("sparrowx-api-portal:");
     expect(routingYml).toContain("PathPrefix(`/webhooks/whatsapp`)");
     expect(routingYml).toContain("redirect-www-to-apex");
     expect(routingYml).toContain("redirect-game-subdomain");

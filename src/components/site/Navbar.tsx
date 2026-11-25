@@ -6,6 +6,7 @@ import { getSessionSummary } from "@/lib/portal.functions";
 import { verifySessionToken } from "@/lib/advanced-features";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { buildGoogleLoginHref } from "@/components/GoogleSignInButton";
+import { buildMasterHref, buildProductHref } from "@/lib/routing";
 import type { ServiceId } from "@/lib/services";
 import { ServiceSwitcher } from "./ServiceSwitcher";
 
@@ -79,19 +80,19 @@ export function Navbar({ service, onService }: { service: ServiceId; onService: 
         </div>
         <div className="flex items-center gap-2">
           <a
-            href="/docs/game"
+            href={buildMasterHref("/docs/game")}
             className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Docs
           </a>
           <a
-            href="https://sec.sparrowx.net"
+            href={buildProductHref("shield")}
             className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             DDoS Defense
           </a>
           <a
-            href="https://sparrowx.net"
+            href={buildMasterHref("/")}
             className="hidden xl:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             SparrowX Cloud

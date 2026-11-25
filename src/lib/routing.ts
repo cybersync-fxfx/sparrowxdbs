@@ -30,7 +30,8 @@ export type SubdomainProduct =
   | "deploy"
   | "ai"
   | "agents"
-  | "dpdp";
+  | "dpdp"
+  | "console";
 
 /**
  * Prefix rules ordered from most-specific multi-label hosts (e.g. `game.dash.`)
@@ -41,7 +42,8 @@ const SUBDOMAIN_RULES: ReadonlyArray<{
   product: SubdomainProduct;
   route: RootRedirectTarget["to"] | null;
 }> = [
-  { prefixes: ["game.panel."], product: "game-panel", route: null },
+  { prefixes: ["game.panel.", "panel."], product: "game-panel", route: null },
+  { prefixes: ["console."], product: "console", route: null },
   { prefixes: ["game.dash.", "game-dash."], product: "game-dash", route: "/game/dashboard" },
   { prefixes: ["game.", "game-"], product: "game", route: "/game" },
   { prefixes: ["infra.", "metal.", "vps.", "cloud."], product: "infra", route: "/infra" },
@@ -138,6 +140,68 @@ export function buildMasterHref(
   const normalized = pathOrAnchor.startsWith("/") ? pathOrAnchor : `/${pathOrAnchor}`;
   const origin = getMasterRootOrigin(loc);
   return origin ? `${origin}${normalized}` : normalized;
+}
+
+export type CanonicalProductKey =
+  | "db"
+  | "shield"
+  | "drop"
+  | "keys"
+  | "api"
+  | "infra"
+  | "deploy"
+  | "ai"
+  | "agents"
+  | "dpdp"
+  | "game"
+  | "game-dash"
+  | "netsec"
+  | "gamesec";
+
+const CANONICAL_PRODUCT_TARGETS: Record<
+  CanonicalProductKey,
+  { prodBase: string; localPath: string }
+> = {
+  db: { prodBase: "https://db.sparrowx.net", localPath: "/db" },
+  shield: { prodBase: "https://sec.sparrowx.net", localPath: "/shield" },
+  drop: { prodBase: "https://file.sparrowx.net", localPath: "/drop" },
+  keys: { prodBase: "https://password.sparrowx.net", localPath: "/keys" },
+  api: { prodBase: "https://api.sparrowx.net", localPath: "/gateway" },
+  infra: { prodBase: "https://infra.sparrowx.net", localPath: "/infra" },
+  deploy: { prodBase: "https://deploy.sparrowx.net", localPath: "/deploy" },
+  ai: { prodBase: "https://ai.sparrowx.net", localPath: "/ai" },
+  agents: { prodBase: "https://agents.sparrowx.net", localPath: "/agents" },
+  dpdp: { prodBase: "https://dpdp.sparrowx.net", localPath: "/dpdp" },
+  game: { prodBase: "https://sparrowx.net/game", localPath: "/game" },
+  "game-dash": { prodBase: "https://sparrowx.net/game/dashboard", localPath: "/game/dashboard" },
+  netsec: { prodBase: "https://netsec.sparrowx.net", localPath: "https://netsec.sparrowx.net" },
+  gamesec: { prodBase: "https://gamesec.sparrowx.net", localPath: "https://gamesec.sparrowx.net" },
+};
+
+/**
+ * Resolves a product link cleanly for both production (`*.sparrowx.net`) and local dev (`localhost`).
+ * Prevents cross-subdomain path leakage (e.g. clicking Cloud DB from `api.sparrowx.net` always goes
+ * to `https://db.sparrowx.net` in production and `/db` on localhost).
+ */
+export function buildProductHref(
+  product: CanonicalProductKey,
+  subPath = "",
+  loc?: Pick<Location, "hostname" | "protocol" | "port">,
+): string {
+  const spec = CANONICAL_PRODUCT_TARGETS[product];
+  const suffix = subPath ? (subPath.startsWith("/") || subPath.startsWith("#") || subPath.startsWith("?") ? subPath : `/${subPath}`) : "";
+  const targetLoc =
+    loc ?? (typeof window !== "undefined" ? window.location : undefined);
+  const host = (targetLoc?.hostname ?? "").trim().toLowerCase().split(":")[0] ?? "";
+  const isSparrowxProd = host === "sparrowx.net" || host.endsWith(".sparrowx.net");
+
+  if (isSparrowxProd) {
+    return `${spec.prodBase}${suffix}`;
+  }
+  if (spec.localPath.startsWith("http")) {
+    return `${spec.localPath}${suffix}`;
+  }
+  return `${spec.localPath}${suffix}`;
 }
 
 function stripRoutingFlags(

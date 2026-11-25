@@ -8,6 +8,7 @@ import {
   type ServiceDocSpec,
 } from "@/lib/service-docs";
 import { resolveAutoCorrectedDocSlug } from "@/lib/route-autocorrect";
+import { buildMasterHref, buildProductHref } from "@/lib/routing";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 
 export const Route = createFileRoute("/docs/$service")({
@@ -77,13 +78,16 @@ function ServiceDocsPage() {
   const doc: ServiceDocSpec = isValidServiceDocId(service)
     ? SERVICE_DOCS[service]
     : SERVICE_DOCS.db;
+  const launchHref = buildProductHref(doc.id);
+  const docsHubHref = buildMasterHref("/docs");
+  const docsErrorsHref = buildMasterHref("/docs/errors");
 
   return (
     <div className="min-h-screen bg-[#05060A] text-white flex flex-col">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-[#05060A]/90 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <a href={doc.launchPath} className="flex items-center gap-2.5 font-bold text-sm text-white hover:opacity-90 shrink-0">
+            <a href={launchHref} className="flex items-center gap-2.5 font-bold text-sm text-white hover:opacity-90 shrink-0">
               <img src={doc.logo} alt={doc.name} width={28} height={28} className="size-7 object-contain" />
               <span className="truncate">{doc.name}</span>
             </a>
@@ -96,13 +100,13 @@ function ServiceDocsPage() {
 
           <div className="flex items-center gap-2.5 shrink-0">
             <a
-              href="/docs"
+              href={docsHubHref}
               className="px-3 py-1.5 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 text-xs font-medium text-zinc-300 transition-colors"
             >
               All Docs
             </a>
             <a
-              href={doc.launchPath}
+              href={launchHref}
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs transition-colors"
             >
               <span>Open {doc.name.replace("SparrowX ", "")}</span>
@@ -155,7 +159,7 @@ function ServiceDocsPage() {
                 );
               })}
               <a
-                href="/docs/errors"
+                href={docsErrorsHref}
                 className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
               >
                 <span>Error Reference</span>
@@ -207,13 +211,13 @@ function ServiceDocsPage() {
 
           <div className="pt-2 flex flex-wrap items-center justify-between gap-4 border-t border-white/10">
             <a
-              href={doc.launchPath}
+              href={launchHref}
               className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-300 hover:text-white"
             >
               <ArrowLeft className="size-3.5" /> Return to {doc.name}
             </a>
             <a
-              href="/docs/errors"
+              href={docsErrorsHref}
               className="text-xs font-mono text-zinc-400 hover:text-white"
             >
               Looking for an error code? Open Error Reference →

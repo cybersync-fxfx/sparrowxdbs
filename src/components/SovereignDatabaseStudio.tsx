@@ -26,6 +26,7 @@ import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { buildMasterHref } from "@/lib/routing";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import { querySparrowxCrossSystemAi } from "@/lib/sparrowx-ai-brain";
 import {
@@ -1653,8 +1654,7 @@ export function SovereignDatabaseStudio({
         const local = LOCAL_SEED_TABLES[tableName] || [];
         setRows(local);
         setTableCounts((prev) => ({ ...prev, [tableName]: local.length }));
-      } catch (err) {
-        console.warn(`[Studio] Error fetching table ${tableName}, using local fallback`, err);
+      } catch {
         const local = LOCAL_SEED_TABLES[tableName] || [];
         setRows(local);
         setTableCounts((prev) => ({ ...prev, [tableName]: local.length }));
@@ -2385,7 +2385,7 @@ export function SovereignDatabaseStudio({
 
             <nav aria-label="Product Navigation" className="hidden lg:flex items-center gap-7 text-xs font-medium text-zinc-400">
               <a href="#db-bento" className="hover:text-white transition-colors">Features</a>
-              <a href="/docs/db" className="hover:text-white transition-colors">Docs</a>
+              <a href={buildMasterHref("/docs/db")} className="hover:text-white transition-colors">Docs</a>
               <a href="#db-sandbox" className="hover:text-white transition-colors">Sandbox</a>
               <a href="#db-pricing" className="hover:text-white transition-colors">Pricing</a>
             </nav>
@@ -2466,7 +2466,7 @@ export function SovereignDatabaseStudio({
           {landingMobileMenuOpen && (
             <div className="lg:hidden px-4 sm:px-6 py-3 border-t border-white/10 bg-[#05060A] flex flex-wrap gap-3 text-xs font-medium text-zinc-300">
               <a href="#db-bento" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Features</a>
-              <a href="/docs/db" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Docs</a>
+              <a href={buildMasterHref("/docs/db")} onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Docs</a>
               <a href="#db-sandbox" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Sandbox</a>
               <a href="#db-pricing" onClick={() => setLandingMobileMenuOpen(false)} className="px-2 py-1 rounded hover:bg-white/10">Pricing</a>
             </div>

@@ -10,7 +10,12 @@ import {
 describe("SparrowX subdomain-aware path & domain auto-correction", () => {
   it("preserves exact valid routes, API paths, and static assets untouched", () => {
     expect(resolveAutoCorrectedPath("/db", "db.sparrowx.net")).toBeNull();
+    expect(resolveAutoCorrectedPath("/infra/configure", "infra.sparrowx.net")).toBeNull();
     expect(resolveAutoCorrectedPath("/infra/dashboard", "infra.sparrowx.net")).toBeNull();
+    expect(resolveAutoCorrectedPath("/deploy", "deploy.sparrowx.net")).toBeNull();
+    expect(resolveAutoCorrectedPath("/ai", "ai.sparrowx.net")).toBeNull();
+    expect(resolveAutoCorrectedPath("/agents", "agents.sparrowx.net")).toBeNull();
+    expect(resolveAutoCorrectedPath("/dpdp", "dpdp.sparrowx.net")).toBeNull();
     expect(resolveAutoCorrectedPath("/docs/db", "db.sparrowx.net")).toBeNull();
     expect(resolveAutoCorrectedPath("/terms", "sparrowx.net")).toBeNull();
     expect(resolveAutoCorrectedPath("/refund", "sparrowx.net")).toBeNull();
@@ -76,6 +81,12 @@ describe("SparrowX subdomain-aware path & domain auto-correction", () => {
       "https://sparrowx.net/docs/db",
     );
     expect(resolveCanonicalSubdomainRedirect("db.sparrowx.net", "/db")).toBeNull();
+    expect(resolveCanonicalSubdomainRedirect("console.sparrowx.net", "/")).toBeNull();
+    expect(resolveCanonicalSubdomainRedirect("php.sparrowx.net", "/")).toBeNull();
+    expect(resolveCanonicalSubdomainRedirect("panel.sparrowx.net", "/")).toBeNull();
+    expect(resolveCanonicalSubdomainRedirect("admin.sparrowx.net", "/")).toBeNull();
+    expect(resolveCanonicalSubdomainRedirect("my-app.deploy.sparrowx.net", "/")).toBeNull();
+    expect(resolveCanonicalSubdomainRedirect("my-bot.ai.sparrowx.net", "/")).toBeNull();
   });
 
   it("auto-corrects typoed doc slugs and user-entered domain inputs cleanly", () => {

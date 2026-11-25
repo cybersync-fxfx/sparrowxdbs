@@ -106,7 +106,7 @@ echo "=================================================================="
 
 info "1. Checking single-hop HTTP -> HTTPS 301 redirects..."
 for h in \
-  sparrowx.net ai.sparrowx.net deploy.sparrowx.net agents.sparrowx.net \
+  sparrowx.net infra.sparrowx.net ai.sparrowx.net deploy.sparrowx.net agents.sparrowx.net \
   sec.sparrowx.net dpdp.sparrowx.net db.sparrowx.net file.sparrowx.net \
   password.sparrowx.net console.sparrowx.net panel.sparrowx.net api.sparrowx.net
 do

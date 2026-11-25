@@ -1,5 +1,6 @@
 import React from "react";
 import { ArrowRight, CreditCard, Database, FileUp, KeyRound, Lock, ShieldCheck } from "lucide-react";
+import { buildMasterHref, buildProductHref, type CanonicalProductKey } from "@/lib/routing";
 
 export interface DashboardSubscriptionLockProps {
   serviceName: string;
@@ -12,10 +13,14 @@ export interface DashboardSubscriptionLockProps {
   children?: React.ReactNode | undefined;
 }
 
-const FREE_SERVICES = [
-  { label: "Cloud DB (Free Tier)", href: "/db", icon: Database },
-  { label: "SparrowX Drop", href: "/drop", icon: FileUp },
-  { label: "SparrowX Keys", href: "/keys", icon: KeyRound },
+const FREE_SERVICES: ReadonlyArray<{
+  label: string;
+  product: CanonicalProductKey;
+  icon: typeof Database;
+}> = [
+  { label: "Cloud DB (Free Tier)", product: "db", icon: Database },
+  { label: "SparrowX Drop", product: "drop", icon: FileUp },
+  { label: "SparrowX Keys", product: "keys", icon: KeyRound },
 ];
 
 function LockCard({
@@ -63,7 +68,7 @@ function LockCard({
           </button>
         ) : (
           <a
-            href={plansHref || "/#products"}
+            href={plansHref || buildMasterHref("/#products")}
             className="inline-flex items-center gap-2 rounded-xl bg-white hover:bg-zinc-200 text-black font-semibold px-5 py-2.5 text-sm shadow-[0_8px_24px_-8px_rgba(255,255,255,0.35)] transition-all"
           >
             <CreditCard className="size-4" aria-hidden="true" />
@@ -90,10 +95,11 @@ function LockCard({
         <div className="flex flex-wrap items-center justify-center gap-2">
           {FREE_SERVICES.map((svc) => {
             const Icon = svc.icon;
+            const href = buildProductHref(svc.product);
             return (
               <a
-                key={svc.href}
-                href={svc.href}
+                key={svc.product}
+                href={href}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/25 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:text-white transition-colors"
               >
                 <Icon className="size-3.5 text-emerald-400" aria-hidden="true" />

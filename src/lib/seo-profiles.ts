@@ -7,7 +7,11 @@ export type SeoProfileKey =
   | "drop"
   | "keys"
   | "gateway"
-  | "netsec";
+  | "netsec"
+  | "deploy"
+  | "ai"
+  | "agents"
+  | "dpdp";
 
 export interface SeoProfile {
   key: SeoProfileKey;
@@ -704,6 +708,134 @@ export const SEO_PROFILES: Record<SeoProfileKey, SeoProfile> = {
       },
     },
   },
+
+  deploy: {
+    key: "deploy",
+    siteName: "SparrowX Deploy",
+    canonicalUrl: "https://deploy.sparrowx.net/",
+    title: "SparrowX Deploy — Git-to-Edge Cloud PaaS & Instant Web App Hosting",
+    description:
+      "Deploy Next.js, Vite, React, Node.js, Python, and Docker apps with instant *.deploy.sparrowx.net HTTPS URLs, live build logs, and zero egress fees at deploy.sparrowx.net.",
+    keywords:
+      "cloud paas, deploy web app india, git push hosting, nextjs hosting india, docker paas, sparrowx deploy, deploy.sparrowx.net",
+    ogTitle: "SparrowX Deploy — Git-to-Edge Cloud PaaS",
+    ogDescription:
+      "Connect GitHub and ship full-stack apps to Indian bare-metal edge nodes with automatic SSL and live logs.",
+    ogImage: "https://deploy.sparrowx.net/logos/sparrowx-network.png",
+    ogImageAlt: "SparrowX Deploy — Git-to-Edge Cloud PaaS",
+    twitterTitle: "SparrowX Deploy — Cloud PaaS",
+    twitterDescription:
+      "Deploy React, Next.js, Node.js, Python, and Docker workloads on sovereign Indian bare metal.",
+    iconHref: "/logos/sparrowx-network.png",
+    themeColor: "#000000",
+    robots: "index, follow, max-image-preview:large, max-snippet:-1",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://deploy.sparrowx.net/#software",
+      name: "SparrowX Deploy",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web, Linux, Docker",
+      url: "https://deploy.sparrowx.net/",
+      provider: { "@type": "Organization", name: "SparrowX Technologies", url: "https://sparrowx.net/" },
+    },
+  },
+
+  ai: {
+    key: "ai",
+    siteName: "SparrowX AI Gateway",
+    canonicalUrl: "https://ai.sparrowx.net/",
+    title: "SparrowX AI — Unified LLM Gateway, Model Playground & Prompt Guardrails",
+    description:
+      "OpenAI-compatible AI Gateway with live Model Playground, inline prompt-injection & PII guardrails, scoped API keys, and sovereign inference at ai.sparrowx.net.",
+    keywords:
+      "llm gateway, openai compatible proxy, ai prompt guardrails, model playground, sparrowx ai, ai.sparrowx.net",
+    ogTitle: "SparrowX AI — Unified LLM Gateway & Prompt Guardrails",
+    ogDescription:
+      "Route LLMs through one OpenAI-compatible gateway with inline prompt-injection blocking and INR metering.",
+    ogImage: "https://ai.sparrowx.net/logos/sparrowx-main.png",
+    ogImageAlt: "SparrowX AI Gateway",
+    twitterTitle: "SparrowX AI Gateway",
+    twitterDescription:
+      "Unified OpenAI-compatible LLM gateway, model playground, and inline guardrails.",
+    iconHref: "/logos/sparrowx-main.png",
+    themeColor: "#8B5CF6",
+    robots: "index, follow, max-image-preview:large, max-snippet:-1",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://ai.sparrowx.net/#software",
+      name: "SparrowX AI Gateway",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web, REST",
+      url: "https://ai.sparrowx.net/",
+      provider: { "@type": "Organization", name: "SparrowX Technologies", url: "https://sparrowx.net/" },
+    },
+  },
+
+  agents: {
+    key: "agents",
+    siteName: "SparrowX Autonomous Agents",
+    canonicalUrl: "https://agents.sparrowx.net/",
+    title: "SparrowX Agents — Autonomous AI Agent Runtime, Tools & Live Traces",
+    description:
+      "Deploy autonomous AI agents with pgvector memory, authorized security & database tools, Sentinel guardrails, live execution traces, and webhook triggers at agents.sparrowx.net.",
+    keywords:
+      "ai agent hosting, autonomous agents runtime, mcp hosting india, agent workflows, sparrowx agents, agents.sparrowx.net",
+    ogTitle: "SparrowX Agents — Autonomous AI Agent Runtime",
+    ogDescription:
+      "Deploy guardrailed AI agents with tools, pgvector memory, webhooks, and live traces.",
+    ogImage: "https://agents.sparrowx.net/logos/sparrowx-main.png",
+    ogImageAlt: "SparrowX Autonomous Agents",
+    twitterTitle: "SparrowX Autonomous Agents",
+    twitterDescription:
+      "Managed runtime for autonomous AI agents with tools, memory, and webhooks.",
+    iconHref: "/logos/sparrowx-main.png",
+    themeColor: "#10B981",
+    robots: "index, follow, max-image-preview:large, max-snippet:-1",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://agents.sparrowx.net/#software",
+      name: "SparrowX Autonomous Agents",
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web, Linux",
+      url: "https://agents.sparrowx.net/",
+      provider: { "@type": "Organization", name: "SparrowX Technologies", url: "https://sparrowx.net/" },
+    },
+  },
+
+  dpdp: {
+    key: "dpdp",
+    siteName: "SparrowX DPDP Compliance",
+    canonicalUrl: "https://dpdp.sparrowx.net/",
+    title: "SparrowX DPDP — India Digital Personal Data Protection Act 2023 Suite",
+    description:
+      "Automate India DPDP Act 2023 compliance: Section 6 consent notice builder, DSAR Data Principal rights desk, 72-hour breach console, and sovereign data inventory at dpdp.sparrowx.net.",
+    keywords:
+      "dpdp act 2023 compliance, india data protection, dsar portal, consent notice builder, sparrowx dpdp, dpdp.sparrowx.net",
+    ogTitle: "SparrowX DPDP — India DPDP Act 2023 Compliance Suite",
+    ogDescription:
+      "Section 6 consent manager, DSAR rights desk, 72-hour breach console, and data inventory for Indian teams.",
+    ogImage: "https://dpdp.sparrowx.net/logos/sparrowx-shield.png",
+    ogImageAlt: "SparrowX DPDP Compliance Suite",
+    twitterTitle: "SparrowX DPDP Compliance Suite",
+    twitterDescription:
+      "Automate India DPDP Act 2023 consent, DSAR rights, and breach reporting.",
+    iconHref: "/logos/sparrowx-shield.png",
+    themeColor: "#10B981",
+    robots: "index, follow, max-image-preview:large, max-snippet:-1",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "@id": "https://dpdp.sparrowx.net/#software",
+      name: "SparrowX DPDP Compliance",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      url: "https://dpdp.sparrowx.net/",
+      provider: { "@type": "Organization", name: "SparrowX Technologies", url: "https://sparrowx.net/" },
+    },
+  },
 };
 
 export function normalizeSeoHostname(rawHost: string | null | undefined): string {
@@ -719,7 +851,11 @@ export function resolveSeoProfileKeyForHost(rawHost: string | null | undefined):
   if (host.startsWith("file.") || host.startsWith("drop.") || host.startsWith("share.")) return "drop";
   if (host.startsWith("password.") || host.startsWith("passwd.") || host.startsWith("keys.")) return "keys";
   if (host.startsWith("infra.") || host.startsWith("metal.") || host.startsWith("vps.")) return "infra";
-  if (host.startsWith("api.")) return "gateway";
+  if (host.startsWith("deploy.")) return "deploy";
+  if (host.startsWith("ai.")) return "ai";
+  if (host.startsWith("agents.")) return "agents";
+  if (host.startsWith("dpdp.")) return "dpdp";
+  if (host.startsWith("api.") || host.startsWith("rest.")) return "gateway";
   if (host.startsWith("netsec.")) return "netsec";
   if (host.startsWith("game.")) return "game";
   return "master";
@@ -778,9 +914,15 @@ export function buildRouteHeadFromProfile(profile: SeoProfile) {
 }
 
 /**
- * HTTP 301 canonical host redirect for server-side requests on `sparrowx.net` / `www.sparrowx.net`.
- * Ensures Googlebot and visitors hitting legacy path URLs immediately transfer 100% authority
- * to the dedicated subdomain with zero duplicate-content collision.
+ * HTTP 301 canonical host redirect for server-side requests across `sparrowx.net`
+ * and all product subdomains.
+ *
+ * Enforces strict host isolation:
+ * 1. Legacy path mirrors on `sparrowx.net` / `www.sparrowx.net` (`/db`, `/shield`, `/drop`,
+ *    `/keys`, `/infra`, `/deploy`, `/ai`, `/agents`, `/dpdp`, `/gateway`) 301 to their canonical subdomain.
+ * 2. Cross-subdomain path leaks (e.g. `db.sparrowx.net/infra`, `sec.sparrowx.net/story`,
+ *    `api.sparrowx.net/db`) 301 directly to the owning canonical host in a single hop.
+ * 3. Localhost / non-production hosts always return `null` so local routing stays intact.
  */
 export function resolveCanonicalSubdomainRedirect(
   rawHost: string | null | undefined,
@@ -788,18 +930,87 @@ export function resolveCanonicalSubdomainRedirect(
   search: string,
 ): string | null {
   const host = normalizeSeoHostname(rawHost);
-  if (host !== "sparrowx.net" && host !== "www.sparrowx.net") {
+  if (!host || (host !== "sparrowx.net" && !host.endsWith(".sparrowx.net"))) {
+    return null;
+  }
+
+  // Never intercept APIs, PostgREST, server functions, static assets, or external apps
+  if (
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/rest/") ||
+    pathname.startsWith("/_serverFn") ||
+    pathname.startsWith("/assets/") ||
+    pathname.startsWith("/logos/") ||
+    pathname.startsWith("/3d/") ||
+    pathname.startsWith("/xdp/") ||
+    /\.[a-z0-9]{1,8}$/i.test(pathname)
+  ) {
+    return null;
+  }
+
+  // Skip wildcard tenant hosts (`*.ai.sparrowx.net`, `*.deploy.sparrowx.net`) & special hosts
+  const prefix = host === "sparrowx.net" ? "" : host.slice(0, -".sparrowx.net".length);
+  if (
+    prefix === "admin" ||
+    prefix === "console" ||
+    prefix === "php" ||
+    prefix === "panel" ||
+    prefix === "game.panel" ||
+    prefix === "netsec" ||
+    prefix === "gamesec" ||
+    prefix.startsWith("ingest.") ||
+    prefix.endsWith(".ai") ||
+    prefix.endsWith(".deploy")
+  ) {
     return null;
   }
 
   const normalizedPath = pathname.replace(/\/+$/, "") || "/";
   const suffix = search || "";
 
-  if (normalizedPath === "/db") return `https://db.sparrowx.net/${suffix}`;
-  if (normalizedPath === "/shield") return `https://sec.sparrowx.net/${suffix}`;
-  if (normalizedPath === "/drop") return `https://file.sparrowx.net/${suffix}`;
-  if (normalizedPath === "/keys") return `https://password.sparrowx.net/${suffix}`;
-  if (normalizedPath === "/infra") return `https://infra.sparrowx.net/${suffix}`;
+  // Map every dedicated path to its canonical owner host + path
+  const PATH_OWNERS: ReadonlyArray<{
+    match: (p: string) => boolean;
+    ownerHost: string;
+    destPath: (p: string) => string;
+  }> = [
+    { match: (p) => p === "/db", ownerHost: "db.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/shield", ownerHost: "sec.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/drop", ownerHost: "file.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/f" || p.startsWith("/f/"), ownerHost: "file.sparrowx.net", destPath: (p) => p },
+    { match: (p) => p === "/keys", ownerHost: "password.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/gateway", ownerHost: "api.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/infra", ownerHost: "infra.sparrowx.net", destPath: () => "/" },
+    {
+      match: (p) => p === "/infra/dashboard" || p === "/infra/configure",
+      ownerHost: "infra.sparrowx.net",
+      destPath: (p) => p,
+    },
+    { match: (p) => p === "/deploy", ownerHost: "deploy.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/ai", ownerHost: "ai.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/agents", ownerHost: "agents.sparrowx.net", destPath: () => "/" },
+    { match: (p) => p === "/dpdp", ownerHost: "dpdp.sparrowx.net", destPath: () => "/" },
+    {
+      match: (p) =>
+        p === "/game" ||
+        p.startsWith("/game/") ||
+        p === "/story" ||
+        p === "/terms" ||
+        p === "/refund" ||
+        p === "/security",
+      ownerHost: "sparrowx.net",
+      destPath: (p) => p,
+    },
+  ];
+
+  for (const rule of PATH_OWNERS) {
+    if (rule.match(normalizedPath)) {
+      if (host !== rule.ownerHost) {
+        return `https://${rule.ownerHost}${rule.destPath(normalizedPath)}${suffix}`;
+      }
+      return null;
+    }
+  }
 
   // Canonicalize www.sparrowx.net -> https://sparrowx.net
   if (host === "www.sparrowx.net") {
@@ -828,6 +1039,11 @@ export function buildHostRobotsTxt(rawHost: string | null | undefined): string {
       "Disallow: /drop",
       "Disallow: /keys",
       "Disallow: /infra",
+      "Disallow: /deploy",
+      "Disallow: /ai",
+      "Disallow: /agents",
+      "Disallow: /dpdp",
+      "Disallow: /gateway",
       "Disallow: /game/dashboard",
       "Disallow: /game/panel-launch",
       "Disallow: /infra/dashboard",

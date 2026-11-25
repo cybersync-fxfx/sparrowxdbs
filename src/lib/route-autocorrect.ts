@@ -127,6 +127,7 @@ export const VALID_STATIC_PATHS = new Set<string>([
   "/",
   "/db",
   "/infra",
+  "/infra/configure",
   "/infra/dashboard",
   "/game",
   "/game/dashboard",
@@ -218,6 +219,13 @@ const DOC_SLUG_ALIASES: Record<string, string> = {
   troubleshoot: "errors",
   troubleshooting: "errors",
   codes: "errors",
+  deploy: "infra",
+  paas: "infra",
+  ai: "api",
+  llm: "api",
+  agents: "api",
+  dpdp: "shield",
+  compliance: "shield",
 };
 
 const SUBDOMAIN_ALIASES: Record<string, SubdomainKey> = {
@@ -290,6 +298,9 @@ const PATH_ALIASES: Record<string, string> = {
   "/baremetal": "/infra",
   "/bare-metal": "/infra",
   "/dedicated": "/infra",
+  "/infra/configure": "/infra/configure",
+  "/infra/config": "/infra/configure",
+  "/configure": "/infra/configure",
   "/infra/dashboard": "/infra/dashboard",
   "/infra-dashboard": "/infra/dashboard",
   "/infra/panel": "/infra/dashboard",
@@ -410,8 +421,20 @@ export function detectSubdomainContext(rawHost?: string | null): SubdomainProfil
   }
   if (!prefix || prefix === "www") return SUBDOMAIN_PROFILES.master;
 
-  // Never override external panel/netsec/gamesec hostnames
-  if (prefix === "game.panel" || prefix === "netsec" || prefix === "gamesec") {
+  // Never override external/dedicated platform & wildcard tenant hostnames
+  if (
+    prefix === "game.panel" ||
+    prefix === "panel" ||
+    prefix === "netsec" ||
+    prefix === "gamesec" ||
+    prefix === "php" ||
+    prefix === "admin" ||
+    prefix === "console" ||
+    prefix === "ingest.sec" ||
+    prefix === "ingest.dpdp" ||
+    prefix.endsWith(".ai") ||
+    prefix.endsWith(".deploy")
+  ) {
     return SUBDOMAIN_PROFILES.master;
   }
 
@@ -443,7 +466,19 @@ export function resolveCanonicalSubdomainRedirect(
   if (!host || !host.endsWith(".sparrowx.net")) return null;
 
   const prefix = host.slice(0, -".sparrowx.net".length);
-  if (prefix === "game.panel" || prefix === "netsec" || prefix === "gamesec") {
+  if (
+    prefix === "game.panel" ||
+    prefix === "panel" ||
+    prefix === "netsec" ||
+    prefix === "gamesec" ||
+    prefix === "php" ||
+    prefix === "admin" ||
+    prefix === "console" ||
+    prefix === "ingest.sec" ||
+    prefix === "ingest.dpdp" ||
+    prefix.endsWith(".ai") ||
+    prefix.endsWith(".deploy")
+  ) {
     return null;
   }
 
@@ -594,12 +629,20 @@ export function resolveAutoCorrectedPath(
   if (parts.length >= 2) {
     const first = parts[0]!;
     const second = parts[1]!;
-    const closestRoot = findClosestKey(first, ["infra", "game", "db", "shield", "drop", "keys", "gateway", "docs"], 2);
+    const closestRoot = findClosestKey(
+      first,
+      ["infra", "game", "db", "shield", "drop", "keys", "gateway", "docs", "deploy", "ai", "agents", "dpdp"],
+      2,
+    );
     if (closestRoot === "docs") {
       return `/docs/${resolveAutoCorrectedDocSlug(second, rawHost)}`;
     }
-    if (closestRoot === "infra" && isDashboardIntent(`/${second}`)) {
-      return "/infra/dashboard";
+    if (closestRoot === "infra") {
+      if (isDashboardIntent(`/${second}`)) return "/infra/dashboard";
+      if (second.includes("config") || editDistance(second, "configure") <= 2) {
+        return "/infra/configure";
+      }
+      return "/infra";
     }
     if (closestRoot === "game") {
       if (isDashboardIntent(`/${second}`)) return "/game/dashboard";

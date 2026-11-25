@@ -29,6 +29,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { INFRA_OS_IMAGES } from "@/lib/infra-plans";
+import { buildMasterHref } from "@/lib/routing";
 import { UpiAutoPayModal, type UpiCheckoutOrder } from "@/components/UpiAutoPayModal";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
@@ -334,6 +335,12 @@ export function SparrowxInfraDashboard() {
             >
               <ArrowLeft className="size-3.5" aria-hidden="true" />
               <span>Order New Server</span>
+            </a>
+            <a
+              href={buildMasterHref("/")}
+              className="hidden lg:inline-flex items-center gap-1 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+            >
+              <span>Portal</span>
             </a>
           </div>
 

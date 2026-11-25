@@ -11,6 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { buildMasterHref, buildProductHref } from "@/lib/routing";
 
 export function SparrowxStoryPage() {
   return (
@@ -18,7 +19,7 @@ export function SparrowxStoryPage() {
       {/* Sticky Header */}
       <header className="border-b border-sky-500/15 bg-[#0B1020]/95 px-4 sm:px-6 py-3.5 sticky top-0 z-40 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
-          <a href="/" className="flex items-center gap-2.5 shrink-0">
+          <a href={buildMasterHref("/")} className="flex items-center gap-2.5 shrink-0">
             <div className="size-9 rounded-lg overflow-hidden border border-sky-400/30 bg-[#060B18] shrink-0 drop-shadow-[0_4px_12px_rgba(56,189,248,0.25)]">
               <img
                 src="/logos/sparrowx-network.jpg"
@@ -55,7 +56,7 @@ export function SparrowxStoryPage() {
           </nav>
 
           <a
-            href="/"
+            href={buildMasterHref("/")}
             className="px-3.5 py-1.5 rounded bg-[#111A30] border border-sky-500/25 hover:border-sky-400 text-xs font-mono text-white transition-all inline-flex items-center gap-1.5 shrink-0"
           >
             <ArrowLeft className="size-3.5 text-sky-400" />
@@ -265,13 +266,13 @@ export function SparrowxStoryPage() {
 
               <div className="flex flex-wrap items-center gap-2.5 text-xs font-mono">
                 <a
-                  href="/"
+                  href={buildMasterHref("/")}
                   className="px-4 py-2 rounded bg-sky-500 hover:bg-sky-400 text-black font-bold transition-colors"
                 >
                   Explore All Services
                 </a>
                 <a
-                  href="https://db.sparrowx.net"
+                  href={buildProductHref("db")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded bg-[#111A30] border border-sky-500/30 hover:border-sky-400 text-white transition-colors inline-flex items-center gap-1"
@@ -280,7 +281,7 @@ export function SparrowxStoryPage() {
                   <ArrowUpRight className="size-3" />
                 </a>
                 <a
-                  href="https://file.sparrowx.net"
+                  href={buildProductHref("drop")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded bg-[#111A30] border border-emerald-500/30 hover:border-emerald-400 text-white transition-colors inline-flex items-center gap-1"
@@ -289,7 +290,7 @@ export function SparrowxStoryPage() {
                   <ArrowUpRight className="size-3" />
                 </a>
                 <a
-                  href="https://sec.sparrowx.net"
+                  href={buildProductHref("shield")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-3.5 py-2 rounded bg-[#111A30] border border-orange-500/30 hover:border-orange-400 text-white transition-colors inline-flex items-center gap-1"

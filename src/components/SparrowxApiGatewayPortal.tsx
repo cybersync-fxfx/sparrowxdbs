@@ -36,6 +36,7 @@ import {
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { buildMasterHref, buildProductHref } from "@/lib/routing";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
 import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 
@@ -372,7 +373,7 @@ print(response.json())`;
             </div>
 
             <a
-              href="https://db.sparrowx.net"
+              href={buildProductHref("db")}
               className="px-3 py-1.5 rounded bg-[#14171F] border border-white/10 text-xs font-mono text-[#9CA3AF] hover:text-white transition-colors"
             >
               Open DB Studio
@@ -507,18 +508,12 @@ print(response.json())`;
 
             <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between text-[11px] font-mono text-[#64748B]">
               <a
-                href={
-                  typeof window !== "undefined" &&
-                  (window.location.hostname.startsWith("api.") ||
-                    window.location.hostname.startsWith("rest."))
-                    ? "https://sparrowx.net"
-                    : "/"
-                }
+                href={buildMasterHref("/")}
                 className="hover:text-white transition-colors"
               >
                 ← sparrowx.net
               </a>
-              <a href="/db" className="text-emerald-400 hover:underline">
+              <a href={buildProductHref("db")} className="text-emerald-400 hover:underline">
                 Manage in DB Studio →
               </a>
             </div>
@@ -567,6 +562,18 @@ print(response.json())`;
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono">
+            <a
+              href={buildProductHref("db")}
+              className="hidden sm:inline-flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] hover:border-white/25 px-2.5 py-1 rounded-sm text-[#9CA3AF] hover:text-white transition-colors"
+            >
+              <span>DB Studio</span>
+            </a>
+            <a
+              href={buildMasterHref("/")}
+              className="hidden sm:inline-flex items-center gap-1.5 border border-white/[0.08] bg-[#14171F] hover:border-white/25 px-2.5 py-1 rounded-sm text-[#9CA3AF] hover:text-white transition-colors"
+            >
+              <span>Portal</span>
+            </a>
             <button
               type="button"
               onClick={handleSignOut}
