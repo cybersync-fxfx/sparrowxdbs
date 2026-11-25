@@ -9,27 +9,33 @@ import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 export function Hero({ service, onService }: { service: Service; onService: (s: ServiceId) => void }) {
   return (
     <section className="relative isolate flex min-h-[100svh] items-center overflow-hidden pb-16 pt-36 md:pt-32">
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         <motion.img
           key={service.id}
           src={service.image}
           alt=""
           aria-hidden
-          initial={{ opacity: 0, scale: 1.08 }}
+          fetchPriority="high"
+          decoding="sync"
+          initial={{ opacity: 0, scale: 1.04 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           className="absolute inset-0 -z-20 h-full w-full object-cover"
         />
       </AnimatePresence>
       <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background via-background/85 to-background/30" />
       <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-transparent to-background/60" />
-      <div className="pointer-events-none absolute -left-40 top-1/3 -z-10 size-[520px] rounded-full bg-svc/25 blur-[140px]" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-48 top-1/4 -z-10 size-[680px] rounded-full"
+        style={{ background: "radial-gradient(circle at center, color-mix(in oklab, var(--svc) 24%, transparent), transparent 68%)" }}
+      />
       <div className="absolute inset-0 -z-10 grid-fade" />
 
       <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 lg:grid-cols-[1.3fr_1fr]">
         <div>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={service.id}
               initial={{ opacity: 0, y: 18 }}

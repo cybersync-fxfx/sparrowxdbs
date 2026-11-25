@@ -480,7 +480,8 @@ export function SparrowxMasterLanding({
               alt="SparrowX Autonomous Security Platform and Sovereign Developer Cloud Logo"
               width={36}
               height={36}
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)] group-hover:scale-105 transition-transform duration-200"
+              decoding="async"
+              className="size-9 object-contain shrink-0 group-hover:scale-105 transition-transform duration-200"
             />
             <span className="font-bold text-sm tracking-wider text-white font-sans">
               SPARROWX
@@ -1082,9 +1083,17 @@ export function SparrowxMasterLanding({
 
       {/* SECTION 2: DEVELOPER TOOLKIT HERO */}
       <section className="border-b border-white/15 bg-gradient-to-b from-black/80 via-black/60 to-transparent px-4 sm:px-6 py-10 sm:py-20 relative z-10 overflow-hidden">
-        {/* Soft Animated Ambient Glow */}
-        <div className="animate-spx-orb-1 absolute -top-10 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="animate-spx-orb-2 absolute bottom-0 right-1/5 w-72 h-72 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+        {/* Soft Pre-Feathered Radial Ambient Glow (zero GPU blur filter cost) */}
+        <div
+          aria-hidden="true"
+          className="animate-spx-orb-1 absolute -top-24 left-[18%] w-[520px] h-[520px] rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle at center, rgba(255,255,255,0.085) 0%, transparent 68%)" }}
+        />
+        <div
+          aria-hidden="true"
+          className="animate-spx-orb-2 absolute -bottom-24 right-[12%] w-[440px] h-[440px] rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 68%)" }}
+        />
 
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-10 items-center relative z-10">
           {/* Left Column: Developer Toolkit Pitch */}
@@ -1167,7 +1176,7 @@ export function SparrowxMasterLanding({
       </div>
 
       {/* SECTION 3: DEVELOPER TOOLKIT ECOSYSTEM BENTO GRID */}
-      <section id="products" className="scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
+      <section id="products" className="spx-defer-section scroll-mt-24 px-4 sm:px-6 py-16 max-w-7xl mx-auto w-full space-y-8 relative z-10">
         <div className="space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-sans">
             Eight Developer Platforms. One Unified Toolkit.
@@ -1275,6 +1284,7 @@ export function SparrowxMasterLanding({
                       width={36}
                       height={36}
                       loading="lazy"
+                      decoding="async"
                       className="size-full object-contain"
                     />
                   </div>
@@ -1303,7 +1313,7 @@ export function SparrowxMasterLanding({
       </section>
 
       {/* SECTION 5: SHORT EMOTIONAL STORY TEASER -> FULL /story PAGE */}
-      <section id="story" className="scroll-mt-24 border-t border-white/15 bg-[#05060A]/80 backdrop-blur-sm px-4 sm:px-6 py-14 relative z-10">
+      <section id="story" className="spx-defer-section scroll-mt-24 border-t border-white/15 bg-[#05060A]/80 backdrop-blur-sm px-4 sm:px-6 py-14 relative z-10">
         <div className="max-w-4xl mx-auto">
           <div className="border border-white/20 bg-[#090B10]/90 backdrop-blur-md rounded-lg p-6 sm:p-9 space-y-6 shadow-2xl relative">
             <div className="inline-flex items-center gap-2 text-xs font-mono text-zinc-300">
@@ -1367,7 +1377,7 @@ export function SparrowxMasterLanding({
         </div>
       </section>
 
-      <div className="relative z-10">
+      <div className="spx-defer-section relative z-10">
         <ContactSection />
       </div>
 

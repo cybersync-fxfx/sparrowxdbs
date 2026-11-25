@@ -168,7 +168,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Unbounded:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap",
       },
     ],
   }),
@@ -222,58 +222,136 @@ function useSilentProductionConsole() {
 
 function useDeferredAdSense() {
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    if (typeof window === "undefined" || typeof document === "undefined") return;
     if (document.querySelector('script[data-spx-adsense="true"]')) return;
-    const script = document.createElement("script");
-    script.async = true;
-    script.src =
-      "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5926090831336748";
-    script.crossOrigin = "anonymous";
-    script.setAttribute("data-spx-adsense", "true");
-    document.head.appendChild(script);
+
+    let cancelled = false;
+    let idleId: number | null = null;
+    let timerId: number | null = null;
+
+    const inject = () => {
+      if (cancelled || document.querySelector('script[data-spx-adsense="true"]')) return;
+      const script = document.createElement("script");
+      script.async = true;
+      script.src =
+        "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5926090831336748";
+      script.crossOrigin = "anonymous";
+      script.setAttribute("fetchpriority", "low");
+      script.setAttribute("data-spx-adsense", "true");
+      document.body.appendChild(script);
+    };
+
+    const scheduleInject = () => {
+      if (cancelled) return;
+      const win = window as Window & {
+        requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+        cancelIdleCallback?: (id: number) => void;
+      };
+      if (typeof win.requestIdleCallback === "function") {
+        idleId = win.requestIdleCallback(inject, { timeout: 3500 });
+      } else {
+        timerId = window.setTimeout(inject, 2200);
+      }
+    };
+
+    if (document.readyState === "complete") {
+      scheduleInject();
+    } else {
+      window.addEventListener("load", scheduleInject, { once: true });
+    }
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("load", scheduleInject);
+      const win = window as Window & { cancelIdleCallback?: (id: number) => void };
+      if (idleId !== null && typeof win.cancelIdleCallback === "function") {
+        win.cancelIdleCallback(idleId);
+      }
+      if (timerId !== null) window.clearTimeout(timerId);
+    };
   }, []);
 }
 
 function useGlobalScrollReveal() {
   useEffect(() => {
-    if (typeof window === "undefined" || typeof IntersectionObserver === "undefined") return;
+    if (typeof window === "undefined") return;
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
 
+    const supportsNativeViewTimeline =
+      typeof CSS !== "undefined" &&
+      typeof CSS.supports === "function" &&
+      CSS.supports("(animation-timeline: view()) and (animation-range: entry)");
+
+    if (!supportsNativeViewTimeline && typeof IntersectionObserver === "undefined") return;
+
     const observed = new WeakSet<Element>();
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.setAttribute("data-spx-reveal", "visible");
-            io.unobserve(entry.target);
-          }
-        }
-      },
-      { rootMargin: "0px 0px -6% 0px", threshold: 0.06 },
-    );
+    const io = supportsNativeViewTimeline
+      ? null
+      : new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.setAttribute("data-spx-reveal", "visible");
+                io?.unobserve(entry.target);
+              }
+            }
+          },
+          { rootMargin: "0px 0px -6% 0px", threshold: 0.06 },
+        );
+
+    let rafId = 0;
 
     const scan = () => {
+      rafId = 0;
       const vh = window.innerHeight || 900;
       const nodes = document.querySelectorAll("main section, section[id], article");
-      nodes.forEach((el) => {
-        if (observed.has(el)) return;
+      // Batch DOM reads before DOM writes to prevent forced synchronous layout thrashing
+      const toReveal: Element[] = [];
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i];
+        if (!el || observed.has(el)) continue;
         observed.add(el);
         const rect = el.getBoundingClientRect();
-        // Keep above-the-fold sections visible immediately; animate below-the-fold sections on scroll
         if (rect.top > vh * 0.92) {
-          el.setAttribute("data-spx-reveal", "pending");
-          io.observe(el);
+          toReveal.push(el);
         }
-      });
+      }
+      for (let i = 0; i < toReveal.length; i++) {
+        const el = toReveal[i]!;
+        if (supportsNativeViewTimeline) {
+          el.setAttribute("data-spx-scroll-reveal", "auto");
+        } else {
+          el.setAttribute("data-spx-reveal", "pending");
+          io?.observe(el);
+        }
+      }
     };
 
-    scan();
-    const mo = new MutationObserver(() => scan());
+    const scheduleScan = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(scan);
+    };
+
+    scheduleScan();
+
+    const mo = new MutationObserver((mutations) => {
+      for (let i = 0; i < mutations.length; i++) {
+        const added = mutations[i]?.addedNodes;
+        if (!added || added.length === 0) continue;
+        for (let j = 0; j < added.length; j++) {
+          if (added[j]?.nodeType === 1) {
+            scheduleScan();
+            return;
+          }
+        }
+      }
+    });
     mo.observe(document.body, { childList: true, subtree: true });
 
     return () => {
+      if (rafId) window.cancelAnimationFrame(rafId);
       mo.disconnect();
-      io.disconnect();
+      io?.disconnect();
     };
   }, []);
 }

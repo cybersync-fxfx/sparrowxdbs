@@ -752,7 +752,7 @@ export function SparrowxInfraEngine() {
         {/* SECTION 2: THREE INFRASTRUCTURE PILLARS WITH BESPOKE 3D ARTWORK */}
         <section
           id="pillars"
-          className="scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto"
+          className="spx-defer-section scroll-mt-20 py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto"
         >
           <div className="max-w-2xl space-y-3">
             <h2 className="text-3xl sm:text-4xl font-bold tracking-[-0.03em] text-white">

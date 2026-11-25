@@ -1,24 +1,9 @@
-import { AiGuardrailSandbox } from "@/components/AiGuardrailSandbox";
 import {
   BackgroundEngineToaster,
   emitEngineActivity,
   emitEngineToast,
 } from "@/components/BackgroundEngineToaster";
-import { ClientIntegrationModal } from "@/components/ClientIntegrationModal";
 import { generateComplianceReportDocument } from "@/lib/client-sdk-generator";
-import { FirewallRuleExporter } from "@/components/FirewallRuleExporter";
-import { IncidentTimelineView } from "@/components/IncidentTimelineView";
-import { LiveWebhookDispatcherManager } from "@/components/LiveWebhookDispatcherManager";
-import { NotificationCenterDrawer } from "@/components/NotificationCenterDrawer";
-import { CheckpointsAndProbesView } from "@/components/CheckpointsAndProbesView";
-import { LiveOperationsView } from "@/components/LiveOperationsView";
-import { IncidentStatisticsView } from "@/components/IncidentStatisticsView";
-import { ThreatHuntingView } from "@/components/ThreatHuntingView";
-import { SiemAndDetectionRulesView } from "@/components/SiemAndDetectionRulesView";
-import { ProtectionVerificationCenter } from "@/components/ProtectionVerificationCenter";
-import { AdminErrorMonitoring } from "@/components/AdminErrorMonitoring";
-import { UserActivityHistory } from "@/components/UserActivityHistory";
-import { SystemStatusSection } from "@/components/SystemStatusSection";
 import {
   notifySuccess,
   notifyError,
@@ -27,10 +12,67 @@ import {
   notifyLoading,
   registerGlobalDocsNavigator,
 } from "@/lib/feedback";
-import { GlobalTrafficMeshGlobe } from "@/components/GlobalTrafficMeshGlobe";
 import { SparrowxMasterLanding } from "@/components/SparrowxMasterLanding";
+import { SERVICE_MODULES } from "@/lib/service-modules";
 
-// Lazy-load heavy standalone product engines so sparrowx.net initial load stays lean & fast
+// Lazy-load heavy SOC, Portal, and standalone product engines so sparrowx.net initial load stays lean & fast
+const AiGuardrailSandbox = lazy(() =>
+  import("@/components/AiGuardrailSandbox").then((m) => ({ default: m.AiGuardrailSandbox })),
+);
+const ClientIntegrationModal = lazy(() =>
+  import("@/components/ClientIntegrationModal").then((m) => ({ default: m.ClientIntegrationModal })),
+);
+const FirewallRuleExporter = lazy(() =>
+  import("@/components/FirewallRuleExporter").then((m) => ({ default: m.FirewallRuleExporter })),
+);
+const IncidentTimelineView = lazy(() =>
+  import("@/components/IncidentTimelineView").then((m) => ({ default: m.IncidentTimelineView })),
+);
+const NotificationCenterDrawer = lazy(() =>
+  import("@/components/NotificationCenterDrawer").then((m) => ({ default: m.NotificationCenterDrawer })),
+);
+const CheckpointsAndProbesView = lazy(() =>
+  import("@/components/CheckpointsAndProbesView").then((m) => ({ default: m.CheckpointsAndProbesView })),
+);
+const LiveOperationsView = lazy(() =>
+  import("@/components/LiveOperationsView").then((m) => ({ default: m.LiveOperationsView })),
+);
+const IncidentStatisticsView = lazy(() =>
+  import("@/components/IncidentStatisticsView").then((m) => ({ default: m.IncidentStatisticsView })),
+);
+const ThreatHuntingView = lazy(() =>
+  import("@/components/ThreatHuntingView").then((m) => ({ default: m.ThreatHuntingView })),
+);
+const SiemAndDetectionRulesView = lazy(() =>
+  import("@/components/SiemAndDetectionRulesView").then((m) => ({ default: m.SiemAndDetectionRulesView })),
+);
+const ProtectionVerificationCenter = lazy(() =>
+  import("@/components/ProtectionVerificationCenter").then((m) => ({ default: m.ProtectionVerificationCenter })),
+);
+const AdminErrorMonitoring = lazy(() =>
+  import("@/components/AdminErrorMonitoring").then((m) => ({ default: m.AdminErrorMonitoring })),
+);
+const UserActivityHistory = lazy(() =>
+  import("@/components/UserActivityHistory").then((m) => ({ default: m.UserActivityHistory })),
+);
+const SystemStatusSection = lazy(() =>
+  import("@/components/SystemStatusSection").then((m) => ({ default: m.SystemStatusSection })),
+);
+const GlobalTrafficMeshGlobe = lazy(() =>
+  import("@/components/GlobalTrafficMeshGlobe").then((m) => ({ default: m.GlobalTrafficMeshGlobe })),
+);
+const AdminPortalView = lazy(() =>
+  import("@/components/portals/ClientAndAdminPortals").then((m) => ({ default: m.AdminPortalView })),
+);
+const ClientPortalView = lazy(() =>
+  import("@/components/portals/ClientAndAdminPortals").then((m) => ({ default: m.ClientPortalView })),
+);
+const PortalLoginScreen = lazy(() =>
+  import("@/components/portals/ClientAndAdminPortals").then((m) => ({ default: m.PortalLoginScreen })),
+);
+const DashboardSettingsAndConnector = lazy(() =>
+  import("@/components/DashboardSettingsAndConnector").then((m) => ({ default: m.DashboardSettingsAndConnector })),
+);
 const ErrorDocumentationCenter = lazy(() =>
   import("@/components/ErrorDocumentationCenter").then((m) => ({ default: m.ErrorDocumentationCenter })),
 );
@@ -154,13 +196,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  AdminPortalView,
-  ClientPortalView,
-  PortalLoginScreen,
-  SERVICE_MODULES,
-} from "@/components/portals/ClientAndAdminPortals";
-import { DashboardSettingsAndConnector } from "@/components/DashboardSettingsAndConnector";
 import {
   analyzePromptInSandbox,
   dispatchIncidentWebhook,
@@ -2267,9 +2302,10 @@ function Dashboard() {
             SparrowX SOC &amp; Operator Authentication Portal
           </span>
         </div>
-        <PortalLoginScreen
-          backendSource={backendSource}
-          onRegisterAndLoginUser={async (input) => {
+        <Suspense fallback={lazyEngineFallback}>
+          <PortalLoginScreen
+            backendSource={backendSource}
+            onRegisterAndLoginUser={async (input) => {
             const cleanEmail = input.email.trim().toLowerCase();
             const existingBackendUser = await fetchAppUserByEmailFromBackend(cleanEmail);
             if (existingBackendUser) {
@@ -2363,9 +2399,10 @@ function Dashboard() {
             showToast(`Welcome ${createdUser.fullName} — Client Area ready`);
             return {};
           }}
-          onUserAuthenticated={handleUserAuthenticated}
-          tenants={clientTenants}
-        />
+            onUserAuthenticated={handleUserAuthenticated}
+            tenants={clientTenants}
+          />
+        </Suspense>
         <BackgroundEngineToaster />
       </>
     );
@@ -2421,6 +2458,7 @@ function Dashboard() {
     : "SX";
 
   return (
+    <Suspense fallback={lazyEngineFallback}>
     <SidebarProvider className="bg-background" onOpenChange={setSidebarOpen} open={sidebarOpen}>
       <AppSidebar
         activeClientTenant={activeClientTenant}
@@ -5241,6 +5279,7 @@ function Dashboard() {
         <BackgroundEngineToaster />
       </SidebarInset>
     </SidebarProvider>
+    </Suspense>
   );
 }
 

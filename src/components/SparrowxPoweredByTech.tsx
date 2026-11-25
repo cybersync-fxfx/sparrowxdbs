@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useState } from "react";
+import { Pause, Play } from "lucide-react";
 
 export interface TechLogoItem {
   id: string;
@@ -183,6 +184,7 @@ export function SparrowxPoweredByTech({
   service = "all",
   className = "",
 }: SparrowxPoweredByTechProps) {
+  const [paused, setPaused] = useState(false);
   const items =
     service === "infra"
       ? POWERING_TECHNOLOGIES.filter((t) => INFRA_TECH_IDS.has(t.id))
@@ -194,38 +196,25 @@ export function SparrowxPoweredByTech({
       aria-label="Technologies Powering SparrowX"
       className={`relative py-6 ${className}`}
     >
-      <style>{`
-        @keyframes spx-logo-marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-        @keyframes spx-logo-bob {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-4px); }
-        }
-        .spx-marquee-track {
-          display: flex;
-          width: max-content;
-          animation: spx-logo-marquee 32s linear infinite;
-        }
-        .spx-marquee-wrap:hover .spx-marquee-track {
-          animation-play-state: paused;
-        }
-        .spx-float-logo {
-          animation: spx-logo-bob 4.2s ease-in-out infinite;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .spx-marquee-track, .spx-float-logo {
-            animation: none;
-          }
-        }
-      `}</style>
+      <div className="mb-4 flex items-center justify-center gap-3">
+        <p className="text-center font-mono text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
+          {title}
+        </p>
+        <button
+          type="button"
+          onClick={() => setPaused((p) => !p)}
+          className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] text-zinc-400 hover:border-white/25 hover:text-white transition-colors"
+          aria-label={paused ? "Play technology marquee" : "Pause technology marquee"}
+        >
+          {paused ? <Play className="size-2.5" aria-hidden="true" /> : <Pause className="size-2.5" aria-hidden="true" />}
+          <span>{paused ? "Play" : "Pause"}</span>
+        </button>
+      </div>
 
-      <p className="mb-4 text-center font-mono text-[10px] font-semibold uppercase tracking-[0.26em] text-zinc-500">
-        {title}
-      </p>
-
-      <div className="spx-marquee-wrap relative overflow-hidden">
+      <div
+        className="spx-marquee-wrap relative overflow-hidden"
+        data-paused={paused ? "true" : "false"}
+      >
         {/* Soft left/right fade edges */}
         <div
           aria-hidden="true"
@@ -244,8 +233,7 @@ export function SparrowxPoweredByTech({
               target="_blank"
               rel="noopener noreferrer"
               title={tech.name}
-              style={{ animationDelay: `${(idx % 5) * 0.45}s` }}
-              className="spx-float-logo group inline-flex shrink-0 items-center gap-2.5 opacity-75 transition-all duration-200 hover:opacity-100 hover:scale-105"
+              className="group inline-flex shrink-0 items-center gap-2.5 opacity-75 transition-opacity duration-200 hover:opacity-100"
             >
               <img
                 src={tech.logoSrc}
@@ -253,7 +241,8 @@ export function SparrowxPoweredByTech({
                 width={30}
                 height={30}
                 loading="lazy"
-                className="size-7 sm:size-8 object-contain drop-shadow-[0_4px_14px_rgba(255,255,255,0.12)]"
+                decoding="async"
+                className="size-7 sm:size-8 object-contain"
               />
               <span className="font-mono text-xs font-medium tracking-tight text-zinc-300 group-hover:text-white whitespace-nowrap">
                 {tech.name}

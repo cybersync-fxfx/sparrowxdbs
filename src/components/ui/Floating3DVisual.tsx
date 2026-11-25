@@ -63,6 +63,7 @@ export function Floating3DVisual({
   height = 512,
 }: Floating3DVisualProps) {
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const tiltRafRef = useRef<number>(0);
   const [tilted, setTilted] = useState(false);
   const stageId = useId();
 
@@ -70,18 +71,28 @@ export function Floating3DVisual({
     if (e.pointerType === "touch") return;
     const node = stageRef.current;
     if (!node) return;
-    const rect = node.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const nx = (e.clientX - rect.left) / rect.width - 0.5;
-    const ny = (e.clientY - rect.top) / rect.height - 0.5;
-    node.style.setProperty("--spx-tilt-y", `${(nx * 16).toFixed(2)}deg`);
-    node.style.setProperty("--spx-tilt-x", `${(-ny * 14).toFixed(2)}deg`);
-    node.style.setProperty("--spx-glare-x", `${((nx + 0.5) * 100).toFixed(1)}%`);
-    node.style.setProperty("--spx-glare-y", `${((ny + 0.5) * 100).toFixed(1)}%`);
-    setTilted(true);
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    if (tiltRafRef.current) return;
+    tiltRafRef.current = window.requestAnimationFrame(() => {
+      tiltRafRef.current = 0;
+      const rect = node.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const nx = (clientX - rect.left) / rect.width - 0.5;
+      const ny = (clientY - rect.top) / rect.height - 0.5;
+      node.style.setProperty("--spx-tilt-y", `${(nx * 16).toFixed(2)}deg`);
+      node.style.setProperty("--spx-tilt-x", `${(-ny * 14).toFixed(2)}deg`);
+      node.style.setProperty("--spx-glare-x", `${((nx + 0.5) * 100).toFixed(1)}%`);
+      node.style.setProperty("--spx-glare-y", `${((ny + 0.5) * 100).toFixed(1)}%`);
+      setTilted((prev) => (prev ? prev : true));
+    });
   }, []);
 
   const handlePointerLeave = useCallback(() => {
+    if (tiltRafRef.current) {
+      window.cancelAnimationFrame(tiltRafRef.current);
+      tiltRafRef.current = 0;
+    }
     const node = stageRef.current;
     if (!node) return;
     node.style.setProperty("--spx-tilt-x", "0deg");
@@ -101,6 +112,8 @@ export function Floating3DVisual({
   const imgFetchPriority = priority === "lcp" ? "high" : undefined;
   const imgLoading = priority === "lazy" ? "lazy" : undefined;
   const isRasterDarkBackdrop = /\.(jpe?g)$/i.test(src);
+  const isLocalRaster = /^\/(3d|logos)\/.*\.(png|jpe?g)$/i.test(src);
+  const webpSource = isLocalRaster ? src.replace(/\.(png|jpe?g)$/i, ".webp") : null;
   const initialSrc = src.startsWith("/3d/") && !src.includes("?") ? `${src}?v=2` : src;
   const [currentSrc, setCurrentSrc] = useState(initialSrc);
   const [hasError, setHasError] = useState(false);
@@ -163,19 +176,38 @@ export function Floating3DVisual({
       >
         <div className="spx-3d-float relative flex size-full items-center justify-center">
           {!hasError ? (
-            <img
-              src={currentSrc}
-              alt={alt}
-              width={width}
-              height={height}
-              decoding={priority === "lcp" ? "sync" : "async"}
-              onError={handleImageError}
-              {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
-              {...(imgLoading ? { loading: imgLoading } : {})}
-              className={`size-full object-contain pointer-events-none ${
-                isRasterDarkBackdrop ? "spx-3d-img-raster scale-110" : "spx-3d-img-vector"
-              }`}
-            />
+            webpSource ? (
+              <picture className="flex size-full items-center justify-center">
+                <source srcSet={webpSource} type="image/webp" />
+                <img
+                  src={currentSrc}
+                  alt={alt}
+                  width={width}
+                  height={height}
+                  decoding={priority === "lcp" ? "sync" : "async"}
+                  onError={handleImageError}
+                  {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
+                  {...(imgLoading ? { loading: imgLoading } : {})}
+                  className={`size-full object-contain pointer-events-none ${
+                    isRasterDarkBackdrop ? "spx-3d-img-raster scale-110" : "spx-3d-img-vector"
+                  }`}
+                />
+              </picture>
+            ) : (
+              <img
+                src={currentSrc}
+                alt={alt}
+                width={width}
+                height={height}
+                decoding={priority === "lcp" ? "sync" : "async"}
+                onError={handleImageError}
+                {...(imgFetchPriority ? { fetchPriority: imgFetchPriority } : {})}
+                {...(imgLoading ? { loading: imgLoading } : {})}
+                className={`size-full object-contain pointer-events-none ${
+                  isRasterDarkBackdrop ? "spx-3d-img-raster scale-110" : "spx-3d-img-vector"
+                }`}
+              />
+            )
           ) : (
             <svg
               viewBox="0 0 400 400"

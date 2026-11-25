@@ -11,10 +11,10 @@ function Bar({ label, value, display, delay }: { label: string; value: number; d
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-muted">
         <motion.div
-          className="h-full rounded-full bg-svc"
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 1.1, delay, ease: [0.22, 1, 0.36, 1] }}
+          className="h-full w-full origin-left rounded-full bg-svc"
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: Math.max(0.04, Math.min(1, value / 100)) }}
+          transition={{ duration: 0.9, delay, ease: [0.22, 1, 0.36, 1] }}
         />
       </div>
     </div>

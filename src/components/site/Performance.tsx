@@ -56,11 +56,11 @@ function CompareBars({ m, i }: { m: Metric; i: number }) {
           </div>
           <div className="h-2.5 overflow-hidden rounded-full bg-muted">
             <motion.div
-              className={`h-full rounded-full ${row.cls}`}
-              initial={{ width: 0 }}
-              whileInView={{ width: `${pct(row.v)}%` }}
+              className={`h-full w-full origin-left rounded-full ${row.cls}`}
+              initial={{ scaleX: 0 }}
+              whileInView={{ scaleX: pct(row.v) / 100 }}
               viewport={{ once: true }}
-              transition={{ duration: 1.2, delay: 0.2 + j * 0.15, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.9, delay: 0.15 + j * 0.12, ease: [0.22, 1, 0.36, 1] }}
             />
           </div>
         </div>

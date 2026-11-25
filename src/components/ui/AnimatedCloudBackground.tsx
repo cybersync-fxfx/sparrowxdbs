@@ -148,11 +148,13 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
     let width = window.innerWidth || 1280;
     let height = window.innerHeight || 720;
     let rafId = 0;
+    let lastFrameAt = 0;
+    let paused = document.hidden;
 
     const updateSize = () => {
       width = window.innerWidth || 1280;
       height = window.innerHeight || 720;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       canvas.style.width = `${width}px`;
@@ -162,21 +164,28 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
 
     updateSize();
 
-    const nodeCount = isSubtle ? 18 : 36;
+    const lowPower =
+      width < 768 ||
+      (typeof navigator !== "undefined" &&
+        typeof navigator.hardwareConcurrency === "number" &&
+        navigator.hardwareConcurrency <= 4);
+    const nodeCount = lowPower ? (isSubtle ? 10 : 18) : isSubtle ? 16 : 28;
     const nodes: CloudNode[] = Array.from({ length: nodeCount }, (_, idx) => ({
       x: Math.random() * width,
       y: Math.random() * height,
-      vx: (Math.random() - 0.5) * (isSubtle ? 0.25 : 0.42),
-      vy: (Math.random() - 0.5) * (isSubtle ? 0.25 : 0.42),
+      vx: (Math.random() - 0.5) * (isSubtle ? 0.35 : 0.55),
+      vy: (Math.random() - 0.5) * (isSubtle ? 0.35 : 0.55),
       radius: 1.2 + Math.random() * 1.8,
       pulsePhase: Math.random() * Math.PI * 2,
-      pulseSpeed: 0.015 + Math.random() * 0.025,
+      pulseSpeed: 0.025 + Math.random() * 0.035,
       useSecondary: idx % 3 === 0,
     }));
 
     const pointer = { x: -9999, y: -9999, active: false };
-    const maxLinkDist = 150;
-    const pointerRadius = 170;
+    const maxLinkDist = 145;
+    const maxLinkDistSq = maxLinkDist * maxLinkDist;
+    const pointerRadius = 165;
+    const pointerRadiusSq = pointerRadius * pointerRadius;
 
     const onMouseMove = (e: MouseEvent) => {
       pointer.x = e.clientX;
@@ -188,33 +197,39 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
       pointer.active = false;
     };
 
-    window.addEventListener("resize", updateSize, { passive: true });
-    window.addEventListener("mousemove", onMouseMove, { passive: true });
-    window.addEventListener("mouseleave", onMouseLeave, { passive: true });
+    const renderFrame = (now: number) => {
+      rafId = 0;
+      if (paused || !ctx) return;
 
-    const renderFrame = () => {
-      if (!ctx) return;
+      // Cap decorative ambient constellation at ~30fps to halve main-thread & GPU draw load
+      if (now - lastFrameAt < 32) {
+        rafId = window.requestAnimationFrame(renderFrame);
+        return;
+      }
+      lastFrameAt = now;
+
       ctx.clearRect(0, 0, width, height);
 
-      for (const node of nodes) {
+      const maxSpeed = isSubtle ? 0.6 : 0.9;
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i]!;
         node.pulsePhase += node.pulseSpeed;
 
         if (pointer.active) {
           const dx = node.x - pointer.x;
           const dy = node.y - pointer.y;
           const distSq = dx * dx + dy * dy;
-          if (distSq > 1 && distSq < pointerRadius * pointerRadius) {
+          if (distSq > 1 && distSq < pointerRadiusSq) {
             const dist = Math.sqrt(distSq);
             const force = (1 - dist / pointerRadius) * 0.16;
-            node.vx += (dx / dist) * force * 0.18;
-            node.vy += (dy / dist) * force * 0.18;
+            node.vx += (dx / dist) * force * 0.22;
+            node.vy += (dy / dist) * force * 0.22;
           }
         }
 
-        // Clamp velocity so interactive repels settle gently back to calm drift
-        const speed = Math.hypot(node.vx, node.vy);
-        const maxSpeed = isSubtle ? 0.45 : 0.72;
-        if (speed > maxSpeed) {
+        const speedSq = node.vx * node.vx + node.vy * node.vy;
+        if (speedSq > maxSpeed * maxSpeed) {
+          const speed = Math.sqrt(speedSq);
           node.vx = (node.vx / speed) * maxSpeed;
           node.vy = (node.vy / speed) * maxSpeed;
         }
@@ -228,66 +243,97 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
         else if (node.y > height + 10) node.y = -10;
       }
 
-      // Draw faint constellation filaments
-      const lineAlphaBase = isSubtle ? 0.08 : 0.14;
+      // Batch constellation filaments into 1 single path stroke instead of O(n^2) stroke() calls
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = `rgba(${palette.nodeRgb}, ${isSubtle ? "0.06" : "0.10"})`;
+      ctx.beginPath();
       for (let i = 0; i < nodes.length; i++) {
-        const a = nodes[i];
-        if (!a) continue;
+        const a = nodes[i]!;
         for (let j = i + 1; j < nodes.length; j++) {
-          const b = nodes[j];
-          if (!b) continue;
+          const b = nodes[j]!;
           const dx = a.x - b.x;
           const dy = a.y - b.y;
-          const distSq = dx * dx + dy * dy;
-          if (distSq < maxLinkDist * maxLinkDist) {
-            const alpha = (1 - Math.sqrt(distSq) / maxLinkDist) * lineAlphaBase;
-            ctx.strokeStyle = `rgba(${palette.nodeRgb}, ${alpha.toFixed(3)})`;
-            ctx.lineWidth = 0.75;
-            ctx.beginPath();
+          if (dx * dx + dy * dy < maxLinkDistSq) {
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.stroke();
           }
         }
+      }
+      ctx.stroke();
 
-        if (pointer.active) {
+      if (pointer.active) {
+        ctx.lineWidth = 0.85;
+        ctx.strokeStyle = `rgba(${palette.secondaryRgb}, ${isSubtle ? "0.12" : "0.22"})`;
+        ctx.beginPath();
+        for (let i = 0; i < nodes.length; i++) {
+          const a = nodes[i]!;
           const pdx = a.x - pointer.x;
           const pdy = a.y - pointer.y;
-          const pDistSq = pdx * pdx + pdy * pdy;
-          if (pDistSq < pointerRadius * pointerRadius) {
-            const pAlpha = (1 - Math.sqrt(pDistSq) / pointerRadius) * (isSubtle ? 0.15 : 0.28);
-            ctx.strokeStyle = `rgba(${palette.secondaryRgb}, ${pAlpha.toFixed(3)})`;
-            ctx.lineWidth = 0.85;
-            ctx.beginPath();
+          if (pdx * pdx + pdy * pdy < pointerRadiusSq) {
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(pointer.x, pointer.y);
-            ctx.stroke();
           }
         }
+        ctx.stroke();
       }
 
-      // Draw pulsing nodes
-      for (const node of nodes) {
-        const pulse = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(node.pulsePhase));
-        const alpha = (isSubtle ? 0.35 : 0.65) * pulse;
-        const rgb = node.useSecondary ? palette.secondaryRgb : palette.nodeRgb;
-
-        ctx.fillStyle = `rgba(${rgb}, ${alpha.toFixed(3)})`;
-        ctx.beginPath();
+      // Batch pulsing nodes into primary + secondary fills
+      const baseAlpha = isSubtle ? 0.34 : 0.58;
+      ctx.fillStyle = `rgba(${palette.nodeRgb}, ${baseAlpha})`;
+      ctx.beginPath();
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i]!;
+        if (node.useSecondary) continue;
+        ctx.moveTo(node.x + node.radius, node.y);
         ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
-        ctx.fill();
       }
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(${palette.secondaryRgb}, ${baseAlpha})`;
+      ctx.beginPath();
+      for (let i = 0; i < nodes.length; i++) {
+        const node = nodes[i]!;
+        if (!node.useSecondary) continue;
+        ctx.moveTo(node.x + node.radius, node.y);
+        ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      }
+      ctx.fill();
 
       rafId = window.requestAnimationFrame(renderFrame);
     };
 
-    rafId = window.requestAnimationFrame(renderFrame);
+    const startLoop = () => {
+      if (paused || rafId) return;
+      lastFrameAt = 0;
+      rafId = window.requestAnimationFrame(renderFrame);
+    };
+
+    const stopLoop = () => {
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+        rafId = 0;
+      }
+    };
+
+    const onVisibilityChange = () => {
+      paused = document.hidden;
+      if (paused) stopLoop();
+      else startLoop();
+    };
+
+    window.addEventListener("resize", updateSize, { passive: true });
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    window.addEventListener("mouseleave", onMouseLeave, { passive: true });
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    startLoop();
 
     return () => {
-      if (rafId) window.cancelAnimationFrame(rafId);
+      stopLoop();
       window.removeEventListener("resize", updateSize);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseleave", onMouseLeave);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [palette.nodeRgb, palette.secondaryRgb, isSubtle]);
 
@@ -299,23 +345,29 @@ export const AnimatedCloudBackground: React.FC<AnimatedCloudBackgroundProps> = (
       aria-hidden="true"
       className="pointer-events-none fixed inset-0 z-0 overflow-hidden select-none"
     >
-      {/* Layer 1: Drifting Ambient Light Orbs */}
+      {/* Layer 1: Pre-softened Radial Light Orbs (zero expensive filter: blur() GPU passes) */}
       <div
-        className="animate-spx-orb-1 absolute -top-28 left-[12%] h-[420px] w-[420px] rounded-full blur-[110px]"
-        style={{ background: isSubtle ? palette.orb1Subtle : palette.orb1Full }}
+        className="animate-spx-orb-1 absolute -top-44 left-[6%] h-[620px] w-[620px] rounded-full"
+        style={{
+          background: `radial-gradient(circle at center, ${isSubtle ? palette.orb1Subtle : palette.orb1Full} 0%, transparent 68%)`,
+        }}
       />
       <div
-        className="animate-spx-orb-2 absolute top-[32%] -right-24 h-[380px] w-[380px] rounded-full blur-[115px]"
-        style={{ background: isSubtle ? palette.orb2Subtle : palette.orb2Full }}
+        className="animate-spx-orb-2 absolute top-[26%] -right-40 h-[560px] w-[560px] rounded-full"
+        style={{
+          background: `radial-gradient(circle at center, ${isSubtle ? palette.orb2Subtle : palette.orb2Full} 0%, transparent 68%)`,
+        }}
       />
       <div
-        className="animate-spx-orb-3 absolute -bottom-24 left-[28%] h-[400px] w-[400px] rounded-full blur-[120px]"
-        style={{ background: isSubtle ? palette.orb3Subtle : palette.orb3Full }}
+        className="animate-spx-orb-3 absolute -bottom-40 left-[22%] h-[580px] w-[580px] rounded-full"
+        style={{
+          background: `radial-gradient(circle at center, ${isSubtle ? palette.orb3Subtle : palette.orb3Full} 0%, transparent 68%)`,
+        }}
       />
 
-      {/* Layer 2: Panning Blueprint Grid & Technical Dot Matrix */}
+      {/* Layer 2: Compositor-Only Panning Blueprint Grid & Technical Dot Matrix */}
       <div
-        className="animate-spx-grid-pan absolute inset-0"
+        className="animate-spx-grid-pan absolute -inset-10"
         style={{
           backgroundImage: `linear-gradient(to right, ${gridLineColor} 1px, transparent 1px), linear-gradient(to bottom, ${gridLineColor} 1px, transparent 1px)`,
           backgroundSize: "40px 40px",

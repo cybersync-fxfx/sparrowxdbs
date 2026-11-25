@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -492,42 +491,36 @@ p {
 
 @keyframes spx-grid-pan {
   0% {
-    background-position: 0px 0px;
+    transform: translate3d(0px, 0px, 0px);
   }
   100% {
-    background-position: 40px 40px;
+    transform: translate3d(40px, 40px, 0px);
   }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .animate-spx-orb-1 {
     animation: spx-orb-drift-1 19s ease-in-out infinite;
-    will-change: transform;
   }
 
   .animate-spx-orb-2 {
     animation: spx-orb-drift-2 23s ease-in-out infinite;
-    will-change: transform;
   }
 
   .animate-spx-orb-3 {
     animation: spx-orb-drift-3 26s ease-in-out infinite;
-    will-change: transform;
   }
 
   .animate-spx-beam-x {
     animation: spx-beam-x var(--beam-duration, 9s) linear infinite;
-    will-change: transform, opacity;
   }
 
   .animate-spx-beam-y {
     animation: spx-beam-y var(--beam-duration, 11s) linear infinite;
-    will-change: transform, opacity;
   }
 
   .animate-spx-grid-pan {
     animation: spx-grid-pan 18s linear infinite;
-    will-change: background-position;
   }
 }
 
@@ -591,7 +584,6 @@ html {
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
 
 @media (forced-colors: active) {
@@ -759,7 +751,30 @@ html {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.45; transform: scale(0.8); }
 }
-@utility animate-pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
+@utility animate-pulse-dot {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: pulse-dot 1.6s ease-in-out infinite;
+  }
+}
+
+/* ============================================================================
+   SPARROWX POWERED-BY MARQUEE (Compositor-Only + Pause Support)
+   ============================================================================ */
+.spx-marquee-track {
+  display: flex;
+  width: max-content;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .spx-marquee-track {
+    animation: spx-marquee 32s linear infinite;
+  }
+
+  .spx-marquee-wrap:hover .spx-marquee-track,
+  .spx-marquee-wrap[data-paused="true"] .spx-marquee-track {
+    animation-play-state: paused;
+  }
+}
 
 /* ============================================================================
    SPARROWX 3D FLOATING VISUAL STAGE (Compositor-Only + Reduced Motion Safe)
@@ -795,6 +810,9 @@ html {
 .spx-3d-tilt {
   transform: rotateX(var(--spx-tilt-x)) rotateY(var(--spx-tilt-y));
   transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.spx-3d-stage[data-tilted="true"] .spx-3d-tilt {
   will-change: transform;
 }
 
@@ -828,8 +846,6 @@ html {
 
 .spx-ambient-logo {
   opacity: 0;
-  filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.14));
-  will-change: opacity, transform;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -877,25 +893,61 @@ html {
 }
 
 /* ============================================================================
-   SPARROWX GLOBAL SCROLL-DRIVEN REVEAL ANIMATIONS (Compositor-Only)
+   SPARROWX GLOBAL SCROLL-DRIVEN REVEAL ANIMATIONS (Native CSS View Timeline + Fallback)
    ============================================================================ */
 @media (prefers-reduced-motion: no-preference) {
+  @supports ((animation-timeline: view()) and (animation-range: entry)) {
+    @keyframes spx-scroll-reveal {
+      from {
+        opacity: 0;
+        transform: translate3d(0, 22px, 0) scale(0.985);
+      }
+      to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+      }
+    }
+
+    [data-spx-scroll-reveal="auto"] {
+      animation: spx-scroll-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 28%;
+    }
+  }
+
   [data-spx-reveal="pending"] {
     opacity: 0;
-    transform: translate3d(0, 26px, 0) scale(0.985);
+    transform: translate3d(0, 22px, 0) scale(0.985);
     transition:
-      opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
-    will-change: opacity, transform;
+      opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   [data-spx-reveal="visible"] {
     opacity: 1;
     transform: translate3d(0, 0, 0) scale(1);
     transition:
-      opacity 620ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 680ms cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
   }
+}
+
+/* ============================================================================
+   SPARROWX DEFERRED OFFSCREEN RENDERING (Below-the-fold sections & heavy stages)
+   ============================================================================ */
+.spx-defer-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 640px;
+}
+
+.spx-defer-stage {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 280px;
+}
+
+.spx-defer-globe {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 460px;
 }
 
 /* ============================================================================

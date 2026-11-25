@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import {
   type Asset,
   type AuditLogEntry,
@@ -10,6 +9,11 @@ import {
   type Vulnerability,
   maskSecretKey,
 } from "@/lib/supabase";
+
+async function createGeminiClient(apiKey: string) {
+  const { GoogleGenAI } = await import("@google/genai");
+  return new GoogleGenAI({ apiKey });
+}
 
 export type SparrowxBrainModel = "gemini-3.8-flash" | "gemini-4-argon";
 
@@ -571,7 +575,7 @@ ${learnedPatterns
 
   if (apiKey) {
     try {
-      const client = new GoogleGenAI({ apiKey });
+      const client = await createGeminiClient(apiKey);
       const interaction = await client.interactions.create({
         model: selectedModel,
         system_instruction: systemInstruction,
@@ -1137,7 +1141,7 @@ export async function analyzeScanWithGeminiBrain(params: {
 
   if (apiKey) {
     try {
-      const client = new GoogleGenAI({ apiKey });
+      const client = await createGeminiClient(apiKey);
       const isAiTarget = params.targetCategory === "AI Agent & LLM Endpoint";
       const isApiTarget = params.targetCategory === "API & Cloud Service";
 
@@ -1322,7 +1326,7 @@ export async function querySparrowxCrossSystemAi(params: {
 
   if (apiKey) {
     try {
-      const client = new GoogleGenAI({ apiKey });
+      const client = await createGeminiClient(apiKey);
       const fullInput = params.contextData
         ? `[LIVE SYSTEM TELEMETRY / CONTEXT]\n${params.contextData}\n\n[OPERATOR REQUEST]\n${params.prompt}`
         : params.prompt;

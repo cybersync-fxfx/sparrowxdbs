@@ -862,6 +862,7 @@ export function GlobalTrafficMeshGlobe({
 
     void syncRealTelemetry();
     const timer = window.setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
       void syncRealTelemetry();
     }, 6000);
 
@@ -878,29 +879,54 @@ export function GlobalTrafficMeshGlobe({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let animId: number;
+    let animId = 0;
+    let paused = typeof document !== "undefined" ? document.hidden : false;
+    let width = Math.max(240, canvas.clientWidth || 480);
+    let height = Math.max(240, canvas.clientHeight || 420);
+
+    const syncCanvasSize = (nextW: number, nextH: number) => {
+      width = Math.max(200, Math.round(nextW));
+      height = Math.max(200, Math.round(nextH));
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const targetW = Math.floor(width * dpr);
+      const targetH = Math.floor(height * dpr);
+      if (canvas.width !== targetW || canvas.height !== targetH) {
+        canvas.width = targetW;
+        canvas.height = targetH;
+      }
+    };
+
+    const initialRect = canvas.getBoundingClientRect();
+    if (initialRect.width && initialRect.height) {
+      syncCanvasSize(initialRect.width, initialRect.height);
+    }
+
+    const resizeObserver =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (entry && entry.contentRect.width && entry.contentRect.height) {
+              syncCanvasSize(entry.contentRect.width, entry.contentRect.height);
+            }
+          })
+        : null;
+    resizeObserver?.observe(canvas);
 
     const render = () => {
+      animId = 0;
+      if (paused || (typeof document !== "undefined" && document.hidden)) return;
+
       if (!rotationRef.current.isDragging) {
         rotationRef.current.y += 0.0032;
       }
 
       const rotX = rotationRef.current.x;
       const rotY = rotationRef.current.y;
-
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.getBoundingClientRect();
-
-      if (canvas.width !== Math.floor(rect.width * dpr) || canvas.height !== Math.floor(rect.height * dpr)) {
-        canvas.width = Math.floor(rect.width * dpr);
-        canvas.height = Math.floor(rect.height * dpr);
-      }
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      const width = rect.width;
-      const height = rect.height;
       const cx = width / 2;
       const cy = height / 2;
       const radius = Math.min(width, height) * 0.41;
@@ -1204,12 +1230,51 @@ export function GlobalTrafficMeshGlobe({
       }
 
       ctx.restore();
+      if (!paused) {
+        animId = requestAnimationFrame(render);
+      }
+    };
+
+    const startLoop = () => {
+      if (paused || animId || (typeof document !== "undefined" && document.hidden)) return;
       animId = requestAnimationFrame(render);
     };
 
-    render();
+    const stopLoop = () => {
+      if (animId) {
+        cancelAnimationFrame(animId);
+        animId = 0;
+      }
+    };
 
-    return () => cancelAnimationFrame(animId);
+    const onVisibilityChange = () => {
+      if (document.hidden) stopLoop();
+      else startLoop();
+    };
+
+    const io =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(
+            (entries) => {
+              const visible = Boolean(entries[0]?.isIntersecting);
+              paused = !visible;
+              if (visible) startLoop();
+              else stopLoop();
+            },
+            { rootMargin: "150px" },
+          )
+        : null;
+    io?.observe(canvas);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    startLoop();
+
+    return () => {
+      stopLoop();
+      io?.disconnect();
+      resizeObserver?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, [activeOrigin]);
 
   // Pointer drag to spin globe freely

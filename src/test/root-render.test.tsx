@@ -61,7 +61,7 @@ describe("Test Full Index Rendering", () => {
     const firstSignIn = signInButtons[0];
     if (!firstSignIn) throw new Error("Expected Sign In button");
     fireEvent.click(firstSignIn);
-    expect(screen.getByText(/Access Developer Workspace/i)).toBeDefined();
+    expect(screen.getByText(/Sign In to SparrowX|Access Developer Workspace/i)).toBeDefined();
 
     // Cancel modal cleanly
     const cancelBtn = screen.getByRole("button", { name: /cancel/i });

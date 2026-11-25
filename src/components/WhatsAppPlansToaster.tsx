@@ -115,10 +115,31 @@ export function WhatsAppPlansToaster() {
 
     // 2. Trigger when a visitor scrolls into any Plans / Pricing section
     let observer: IntersectionObserver | null = null;
+    let mutationObserver: MutationObserver | null = null;
     const observed = new WeakSet<Element>();
     let revealTimer: number | null = null;
+    let scanRafId = 0;
 
-    if (typeof IntersectionObserver !== "undefined") {
+    const stopWatchers = () => {
+      if (scanRafId) {
+        window.cancelAnimationFrame(scanRafId);
+        scanRafId = 0;
+      }
+      mutationObserver?.disconnect();
+      mutationObserver = null;
+      observer?.disconnect();
+      observer = null;
+    };
+
+    const isAlreadyDismissed = (() => {
+      try {
+        return window.sessionStorage.getItem(DISMISS_SESSION_KEY) === "1";
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!isAlreadyDismissed && typeof IntersectionObserver !== "undefined") {
       observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
@@ -126,6 +147,7 @@ export function WhatsAppPlansToaster() {
               if (revealTimer == null) {
                 revealTimer = window.setTimeout(() => {
                   triggerToaster();
+                  stopWatchers();
                 }, 450);
               }
               break;
@@ -136,6 +158,11 @@ export function WhatsAppPlansToaster() {
       );
 
       const attachToPlanSections = () => {
+        scanRafId = 0;
+        if (triggeredRef.current) {
+          stopWatchers();
+          return;
+        }
         document.querySelectorAll(PLAN_SELECTOR).forEach((el) => {
           if (!observed.has(el)) {
             observed.add(el);
@@ -144,14 +171,33 @@ export function WhatsAppPlansToaster() {
         });
       };
 
+      const scheduleAttach = () => {
+        if (scanRafId || triggeredRef.current) return;
+        scanRafId = window.requestAnimationFrame(attachToPlanSections);
+      };
+
       attachToPlanSections();
-      const mutationObserver = new MutationObserver(() => attachToPlanSections());
+      mutationObserver = new MutationObserver((mutations) => {
+        if (triggeredRef.current) {
+          stopWatchers();
+          return;
+        }
+        for (let i = 0; i < mutations.length; i++) {
+          const added = mutations[i]?.addedNodes;
+          if (!added || added.length === 0) continue;
+          for (let j = 0; j < added.length; j++) {
+            if (added[j]?.nodeType === 1) {
+              scheduleAttach();
+              return;
+            }
+          }
+        }
+      });
       mutationObserver.observe(document.body, { childList: true, subtree: true });
 
       return () => {
         document.removeEventListener("click", handleClick, { capture: true });
-        mutationObserver.disconnect();
-        observer?.disconnect();
+        stopWatchers();
         if (revealTimer != null) window.clearTimeout(revealTimer);
       };
     }

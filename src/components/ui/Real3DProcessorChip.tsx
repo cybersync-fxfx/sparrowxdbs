@@ -52,8 +52,8 @@ const VARIANT_CONFIG: Record<
 
 function createLgaBackplateCanvas(variant: ProcessorChipVariant): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
-  canvas.width = 512;
-  canvas.height = variant === "xeon" ? 688 : 512;
+  canvas.width = 256;
+  canvas.height = variant === "xeon" ? 344 : 256;
   const ctx = canvas.getContext("2d");
   if (!ctx) return canvas;
 
@@ -65,8 +65,8 @@ function createLgaBackplateCanvas(variant: ProcessorChipVariant): HTMLCanvasElem
   ctx.fillRect(0, 0, w, h);
 
   // Subtle metallic gold LGA contact pad matrix
-  const cols = variant === "xeon" ? 36 : 34;
-  const rows = variant === "xeon" ? 48 : 34;
+  const cols = variant === "xeon" ? 28 : 26;
+  const rows = variant === "xeon" ? 36 : 26;
   const padMarginX = w * 0.065;
   const padMarginY = h * 0.065;
   const cellW = (w - padMarginX * 2) / cols;
@@ -105,9 +105,9 @@ function createLgaBackplateCanvas(variant: ProcessorChipVariant): HTMLCanvasElem
   // Pin-1 gold corner triangle
   ctx.fillStyle = "#facc15";
   ctx.beginPath();
-  ctx.moveTo(w - 16, h - 16);
-  ctx.lineTo(w - 50, h - 16);
-  ctx.lineTo(w - 16, h - 50);
+  ctx.moveTo(w - 8, h - 8);
+  ctx.lineTo(w - 26, h - 8);
+  ctx.lineTo(w - 8, h - 26);
   ctx.closePath();
   ctx.fill();
 
@@ -118,8 +118,8 @@ function createMaterialMapsFromImage(img: HTMLImageElement): {
   bumpCanvas: HTMLCanvasElement;
   roughnessCanvas: HTMLCanvasElement;
 } {
-  const w = 512;
-  const h = Math.max(256, Math.round((img.naturalHeight / Math.max(1, img.naturalWidth)) * w));
+  const w = 256;
+  const h = Math.max(128, Math.round((img.naturalHeight / Math.max(1, img.naturalWidth)) * w));
 
   const srcCanvas = document.createElement("canvas");
   srcCanvas.width = w;
@@ -204,8 +204,9 @@ export function Real3DProcessorChip({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    const container = containerRef.current;
     const host = canvasHostRef.current;
-    if (!host) return;
+    if (!container || !host) return;
 
     // Skip WebGL in headless test environments (jsdom) where getContext is unimplemented
     if (typeof navigator !== "undefined" && /jsdom/i.test(navigator.userAgent)) return;
@@ -217,14 +218,20 @@ export function Real3DProcessorChip({
     if (!gl) return;
 
     let disposed = false;
+    let initialized = false;
+    let isRendered = true;
     let rafId = 0;
     let cleanupFn: (() => void) | null = null;
+    let startRaf: (() => void) | null = null;
+    let stopRaf: (() => void) | null = null;
 
     const prefersReducedMotion =
       typeof window.matchMedia === "function" &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    (async () => {
+    const initWebglScene = async () => {
+      if (initialized || disposed || !canvasHostRef.current) return;
+      initialized = true;
       try {
         const THREE = await import("three");
         const { RoomEnvironment } = await import(
@@ -284,16 +291,21 @@ export function Real3DProcessorChip({
         const chipGroup = new THREE.Group();
         scene.add(chipGroup);
 
-        // Load real Wikimedia Commons CPU photo texture
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        const loadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
-          img.onload = () => resolve(img);
-          img.onerror = reject;
-        });
-        img.src = cfg.textureSrc;
+        // Load compressed WebP first with PNG fallback
+        const loadTextureImage = (src: string) =>
+          new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.decoding = "async";
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = src;
+          });
 
-        const loadedImg = await loadPromise;
+        const webpSrc = cfg.textureSrc.replace(/\.png$/i, ".webp");
+        const loadedImg = await loadTextureImage(webpSrc).catch(() =>
+          loadTextureImage(cfg.textureSrc),
+        );
         if (disposed) {
           pmrem.dispose();
           envTex.dispose();
@@ -374,7 +386,6 @@ export function Real3DProcessorChip({
           const mid = (cfg.width * 0.16) / 2; // half-width of center tabs
 
           ihsShape.moveTo(-o, -leg);
-          // Bottom-left corner leg -> bottom edge with 2 cutouts + center tab
           ihsShape.lineTo(-o, -o);
           ihsShape.lineTo(-leg, -o);
           ihsShape.lineTo(-leg, -inn);
@@ -385,7 +396,6 @@ export function Real3DProcessorChip({
           ihsShape.lineTo(leg, -inn);
           ihsShape.lineTo(leg, -o);
           ihsShape.lineTo(o, -o);
-          // Right edge with 2 cutouts + center tab
           ihsShape.lineTo(o, -leg);
           ihsShape.lineTo(inn, -leg);
           ihsShape.lineTo(inn, -mid);
@@ -395,7 +405,6 @@ export function Real3DProcessorChip({
           ihsShape.lineTo(inn, leg);
           ihsShape.lineTo(o, leg);
           ihsShape.lineTo(o, o);
-          // Top edge with 2 cutouts + center tab
           ihsShape.lineTo(leg, o);
           ihsShape.lineTo(leg, inn);
           ihsShape.lineTo(mid, inn);
@@ -405,7 +414,6 @@ export function Real3DProcessorChip({
           ihsShape.lineTo(-leg, inn);
           ihsShape.lineTo(-leg, o);
           ihsShape.lineTo(-o, o);
-          // Left edge with 2 cutouts + center tab
           ihsShape.lineTo(-o, leg);
           ihsShape.lineTo(-inn, leg);
           ihsShape.lineTo(-inn, mid);
@@ -437,7 +445,7 @@ export function Real3DProcessorChip({
           bevelEnabled: true,
           bevelThickness: 0.028,
           bevelSize: 0.024,
-          bevelSegments: 3,
+          bevelSegments: 2,
         });
 
         // Compute planar UVs for the extruded IHS top face so the real photo aligns cleanly
@@ -553,7 +561,8 @@ export function Real3DProcessorChip({
 
         const startTime = performance.now();
         const animate = (now: number) => {
-          if (disposed) return;
+          rafId = 0;
+          if (disposed || !isRendered || document.hidden) return;
           const t = (now - startTime) * 0.001;
 
           const floatY = prefersReducedMotion ? 0 : Math.sin(t * 1.45) * 0.09;
@@ -568,10 +577,25 @@ export function Real3DProcessorChip({
           renderer.render(scene, camera);
           rafId = requestAnimationFrame(animate);
         };
-        rafId = requestAnimationFrame(animate);
+
+        startRaf = () => {
+          if (disposed || !isRendered || document.hidden || rafId) return;
+          rafId = requestAnimationFrame(animate);
+        };
+
+        stopRaf = () => {
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = 0;
+          }
+        };
+
+        // Render initial frame and start loop only if currently visible
+        renderer.render(scene, camera);
+        startRaf();
 
         cleanupFn = () => {
-          cancelAnimationFrame(rafId);
+          stopRaf?.();
           resizeObserver.disconnect();
           renderer.domElement.removeEventListener("pointerdown", onPointerDown);
           renderer.domElement.removeEventListener("pointermove", onPointerMove);
@@ -597,21 +621,79 @@ export function Real3DProcessorChip({
       } catch {
         // Fallback image stays visible automatically if WebGL fails
       }
-    })();
+    };
+
+    const setActiveState = (active: boolean) => {
+      isRendered = active;
+      if (active) {
+        if (!initialized) void initWebglScene();
+        else startRaf?.();
+      } else {
+        stopRaf?.();
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) stopRaf?.();
+      else if (isRendered) startRaf?.();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // Pause/resume WebGL rendering via contentvisibilityautostatechange with IntersectionObserver fallback
+    const supportsContentVisibility =
+      typeof document !== "undefined" && "contentVisibility" in document.documentElement.style;
+
+    const onContentVisibilityChange = (event: Event) => {
+      const skipped = Boolean((event as Event & { skipped?: boolean }).skipped);
+      setActiveState(!skipped);
+    };
+
+    let io: IntersectionObserver | null = null;
+    if (supportsContentVisibility) {
+      container.addEventListener("contentvisibilityautostatechange", onContentVisibilityChange);
+    }
+
+    if (typeof IntersectionObserver !== "undefined") {
+      io = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          if (!entry) return;
+          if (entry.isIntersecting) {
+            setActiveState(true);
+            if (supportsContentVisibility) {
+              // Once initialized, contentvisibilityautostatechange handles ongoing pause/resume
+              io?.disconnect();
+              io = null;
+            }
+          } else if (!supportsContentVisibility) {
+            setActiveState(false);
+          }
+        },
+        { rootMargin: "250px" },
+      );
+      io.observe(container);
+    } else {
+      setActiveState(true);
+    }
 
     return () => {
       disposed = true;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      container.removeEventListener("contentvisibilityautostatechange", onContentVisibilityChange);
+      io?.disconnect();
       cancelAnimationFrame(rafId);
       cleanupFn?.();
     };
   }, [cfg.accentHex, cfg.height, cfg.ihsDepth, cfg.pcbColor, cfg.pcbDepth, cfg.rimHex, cfg.textureSrc, cfg.width, variant]);
+
+  const fallbackWebpSrc = cfg.textureSrc.replace(/\.png$/i, ".webp");
 
   return (
     <div
       ref={containerRef}
       role="img"
       aria-label={alt}
-      className={`relative select-none overflow-visible bg-transparent ${sizeClass} ${className}`}
+      className={`spx-defer-stage relative select-none overflow-visible bg-transparent ${sizeClass} ${className}`}
     >
       {/* Ambient radial hardware glow behind floating 3D CPU */}
       <div
@@ -647,19 +729,24 @@ export function Real3DProcessorChip({
         }`}
         style={{ perspective: "900px" }}
       >
-        <img
-          src={cfg.textureSrc}
-          alt={alt}
-          loading="lazy"
-          decoding="async"
-          className="max-h-full max-w-full object-contain drop-shadow-[0_18px_32px_rgba(0,0,0,0.72)]"
-          style={{
-            transform:
-              variant === "xeon"
-                ? "rotateX(20deg) rotateY(22deg) rotateZ(-6deg)"
-                : "rotateX(20deg) rotateY(-22deg) rotateZ(6deg)",
-          }}
-        />
+        <picture className="flex max-h-full max-w-full items-center justify-center">
+          <source srcSet={fallbackWebpSrc} type="image/webp" />
+          <img
+            src={cfg.textureSrc}
+            alt={alt}
+            width={variant === "xeon" ? 380 : 420}
+            height={420}
+            loading="lazy"
+            decoding="async"
+            className="max-h-full max-w-full object-contain drop-shadow-[0_18px_32px_rgba(0,0,0,0.72)]"
+            style={{
+              transform:
+                variant === "xeon"
+                  ? "rotateX(20deg) rotateY(22deg) rotateZ(-6deg)"
+                  : "rotateX(20deg) rotateY(-22deg) rotateZ(6deg)",
+            }}
+          />
+        </picture>
       </div>
     </div>
   );

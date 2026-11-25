@@ -1,14 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/site/Navbar";
 import { Hero } from "@/components/site/Hero";
-import { Performance } from "@/components/site/Performance";
 import { Pricing } from "@/components/site/Pricing";
 import { Footer } from "@/components/site/Footer";
 import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/services";
 import { buildRouteHeadFromProfile, SEO_PROFILES } from "@/lib/seo-profiles";
+
+const Performance = lazy(() =>
+  import("@/components/site/Performance").then((m) => ({ default: m.Performance })),
+);
+
+const GAME_FONT_LINK = {
+  rel: "stylesheet",
+  href: "https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap",
+};
 
 type Search = { service?: ServiceId | undefined; auth_error?: string | undefined };
 
@@ -17,7 +25,13 @@ export const Route = createFileRoute("/game/")({
     service: SERVICE_IDS.includes(s.service as ServiceId) ? (s.service as ServiceId) : undefined,
     auth_error: typeof s.auth_error === "string" ? s.auth_error.slice(0, 120) : undefined,
   }),
-  head: () => buildRouteHeadFromProfile(SEO_PROFILES.game),
+  head: () => {
+    const base = buildRouteHeadFromProfile(SEO_PROFILES.game);
+    return {
+      ...base,
+      links: [...(base.links ?? []), GAME_FONT_LINK],
+    };
+  },
   component: GameIndex,
 });
 
@@ -48,8 +62,14 @@ function GameIndex() {
       <Navbar service={service.id} onService={setService} />
       <main>
         <Hero service={service} onService={setService} />
-        <Performance service={service} />
-        <Pricing service={service} />
+        <div className="spx-defer-section">
+          <Suspense fallback={<div id="performance" className="mx-auto max-w-7xl px-5 py-24 min-h-[540px]" />}>
+            <Performance service={service} />
+          </Suspense>
+        </div>
+        <div className="spx-defer-section">
+          <Pricing service={service} />
+        </div>
       </main>
       <Footer />
       <Toaster theme="dark" position="bottom-right" />
