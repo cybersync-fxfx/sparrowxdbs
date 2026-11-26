@@ -27,6 +27,7 @@ import { migrateCloudSupabaseToLocal } from "./migrate-from-supabase.mjs";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
+const SPARROWX_DOMAIN = (process.env.SPARROWX_DOMAIN || "sparrowx.net").trim().toLowerCase();
 const POSTGREST_HOST = process.env.POSTGREST_HOST || "sparrowx-postgrest";
 const POSTGREST_PORT = Number(process.env.POSTGREST_PORT || 3001);
 const PUBLIC_DIR = resolve(process.cwd(), ".output/public");
