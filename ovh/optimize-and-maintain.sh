@@ -177,6 +177,16 @@ EOF
 # 2. AUTONOMOUS SELF-HEALING WATCHDOG (--maintain)
 # ============================================================================
 run_maintain() {
+  # Skip maintenance tick if update.sh / fix.sh is actively deploying
+  local deploy_lock="/var/run/sparrowx-deploy.lock"
+  [ -w /var/run ] || deploy_lock="/tmp/sparrowx-deploy.lock"
+  if command -v flock >/dev/null 2>&1; then
+    exec 9>"${deploy_lock}"
+    if ! flock -n 9; then
+      return 0
+    fi
+  fi
+
   local healed=()
 
   # 2A. Kill rogue sparrowx-traefik if it tries to compete with sparrowx-nginx on :80/:443, then verify core containers
@@ -186,17 +196,25 @@ run_maintain() {
       docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
       healed+=("removed:sparrowx-traefik")
     fi
+    local missing_any="no"
     for cname in sparrowx-postgres sparrowx-postgrest sparrowx-phpmyadmin sparrowx-app sparrowx-nginx; do
       if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "${cname}"; then
         local state
         state="$(docker inspect -f '{{.State.Running}}' "${cname}" 2>/dev/null || echo "false")"
         if [ "${state}" != "true" ]; then
           log_msg "HEAL" "Container ${cname} was stopped — restarting..."
-          docker start "${cname}" >/dev/null 2>&1 || true
+          docker start "${cname}" >/dev/null 2>&1 || missing_any="yes"
           healed+=("docker:${cname}")
         fi
+      else
+        log_msg "HEAL" "Container ${cname} was missing — recreating via docker-compose.ovh.yml..."
+        missing_any="yes"
+        healed+=("recreate:${cname}")
       fi
     done
+    if [ "${missing_any}" = "yes" ] && [ -f "${INSTALL_DIR}/docker-compose.ovh.yml" ]; then
+      docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up -d --no-build --remove-orphans >/dev/null 2>&1 || true
+    fi
   fi
 
   # 2B. Check Host Services (MariaDB, Redis, PHP-FPM, Host Nginx, Pteroq, Wings)

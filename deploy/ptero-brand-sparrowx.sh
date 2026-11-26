@@ -21,7 +21,7 @@ BACKUP_ROOT="${PTERO_DIR}/.sparrowx-brand-backups"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="${BACKUP_ROOT}/${TIMESTAMP}"
 THEME_CSS_SRC="${REPO_DIR}/ovh/ptero-midnight-theme.css"
-THEME_VERSION="2026-midnight-v2"
+THEME_VERSION="2026-midnight-v3"
 
 green() { printf "\033[32m[OK]\033[0m   %s\n" "$1"; }
 info()  { printf "\033[36m[INFO]\033[0m %s\n" "$1"; }
@@ -173,7 +173,8 @@ PY
 }
 
 inject_midnight_palette "${PTERO_DIR}/resources/views/templates/wrapper.blade.php"
-inject_midnight_palette "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
+# auth/core.blade.php extends wrapper.blade.php (no </head> of its own) — only strip any legacy snippet
+strip_all_sparrowx_layers "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
 
 # ------------------------------------------------------------------------------
 # 4. CLEAR & RE-WARM CACHES + HEALTH CHECK

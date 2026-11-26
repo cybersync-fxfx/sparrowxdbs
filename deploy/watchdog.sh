@@ -27,7 +27,17 @@ HTTPS_PORT="${HTTPS_PORT:-443}"
 APP_HOST_PORT="${APP_HOST_PORT:-3000}"
 PTERO_PORT="${PTERO_PORT:-8090}"
 SPARROWX_DOMAIN="${SPARROWX_DOMAIN:-${DOMAIN_ROOT:-sparrowx.net}}"
-DOMAIN_GAME="${DOMAIN_GAME:-game.${SPARROWX_DOMAIN}}"
+DOMAIN_GAME="${DOMAIN_GAME:-game.panel.${SPARROWX_DOMAIN}}"
+
+# Skip watchdog tick if update.sh or fix.sh is actively deploying (prevents Compose races)
+DEPLOY_LOCK_FILE="/var/run/sparrowx-deploy.lock"
+[ -w /var/run ] || DEPLOY_LOCK_FILE="/tmp/sparrowx-deploy.lock"
+if command -v flock >/dev/null 2>&1; then
+  exec 9>"${DEPLOY_LOCK_FILE}"
+  if ! flock -n 9; then
+    exit 0
+  fi
+fi
 
 USE_OVH=1
 COMPOSE_FILE="${INSTALL_DIR}/docker-compose.ovh.yml"
@@ -75,15 +85,14 @@ if command -v docker >/dev/null 2>&1; then
     fi
   done
 
-  # 3. Verify all core containers are running (Traefik v3 mode when /etc/sparrowx/cf.env exists)
-  USE_TRAEFIK=0
-  if [ -f "/etc/sparrowx/cf.env" ] && [ -f "${INSTALL_DIR}/docker-compose.traefik.yml" ]; then
-    USE_TRAEFIK=1
-    REQUIRED_CONTAINERS="sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-traefik sparrowx-phpmyadmin"
-    APP_CNAME="sparrowx-app"
-    PROXY_CNAME="sparrowx-traefik"
-  elif [ "${USE_OVH}" -eq 1 ]; then
-    REQUIRED_CONTAINERS="sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx"
+  # 3. Verify all core containers are running (always use sparrowx-nginx edge proxy; never fight it with Traefik)
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+    log_wd "HEAL: Removing conflicting sparrowx-traefik container competing with sparrowx-nginx on :80/:443..."
+    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+  fi
+
+  if [ "${USE_OVH}" -eq 1 ]; then
+    REQUIRED_CONTAINERS="sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-phpmyadmin sparrowx-nginx"
     APP_CNAME="sparrowx-app"
     PROXY_CNAME="sparrowx-nginx"
   else
@@ -100,17 +109,10 @@ if command -v docker >/dev/null 2>&1; then
     fi
   done
 
-  if [ "${MISSING}" -eq 1 ]; then
-    if [ "${USE_TRAEFIK}" -eq 1 ]; then
-      log_wd "HEAL: Reconciling SparrowX Traefik v3 fleet..."
-      docker rm -f sparrowx-nginx >/dev/null 2>&1 || true
-      docker compose -f "${INSTALL_DIR}/docker-compose.yml" -f "${INSTALL_DIR}/docker-compose.traefik.yml" up -d traefik sparrowx phpmyadmin postgres postgrest >/dev/null 2>&1 || true
-      sleep 4
-    elif [ -f "${COMPOSE_FILE}" ]; then
-      log_wd "HEAL: Reconciling SparrowX container fleet (${COMPOSE_FILE})..."
-      docker compose -f "${COMPOSE_FILE}" up -d --remove-orphans >/dev/null 2>&1 || true
-      sleep 4
-    fi
+  if [ "${MISSING}" -eq 1 ] && [ -f "${COMPOSE_FILE}" ]; then
+    log_wd "HEAL: Reconciling SparrowX container fleet (${COMPOSE_FILE})..."
+    docker compose -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans >/dev/null 2>&1 || true
+    sleep 4
   fi
 
   # 4. Live HTTP Health Probe on Proxy & App

@@ -13,7 +13,7 @@ set -euo pipefail
 PTERO_DIR="${PTERO_DIR:-/var/www/pterodactyl}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EGG_CACHE_DIR="/tmp/sparrowx-ptero-eggs"
-THEME_VERSION="2026-midnight-v2"
+THEME_VERSION="2026-midnight-v3"
 
 echo "[SparrowX Ptero] Syncing curated eggs & lightweight Stellar Midnight Black palette..."
 
@@ -63,8 +63,24 @@ PY
   echo "[ok] Cleaned legacy theme overlays & linked lightweight Midnight Black CSS in ${tpl}"
 }
 
+strip_legacy_only() {
+  local tpl="$1"
+  [ -f "${tpl}" ] || return 0
+  python3 - "${tpl}" <<'PY'
+import re, sys
+path = sys.argv[1]
+txt = open(path, "r", encoding="utf-8").read()
+txt = re.sub(r"\n?<!-- SPARROWX-BRAND:START -->.*?<!-- SPARROWX-BRAND:END -->\n?", "\n", txt, flags=re.S)
+txt = re.sub(r"\n?<!-- SPARROWX-STELLAR-MIDNIGHT:START -->.*?<!-- SPARROWX-STELLAR-MIDNIGHT:END -->\n?", "\n", txt, flags=re.S)
+txt = re.sub(r'^[ \t]*<link[^>]+/sparrowx/(?:sparrowx-theme|ptero-midnight-theme)\.css[^>]*>\s*\n?', "", txt, flags=re.M)
+txt = re.sub(r'^[ \t]*<script[^>]+/sparrowx/(?:sparrowx-brand|ptero-sparrowx-bridge)\.js[^>]*></script>\s*\n?', "", txt, flags=re.M)
+open(path, "w", encoding="utf-8").write(txt.lstrip("\n"))
+PY
+}
+
 inject_clean_midnight_css "${PTERO_DIR}/resources/views/templates/wrapper.blade.php"
-inject_clean_midnight_css "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
+# auth/core.blade.php extends wrapper.blade.php (no </head> of its own) — only strip legacy blocks
+strip_legacy_only "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
 
 # 3. Download curated Pelican/Pterodactyl Egg JSONs for all SparrowX Game & Bot categories
 mkdir -p "${EGG_CACHE_DIR}"
