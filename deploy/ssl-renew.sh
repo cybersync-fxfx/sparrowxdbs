@@ -76,9 +76,7 @@ CANDIDATE_DOMAINS=(
   "agents.${DOMAIN_ROOT}"
   "dpdp.${DOMAIN_ROOT}"
   "dpd.${DOMAIN_ROOT}"
-  "console.${DOMAIN_ROOT}"
   "php.${DOMAIN_ROOT}"
-  "admin.${DOMAIN_ROOT}"
   "${DOMAIN_GAME_WEB}"
   "${DOMAIN_GAME_DASH}"
   "${DOMAIN_GAME}"
@@ -253,7 +251,7 @@ fi
 if [[ " ${VALID_DOMAINS[*]:-} " =~ " php.${DOMAIN_ROOT} " ]]; then
   renew_dedicated_game_cert "php.${DOMAIN_ROOT}" "php" "# 10\\. phpMyAdmin Database Console"
 fi
-for _plat_sub in ai deploy dpdp agents console admin; do
+for _plat_sub in ai deploy dpdp agents; do
   _plat_dom="${_plat_sub}.${DOMAIN_ROOT}"
   if [[ " ${VALID_DOMAINS[*]:-} " =~ " ${_plat_dom} " ]]; then
     renew_dedicated_game_cert "${_plat_dom}" "${_plat_sub}" "# 11\\.${_plat_sub}\\."

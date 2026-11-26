@@ -1301,7 +1301,7 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${infra_domain}" "infra"
   issue_le_cert_to_ovh_ssl "${php_domain}" "php"
   local extra_sub
-  for extra_sub in ai deploy dpdp agents console admin; do
+  for extra_sub in ai deploy dpdp agents; do
     issue_le_cert_to_ovh_ssl "${extra_sub}.${SPARROWX_DOMAIN}" "${extra_sub}"
   done
   if dig +short A "dpd.${SPARROWX_DOMAIN}" @1.1.1.1 2>/dev/null | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -1348,9 +1348,7 @@ ensure_core_letsencrypt_ssl() {
     "agents.${root_domain}"
     "dpdp.${root_domain}"
     "dpd.${root_domain}"
-    "console.${root_domain}"
     "php.${root_domain}"
-    "admin.${root_domain}"
     "game.${root_domain}"
     "game.dash.${root_domain}"
     "game.panel.${root_domain}"
@@ -1915,7 +1913,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_INFRA},DNS:${DOMAIN_AI},DNS:${DOMAIN_DEPLOY},DNS:${DOMAIN_DPDP},DNS:dpd.${SPARROWX_DOMAIN},DNS:${DOMAIN_AGENTS},DNS:${DOMAIN_CONSOLE},DNS:${DOMAIN_ADMIN},DNS:${DOMAIN_PHP},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_INFRA},DNS:${DOMAIN_AI},DNS:${DOMAIN_DEPLOY},DNS:${DOMAIN_DPDP},DNS:dpd.${SPARROWX_DOMAIN},DNS:${DOMAIN_AGENTS},DNS:${DOMAIN_PHP},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -1927,7 +1925,7 @@ if is_pterodactyl_installed; then
   heal_pterodactyl_host_nginx
 fi
 
-for _cert_prefix in ptero game-web game-dash gamesec netsec infra php ai deploy dpdp agents console admin; do
+for _cert_prefix in ptero game-web game-dash gamesec netsec infra php ai deploy dpdp agents; do
   if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
     cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
   fi
@@ -2641,7 +2639,7 @@ EOF
 
   # 11. Standalone Platform Subdomains (ai, deploy, dpdp+dpd, agents, console, admin)
   local _sub _sub_dom _sub_server_names _sub_cert _sub_key _sub_extra_headers
-  for _sub in ai deploy dpdp agents console admin; do
+  for _sub in ai deploy dpdp agents; do
     _sub_dom="${_sub}.${SPARROWX_DOMAIN:-sparrowx.local}"
     _sub_server_names="${_sub_dom}"
     if [ "${_sub}" = "dpdp" ]; then
@@ -2725,7 +2723,7 @@ EOF
 }
 
 render_sparrowx_nginx_conf
-log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_INFRA}, ${DOMAIN_AI}, ${DOMAIN_DEPLOY}, ${DOMAIN_DPDP}, ${DOMAIN_ADMIN}, ${DOMAIN_AGENTS}, ${DOMAIN_CONSOLE}, ${DOMAIN_PHP}, ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_NETSEC} & ${DOMAIN_GAME}"
+log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_INFRA}, ${DOMAIN_AI}, ${DOMAIN_DEPLOY}, ${DOMAIN_DPDP}, ${DOMAIN_AGENTS}, ${DOMAIN_PHP}, ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_NETSEC} & ${DOMAIN_GAME}"
 
 # ==============================================================================
 # STEP 5/7: Auto-Upgrade Systemd Daemon & CLI Symlinks
@@ -3098,9 +3096,7 @@ PLATFORM_DOMAINS_ALL=(
   "${DOMAIN_DEPLOY}"
   "${DOMAIN_DPDP}"
   "dpd.${SPARROWX_DOMAIN}"
-  "${DOMAIN_ADMIN}"
   "${DOMAIN_AGENTS}"
-  "${DOMAIN_CONSOLE}"
   "db.${SPARROWX_DOMAIN}"
   "sec.${SPARROWX_DOMAIN}"
   "file.${SPARROWX_DOMAIN}"
@@ -3148,15 +3144,14 @@ if [ "${#FAILED_PLAT_DOMAINS[@]}" -gt 0 ]; then
     log_err "Subdomain(s) still returning errors after heal: ${STILL_FAILED_PLAT[*]}"
   fi
 else
-  log_ok "All ${#PLATFORM_DOMAINS_ALL[@]} platform subdomains verified ONLINE over HTTPS (infra, ai, deploy, dpdp, admin, agents, console, db, sec, file, password, api, game)"
+  log_ok "All ${#PLATFORM_DOMAINS_ALL[@]} platform subdomains verified ONLINE over HTTPS (infra, ai, deploy, dpdp, agents, db, sec, file, password, api, game)"
 fi
 
 INFRA_EDGE_CODE="$(probe_platform_domain "${DOMAIN_INFRA}")"
 AI_EDGE_CODE="$(probe_platform_domain "${DOMAIN_AI}")"
 DEPLOY_EDGE_CODE="$(probe_platform_domain "${DOMAIN_DEPLOY}")"
 DPDP_EDGE_CODE="$(probe_platform_domain "${DOMAIN_DPDP}")"
-ADMIN_EDGE_CODE="$(probe_platform_domain "${DOMAIN_ADMIN}")"
-PLAT_SUITE_STATUS="INFRA:${INFRA_EDGE_CODE} AI:${AI_EDGE_CODE} DEPLOY:${DEPLOY_EDGE_CODE} DPDP:${DPDP_EDGE_CODE} ADM:${ADMIN_EDGE_CODE}"
+PLAT_SUITE_STATUS="INFRA:${INFRA_EDGE_CODE} AI:${AI_EDGE_CODE} DEPLOY:${DEPLOY_EDGE_CODE} DPDP:${DPDP_EDGE_CODE}"
 
 GAMESEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAMESEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
 if ! echo "${GAMESEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
@@ -3214,7 +3209,6 @@ printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} AI Gateway       : $
 printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Deploy PaaS      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DEPLOY}"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} DPDP Compliance  : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DPDP} (alias: dpd.)"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Agents Runtime   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_AGENTS}"
-printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Admin Control    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_ADMIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game DDoS Portal : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAMESEC}"

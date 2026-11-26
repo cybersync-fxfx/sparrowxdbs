@@ -1196,7 +1196,7 @@ ensure_game_letsencrypt_ssl() {
   issue_le_cert_to_ovh_ssl "${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}" "infra"
   issue_le_cert_to_ovh_ssl "${DOMAIN_PHP:-php.${SPARROWX_DOMAIN}}" "php"
   local extra_sub
-  for extra_sub in ai deploy dpdp agents console admin; do
+  for extra_sub in ai deploy dpdp agents; do
     issue_le_cert_to_ovh_ssl "${extra_sub}.${SPARROWX_DOMAIN}" "${extra_sub}"
   done
   if dig +short A "dpd.${SPARROWX_DOMAIN}" @1.1.1.1 2>/dev/null | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -1720,9 +1720,7 @@ ensure_core_letsencrypt_ssl() {
     "agents.${root_domain}"
     "dpdp.${root_domain}"
     "dpd.${root_domain}"
-    "console.${root_domain}"
     "php.${root_domain}"
-    "admin.${root_domain}"
     "game.${root_domain}"
     "game.dash.${root_domain}"
     "game.panel.${root_domain}"
@@ -2441,7 +2439,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:${DOMAIN_INFRA},DNS:${DOMAIN_AI},DNS:${DOMAIN_DEPLOY},DNS:${DOMAIN_DPDP},DNS:dpd.${SPARROWX_DOMAIN},DNS:${DOMAIN_AGENTS},DNS:${DOMAIN_CONSOLE},DNS:${DOMAIN_ADMIN},DNS:${DOMAIN_PHP},DNS:${DOMAIN_GAME},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:${DOMAIN_INFRA},DNS:${DOMAIN_AI},DNS:${DOMAIN_DEPLOY},DNS:${DOMAIN_DPDP},DNS:dpd.${SPARROWX_DOMAIN},DNS:${DOMAIN_AGENTS},DNS:${DOMAIN_PHP},DNS:${DOMAIN_GAME},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -3134,9 +3132,9 @@ server {
 }
 EOF
 
-  # 11. Standalone Platform Subdomains (ai, deploy, dpdp+dpd, agents, console, admin)
+  # 11. Standalone Platform Subdomains (ai, deploy, dpdp+dpd, agents)
   local _sub _sub_dom _sub_server_names _sub_cert _sub_key _sub_extra_headers
-  for _sub in ai deploy dpdp agents console admin; do
+  for _sub in ai deploy dpdp agents; do
     _sub_dom="${_sub}.${SPARROWX_DOMAIN:-sparrowx.local}"
     _sub_server_names="${_sub_dom}"
     if [ "${_sub}" = "dpdp" ]; then
@@ -3628,7 +3626,7 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
       -out "${INSTALL_DIR}/ovh/ssl/fullchain.pem" \
       -subj "/CN=${SPARROWX_DOMAIN}" >/dev/null 2>&1 || true
   fi
-  for _cert_prefix in ptero game-web game-dash gamesec netsec infra php ai deploy dpdp agents console admin; do
+  for _cert_prefix in ptero game-web game-dash gamesec netsec infra php ai deploy dpdp agents; do
     if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
       cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
     fi
@@ -3677,7 +3675,7 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
 server {
     listen 80 default_server;
     listen 443 ssl default_server;
-    server_name ${SPARROWX_DOMAIN} www.${SPARROWX_DOMAIN} db.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} file.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} api.${SPARROWX_DOMAIN} ${DOMAIN_INFRA} metal.${SPARROWX_DOMAIN} ${DOMAIN_AI} ${DOMAIN_DEPLOY} ${DOMAIN_DPDP} dpd.${SPARROWX_DOMAIN} ${DOMAIN_AGENTS} ${DOMAIN_CONSOLE} ${DOMAIN_ADMIN} ${DOMAIN_GAME_WEB} ${DOMAIN_GAME_DASH} _;
+    server_name ${SPARROWX_DOMAIN} www.${SPARROWX_DOMAIN} db.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} file.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} api.${SPARROWX_DOMAIN} ${DOMAIN_INFRA} metal.${SPARROWX_DOMAIN} ${DOMAIN_AI} ${DOMAIN_DEPLOY} ${DOMAIN_DPDP} dpd.${SPARROWX_DOMAIN} ${DOMAIN_AGENTS} ${DOMAIN_GAME_WEB} ${DOMAIN_GAME_DASH} _;
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -3840,9 +3838,7 @@ FIX_PLAT_DOMAINS=(
   "${DOMAIN_DEPLOY}"
   "${DOMAIN_DPDP}"
   "dpd.${SPARROWX_DOMAIN}"
-  "${DOMAIN_ADMIN}"
   "${DOMAIN_AGENTS}"
-  "${DOMAIN_CONSOLE}"
   "db.${SPARROWX_DOMAIN}"
   "sec.${SPARROWX_DOMAIN}"
   "file.${SPARROWX_DOMAIN}"
@@ -3888,8 +3884,7 @@ INFRA_CODE="$(probe_fix_domain "${DOMAIN_INFRA}")"
 AI_CODE="$(probe_fix_domain "${DOMAIN_AI}")"
 DEPLOY_CODE="$(probe_fix_domain "${DOMAIN_DEPLOY}")"
 DPDP_CODE="$(probe_fix_domain "${DOMAIN_DPDP}")"
-ADMIN_CODE="$(probe_fix_domain "${DOMAIN_ADMIN}")"
-PLAT_SUITE_HEALTH="INFRA:${INFRA_CODE} AI:${AI_CODE} DEPLOY:${DEPLOY_CODE} DPDP:${DPDP_CODE} ADM:${ADMIN_CODE}"
+PLAT_SUITE_HEALTH="INFRA:${INFRA_CODE} AI:${AI_CODE} DEPLOY:${DEPLOY_CODE} DPDP:${DPDP_CODE}"
 
 echo ""
 echo -e "${C_GREEN}╔══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
@@ -3949,7 +3944,6 @@ printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} AI Gateway       : $
 printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Deploy PaaS      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DEPLOY}"
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} DPDP Compliance  : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DPDP} (alias: dpd.)"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Agents Runtime   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_AGENTS}"
-printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Admin Control    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_ADMIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game DDoS Portal : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAMESEC}"

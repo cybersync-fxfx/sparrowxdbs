@@ -136,7 +136,7 @@ def ensure_record(rtype: str, name: str, content: str, proxied=None):
         print(f"  [CF-DNS] WARN: Failed to create {rtype} {name}: {res.get('errors')}")
         return "failed"
 
-# 3. Sync all SparrowX A records
+# 3. Sync active SparrowX A records (only subdomains backed by real dedicated services/routes)
 a_hosts = [
     domain,
     f"www.{domain}",
@@ -154,20 +154,35 @@ a_hosts = [
     f"deploy.{domain}",
     f"*.deploy.{domain}",
     f"agents.{domain}",
-    f"console.{domain}",
     f"panel.{domain}",
-    f"admin.{domain}",
     f"php.{domain}",
     f"netsec.{domain}",
     f"gamesec.{domain}",
 ]
 
-counts = {"created": 0, "updated": 0, "ok": 0, "failed": 0}
+counts = {"created": 0, "updated": 0, "ok": 0, "deleted": 0, "failed": 0}
 for h in a_hosts:
-    # Force proxied=False for wildcards, php, panel, admin, ingest, netsec, gamesec
-    force_direct = h.startswith("*.") or h.split(".")[0] in ("php", "panel", "admin", "ingest", "netsec", "gamesec")
+    # Force proxied=False for wildcards, php, panel, ingest, netsec, gamesec
+    force_direct = h.startswith("*.") or h.split(".")[0] in ("php", "panel", "ingest", "netsec", "gamesec")
     res = ensure_record("A", h, target_ip, proxied=False if force_direct else None)
     counts[res] += 1
+
+# 3b. Auto-delete stale unmapped subdomains (admin / console) that used to fall back to Master Landing
+stale_hosts = [
+    f"console.{domain}",
+    f"admin.{domain}",
+]
+for sh in stale_hosts:
+    for rtype in ("A", "AAAA", "CNAME"):
+        rec = existing.get((rtype, sh.lower()))
+        if rec and rec.get("id"):
+            st, res = cf_request("DELETE", f"/zones/{zone_id}/dns_records/{rec['id']}")
+            if res.get("success"):
+                print(f"  [CF-DNS] DELETED stale {rtype} {sh}")
+                counts["deleted"] += 1
+            else:
+                print(f"  [CF-DNS] WARN: Failed to delete stale {rtype} {sh}: {res.get('errors')}")
+                counts["failed"] += 1
 
 # 4. Sync DMARC TXT record for SEO & email deliverability
 dmarc_val = f"v=DMARC1; p=quarantine; rua=mailto:security@{domain}; pct=100; adkim=s; aspf=s"
@@ -176,6 +191,6 @@ counts[res] += 1
 
 print(
     f"  [CF-DNS] Done: {counts['created']} created, {counts['updated']} updated, "
-    f"{counts['ok']} already up-to-date, {counts['failed']} failed."
+    f"{counts['deleted']} stale deleted, {counts['ok']} already up-to-date, {counts['failed']} failed."
 )
 PY

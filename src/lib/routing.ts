@@ -30,8 +30,7 @@ export type SubdomainProduct =
   | "deploy"
   | "ai"
   | "agents"
-  | "dpdp"
-  | "console";
+  | "dpdp";
 
 /**
  * Prefix rules ordered from most-specific multi-label hosts (e.g. `game.dash.`)
@@ -43,7 +42,6 @@ const SUBDOMAIN_RULES: ReadonlyArray<{
   route: RootRedirectTarget["to"] | null;
 }> = [
   { prefixes: ["game.panel.", "panel."], product: "game-panel", route: null },
-  { prefixes: ["console."], product: "console", route: null },
   { prefixes: ["game.dash.", "game-dash."], product: "game-dash", route: "/game/dashboard" },
   { prefixes: ["game.", "game-"], product: "game", route: "/game" },
   { prefixes: ["infra.", "metal.", "vps.", "cloud."], product: "infra", route: "/infra" },
