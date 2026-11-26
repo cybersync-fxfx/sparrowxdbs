@@ -83,32 +83,66 @@ export function verifyPteroSsoToken(token: string, secretOverride?: string): Pte
 
 type ProbeCacheEntry = { ok: boolean; checkedAt: number };
 const probeCache = new Map<string, ProbeCacheEntry>();
-const PROBE_TTL_MS = 45_000;
+const PROBE_OK_TTL_MS = 45_000;
+const PROBE_FAIL_TTL_MS = 10_000;
+
+async function probeSsoEndpoint(
+  probeUrl: string,
+  hostHeader?: string,
+): Promise<boolean> {
+  try {
+    const res = await fetch(probeUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        ...(hostHeader ? { Host: hostHeader } : {}),
+      },
+      signal: AbortSignal.timeout(2500),
+    });
+    const ct = res.headers.get("content-type") ?? "";
+    if (!res.ok || !ct.includes("application/json")) return false;
+    const json = (await res.json()) as { ok?: boolean; sso?: string; configured?: boolean };
+    return json?.ok === true && json?.sso === "sparrowx" && json?.configured === true;
+  } catch {
+    return false;
+  }
+}
 
 export async function isPteroSsoReady(baseOverride?: string): Promise<boolean> {
   if (!pteroSsoSecret()) return false;
   const base = (baseOverride ?? panelUrl()).replace(/\/+$/, "");
   const cached = probeCache.get(base);
-  if (cached && Date.now() - cached.checkedAt < PROBE_TTL_MS) {
-    return cached.ok;
-  }
-  try {
-    const res = await fetch(`${base}/sparrowx-sso.php?health=1`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(3000),
-    });
-    const ct = res.headers.get("content-type") ?? "";
-    if (!res.ok || !ct.includes("application/json")) {
-      probeCache.set(base, { ok: false, checkedAt: Date.now() });
-      return false;
+  if (cached) {
+    const ttl = cached.ok ? PROBE_OK_TTL_MS : PROBE_FAIL_TTL_MS;
+    if (Date.now() - cached.checkedAt < ttl) {
+      return cached.ok;
     }
-    const json = (await res.json()) as { ok?: boolean; sso?: string; configured?: boolean };
-    const ready = json?.ok === true && json?.sso === "sparrowx" && json?.configured === true;
-    probeCache.set(base, { ok: ready, checkedAt: Date.now() });
-    return ready;
-  } catch {
-    probeCache.set(base, { ok: false, checkedAt: Date.now() });
-    return false;
   }
+
+  // 1. Try public panel URL first
+  let ready = await probeSsoEndpoint(`${base}/sparrowx-sso.php?health=1`);
+
+  // 2. Fallback for Docker hairpin NAT (container -> sparrowx-nginx or host gateway)
+  if (!ready) {
+    let panelHost = "game.panel.sparrowx.net";
+    try {
+      panelHost = new URL(base).host;
+    } catch {
+      // keep default
+    }
+    const pteroPort = env("PTERO_PORT") || "8090";
+    for (const [internalUrl, hdr] of [
+      ["http://sparrowx-nginx/sparrowx-sso.php?health=1", panelHost],
+      [`http://host.docker.internal:${pteroPort}/sparrowx-sso.php?health=1`, panelHost],
+      [`http://127.0.0.1:${pteroPort}/sparrowx-sso.php?health=1`, panelHost],
+    ] as const) {
+      if (await probeSsoEndpoint(internalUrl, hdr)) {
+        ready = true;
+        break;
+      }
+    }
+  }
+
+  probeCache.set(base, { ok: ready, checkedAt: Date.now() });
+  return ready;
 }

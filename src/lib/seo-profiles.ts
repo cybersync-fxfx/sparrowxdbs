@@ -955,6 +955,8 @@ export function resolveCanonicalSubdomainRedirect(
     prefix === "console" ||
     prefix === "php" ||
     prefix === "panel" ||
+    prefix === "game" ||
+    prefix === "game.dash" ||
     prefix === "game.panel" ||
     prefix === "netsec" ||
     prefix === "gamesec" ||
