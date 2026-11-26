@@ -1055,3 +1055,141 @@ dialog.spx-native-dialog[open] {
   .spx-infra-table td:nth-child(6)::before { content: var(--label-6) ": "; color: #94a3b8; font-size: 0.8125rem; }
   .spx-infra-table td:nth-child(7)::before { content: var(--label-7) ": "; color: #94a3b8; font-size: 0.8125rem; }
 }
+
+/* ============================================================================
+   SPARROWX DEPLOY — OBSIDIAN & BRUSHED METALLIC SILVER DESIGN SYSTEM
+   ============================================================================ */
+:root {
+  --spx-canvas: #05060a;
+  --spx-surface: #090b11;
+  --spx-surface-elevated: #10131c;
+  --spx-input: #06080e;
+  --spx-border: rgba(255, 255, 255, 0.07);
+  --spx-border-hover: rgba(255, 255, 255, 0.14);
+}
+
+dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+  background: rgba(5, 6, 10, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.spx-obsidian-card {
+  background: var(--spx-surface);
+  border: 1px solid var(--spx-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.spx-obsidian-card-hover:hover {
+  background: var(--spx-surface-elevated);
+  border-color: var(--spx-border-hover);
+}
+
+.spx-obsidian-input {
+  background: var(--spx-input);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #f3f6fa;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.spx-obsidian-input:focus {
+  outline: none;
+  border-color: rgba(216, 224, 238, 0.42);
+  box-shadow: 0 0 0 3px rgba(216, 224, 238, 0.18);
+}
+
+.spx-silver-btn {
+  background: linear-gradient(180deg, #f3f6fa 0%, #cfd6e2 100%);
+  color: #05060a;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 2px rgba(0, 0, 0, 0.45);
+  transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+  translate: 0px 0px;
+}
+
+.spx-silver-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffffff 0%, #dde3ee 100%);
+  translate: 0px -1px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.spx-silver-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spx-ghost-btn {
+  background: #121622;
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.spx-ghost-btn:hover:not(:disabled) {
+  background: #181d2c;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.spx-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+
+
+/* ===== SparrowX AI (ai.sparrowx.net) Design System & Modern Web Guidance Rules ===== */
+.spx-silver-text {
+  background: linear-gradient(135deg, #ffffff 0%, #b8c2d1 55%, #7e8899 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.spx-silver-btn {
+  background: linear-gradient(135deg, #ffffff 0%, #b8c2d1 55%, #7e8899 100%);
+}
+
+.spx-silver-btn:hover {
+  filter: brightness(1.06);
+}
+
+/* modern-web-guidance `dialog`: prevent underlying page scroll while modal is open */
+dialog.spx-ai-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.spx-ai-dialog::backdrop {
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* modern-web-guidance `tabs`: non-color-only border underline driven by aria-selected */
+.spx-ai-tab {
+  position: relative;
+}
+
+.spx-ai-tab[aria-selected="true"] {
+  color: #ffffff;
+}
+
+.spx-ai-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  border-block-end: 2px solid #b8c2d1;
+}
+
+/* modern-web-guidance `validate-input-after-interaction`: post-interaction visual states */
+.spx-ai-input:user-invalid {
+  border-color: #ef4444;
+}
+
+.spx-ai-input:user-valid {
+  border-color: #10b981;
+}

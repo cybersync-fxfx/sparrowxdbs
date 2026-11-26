@@ -6,11 +6,11 @@ import { BackgroundEngineToaster } from "@/components/BackgroundEngineToaster";
 export const Route = createFileRoute("/ai")({
   head: () => ({
     meta: [
-      { title: "SparrowX AI — Unified LLM Gateway, Model Playground & Prompt Guardrails" },
+      { title: "SparrowX AI — Deploy AI Agents, Workflows & MCP Servers in India (INR)" },
       {
         name: "description",
         content:
-          "OpenAI-compatible AI Gateway with live Model Playground, inline prompt-injection & PII guardrails, scoped API keys, and autonomous threat intelligence.",
+          "Deploy 24/7 AI agents, Langflow workflows, RAG stacks, and MCP servers in 60 seconds on dedicated Indian bare-metal infrastructure. Billed in INR via UPI.",
       },
     ],
     links: [

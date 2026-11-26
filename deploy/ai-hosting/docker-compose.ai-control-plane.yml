@@ -1,0 +1,132 @@
+# SparrowX AI Control Plane (ai.sparrowx.net) — Production Docker Compose
+# Topology: OVH Mumbai Gateway (WireGuard/GRE) -> Caddy Edge -> TanStack Start + BullMQ Worker -> Proxmox/Docker
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: sparrowx-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sparrowx_ai
+      POSTGRES_USER: sparrowx_ai
+      POSTGRES_PASSWORD: ${AI_POSTGRES_PASSWORD:?Set AI_POSTGRES_PASSWORD}
+    volumes:
+      - ai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sparrowx_ai -d sparrowx_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ai_internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: sparrowx-ai-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${AI_REDIS_PASSWORD:?Set AI_REDIS_PASSWORD}"]
+    volumes:
+      - ai_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${AI_REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai_internal
+
+  web:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: sparrowx-ai-web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://sparrowx_ai:${AI_POSTGRES_PASSWORD}@postgres:5432/sparrowx_ai
+      REDIS_URL: redis://:${AI_REDIS_PASSWORD}@redis:6379
+      AI_VAULT_MASTER_KEY: ${AI_VAULT_MASTER_KEY:?Set 32-byte AI_VAULT_MASTER_KEY}
+      PVE_URL: ${PVE_URL:-}
+      PVE_NODE: ${PVE_NODE:-pve-in-01}
+      PVE_TOKEN_ID: ${PVE_TOKEN_ID:-}
+      PVE_TOKEN_SECRET: ${PVE_TOKEN_SECRET:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+    ports:
+      - "127.0.0.1:3010:3000"
+    networks:
+      - ai_internal
+
+  provisioner-worker:
+    image: node:22-alpine
+    container_name: sparrowx-ai-worker
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://sparrowx_ai:${AI_POSTGRES_PASSWORD}@postgres:5432/sparrowx_ai
+      REDIS_URL: redis://:${AI_REDIS_PASSWORD}@redis:6379
+      AI_VAULT_MASTER_KEY: ${AI_VAULT_MASTER_KEY:?Set 32-byte AI_VAULT_MASTER_KEY}
+      PVE_URL: ${PVE_URL:-}
+      PVE_NODE: ${PVE_NODE:-pve-in-01}
+      PVE_TOKEN_ID: ${PVE_TOKEN_ID:-}
+      PVE_TOKEN_SECRET: ${PVE_TOKEN_SECRET:-}
+    volumes:
+      - ./apps/worker:/app/worker:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ai_edge_routes:/etc/caddy/tenants
+    command: ["node", "--experimental-strip-types", "/app/worker/provisioner.worker.ts"]
+    networks:
+      - ai_internal
+
+  caddy-edge:
+    image: caddy:2-alpine
+    container_name: sparrowx-ai-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ai_edge_routes:/etc/caddy/tenants
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - ai_internal
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: sparrowx-ai-cadvisor
+    restart: unless-stopped
+    read_only: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "127.0.0.1:8085:8080"
+    networks:
+      - ai_internal
+
+volumes:
+  ai_pgdata:
+  ai_redisdata:
+  ai_edge_routes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  ai_internal:
+    driver: bridge
