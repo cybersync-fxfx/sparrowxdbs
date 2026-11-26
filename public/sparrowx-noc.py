@@ -39,6 +39,7 @@ import ipaddress
 import json
 import os
 import platform
+import queue
 import re
 import shutil
 import socket
@@ -59,7 +60,7 @@ except ImportError:
     curses = None  # Handled gracefully for --once mode on non-curses systems
 
 
-VERSION = "2.7.0"
+VERSION = "2.8.0"
 SPARK_CHARS = " ▁▂▃▄▅▆▇█"
 IS_LINUX = sys.platform.startswith("linux")
 THEMES = ("cyber", "emerald", "crimson")
@@ -69,6 +70,14 @@ BLOCKLIST_FILE = Path("/opt/sparrowx/xdp/blocked_ipv4.txt")
 AUTO_BAN_TTL_SEC = 1800          # 30 minutes max for any automated temporary mitigation
 STRICT_SYN_COOLDOWN_SEC = 60.0   # Minimum hold before relaxing auto-triggered strict SYN
 STRICT_MANUAL_DEBOUNCE_SEC = 1.5 # Prevent accidental rapid key-repeat flapping on [x]
+DISCORD_DEFAULT_DIGEST_SEC = 900 # Periodic Discord health update every 15 minutes (0 to disable)
+DISCORD_ENV_FILES = (
+    Path("/opt/sparrowxdbs/.env"),
+    Path("/opt/sparrowx/.env"),
+    Path("/etc/sparrowx/noc.env"),
+    Path(".env"),
+    Path(".env.local"),
+)
 
 # Built-in infrastructure CIDRs that MUST NEVER be auto-banned or flagged as attackers
 INTERNAL_SAFE_CIDRS = tuple(
@@ -1012,16 +1021,275 @@ def evaluate_talker_behavior(
 
 
 # ------------------------------------------------------------------------------
+# Discord Webhook Alerting & Periodic NOC Telemetry Notifier (Stdlib Only)
+# ------------------------------------------------------------------------------
+
+def resolve_discord_webhook_url(explicit: Optional[str] = None) -> str:
+    """Resolve Discord webhook URL from CLI flag, environment, or local .env files."""
+    candidates: List[str] = []
+    if explicit:
+        candidates.append(explicit.strip())
+    for env_key in (
+        "SPARROWX_DISCORD_WEBHOOK_URL",
+        "NOC_DISCORD_WEBHOOK_URL",
+        "DISCORD_WEBHOOK_URL",
+    ):
+        val = os.environ.get(env_key, "").strip()
+        if val:
+            candidates.append(val)
+
+    for env_path in DISCORD_ENV_FILES:
+        if not env_path.exists():
+            continue
+        try:
+            for raw in env_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                if k in (
+                    "SPARROWX_DISCORD_WEBHOOK_URL",
+                    "NOC_DISCORD_WEBHOOK_URL",
+                    "DISCORD_WEBHOOK_URL",
+                ):
+                    v = v.strip().strip('"').strip("'")
+                    if v:
+                        candidates.append(v)
+        except OSError:
+            continue
+
+    for url in candidates:
+        if url.startswith("https://discord.com/api/webhooks/") or url.startswith(
+            "https://discordapp.com/api/webhooks/"
+        ):
+            return url
+    return ""
+
+
+def _neutralize_discord_mentions(text: str) -> str:
+    text = re.sub(r"@(everyone|here)", "@\u200b\\1", text, flags=re.IGNORECASE)
+    return re.sub(r"<@!?\d+>|<@&\d+>", "[mention]", text)
+
+
+class DiscordWebhookNotifier:
+    """Non-blocking Discord embed dispatcher with cooldown deduplication."""
+
+    COLOR_RED = 0xEF4444
+    COLOR_ORANGE = 0xF97316
+    COLOR_AMBER = 0xF59E0B
+    COLOR_GREEN = 0x10B981
+    COLOR_CYAN = 0x06B6D4
+    COLOR_PURPLE = 0xA855F7
+
+    def __init__(
+        self,
+        webhook_url: Optional[str] = None,
+        enabled: bool = True,
+        digest_interval_sec: float = DISCORD_DEFAULT_DIGEST_SEC,
+    ):
+        self.webhook_url = resolve_discord_webhook_url(webhook_url) if enabled else ""
+        self.enabled = bool(enabled and self.webhook_url)
+        self.digest_interval_sec = max(0.0, float(digest_interval_sec))
+        self.sent_count = 0
+        self.failed_count = 0
+        self.last_error = ""
+        self._cooldowns: Dict[str, float] = {}
+        self._lock = threading.Lock()
+        self._queue: "queue.Queue[Dict[str, Any]]" = queue.Queue(maxsize=64)
+        self._worker: Optional[threading.Thread] = None
+        if self.enabled:
+            self._worker = threading.Thread(target=self._worker_loop, daemon=True)
+            self._worker.start()
+
+    def _post_payload(self, payload: Dict[str, Any], timeout: float = 5.0) -> Tuple[bool, str]:
+        if not self.webhook_url:
+            return False, "Discord webhook URL not configured"
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            self.webhook_url,
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "User-Agent": f"SparrowX-NOC/{VERSION}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                status = getattr(resp, "status", 204)
+                if 200 <= status < 300:
+                    with self._lock:
+                        self.sent_count += 1
+                    return True, f"HTTP {status}"
+                with self._lock:
+                    self.failed_count += 1
+                    self.last_error = f"HTTP {status}"
+                return False, f"HTTP {status}"
+        except urllib.error.HTTPError as e:
+            err_msg = f"HTTP {e.code}"
+            with self._lock:
+                self.failed_count += 1
+                self.last_error = err_msg
+            return False, err_msg
+        except Exception as e:
+            err_msg = str(e)[:120]
+            with self._lock:
+                self.failed_count += 1
+                self.last_error = err_msg
+            return False, err_msg
+
+    def _worker_loop(self) -> None:
+        while True:
+            payload = self._queue.get()
+            try:
+                self._post_payload(payload, timeout=5.0)
+                time.sleep(0.45)  # Polite pacing to avoid Discord 429 burst limits
+            except Exception:
+                pass
+            finally:
+                self._queue.task_done()
+
+    def build_embed_payload(
+        self,
+        title: str,
+        description: str = "",
+        color: int = COLOR_CYAN,
+        fields: Optional[List[Tuple[str, str, bool]]] = None,
+        content: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        embed_fields: List[Dict[str, Any]] = []
+        for name, val, inline in (fields or [])[:20]:
+            s_val = _neutralize_discord_mentions(str(val or "—"))[:950]
+            embed_fields.append(
+                {
+                    "name": _neutralize_discord_mentions(str(name))[:120],
+                    "value": s_val or "—",
+                    "inline": bool(inline),
+                }
+            )
+        embed: Dict[str, Any] = {
+            "title": _neutralize_discord_mentions(title)[:220],
+            "color": color,
+            "fields": embed_fields,
+            "footer": {"text": f"SparrowX Master Cybersecurity NOC v{VERSION} · Live Telemetry"},
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+        if description:
+            embed["description"] = _neutralize_discord_mentions(description)[:1900]
+        payload: Dict[str, Any] = {
+            "username": "SparrowX Master NOC",
+            "allowed_mentions": {"parse": []},
+            "embeds": [embed],
+        }
+        if content:
+            payload["content"] = _neutralize_discord_mentions(content)[:300]
+        return payload
+
+    def send_embed(
+        self,
+        title: str,
+        description: str = "",
+        color: int = COLOR_CYAN,
+        fields: Optional[List[Tuple[str, str, bool]]] = None,
+        dedup_key: Optional[str] = None,
+        cooldown_sec: float = 30.0,
+        content: Optional[str] = None,
+        sync: bool = False,
+    ) -> Tuple[bool, str]:
+        if not self.enabled:
+            return False, "Discord webhook not configured (set SPARROWX_DISCORD_WEBHOOK_URL)"
+        now = time.monotonic()
+        if dedup_key and not sync:
+            with self._lock:
+                last = self._cooldowns.get(dedup_key, 0.0)
+                if (now - last) < cooldown_sec:
+                    return False, "cooldown"
+                self._cooldowns[dedup_key] = now
+                if len(self._cooldowns) > 400:
+                    cutoff = now - 600.0
+                    self._cooldowns = {k: v for k, v in self._cooldowns.items() if v >= cutoff}
+        payload = self.build_embed_payload(
+            title=title,
+            description=description,
+            color=color,
+            fields=fields,
+            content=content,
+        )
+        if sync:
+            return self._post_payload(payload, timeout=6.0)
+        try:
+            self._queue.put_nowait(payload)
+            return True, "queued"
+        except queue.Full:
+            return False, "queue_full"
+
+    def send_snapshot(
+        self,
+        snap: DashboardSnapshot,
+        title: str = "Live NOC Status Update",
+        color: Optional[int] = None,
+        sync: bool = False,
+    ) -> Tuple[bool, str]:
+        f = snap.filtration
+        nic = snap.nic
+        host = snap.host
+        if color is None:
+            color = (
+                self.COLOR_RED
+                if f.threat_level == "UNDER ATTACK"
+                else (self.COLOR_AMBER if f.threat_level == "ELEVATED" else self.COLOR_GREEN)
+            )
+        top_blk = ", ".join(b.ip for b in snap.blocked_ips[:5]) or "None"
+        fields: List[Tuple[str, str, bool]] = [
+            ("Host & NIC", f"`{host.hostname}` · `{nic.iface}` ({nic.ipv4})", True),
+            ("Threat Level", f"**{f.threat_level}** · Guard: `{f.autoguard_mode.upper()}`", True),
+            ("CPU / RAM / Uptime", f"{host.cpu_pct:.1f}% ({host.cpu_cores}c) · {host.mem_used_gb:.1f}/{host.mem_total_gb:.1f}GB · Up {host.uptime_str}", False),
+            ("Ingress (RX)", f"{fmt_bps(nic.rx_bps)} ({fmt_pps(nic.rx_pps)}) · Peak {fmt_bps(nic.peak_rx_bps)}", True),
+            ("Egress (TX)", f"{fmt_bps(nic.tx_bps)} ({fmt_pps(nic.tx_pps)}) · Peak {fmt_bps(nic.peak_tx_bps)}", True),
+            ("XDP / Firewall", f"{f.xdp_mode} · Drop `{fmt_pps(f.xdp_drop_pps)}` · Strict-SYN `{'ON' if f.strict_mode else 'STD'}` · UFW `{f.ufw_status}`", False),
+            ("Connections", f"{len(snap.talkers)} IPs / {f.total_sockets} sock · SYN `{f.syn_recv_count}` · EST `{f.established_count}` · TW `{f.time_wait_count}`", True),
+            ("Protected / Policy", f"{len(snap.backends)} services · ⛔ {len(snap.blocked_ips)} BLK · ✓ {len(snap.whitelisted_ips)} WL", True),
+            ("Recent Blocklist", f"`{top_blk}`", False),
+        ]
+        return self.send_embed(
+            title=f"🛡️ {title}",
+            description=f"Real-time kernel, XDP/eBPF & firewall snapshot from `{host.hostname}`.",
+            color=color,
+            fields=fields,
+            sync=sync,
+        )
+
+
+# ------------------------------------------------------------------------------
 # Linux Telemetry Collectors (100% Real Kernel/System Data in Live Mode)
 # ------------------------------------------------------------------------------
 
 class TelemetryCollector:
-    def __init__(self, iface: Optional[str] = None, demo: bool = False, autoguard: str = "monitor"):
+    def __init__(
+        self,
+        iface: Optional[str] = None,
+        demo: bool = False,
+        autoguard: str = "monitor",
+        discord_webhook: Optional[str] = None,
+        discord_interval: float = DISCORD_DEFAULT_DIGEST_SEC,
+        no_discord: bool = False,
+    ):
         self.demo = demo
         self.forced_iface = iface
         self.active_iface = iface or self._detect_default_iface()
         self.autoguard_mode = autoguard if autoguard in AUTOGUARD_MODES else "monitor"
         self.safe_guard = SafeIpGuard()
+        self.discord = DiscordWebhookNotifier(
+            webhook_url=discord_webhook,
+            enabled=not no_discord,
+            digest_interval_sec=discord_interval,
+        )
+        self._discord_baseline_ready: bool = False
+        self._discord_seen_blocked: Set[str] = set()
+        self._discord_last_threat: str = "NORMAL"
+        self._discord_last_digest_mono: float = time.monotonic()
+        self._last_snapshot: Optional[DashboardSnapshot] = None
 
         self._prev_cpu: Optional[Tuple[int, int]] = None
         self._prev_net: Dict[str, Tuple[float, int, int, int, int, int, int]] = {}
@@ -2313,6 +2581,14 @@ class TelemetryCollector:
         }[self.autoguard_mode]
         msg = f"Auto-Guard switched to {desc}"
         self.push_event("SAFE", msg)
+        self.discord.send_embed(
+            title=f"⚙️ Auto-Guard Mode Changed -> {self.autoguard_mode.upper()}",
+            description=desc,
+            color=DiscordWebhookNotifier.COLOR_PURPLE,
+            fields=[("Host", f"`{socket.gethostname()}`", True), ("Mode", f"`{self.autoguard_mode.upper()}`", True)],
+            dedup_key=f"autoguard:{self.autoguard_mode}",
+            cooldown_sec=5.0,
+        )
         return msg
 
     def _evaluate_smart_defense(
@@ -2476,6 +2752,23 @@ class TelemetryCollector:
         if applied:
             msg = f"BANNED {ip} -> [{', '.join(applied)}]"
             self.push_event("BAN", msg)
+            geo = self.geo_resolver.get_cached_or_queue(ip)
+            geo_loc = ", ".join(p for p in (geo.city, geo.country) if p) if geo and geo.geo_status == "ok" else "Resolving..."
+            geo_isp = f"{geo.isp} ({geo.asn})" if geo and geo.isp else "Unknown"
+            self._discord_seen_blocked.add(ip)
+            self.discord.send_embed(
+                title=f"⛔ IP Banned: {ip}",
+                description=ban_reason,
+                color=DiscordWebhookNotifier.COLOR_RED,
+                fields=[
+                    ("Target IP", f"`{ip}`", True),
+                    ("Layers Applied", f"`{', '.join(applied)}`", True),
+                    ("Attempted Activity", ban_tried, False),
+                    ("Location / ISP", f"{geo_loc} · {geo_isp}", False),
+                ],
+                dedup_key=f"ban:{ip}",
+                cooldown_sec=60.0,
+            )
             return msg
         msg = f"Ban failed for {ip} (run with sudo/root privileges)"
         self.push_event("SYS", msg)
@@ -2525,6 +2818,16 @@ class TelemetryCollector:
         msg = f"UNBANNED {ip} <- [{', '.join(removed)}]" if removed else f"No active ban found for {ip}"
         if not silent:
             self.push_event("SYS", msg)
+            if removed:
+                self._discord_seen_blocked.discard(ip)
+                self.discord.send_embed(
+                    title=f"✅ IP Unbanned: {ip}",
+                    description=msg,
+                    color=DiscordWebhookNotifier.COLOR_GREEN,
+                    fields=[("IP", f"`{ip}`", True), ("Cleared From", f"`{', '.join(removed)}`", True)],
+                    dedup_key=f"unban:{ip}",
+                    cooldown_sec=10.0,
+                )
         return msg
 
     def whitelist_ip(self, ip: str, note: str = "trusted") -> str:
@@ -2611,6 +2914,14 @@ class TelemetryCollector:
         if applied:
             msg = f"WHITELISTED {ip} -> [{', '.join(applied)}]"
             self.push_event("WHT", msg)
+            self.discord.send_embed(
+                title=f"🟢 IP Whitelisted: {ip}",
+                description=f"Added to bypass maps ({note}).",
+                color=DiscordWebhookNotifier.COLOR_GREEN,
+                fields=[("IP", f"`{ip}`", True), ("Layers", f"`{', '.join(applied)}`", True)],
+                dedup_key=f"wl:{ip}",
+                cooldown_sec=10.0,
+            )
             return msg
         msg = f"Whitelist failed for {ip} (run with sudo/root privileges)"
         self.push_event("SYS", msg)
@@ -2711,6 +3022,17 @@ class TelemetryCollector:
             self._last_strict_toggle_mono = now_mono
             if not auto:
                 self._strict_auto_engaged = False
+            self.discord.send_embed(
+                title=f"⚡ Strict-SYN Mitigation {'ENABLED' if want_strict else 'RELAXED'}",
+                description=msg,
+                color=DiscordWebhookNotifier.COLOR_ORANGE if want_strict else DiscordWebhookNotifier.COLOR_GREEN,
+                fields=[
+                    ("Host", f"`{socket.gethostname()}`", True),
+                    ("Trigger", "Auto-Guard" if auto else "Manual Operator", True),
+                ],
+                dedup_key=f"strict:{want_strict}",
+                cooldown_sec=15.0,
+            )
         self.push_event("XDP", msg)
         return msg
 
@@ -2890,7 +3212,7 @@ class TelemetryCollector:
 
         self._poll_logs()
 
-        return DashboardSnapshot(
+        snap = DashboardSnapshot(
             timestamp=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             host=host,
             nic=nic,
@@ -2903,6 +3225,125 @@ class TelemetryCollector:
             logs=list(self.log_buffer),
             demo_mode=False,
         )
+        self._last_snapshot = snap
+        self._process_discord_telemetry(snap)
+        return snap
+
+    def _process_discord_telemetry(self, snap: DashboardSnapshot) -> None:
+        """Detect live threat transitions, new Fail2Ban/XDP bans, and periodic digests."""
+        if not self.discord.enabled or snap.demo_mode:
+            return
+
+        current_blocked = {b.ip: b for b in snap.blocked_ips}
+        threat = snap.filtration.threat_level
+
+        # First tick: record baseline so startup doesn't replay pre-existing bans
+        if not self._discord_baseline_ready:
+            self._discord_baseline_ready = True
+            self._discord_seen_blocked = set(current_blocked.keys())
+            self._discord_last_threat = threat
+            self._discord_last_digest_mono = time.monotonic()
+            return
+
+        # 1. Threat level escalation or recovery
+        if threat != self._discord_last_threat:
+            prev_threat = self._discord_last_threat
+            self._discord_last_threat = threat
+            if threat == "UNDER ATTACK":
+                top_talkers = ", ".join(
+                    f"{t.ip} ({t.total_conns}c/{t.risk})" for t in snap.talkers[:4]
+                ) or "None"
+                self.discord.send_embed(
+                    title=f"🚨 UNDER ATTACK DETECTED on {snap.host.hostname}",
+                    description=f"Threat escalated from `{prev_threat}` -> **`UNDER ATTACK`** on `{snap.nic.iface}`.",
+                    color=DiscordWebhookNotifier.COLOR_RED,
+                    content="**URGENT: SPARROWX NOC UNDER ATTACK ALERT**",
+                    fields=[
+                        ("Ingress (RX)", f"{fmt_bps(snap.nic.rx_bps)} ({fmt_pps(snap.nic.rx_pps)})", True),
+                        ("XDP Drop Rate", f"`{fmt_pps(snap.filtration.xdp_drop_pps)}`", True),
+                        ("SYN-RECV / Sockets", f"SYN `{snap.filtration.syn_recv_count}` · Total `{snap.filtration.total_sockets}`", True),
+                        ("Auto-Guard / Strict-SYN", f"`{snap.filtration.autoguard_mode.upper()}` · Strict `{'ON' if snap.filtration.strict_mode else 'STD'}`", True),
+                        ("Top Active IPs", f"`{top_talkers}`", False),
+                    ],
+                    dedup_key="threat:UNDER_ATTACK",
+                    cooldown_sec=90.0,
+                )
+            elif threat == "ELEVATED":
+                self.discord.send_embed(
+                    title=f"⚠️ Elevated Traffic / Threat on {snap.host.hostname}",
+                    description=f"Threat transitioned `{prev_threat}` -> **`ELEVATED`** on `{snap.nic.iface}`.",
+                    color=DiscordWebhookNotifier.COLOR_AMBER,
+                    fields=[
+                        ("Ingress (RX)", f"{fmt_bps(snap.nic.rx_bps)} ({fmt_pps(snap.nic.rx_pps)})", True),
+                        ("XDP Drop Rate", f"`{fmt_pps(snap.filtration.xdp_drop_pps)}`", True),
+                        ("SYN-RECV", f"`{snap.filtration.syn_recv_count}`", True),
+                    ],
+                    dedup_key="threat:ELEVATED",
+                    cooldown_sec=120.0,
+                )
+            elif prev_threat in ("UNDER ATTACK", "ELEVATED") and threat == "NORMAL":
+                self.discord.send_embed(
+                    title=f"✅ Threat Mitigated — Back to NORMAL ({snap.host.hostname})",
+                    description=f"Traffic normalized from `{prev_threat}` -> **`NORMAL`**.",
+                    color=DiscordWebhookNotifier.COLOR_GREEN,
+                    fields=[
+                        ("Ingress (RX)", f"{fmt_bps(snap.nic.rx_bps)} ({fmt_pps(snap.nic.rx_pps)})", True),
+                        ("XDP Drop Rate", f"`{fmt_pps(snap.filtration.xdp_drop_pps)}`", True),
+                        ("Active Blocklist", f"`{len(snap.blocked_ips)}` IPs", True),
+                    ],
+                    dedup_key="threat:NORMAL",
+                    cooldown_sec=60.0,
+                )
+
+        # 2. Newly detected Fail2Ban / XDP / nftables / UFW bans
+        for ip, entry in current_blocked.items():
+            if ip in self._discord_seen_blocked:
+                continue
+            self._discord_seen_blocked.add(ip)
+            geo_parts = [p for p in (entry.city, entry.country) if p]
+            geo_loc = ", ".join(geo_parts) if geo_parts else "Unknown"
+            if entry.country_code and entry.country_code != "??":
+                geo_loc = f"{geo_loc} ({entry.country_code})"
+            isp_str = f"{entry.isp} ({entry.asn})" if entry.isp else (entry.asn or "Unknown")
+            self.discord.send_embed(
+                title=f"🛡️ New Blocklist Hit: {ip} [{entry.source}]",
+                description=entry.reason or "Blocked by SparrowX Security Layer",
+                color=DiscordWebhookNotifier.COLOR_ORANGE,
+                fields=[
+                    ("Host", f"`{snap.host.hostname}`", True),
+                    ("Blocked IP", f"`{ip}`", True),
+                    ("Enforcement", f"`{entry.source}`", True),
+                    ("Activity / Evidence", entry.attempted or entry.note or "Filter violation", False),
+                    ("GeoIP & ISP", f"{geo_loc} · {isp_str}", False),
+                ],
+                dedup_key=f"newblk:{ip}",
+                cooldown_sec=180.0,
+            )
+
+        # Prune unbanned IPs from seen set so future re-bans alert again
+        self._discord_seen_blocked &= set(current_blocked.keys())
+
+        # 3. Periodic NOC status digest
+        if self.discord.digest_interval_sec > 0:
+            now_mono = time.monotonic()
+            if (now_mono - self._discord_last_digest_mono) >= self.discord.digest_interval_sec:
+                self._discord_last_digest_mono = now_mono
+                self.discord.send_snapshot(snap, title=f"Periodic NOC Health Update ({snap.host.hostname})")
+
+    def send_discord_snapshot(self, sync: bool = False) -> str:
+        snap = self._last_snapshot or self.collect(sync_geo=True)
+        ok, detail = self.discord.send_snapshot(
+            snap,
+            title=f"Live NOC Snapshot ({snap.host.hostname})",
+            sync=sync,
+        )
+        if ok:
+            msg = f"Discord NOC snapshot {'sent' if sync else 'queued'} ({detail})"
+            self.push_event("SYS", msg)
+            return msg
+        msg = f"Discord webhook unavailable: {detail}"
+        self.push_event("SYS", msg)
+        return msg
 
 
 # ------------------------------------------------------------------------------
@@ -3084,11 +3525,13 @@ class SparrowxCursesApp:
         # Sub-header hardware & policy summary strip (line 1)
         cpu_bar = make_bar(snap.host.cpu_pct / 100.0, 8)
         ram_bar = make_bar(snap.host.mem_pct / 100.0, 8)
+        disc_s = f"DISCORD:ON({self.collector.discord.sent_count})" if self.collector.discord.enabled else "DISCORD:OFF"
         sub = (
             f" CPU [{cpu_bar}] {snap.host.cpu_pct:4.1f}% ({snap.host.cpu_cores}c)  │  "
             f"RAM [{ram_bar}] {snap.host.mem_used_gb:.1f}/{snap.host.mem_total_gb:.1f}GB  │  "
             f"UP {snap.host.uptime_str}  │  "
             f"GUARD:{snap.filtration.autoguard_mode.upper()}  │  "
+            f"{disc_s}  │  "
             f"⛔ {len(snap.blocked_ips)} BLK · ✓ {len(snap.whitelisted_ips)} WL · 🛡️ {snap.filtration.safeguard_protected} SAFE"
         )
         self._safe_addstr(stdscr, 1, 0, sub, curses.color_pair(self.P_MUTED))
@@ -3513,7 +3956,7 @@ class SparrowxCursesApp:
             filt_lbl = f" FILTER='{self.filter_text}'" if self.filter_text else ""
             bar = (
                 f" [1-5/0] Pane  [b] Ban  [u] Unban  [w] WL  [W] UnWL  [a] AutoGuard  "
-                f"[x] StrictSYN  [t] View  [c] Theme  [i] NIC  [p] {pause_lbl}  [/] Filter  [q] Quit{filt_lbl}"
+                f"[x] StrictSYN  [d] Discord  [t] View  [c] Theme  [i] NIC  [p] {pause_lbl}  [/] Filter  [q] Quit{filt_lbl}"
             )
             attr = curses.color_pair(self.P_HEADER_BAR) | curses.A_BOLD
         self._safe_addstr(stdscr, h - 1, 0, bar.ljust(max(1, w - 1)), attr)
@@ -3687,6 +4130,9 @@ class SparrowxCursesApp:
                 msg = self.collector.toggle_strict_mode()
                 self.snapshot = self.collector.collect()
                 self.set_banner(msg)
+            elif ch in (ord("d"), ord("D")):
+                msg = self.collector.send_discord_snapshot(sync=False)
+                self.set_banner(msg, duration=5.0)
             elif ch == curses.KEY_UP:
                 if self.focused_pane == 4 or self.policy_view == 1:
                     self.selected_block_idx = max(0, self.selected_block_idx - 1)
@@ -3881,9 +4327,77 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--once", action="store_true", help="Print a single ANSI terminal snapshot and exit")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors in --once mode")
     parser.add_argument("--demo", action="store_true", help="Run with simulated DDoS telemetry (opt-in preview)")
+    parser.add_argument(
+        "--discord-webhook",
+        default=None,
+        help="Discord webhook URL (auto-discovered from SPARROWX_DISCORD_WEBHOOK_URL or .env if omitted)",
+    )
+    parser.add_argument(
+        "--discord-interval",
+        type=float,
+        default=DISCORD_DEFAULT_DIGEST_SEC,
+        help=f"Seconds between periodic Discord status digests (default: {DISCORD_DEFAULT_DIGEST_SEC}, 0 to disable)",
+    )
+    parser.add_argument("--no-discord", action="store_true", help="Disable Discord webhook alerts")
+    parser.add_argument(
+        "--discord-test",
+        action="store_true",
+        help="Send a live NOC snapshot embed to the configured Discord webhook and exit",
+    )
+    parser.add_argument(
+        "--daemon",
+        action="store_true",
+        help="Run headless 24/7 background monitor pushing real-time Discord security alerts & periodic status updates",
+    )
     args = parser.parse_args(argv)
 
-    collector = TelemetryCollector(iface=args.iface, demo=args.demo, autoguard=args.autoguard)
+    collector = TelemetryCollector(
+        iface=args.iface,
+        demo=args.demo,
+        autoguard=args.autoguard,
+        discord_webhook=args.discord_webhook,
+        discord_interval=args.discord_interval,
+        no_discord=args.no_discord,
+    )
+
+    if args.discord_test:
+        if not collector.discord.enabled:
+            print("ERROR: Discord webhook URL not found. Set SPARROWX_DISCORD_WEBHOOK_URL in .env or pass --discord-webhook.")
+            return 1
+        if not args.demo and IS_LINUX:
+            collector.collect(sync_geo=False)
+            time.sleep(0.35)
+        snap = collector.collect(sync_geo=not args.demo)
+        ok, detail = collector.discord.send_snapshot(
+            snap,
+            title=f"Live NOC Connection Verified ({snap.host.hostname})",
+            sync=True,
+        )
+        print(f"Discord test {'SUCCEEDED' if ok else 'FAILED'}: {detail}")
+        return 0 if ok else 1
+
+    if args.daemon:
+        poll_sec = max(2.0, float(args.interval))
+        print(
+            f"[sparrowx-noc v{VERSION}] Starting headless daemon (iface={collector.active_iface}, "
+            f"autoguard={collector.autoguard_mode}, discord={'ON' if collector.discord.enabled else 'OFF'}, "
+            f"digest={int(collector.discord.digest_interval_sec)}s, poll={poll_sec}s)",
+            flush=True,
+        )
+        snap = collector.collect(sync_geo=not args.demo)
+        if collector.discord.enabled:
+            collector.discord.send_snapshot(
+                snap,
+                title=f"SparrowX NOC Monitor Online ({snap.host.hostname})",
+                sync=True,
+            )
+        try:
+            while True:
+                time.sleep(poll_sec)
+                collector.collect(sync_geo=False)
+        except KeyboardInterrupt:
+            pass
+        return 0
 
     if args.once or curses is None or not sys.stdout.isatty():
         if not args.demo and IS_LINUX:
