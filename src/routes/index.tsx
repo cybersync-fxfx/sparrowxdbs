@@ -79,9 +79,6 @@ const ErrorDocumentationCenter = lazy(() =>
 const SparrowxAiBrainCenter = lazy(() =>
   import("@/components/SparrowxAiBrainCenter").then((m) => ({ default: m.SparrowxAiBrainCenter })),
 );
-const GlobalAiBrainFloatingDock = lazy(() =>
-  import("@/components/SparrowxAiBrainCenter").then((m) => ({ default: m.GlobalAiBrainFloatingDock })),
-);
 const SovereignDatabaseStudio = lazy(() =>
   import("@/components/SovereignDatabaseStudio").then((m) => ({ default: m.SovereignDatabaseStudio })),
 );
@@ -336,8 +333,8 @@ function Dashboard() {
   const [newServiceEndpoint, setNewServiceEndpoint] = useState("");
   const [sdkServiceId, setSdkServiceId] = useState<string | null>(null);
 
-  // Navigation & layout state
-  const [activeNav, setActiveNav] = useState("Overview");
+  // Navigation & layout state (Main Client Area always opens on My Services)
+  const [activeNav, setActiveNav] = useState("My Services");
   const [activeDocCode, setActiveDocCode] = useState<string | null>(null);
   const [activeDocRef, setActiveDocRef] = useState<string | null>(null);
   const [activeDocSection, setActiveDocSection] = useState<"sdk_install" | "errors" | "dns_verification">("sdk_install");
@@ -480,7 +477,8 @@ function Dashboard() {
           operatorName: storedSession.fullName || "SparrowX Admin",
           operatorEmail: storedSession.email,
         });
-        setPortalMode("soc");
+        setPortalMode("client");
+        setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));
       } else {
         setAuthSession({
           role: "client",
@@ -520,7 +518,8 @@ function Dashboard() {
             operatorName: dbUser.fullName || storedSession.fullName || "SparrowX Admin",
             operatorEmail: dbUser.email,
           });
-          setPortalMode("soc");
+          setPortalMode((prev) => (prev === "admin" ? "admin" : "client"));
+          setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));
         } else {
           setAuthSession({
             role: "client",
@@ -558,7 +557,8 @@ function Dashboard() {
             operatorName: ssoUser.fullName || "SparrowX Admin",
             operatorEmail: ssoUser.email,
           });
-          setPortalMode("soc");
+          setPortalMode("client");
+          setActiveNav((prev) => (prev === "Overview" ? "My Services" : prev));
         } else {
           setAuthSession({
             role: "client",
@@ -1619,16 +1619,6 @@ function Dashboard() {
         return;
       }
     }
-    if (navLabel === "SIEM Rules") {
-      setPortalMode(authSession.role === "admin" ? "soc" : "client");
-      setActiveNav("SIEM & Detection Rules");
-      return;
-    }
-    if (navLabel === "CVEs & Patch Tracker") {
-      setPortalMode(authSession.role === "admin" ? "soc" : "client");
-      setActiveNav("Vulnerabilities");
-      return;
-    }
     if (
       navLabel === "Activity History" ||
       navLabel === "Activity & Operations History" ||
@@ -1637,7 +1627,7 @@ function Dashboard() {
       setActiveNav("Activity History");
       return;
     }
-    if (navLabel === "Client Subscriptions" || navLabel === "Performance & Kill-Switch") {
+    if (navLabel === "Client Subscriptions" || navLabel === "Performance & Kill-Switch" || navLabel === "Error Monitoring") {
       if (authSession.role !== "admin") {
         showToast("Access Restricted: Admin Master requires Administrator credentials.", "error");
         return;
@@ -1648,47 +1638,26 @@ function Dashboard() {
         showToast("Access Restricted: Access Control requires Administrator credentials.", "error");
         return;
       }
-      if (portalMode !== "soc") {
-        setPortalMode("admin");
-      }
+      setPortalMode("admin");
     } else if (
       navLabel === "My Services" ||
       navLabel === "Clients & Services" ||
       navLabel === "Subscriptions & Due Dates" ||
       navLabel === "Billing & Credits" ||
-      navLabel === "Profile Management"
-    ) {
-      setPortalMode("client");
-    } else if (
+      navLabel === "Profile Management" ||
       navLabel === "Client Overview" ||
-      navLabel === "Web & WAF Security" ||
-      navLabel === "AI Agent & LLM Shield" ||
-      navLabel === "Cloud & Endpoint Security" ||
-      navLabel === "Compliance & Evidence" ||
       navLabel === "Subscription & Modules"
     ) {
       setPortalMode("client");
-    } else if (
-      navLabel === "Help center" ||
-      navLabel === "Settings" ||
-      navLabel === "AI Brain" ||
-      navLabel === "SparrowX AI Brain" ||
-      navLabel === "Protection Status & Verification" ||
-      navLabel === "Protection Verification" ||
-      navLabel === "Protection Status" ||
-      navLabel === "Global Traffic Mesh" ||
-      navLabel === "Live Traffic Mesh"
-    ) {
-      // Retain current active portalMode (works in SOC Command, Client Area, and Admin)
+    } else if (navLabel === "Help center" || navLabel === "Settings") {
+      // Retain current active portalMode (Client Area or Admin Master)
     } else {
-      // All SOC Operations (Overview, Incidents, Threat indicators, CVEs, Assets, Team, Integrations)
-      if (authSession.role === "admin") {
-        setPortalMode("soc");
-      } else {
-        setPortalMode("client");
-      }
+      // Legacy SOC views live on sec.sparrowx.net — keep main Client Area clean on My Services
+      setPortalMode("client");
+      setActiveNav("My Services");
+      return;
     }
-    const resolvedNav = navLabel === "SparrowX AI Brain" ? "AI Brain" : navLabel;
+    const resolvedNav = navLabel === "Clients & Services" ? "My Services" : navLabel;
     setActiveNav(resolvedNav);
     if (typeof window !== "undefined") {
       try {
@@ -1707,7 +1676,7 @@ function Dashboard() {
     if (typeof window === "undefined") return undefined;
     const onPopState = (event: PopStateEvent) => {
       const state = event.state as { spxNav?: string; spxPortalMode?: "client" | "soc" | "admin" } | null;
-      if (state?.spxNav) {
+      if (state?.spxNav && state.spxPortalMode !== "soc" && state.spxNav !== "Overview") {
         setActiveNav(state.spxNav);
         if (state.spxPortalMode) setPortalMode(state.spxPortalMode);
       } else {
@@ -1792,16 +1761,16 @@ function Dashboard() {
         operatorName: user.fullName || "SparrowX Admin",
         operatorEmail: user.email,
       });
-      setPortalMode("soc");
-      setActiveNav("Overview");
+      setPortalMode("client");
+      setActiveNav("My Services");
       void recordAudit(
-        `Admin user ${user.email} (admin=yes) authenticated into Admin Command Center`,
-        "Admin & Subscriptions Portal",
+        `Admin user ${user.email} (admin=yes) authenticated into SparrowX Client Area`,
+        "Client Area & Subscriptions Portal",
         "Info",
       );
-      emitEngineToast(`Admin session active (${user.email})`, "success", "Admin Authenticated");
-      emitEngineActivity("Auth", `Admin ${user.email} logged into SOC command`, "success");
-      showToast(`Admin session active (${user.email})`);
+      emitEngineToast(`Signed in as ${user.fullName || user.email}`, "success", "Authenticated");
+      emitEngineActivity("Auth", `Admin ${user.email} opened Client Area`, "success");
+      showToast(`Welcome back, ${user.fullName || user.email}`);
     } else {
       const matchedTenant =
         clientTenants.find(
@@ -1925,77 +1894,14 @@ function Dashboard() {
       action: () => void;
     }> = [];
 
-    // 1. Core Security & WAF Rules
+    // 1. Core Client Area & Platform Services
     const securityItems = [
       {
-        title: "Web & WAF Security",
-        description: "Edge reverse proxy, SQL injection filters, OWASP Top 10, rate limiting & DDoS mitigation",
-        category: "Security Module" as const,
-        badge: "WAF Active",
-        keywords: ["waf", "web", "firewall", "shield", "sqli", "sql injection", "xss", "ddos", "proxy", "edge", "rules"],
-        action: () => {
-          handleNavigate("Web & WAF Security");
-          setSearch("");
-          setSearchOpen(false);
-          showToast("Navigated to Web & WAF Security module");
-        },
-      },
-      {
-        title: "AI Agent & LLM Shield",
-        description: "Zero-latency prompt firewall, adversarial jailbreak protection, and MCP tool call defense",
-        category: "Security Module" as const,
-        badge: "AI Guard",
-        keywords: ["ai", "llm", "agent", "prompt", "jailbreak", "mcp", "guardrails", "guard"],
-        action: () => {
-          handleNavigate("AI Agent & LLM Shield");
-          setSearch("");
-          setSearchOpen(false);
-          showToast("Navigated to AI Agent & LLM Shield");
-        },
-      },
-      {
-        title: "Protection Status & Verification",
-        description: "Live health probe, edge DNS verification, latency checks, and inline protection auditing",
-        category: "Security Module" as const,
-        badge: "Verification",
-        keywords: ["verify", "verification", "status", "probe", "dns", "latency", "health", "audit"],
-        action: () => {
-          handleNavigate("Protection Status & Verification");
-          setSearch("");
-          setSearchOpen(false);
-          showToast("Navigated to Protection Status & Verification Center");
-        },
-      },
-      {
-        title: "SparrowX DB (DBaaS)",
-        description: "Sovereign Postgres 16, pgvector embeddings, connection pooler (:6543), and REST APIs",
-        category: "Database" as const,
-        badge: "DBaaS",
-        keywords: ["db", "database", "postgres", "sparrowbase", "supabase", "sql", "pooler", "keys", "vector"],
-        action: () => {
-          handleNavigate("SparrowX DB");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "Live Traffic Mesh & Threat Map",
-        description: "Visual attack vectors, live threat arcs, host beacons, and connection streams",
-        category: "Navigation" as const,
-        badge: "Threat Map",
-        keywords: ["map", "globe", "traffic", "mesh", "matrix", "threats", "arcs", "streams", "live"],
-        action: () => {
-          handleNavigate("Live Traffic Mesh");
-          setSearch("");
-          setSearchOpen(false);
-        },
-      },
-      {
-        title: "Client Portal & Services",
-        description: "Service onboarding wizard, DNS CNAME configuration, and active service credentials",
+        title: "My Services & Provisioned Workspaces",
+        description: "View created services, launch dashboards, rename or manage active deployments",
         category: "Navigation" as const,
         badge: "Client Area",
-        keywords: ["client", "services", "portal", "onboarding", "dns", "cname", "customer", "my services"],
+        keywords: ["client", "services", "portal", "my services", "dashboard", "created", "workspace"],
         action: () => {
           handleNavigate("My Services");
           setSearch("");
@@ -2003,23 +1909,71 @@ function Dashboard() {
         },
       },
       {
-        title: "SIEM & Detection Rules",
-        description: "Configured perimeter detection triggers, anomaly heuristics, and automated block rules",
-        category: "Security Module" as const,
-        badge: "SIEM",
-        keywords: ["siem", "rules", "detection", "anomaly", "heuristics", "block rules"],
+        title: "Subscriptions & Due Dates",
+        description: "Inspect active subscriptions, renewal due dates, and plan status across services",
+        category: "Navigation" as const,
+        badge: "Subscriptions",
+        keywords: ["subscription", "subscriptions", "due", "renewal", "renew", "plan", "plans"],
         action: () => {
-          handleNavigate("SIEM Rules");
+          handleNavigate("Subscriptions & Due Dates");
           setSearch("");
           setSearchOpen(false);
         },
       },
       {
-        title: "Activity & Operations History",
-        description: "Immutable security audit log, operator access events, and incident resolution history",
+        title: "Billing & SparrowX Coins",
+        description: "Manage SparrowX Coins balance, top up via UPI/USDT, and inspect billing transactions",
         category: "Navigation" as const,
-        badge: "Audit Log",
-        keywords: ["audit", "logs", "activity", "history", "events", "compliance"],
+        badge: "Finance",
+        keywords: ["billing", "credits", "coins", "payment", "upi", "invoice", "plan", "pricing"],
+        action: () => {
+          handleNavigate("Billing & Credits");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "SparrowX Cloud DB (PostgreSQL)",
+        description: "Sovereign Postgres 16, pgvector embeddings, connection pooler (:6543), and REST APIs",
+        category: "Database" as const,
+        badge: "DBaaS",
+        keywords: ["db", "database", "postgres", "sparrowbase", "supabase", "sql", "pooler", "vector"],
+        action: () => {
+          handleNavigate("SparrowX DB");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "SparrowX Shield (WAF & SOC)",
+        description: "Dedicated Edge WAF, DDoS defense, deep domain scanner & SOC workbench on sec.sparrowx.net",
+        category: "Security Module" as const,
+        badge: "sec.sparrowx.net",
+        keywords: ["waf", "web", "firewall", "shield", "soc", "ddos", "security", "sec"],
+        action: () => {
+          handleNavigate("SparrowX Shield");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Profile Management",
+        description: "Account identity, Google/GitHub SSO profile, and workspace preferences",
+        category: "Navigation" as const,
+        badge: "Account",
+        keywords: ["profile", "account", "settings", "email", "sso", "user"],
+        action: () => {
+          handleNavigate("Profile Management");
+          setSearch("");
+          setSearchOpen(false);
+        },
+      },
+      {
+        title: "Activity History",
+        description: "Account activity log, provisioning history, and service operations timeline",
+        category: "Navigation" as const,
+        badge: "Activity",
+        keywords: ["audit", "logs", "activity", "history", "events"],
         action: () => {
           handleNavigate("Activity History");
           setSearch("");
@@ -2027,13 +1981,13 @@ function Dashboard() {
         },
       },
       {
-        title: "Billing & Credits",
-        description: "Manage subscription plans, top up usage credits, and inspect payment transactions",
+        title: "System Status & Docs",
+        description: "Live infrastructure health, error reference lookup, and platform guides",
         category: "Navigation" as const,
-        badge: "Finance",
-        keywords: ["billing", "credits", "payment", "invoice", "plan", "subscription", "pricing"],
+        badge: "Docs",
+        keywords: ["status", "health", "docs", "help", "errors", "troubleshooting"],
         action: () => {
-          handleNavigate("Billing & Credits");
+          handleNavigate("Troubleshooting & Docs");
           setSearch("");
           setSearchOpen(false);
         },
@@ -2419,12 +2373,12 @@ function Dashboard() {
           currentUser={currentUser}
           onUserAuthenticated={handleUserAuthenticated}
           onOpenClientArea={() => {
-            setActiveNav(authSession.role === "admin" ? "Overview" : "My Services");
-            setPortalMode(authSession.role === "admin" ? "soc" : "client");
+            setActiveNav("My Services");
+            setPortalMode("client");
           }}
           onClose={() => {
-            setActiveNav(authSession.role === "admin" ? "Overview" : "My Services");
-            setPortalMode(authSession.role === "admin" ? "soc" : "client");
+            setActiveNav("My Services");
+            setPortalMode("client");
           }}
         />
         <BackgroundEngineToaster />
@@ -2439,8 +2393,8 @@ function Dashboard() {
           currentUser={currentUser}
           onUserAuthenticated={handleUserAuthenticated}
           onOpenClientArea={() => {
-            setActiveNav(authSession.role === "admin" ? "Overview" : "My Services");
-            setPortalMode(authSession.role === "admin" ? "soc" : "client");
+            setActiveNav("My Services");
+            setPortalMode("client");
           }}
         />
         <BackgroundEngineToaster />
@@ -2522,32 +2476,18 @@ function Dashboard() {
             )}
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-            {/* Top Workspace Switcher (SOC Dashboard vs Client Area vs Admin) */}
+            {/* Top Workspace Switcher (Client Area vs Admin Master — SOC lives on sec.sparrowx.net) */}
             {authSession.role === "admin" ? (
               <div className="flex items-center gap-0.5 sm:gap-1 rounded-lg border border-border bg-card/90 p-0.5 text-xs shadow-sm shrink-0">
                 <button
                   type="button"
-                  onClick={() => handleNavigate("Overview")}
-                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    portalMode === "soc"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                  }`}
-                  title="Security Operations Center (Incidents, IOCs, CVEs, Assets)"
-                >
-                  <ShieldAlert className="size-3.5 shrink-0" />
-                  <span className="hidden sm:inline">SOC Command</span>
-                  <span className="sm:hidden text-[11px]">SOC</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => handleNavigate("My Services")}
-                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
-                    portalMode === "client"
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1 text-xs font-semibold transition-all ${
+                    portalMode !== "admin"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                   }`}
-                  title="Client Portal (Protected Services, Credits, SDKs)"
+                  title="Client Area (My Services, Subscriptions & SparrowX Coins)"
                 >
                   <Boxes className="size-3.5 shrink-0" />
                   <span className="hidden sm:inline">Client Area</span>
@@ -2556,7 +2496,7 @@ function Dashboard() {
                 <button
                   type="button"
                   onClick={() => handleNavigate("Client Subscriptions")}
-                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-1.5 sm:px-2.5 py-1 text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1 sm:gap-1.5 rounded-md px-2 sm:px-3 py-1 text-xs font-semibold transition-all ${
                     portalMode === "admin" && activeNav !== "Database Studio"
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
@@ -2590,14 +2530,14 @@ function Dashboard() {
               <Search className="size-3.5 shrink-0" />
               <input
                 ref={searchInputRef}
-                aria-label="Search operational assets, incidents, and threat feeds"
+                aria-label="Search your services, subscriptions, billing, and docs"
                 className="w-44 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
                 onChange={(event) => {
                   setSearch(event.target.value);
                   setSearchOpen(true);
                 }}
                 onFocus={() => setSearchOpen(true)}
-                placeholder="Search telemetry, WAF, AI..."
+                placeholder="Search services, billing..."
                 type="text"
                 value={search}
               />
@@ -2623,7 +2563,7 @@ function Dashboard() {
               {searchOpen && search.trim().length > 0 && (
                 <div className="absolute top-10 right-0 z-50 w-[420px] rounded-xl border border-border bg-popover/95 p-2 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-100 max-h-[460px] overflow-y-auto">
                   <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-mono text-muted-foreground border-b border-border/60 pb-1.5 mb-1.5">
-                    <span>SECURITY SEARCH RESULTS ({searchResults.length})</span>
+                    <span>WORKSPACE SEARCH RESULTS ({searchResults.length})</span>
                     <span>ESC to close</span>
                   </div>
 
@@ -2688,7 +2628,7 @@ function Dashboard() {
               type="button"
               onClick={() => setNotificationDrawerOpen(true)}
               className="relative flex size-8.5 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors shadow-xs"
-              title="Security Operations Alerts"
+              title="Account & Service Notifications"
               aria-label="Open notifications drawer"
             >
               <Bell className="size-4" />
@@ -2731,13 +2671,24 @@ function Dashboard() {
                   <Button
                     className="w-full justify-start text-xs font-medium"
                     onClick={() => {
-                      handleNavigate("Overview");
+                      handleNavigate("My Services");
                       setMenuOpen(false);
                     }}
                     size="sm"
-                    variant={portalMode === "soc" ? "secondary" : "ghost"}
+                    variant={portalMode === "client" ? "secondary" : "ghost"}
                   >
-                    <ShieldAlert className="size-3.5 text-primary" /> SOC Operations Command
+                    <Boxes className="size-3.5 text-primary" /> My Services (Client Area)
+                  </Button>
+                  <Button
+                    className="w-full justify-start text-xs font-medium"
+                    onClick={() => {
+                      handleNavigate("Billing & Credits");
+                      setMenuOpen(false);
+                    }}
+                    size="sm"
+                    variant={activeNav === "Billing & Credits" ? "secondary" : "ghost"}
+                  >
+                    <Coins className="size-3.5 text-primary" /> Billing &amp; SparrowX Coins
                   </Button>
                   <Button
                     className="w-full justify-start text-xs font-medium"
@@ -2944,7 +2895,7 @@ function Dashboard() {
                 initialCode={activeDocCode}
                 initialReferenceId={activeDocRef}
                 initialSection={activeDocSection}
-                onNavigateBack={() => handleNavigate(portalMode === "soc" ? "Overview" : "My Services")}
+                onNavigateBack={() => handleNavigate("My Services")}
                 onNavigateToGlobe={() => handleNavigate("Global Traffic Mesh")}
                 showToast={showToast}
               />
@@ -5258,24 +5209,6 @@ function Dashboard() {
             );
           })()}
 
-        {authSession.role === "admin" && (
-          <Suspense fallback={null}>
-            <GlobalAiBrainFloatingDock
-              activeNav={activeNav}
-              portalMode={portalMode}
-              incidents={incidents}
-              threatIndicators={threatIndicators}
-              assets={assets}
-              vulnerabilities={vulnerabilities}
-              protectedServices={protectedServices}
-              clientTenants={clientTenants}
-              auditLogs={auditLogs}
-              onEnforceGlobalAutoBlock={handleEnforceGlobalAutoBlock}
-              onOpenFullBrainView={() => handleNavigate("AI Brain")}
-              showToast={showToast}
-            />
-          </Suspense>
-        )}
         <BackgroundEngineToaster />
       </SidebarInset>
     </SidebarProvider>
@@ -5635,7 +5568,7 @@ function AppSidebar({
     { label: "Platform Settings & MFA", navKey: "Settings", icon: Wrench },
   ];
 
-  // Client Area Hub Navigation (clean routing pipeline — each product manages its own dashboard & API keys)
+  // Client Area Hub Navigation (clean account hub for managing created services, subscriptions & coins)
   const clientAreaNavItems: Array<{
     label: string;
     icon: typeof Activity;
@@ -5646,16 +5579,7 @@ function AppSidebar({
       icon: Boxes,
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
-    ...(isAdminSession
-      ? [
-          {
-            label: "SparrowX AI Brain",
-            icon: Brain,
-            count: "AI",
-          },
-        ]
-      : []),
-    { label: "Subscriptions & Due Dates", icon: Activity },
+    { label: "Subscriptions & Due Dates", icon: CreditCard },
     { label: "Billing & Credits", icon: Coins, count: "COINS" },
     { label: "Profile Management", icon: Users },
     { label: "Activity History", icon: Clock3 },
@@ -5671,21 +5595,6 @@ function AppSidebar({
     count?: string | undefined;
   }> = [
     { label: "Client Overview", icon: Sparkles },
-    ...(tenantCount > 0 ? [{ label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" }] : []),
-    ...(isAdminSession ? [{ label: "SparrowX AI Brain", icon: Brain, count: "AI" }] : []),
-    { label: "Defense Updates & Intel", icon: Globe2 },
-    ...(clientEnabledModules.includes("web_security")
-      ? [{ label: "Web & WAF Security", icon: Globe2 }]
-      : []),
-    ...(clientEnabledModules.includes("ai_shield")
-      ? [{ label: "AI Agent & LLM Shield", icon: ShieldCheck }]
-      : []),
-    ...(clientEnabledModules.includes("cloud_security")
-      ? [{ label: "Cloud & Endpoint Security", icon: Server }]
-      : []),
-    ...(clientEnabledModules.includes("compliance")
-      ? [{ label: "Compliance & Evidence", icon: FileSearch }]
-      : []),
     { label: "Subscription & Modules", icon: Wrench },
   ];
 
@@ -5697,9 +5606,6 @@ function AppSidebar({
         icon: Users,
         count: tenantCount > 0 ? String(tenantCount) : undefined,
       },
-      { label: "Global Traffic Mesh", icon: Globe2, count: "LIVE" },
-      { label: "SparrowX AI Brain", icon: Brain, count: "AI" },
-      { label: "Defense Updates & Intel", icon: Globe2 },
       { label: "Performance & Kill-Switch", icon: Activity },
       { label: "Error Monitoring", icon: AlertTriangle },
       { label: "System Status", icon: Activity },
@@ -5753,11 +5659,9 @@ function AppSidebar({
               isCollapsed
                 ? toggleSidebar()
                 : handleNavClick(
-                    portalMode === "soc"
-                      ? "Overview"
-                      : isAdminSession
-                        ? "Client Subscriptions"
-                        : "My Services",
+                    portalMode === "admin" && isAdminSession
+                      ? "Client Subscriptions"
+                      : "My Services",
                   )
             }
             title={isCollapsed ? "Expand sidebar (Ctrl+B)" : "SparrowX Home"}
@@ -5776,13 +5680,11 @@ function AppSidebar({
               sparrow<span className="text-primary">x</span>
             </div>
             <div className="text-[10px] uppercase text-muted-foreground font-semibold">
-              {portalMode === "soc"
-                ? "SOC Incident Command"
-                : portalMode === "admin"
-                  ? "Admin Control"
-                  : isInClientArea
-                    ? "Client Area"
-                    : "Service Dashboard"}
+              {portalMode === "admin"
+                ? "Admin Control"
+                : isInClientArea
+                  ? "Client Area"
+                  : "Service Dashboard"}
             </div>
           </div>
           <Button
@@ -5807,22 +5709,18 @@ function AppSidebar({
             }`}
           />
           <span className="truncate text-xs font-medium">
-            {portalMode === "soc"
-              ? "Security Operations Center"
-              : portalMode === "admin"
-                ? "Admin Master"
-                : isInClientArea
-                  ? currentUser?.fullName || "Client Account"
-                  : activeClientTenant?.name || "Service"}
+            {portalMode === "admin"
+              ? "Admin Master"
+              : isInClientArea
+                ? currentUser?.fullName || "Client Account"
+                : activeClientTenant?.name || "Service"}
           </span>
           <span className="ml-auto text-[10px] font-mono text-muted-foreground">
-            {portalMode === "soc"
-              ? "SOC LIVE"
-              : portalMode === "admin"
-                ? "ADMIN"
-                : !isInClientArea && activeClientTenant
-                  ? activeClientTenant.planTier.toUpperCase()
-                  : "ACTIVE"}
+            {portalMode === "admin"
+              ? "ADMIN"
+              : !isInClientArea && activeClientTenant
+                ? activeClientTenant.planTier.toUpperCase()
+                : "ACTIVE"}
           </span>
         </div>
       </SidebarHeader>
@@ -6055,17 +5953,17 @@ function AppSidebar({
               </SidebarGroupContent>
             </SidebarGroup>
             <SidebarGroup className="mt-1 group-data-[collapsible=icon]:items-center">
-              <SidebarGroupLabel>Operations</SidebarGroupLabel>
+              <SidebarGroupLabel>Workspace</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                   <SidebarMenuItem>
                     <SidebarMenuButton
-                      isActive={activeNav === "Overview"}
-                      onClick={() => handleNavClick("Overview")}
-                      tooltip="Switch to SOC Command"
+                      isActive={false}
+                      onClick={() => handleNavClick("My Services")}
+                      tooltip="Switch to Client Area"
                     >
-                      <ShieldAlert className="size-4 text-primary shrink-0" />
-                      <span className="truncate">Switch to SOC Command</span>
+                      <Boxes className="size-4 text-primary shrink-0" />
+                      <span className="truncate">Back to Client Area</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -6097,20 +5995,20 @@ function AppSidebar({
 
             {isAdminSession && (
               <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-                <SidebarGroupLabel>Security Operations</SidebarGroupLabel>
+                <SidebarGroupLabel>Administration</SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className="group-data-[collapsible=icon]:items-center">
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         className="font-medium text-primary hover:text-primary"
-                        onClick={() => handleNavClick("Overview")}
-                        tooltip="SOC Operations & Live Telemetry"
+                        onClick={() => handleNavClick("Client Subscriptions")}
+                        tooltip="Manage all client subscriptions & plans"
                       >
-                        <ShieldAlert className="size-4 text-primary shrink-0" />
-                        <span className="truncate">SOC Dashboard</span>
+                        <Users className="size-4 text-primary shrink-0" />
+                        <span className="truncate">Admin Master</span>
                       </SidebarMenuButton>
                       <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
-                        Live
+                        Admin
                       </SidebarMenuBadge>
                     </SidebarMenuItem>
                   </SidebarMenu>
@@ -6150,29 +6048,6 @@ function AppSidebar({
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-
-            {isAdminSession && (
-              <SidebarGroup className="mt-2 border-t border-sidebar-border/50 pt-2 group-data-[collapsible=icon]:items-center">
-                <SidebarGroupLabel>Security Operations</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu className="group-data-[collapsible=icon]:items-center">
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        className="font-medium text-primary hover:text-primary"
-                        onClick={() => handleNavClick("Overview")}
-                        tooltip="SOC Operations & Live Telemetry"
-                      >
-                        <ShieldAlert className="size-4 text-primary shrink-0" />
-                        <span className="truncate">SOC Dashboard</span>
-                      </SidebarMenuButton>
-                      <SidebarMenuBadge className="border border-primary/30 bg-primary/15 text-primary">
-                        Live
-                      </SidebarMenuBadge>
-                    </SidebarMenuItem>
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            )}
           </>
         )}
       </SidebarContent>

@@ -158,8 +158,8 @@ export const SPARROWX_ROUTING_SERVICES: SparrowxCatalogService[] = [
     id: "game-hosting",
     name: "SparrowX Game Hosting",
     tagline: "NVMe Gen4 FiveM, SA-MP, Minecraft & Discord Bot servers with 1-click Pterodactyl SSO.",
-    domain: "game.dash.sparrowx.net",
-    prodUrl: "https://game.dash.sparrowx.net",
+    domain: "sparrowx.net/game/dashboard",
+    prodUrl: "https://sparrowx.net/game/dashboard",
     url: "/game/dashboard",
     badge: "Game Cloud",
   },
@@ -271,7 +271,7 @@ function resolveServiceDashboardUrl(srv: ClientTenant): string {
     hay.includes("samp") ||
     hay.includes("discord")
   ) {
-    return prod ? "https://game.dash.sparrowx.net" : "/game/dashboard";
+    return prod ? "https://sparrowx.net/game/dashboard" : "/game/dashboard";
   }
   if (hay.includes("deploy") || hay.includes("paas") || hay.includes("vercel")) {
     return prod ? "https://deploy.sparrowx.net" : "/deploy";
@@ -301,6 +301,22 @@ function resolveServiceDashboardUrl(srv: ClientTenant): string {
     return prod ? "https://infra.sparrowx.net/infra/dashboard" : "/infra/dashboard";
   }
   return prod ? "https://sec.sparrowx.net" : "/shield";
+}
+
+function resolveServicePlatformLabel(srv: ClientTenant): string {
+  const hay = `${srv.name} ${srv.primaryDomain} ${srv.enabledModules.join(" ")}`.toLowerCase();
+  if (hay.includes("netsec") || hay.includes("ddos") || hay.includes("xdp")) return "SparrowX NetSec";
+  if (hay.includes("game") || hay.includes("fivem") || hay.includes("minecraft") || hay.includes("samp") || hay.includes("discord")) return "SparrowX Game Hosting";
+  if (hay.includes("deploy") || hay.includes("paas") || hay.includes("vercel")) return "SparrowX Deploy";
+  if (hay.includes("agent")) return "SparrowX Agents";
+  if (hay.includes("dpdp") || hay.includes("compliance")) return "SparrowX DPDP";
+  if (hay.includes("ai_shield") || hay.includes("ai.") || hay.includes("llm") || hay.includes("guardrail")) return "SparrowX AI Gateway";
+  if (hay.includes("gateway") || hay.includes("api.")) return "SparrowX API Gateway";
+  if (hay.includes("db") || hay.includes("postgres") || hay.includes("database")) return "SparrowX Cloud DB";
+  if (hay.includes("drop") || hay.includes("file") || hay.includes("vault")) return "SparrowX Drop";
+  if (hay.includes("key") || hay.includes("password")) return "SparrowX Keys";
+  if (hay.includes("infra") || hay.includes("vps") || hay.includes("vds") || hay.includes("metal")) return "SparrowX Cloud Infra";
+  return "SparrowX Shield";
 }
 
 export function ClientPortalView({
@@ -778,7 +794,7 @@ export function ClientPortalView({
                       <div className="mt-5 border-t border-border pt-3 text-xs">
                         <div className="flex items-center justify-between text-muted-foreground">
                           <span>
-                            Department: <strong className="text-foreground">SparrowX Shield</strong> · Active
+                            Service: <strong className="text-foreground">{resolveServicePlatformLabel(srv)}</strong> · {srv.planTier}
                           </span>
                           <span>Renewal: {getDueDateLabel(idx)}</span>
                         </div>
@@ -788,7 +804,21 @@ export function ClientPortalView({
                             onClick={() => launchServiceDestination(destUrl, srv.name)}
                             size="sm"
                           >
-                            Renew / Open Dashboard <ArrowRight className="ml-1 size-3.5" />
+                            Open Dashboard <ArrowRight className="ml-1 size-3.5" />
+                          </Button>
+                          <Button
+                            className="h-7 px-2.5 text-xs"
+                            onClick={() => {
+                              setClickedServiceId(srv.id);
+                              setManageSubView("manage");
+                              setRenameValue(srv.name);
+                              setDomainValue(srv.primaryDomain);
+                              setPlanValue(srv.planTier);
+                            }}
+                            size="sm"
+                            variant="outline"
+                          >
+                            Manage
                           </Button>
                         </div>
                       </div>
@@ -865,7 +895,7 @@ export function ClientPortalView({
                   <div className="flex items-start justify-between border-b border-border pb-3">
                     <div>
                       <span className="text-[10px] font-semibold uppercase text-primary">
-                        {clickedService.id} · SparrowX Shield Protection
+                        {clickedService.id} · {resolveServicePlatformLabel(clickedService)}
                       </span>
                       <h2 className="mt-0.5 text-lg font-semibold">{clickedService.name}</h2>
                       <p className="font-mono text-xs text-muted-foreground">
@@ -1115,7 +1145,7 @@ export function ClientPortalView({
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-semibold">{srv.name}</span>
                           <span className="rounded-sm bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            SparrowX Shield · Active
+                            {resolveServicePlatformLabel(srv)} · {srv.status}
                           </span>
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">

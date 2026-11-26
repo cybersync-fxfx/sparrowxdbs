@@ -115,6 +115,10 @@ describe("Test Full Index Rendering", () => {
 
     const { container: adminContainer } = render(React.createElement(Component));
     expect(adminContainer).toBeDefined();
+    // Main Client Area must never drop admins into legacy SOC Incident Command
+    expect(screen.queryByText(/SOC Incident Command/i)).toBeNull();
+    expect(screen.queryByText(/Operational Security Command Center/i)).toBeNull();
+    expect(screen.queryByText(/SOC Command/i)).toBeNull();
 
     const hookOrHydrationErrors = errorSpy.mock.calls.filter((args) => {
       const msg = args.map(String).join(" ");
