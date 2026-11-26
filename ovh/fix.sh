@@ -1199,6 +1199,9 @@ ensure_game_letsencrypt_ssl() {
   for extra_sub in ai deploy dpdp agents console admin; do
     issue_le_cert_to_ovh_ssl "${extra_sub}.${SPARROWX_DOMAIN}" "${extra_sub}"
   done
+  if dig +short A "dpd.${SPARROWX_DOMAIN}" @1.1.1.1 2>/dev/null | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    issue_le_cert_to_ovh_ssl "dpd.${SPARROWX_DOMAIN}" "dpd"
+  fi
 }
 
 ensure_gamesec_landing_running() {
@@ -1716,6 +1719,7 @@ ensure_core_letsencrypt_ssl() {
     "ai.${root_domain}"
     "agents.${root_domain}"
     "dpdp.${root_domain}"
+    "dpd.${root_domain}"
     "console.${root_domain}"
     "php.${root_domain}"
     "admin.${root_domain}"
@@ -2059,6 +2063,14 @@ PGRST_HOST_PORT="${PGRST_HOST_PORT:-3001}"
 PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
 DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
+DOMAIN_INFRA="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
+DOMAIN_AI="${DOMAIN_AI:-ai.${SPARROWX_DOMAIN}}"
+DOMAIN_DEPLOY="${DOMAIN_DEPLOY:-deploy.${SPARROWX_DOMAIN}}"
+DOMAIN_DPDP="${DOMAIN_DPDP:-dpdp.${SPARROWX_DOMAIN}}"
+DOMAIN_AGENTS="${DOMAIN_AGENTS:-agents.${SPARROWX_DOMAIN}}"
+DOMAIN_CONSOLE="${DOMAIN_CONSOLE:-console.${SPARROWX_DOMAIN}}"
+DOMAIN_ADMIN="${DOMAIN_ADMIN:-admin.${SPARROWX_DOMAIN}}"
+DOMAIN_PHP="${DOMAIN_PHP:-php.${SPARROWX_DOMAIN}}"
 DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
 GAMESEC_REPO_URL="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
 GAMESEC_DIR="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
@@ -2130,6 +2142,14 @@ ensure_env_key "SPARROWX_STUDIO_DOMAIN" "${SPARROWX_STUDIO_DOMAIN}"
 ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
 ensure_env_key "DOMAIN_GAME_WEB" "${DOMAIN_GAME_WEB}"
 ensure_env_key "DOMAIN_GAME_DASH" "${DOMAIN_GAME_DASH}"
+ensure_env_key "DOMAIN_INFRA" "${DOMAIN_INFRA}"
+ensure_env_key "DOMAIN_AI" "${DOMAIN_AI}"
+ensure_env_key "DOMAIN_DEPLOY" "${DOMAIN_DEPLOY}"
+ensure_env_key "DOMAIN_DPDP" "${DOMAIN_DPDP}"
+ensure_env_key "DOMAIN_AGENTS" "${DOMAIN_AGENTS}"
+ensure_env_key "DOMAIN_CONSOLE" "${DOMAIN_CONSOLE}"
+ensure_env_key "DOMAIN_ADMIN" "${DOMAIN_ADMIN}"
+ensure_env_key "DOMAIN_PHP" "${DOMAIN_PHP}"
 ensure_env_key "DOMAIN_GAMESEC" "${DOMAIN_GAMESEC}"
 ensure_env_key "GAMESEC_PORT" "${GAMESEC_PORT}"
 ensure_env_key "GAMESEC_REPO_URL" "${GAMESEC_REPO_URL}"
@@ -2168,7 +2188,10 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${GOOGLE_CLIENT_ID:-}" ] && ensure_env_key "GOOGLE_CLIENT_ID" "${GOOGLE_CLIENT_ID}"
 [ -n "${GOOGLE_CLIENT_SECRET:-}" ] && ensure_env_key "GOOGLE_CLIENT_SECRET" "${GOOGLE_CLIENT_SECRET}"
 [ -n "${GOOGLE_REDIRECT_URI:-}" ] && ensure_env_key "GOOGLE_REDIRECT_URI" "${GOOGLE_REDIRECT_URI}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI
+[ -n "${GITHUB_CLIENT_ID:-}" ] && ensure_env_key "GITHUB_CLIENT_ID" "${GITHUB_CLIENT_ID}"
+[ -n "${GITHUB_CLIENT_SECRET:-}" ] && ensure_env_key "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET}"
+[ -n "${GITHUB_REDIRECT_URI:-}" ] && ensure_env_key "GITHUB_REDIRECT_URI" "${GITHUB_REDIRECT_URI}"
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_INFRA DOMAIN_AI DOMAIN_DEPLOY DOMAIN_DPDP DOMAIN_AGENTS DOMAIN_CONSOLE DOMAIN_ADMIN DOMAIN_PHP DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET GITHUB_REDIRECT_URI
 
 log_ok "Verified .env (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -2414,7 +2437,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:${DOMAIN_INFRA},DNS:${DOMAIN_AI},DNS:${DOMAIN_DEPLOY},DNS:${DOMAIN_DPDP},DNS:dpd.${SPARROWX_DOMAIN},DNS:${DOMAIN_AGENTS},DNS:${DOMAIN_CONSOLE},DNS:${DOMAIN_ADMIN},DNS:${DOMAIN_PHP},DNS:${DOMAIN_GAME},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:*.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -3107,10 +3130,18 @@ server {
 }
 EOF
 
-  # 11. Standalone Platform Subdomains (ai, deploy, dpdp, agents, console, admin)
-  local _sub _sub_dom _sub_cert _sub_key
+  # 11. Standalone Platform Subdomains (ai, deploy, dpdp+dpd, agents, console, admin)
+  local _sub _sub_dom _sub_server_names _sub_cert _sub_key _sub_extra_headers
   for _sub in ai deploy dpdp agents console admin; do
     _sub_dom="${_sub}.${SPARROWX_DOMAIN:-sparrowx.local}"
+    _sub_server_names="${_sub_dom}"
+    if [ "${_sub}" = "dpdp" ]; then
+      _sub_server_names="${_sub_dom} dpd.${SPARROWX_DOMAIN:-sparrowx.local}"
+    fi
+    _sub_extra_headers=""
+    if [ "${_sub}" = "admin" ] || [ "${_sub}" = "console" ]; then
+      _sub_extra_headers='    add_header X-Robots-Tag "noindex, nofollow" always;'
+    fi
     _sub_cert="/etc/nginx/ssl/fullchain.pem"
     _sub_key="/etc/nginx/ssl/privkey.pem"
     if [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-privkey.pem" ]; then
@@ -3119,10 +3150,11 @@ EOF
     fi
     cat >> "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 
+# 11.${_sub}. Platform Subdomain (${_sub_dom})
 server {
     listen 80;
     listen 443 ssl;
-    server_name ${_sub_dom};
+    server_name ${_sub_server_names};
     ssl_certificate ${_sub_cert};
     ssl_certificate_key ${_sub_key};
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -3137,6 +3169,7 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     add_header X-SparrowX-Shield "PROTECTED" always;
+${_sub_extra_headers}
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -3151,6 +3184,7 @@ server {
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
@@ -3165,6 +3199,10 @@ server {
         set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
         proxy_pass \$fallback_app;
         proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
@@ -3586,7 +3624,7 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
       -out "${INSTALL_DIR}/ovh/ssl/fullchain.pem" \
       -subj "/CN=${SPARROWX_DOMAIN}" >/dev/null 2>&1 || true
   fi
-  for _cert_prefix in ptero game-web game-dash gamesec netsec; do
+  for _cert_prefix in ptero game-web game-dash gamesec netsec infra php ai deploy dpdp agents console admin; do
     if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
       cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
     fi
@@ -3635,7 +3673,7 @@ if { [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] || [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ]; 
 server {
     listen 80 default_server;
     listen 443 ssl default_server;
-    server_name ${SPARROWX_DOMAIN} www.${SPARROWX_DOMAIN} db.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} file.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} _;
+    server_name ${SPARROWX_DOMAIN} www.${SPARROWX_DOMAIN} db.${SPARROWX_DOMAIN} sec.${SPARROWX_DOMAIN} file.${SPARROWX_DOMAIN} password.${SPARROWX_DOMAIN} api.${SPARROWX_DOMAIN} ${DOMAIN_INFRA} metal.${SPARROWX_DOMAIN} ${DOMAIN_AI} ${DOMAIN_DEPLOY} ${DOMAIN_DPDP} dpd.${SPARROWX_DOMAIN} ${DOMAIN_AGENTS} ${DOMAIN_CONSOLE} ${DOMAIN_ADMIN} ${DOMAIN_GAME_WEB} ${DOMAIN_GAME_DASH} _;
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -3786,6 +3824,69 @@ if is_pterodactyl_installed; then
   fi
 fi
 
+# Live Multi-Domain Edge Probe & Auto-Heal across ALL platform subdomains
+probe_fix_domain() {
+  local host_dom="$1"
+  curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${host_dom}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000"
+}
+
+FIX_PLAT_DOMAINS=(
+  "${DOMAIN_INFRA}"
+  "${DOMAIN_AI}"
+  "${DOMAIN_DEPLOY}"
+  "${DOMAIN_DPDP}"
+  "dpd.${SPARROWX_DOMAIN}"
+  "${DOMAIN_ADMIN}"
+  "${DOMAIN_AGENTS}"
+  "${DOMAIN_CONSOLE}"
+  "db.${SPARROWX_DOMAIN}"
+  "sec.${SPARROWX_DOMAIN}"
+  "file.${SPARROWX_DOMAIN}"
+  "password.${SPARROWX_DOMAIN}"
+  "api.${SPARROWX_DOMAIN}"
+  "${DOMAIN_GAME_WEB}"
+  "${DOMAIN_GAME_DASH}"
+)
+
+FIX_FAILED_PLAT=()
+for _fpd in "${FIX_PLAT_DOMAINS[@]}"; do
+  _fpc="$(probe_fix_domain "${_fpd}")"
+  if ! echo "${_fpc}" | grep -qE "^(200|301|302|307|308|401|403)$"; then
+    FIX_FAILED_PLAT+=("${_fpd}:${_fpc}")
+  fi
+done
+
+if [ "${#FIX_FAILED_PLAT[@]}" -gt 0 ]; then
+  log_fix "Platform subdomain(s) failed probe (${FIX_FAILED_PLAT[*]}); re-rendering Nginx & healing app upstream"
+  if [ "${HAS_DOCKER}" = "true" ]; then
+    render_sparrowx_nginx_conf
+    docker start "${APP_CTR}" >/dev/null 2>&1 || true
+    if docker exec "${EDGE_CTR}" nginx -t >/dev/null 2>&1; then
+      docker exec "${EDGE_CTR}" nginx -s reload >/dev/null 2>&1 || docker restart "${EDGE_CTR}" >/dev/null 2>&1 || true
+    else
+      docker restart "${EDGE_CTR}" >/dev/null 2>&1 || true
+    fi
+    sleep 2
+  fi
+  if ! curl -fsS --max-time 4 "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+    ensure_native_fallback_running || true
+  fi
+  FIX_FAILED_PLAT=()
+  for _fpd in "${FIX_PLAT_DOMAINS[@]}"; do
+    _fpc="$(probe_fix_domain "${_fpd}")"
+    if ! echo "${_fpc}" | grep -qE "^(200|301|302|307|308|401|403)$"; then
+      FIX_FAILED_PLAT+=("${_fpd}:${_fpc}")
+    fi
+  done
+fi
+
+INFRA_CODE="$(probe_fix_domain "${DOMAIN_INFRA}")"
+AI_CODE="$(probe_fix_domain "${DOMAIN_AI}")"
+DEPLOY_CODE="$(probe_fix_domain "${DOMAIN_DEPLOY}")"
+DPDP_CODE="$(probe_fix_domain "${DOMAIN_DPDP}")"
+ADMIN_CODE="$(probe_fix_domain "${DOMAIN_ADMIN}")"
+PLAT_SUITE_HEALTH="INFRA:${INFRA_CODE} AI:${AI_CODE} DEPLOY:${DEPLOY_CODE} DPDP:${DPDP_CODE} ADM:${ADMIN_CODE}"
+
 echo ""
 echo -e "${C_GREEN}╔══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
 echo -e "${C_GREEN}║${C_RESET}  ${C_BOLD}${C_WHITE}✅ SPARROWX DIAGNOSTIC & AUTO-HEAL COMPLETE${C_RESET}                             ${C_GREEN}║${C_RESET}"
@@ -3800,6 +3901,7 @@ fi
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "PostgREST API" "${PGRST_HEALTH}"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "SparrowX Web App" "${APP_HEALTH}"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Nginx Edge HTTP / HTTPS" "${EDGE_HTTP_HEALTH} / ${EDGE_HTTPS_HEALTH}"
+printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-26s${C_RESET} : %-42s ${C_GREEN}║${C_RESET}\n" "Platform Subdomains" "${PLAT_SUITE_HEALTH:0:42}"
 GAMESEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAMESEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
 if echo "${GAMESEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
   GAMESEC_HEALTH="ONLINE (HTTP ${GAMESEC_EDGE_CODE} -> :${GAMESEC_PORT})"
@@ -3838,10 +3940,17 @@ printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Drop Vault       : ${C_
 printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Password Vault   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://password.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://sec.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Cloud Infra      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_INFRA}"
+printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} AI Gateway       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_AI}"
+printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Deploy PaaS      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DEPLOY}"
+printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} DPDP Compliance  : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DPDP} (alias: dpd.)"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Agents Runtime   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_AGENTS}"
+printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Admin Control    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_ADMIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game DDoS Portal : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAMESEC}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Net DDoS Dash    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_NETSEC}"
+printf "${C_GREEN}║${C_RESET}   ${C_DIM}•${C_RESET} phpMyAdmin       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_PHP}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
 fi
@@ -3874,6 +3983,11 @@ echo -e "${C_GREEN}╚═══════════════════�
 [ "${APP_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("SparrowX Web App DOWN on 127.0.0.1:${APP_HOST_PORT}")
 [ "${EDGE_HTTP_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Nginx Edge HTTP DOWN on :${HTTP_PORT}")
 [ "${EDGE_HTTPS_HEALTH}" = "DOWN" ] && UNFIXED_LOG+=("Nginx Edge HTTPS DOWN on :${HTTPS_PORT}")
+if [ "${#FIX_FAILED_PLAT[@]}" -gt 0 ]; then
+  for _uplat in "${FIX_FAILED_PLAT[@]}"; do
+    UNFIXED_LOG+=("Platform subdomain unhealthy: ${_uplat}")
+  done
+fi
 if [[ "${GAMESEC_HEALTH}" == CHECK* ]]; then
   UNFIXED_LOG+=("Game DDoS Defense (${DOMAIN_GAMESEC}) unhealthy (${GAMESEC_HEALTH})")
 fi

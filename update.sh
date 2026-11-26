@@ -293,9 +293,12 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${INSTALL_DIR}
+EnvironmentFile=-${INSTALL_DIR}/.env
 Environment=NODE_ENV=production
 Environment=HOST=0.0.0.0
 Environment=PORT=${app_p}
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=${PG_HOST_PORT:-5432}
 Environment=POSTGREST_HOST=127.0.0.1
 Environment=POSTGREST_PORT=${pgrst_p}
 Environment=POSTGREST_INTERNAL_URL=http://127.0.0.1:${pgrst_p}
@@ -311,9 +314,16 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF_NATIVE
     systemctl daemon-reload >/dev/null 2>&1 || true
-    systemctl enable --now sparrowx-native.service >/dev/null 2>&1 || systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
+    systemctl enable sparrowx-native.service >/dev/null 2>&1 || true
+    systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
   else
-    nohup env NODE_ENV=production HOST=0.0.0.0 PORT="${app_p}" POSTGREST_HOST=127.0.0.1 POSTGREST_PORT="${pgrst_p}" POSTGREST_INTERNAL_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DB_REST_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DATA_DIR="${INSTALL_DIR}/data" SPARROWX_DOMAIN="${SPARROWX_DOMAIN}" SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP}" "${node_bin}" "${INSTALL_DIR}/ovh/node-server.mjs" >"${INSTALL_DIR}/logs/sparrowx-native.log" 2>&1 &
+    nohup env NODE_ENV=production HOST=0.0.0.0 PORT="${app_p}" POSTGRES_HOST=127.0.0.1 POSTGRES_PORT="${PG_HOST_PORT:-5432}" POSTGREST_HOST=127.0.0.1 POSTGREST_PORT="${pgrst_p}" POSTGREST_INTERNAL_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DB_REST_URL="http://127.0.0.1:${pgrst_p}" SPARROWX_DATA_DIR="${INSTALL_DIR}/data" SPARROWX_DOMAIN="${SPARROWX_DOMAIN}" SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP}" "${node_bin}" "${INSTALL_DIR}/ovh/node-server.mjs" >"${INSTALL_DIR}/logs/sparrowx-native.log" 2>&1 &
+  fi
+
+  # Ensure UFW allows Docker bridge -> host native fallback port (prevents 502 Bad Gateway when port shifts to 3010)
+  if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+    ufw allow in from 172.16.0.0/12 to any port "${app_p}" proto tcp >/dev/null 2>&1 || true
+    ufw allow in from 127.0.0.1 to any port "${app_p}" proto tcp >/dev/null 2>&1 || true
   fi
 
   if [ "${HAS_DOCKER:-false}" = "true" ] && [ -n "${COMPOSE_FILE:-}" ] && [ -f "${COMPOSE_FILE}" ]; then
@@ -564,29 +574,27 @@ ensure_netsec_dashboard_running() {
   local sbs_assets_changed="no"
   if [ -d "${local_sbs_src}" ] && [ -f "${local_sbs_src}/sparrowx-db-adapter.js" ]; then
     mkdir -p "${netsec_dir}" "${netsec_dir}/frontend/public" "${netsec_dir}/frontend/src/components" "${netsec_dir}/frontend/src/pages" 2>/dev/null || true
-    for _sbs_check in \
-      "server.js" \
-      "pg-compat.js" \
-      "radar-scanner.js" \
-      "frontend/public/logo.png" \
-      "frontend/index.html" \
-      "frontend/src/App.jsx" \
-      "frontend/src/index.css" \
-      "frontend/src/pages/Landing.jsx" \
-      "frontend/src/pages/Auth.jsx" \
-      "frontend/src/pages/Dashboard.jsx" \
-      "frontend/src/pages/Docs.jsx"; do
-      if [ -f "${local_sbs_src}/${_sbs_check}" ] && ! cmp -s "${local_sbs_src}/${_sbs_check}" "${netsec_dir}/${_sbs_check}" 2>/dev/null; then
-        sbs_assets_changed="yes"
-      fi
-    done
     cp -f "${local_sbs_src}/sparrowx-db-adapter.js" "${netsec_dir}/sparrowx-db-adapter.js" 2>/dev/null || true
-    [ -f "${local_sbs_src}/pg-compat.js" ] && cp -f "${local_sbs_src}/pg-compat.js" "${netsec_dir}/pg-compat.js" 2>/dev/null || true
-    [ -f "${local_sbs_src}/radar-scanner.js" ] && cp -f "${local_sbs_src}/radar-scanner.js" "${netsec_dir}/radar-scanner.js" 2>/dev/null || true
+    cp -f "${local_sbs_src}/pg-compat.js" "${netsec_dir}/pg-compat.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/server.js" "${netsec_dir}/server.js" 2>/dev/null || true
     cp -f "${local_sbs_src}/package.json" "${netsec_dir}/package.json" 2>/dev/null || true
     cp -f "${local_sbs_src}/.env.example" "${netsec_dir}/.env.example" 2>/dev/null || true
     if [ -d "${local_sbs_src}/frontend" ]; then
+      if [ -f "${local_sbs_src}/frontend/public/logo.png" ] && ! cmp -s "${local_sbs_src}/frontend/public/logo.png" "${netsec_dir}/frontend/public/logo.png" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/index.html" ] && ! cmp -s "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/src/pages/Landing.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Landing.jsx" "${netsec_dir}/frontend/src/pages/Landing.jsx" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Dashboard.jsx" "${netsec_dir}/frontend/src/pages/Dashboard.jsx" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
+      if [ -f "${local_sbs_src}/frontend/src/pages/Auth.jsx" ] && ! cmp -s "${local_sbs_src}/frontend/src/pages/Auth.jsx" "${netsec_dir}/frontend/src/pages/Auth.jsx" 2>/dev/null; then
+        sbs_assets_changed="yes"
+      fi
       cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/public/" 2>/dev/null || true
       [ -f "${local_sbs_src}/frontend/index.html" ] && cp -f "${local_sbs_src}/frontend/index.html" "${netsec_dir}/frontend/index.html" 2>/dev/null || true
       [ -d "${local_sbs_src}/frontend/src" ] && cp -rf "${local_sbs_src}/frontend/src/." "${netsec_dir}/frontend/src/" 2>/dev/null || true
@@ -594,11 +602,6 @@ ensure_netsec_dashboard_running() {
         cp -rf "${local_sbs_src}/frontend/public/." "${netsec_dir}/frontend/dist/" 2>/dev/null || true
       fi
     fi
-  fi
-
-  # Clear any false-positive visitor auto-bans created by legacy TIME-WAIT radar scoring
-  if command -v nft >/dev/null 2>&1; then
-    nft flush set inet detroit_guard blacklist >/dev/null 2>&1 || true
   fi
 
   if [ ! -f "${netsec_dir}/package.json" ] || [ ! -f "${netsec_dir}/server.js" ]; then
@@ -1013,6 +1016,59 @@ heal_pterodactyl_host_nginx() {
       fi
     fi
 
+    # Auto-provision Pterodactyl Application API Key (ptla_...) if missing so Client Area creates Panel users automatically
+    local current_ptero_key="${PTERO_APPLICATION_API_KEY:-}"
+    if [ -z "${current_ptero_key}" ] && [ -f "${INSTALL_DIR}/.env" ]; then
+      current_ptero_key="$(awk -F= '/^PTERO_APPLICATION_API_KEY=/{sub(/^[^=]*=/,""); print; exit}' "${INSTALL_DIR}/.env" 2>/dev/null | tr -d "\"'\r[:space:]" || true)"
+    fi
+    if [ -z "${current_ptero_key}" ]; then
+      local generated_ptero_key=""
+      generated_ptero_key="$("${php_bin}" -r '
+        require "/var/www/pterodactyl/vendor/autoload.php";
+        $app = require "/var/www/pterodactyl/bootstrap/app.php";
+        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+        $admin = Pterodactyl\Models\User::where("root_admin", 1)->orderBy("id")->first();
+        if (!$admin) { exit(0); }
+        $existing = Pterodactyl\Models\ApiKey::where("user_id", $admin->id)
+          ->where("key_type", Pterodactyl\Models\ApiKey::TYPE_APPLICATION)
+          ->where("memo", "SparrowX Client Area Auto-Sync")
+          ->orderByDesc("id")
+          ->first();
+        $encrypter = $app->make(Illuminate\Contracts\Encryption\Encrypter::class);
+        if ($existing) {
+          echo $existing->identifier . $encrypter->decrypt($existing->token);
+          exit(0);
+        }
+        $svc = $app->make(Pterodactyl\Services\Api\KeyCreationService::class);
+        $svc->setKeyType(Pterodactyl\Models\ApiKey::TYPE_APPLICATION);
+        $model = $svc->handle(
+          [
+            "user_id" => $admin->id,
+            "memo" => "SparrowX Client Area Auto-Sync",
+            "allowed_ips" => [],
+          ],
+          [
+            "r_users" => 3,
+            "r_servers" => 3,
+            "r_allocations" => 3,
+            "r_nests" => 1,
+            "r_eggs" => 1,
+            "r_locations" => 1,
+            "r_nodes" => 1,
+            "r_database_hosts" => 1,
+            "r_server_databases" => 3,
+          ]
+        );
+        echo $model->identifier . $encrypter->decrypt($model->token);
+      ' 2>/dev/null | tr -d '\r\n[:space:]' || true)"
+      if [ -n "${generated_ptero_key}" ] && [ "${#generated_ptero_key}" -ge 24 ]; then
+        PTERO_APPLICATION_API_KEY="${generated_ptero_key}"
+        ensure_env_key "PTERO_APPLICATION_API_KEY" "${PTERO_APPLICATION_API_KEY}"
+        export PTERO_APPLICATION_API_KEY
+        log_ok "Auto-provisioned Pterodactyl Application API Key into ${INSTALL_DIR}/.env"
+      fi
+    fi
+
     (cd "${ptero_dir}" && "${php_bin}" artisan config:clear >/dev/null 2>&1 || true)
     (cd "${ptero_dir}" && "${php_bin}" artisan cache:clear >/dev/null 2>&1 || true)
     (cd "${ptero_dir}" && "${php_bin}" artisan view:clear >/dev/null 2>&1 || true)
@@ -1248,6 +1304,9 @@ ensure_game_letsencrypt_ssl() {
   for extra_sub in ai deploy dpdp agents console admin; do
     issue_le_cert_to_ovh_ssl "${extra_sub}.${SPARROWX_DOMAIN}" "${extra_sub}"
   done
+  if dig +short A "dpd.${SPARROWX_DOMAIN}" @1.1.1.1 2>/dev/null | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+    issue_le_cert_to_ovh_ssl "dpd.${SPARROWX_DOMAIN}" "dpd"
+  fi
 }
 
 ensure_core_letsencrypt_ssl() {
@@ -1288,6 +1347,7 @@ ensure_core_letsencrypt_ssl() {
     "ai.${root_domain}"
     "agents.${root_domain}"
     "dpdp.${root_domain}"
+    "dpd.${root_domain}"
     "console.${root_domain}"
     "php.${root_domain}"
     "admin.${root_domain}"
@@ -1567,6 +1627,13 @@ PG_HOST_PORT="${PG_HOST_PORT:-5432}"
 DOMAIN_GAME_WEB="${DOMAIN_GAME_WEB:-game.${SPARROWX_DOMAIN}}"
 DOMAIN_GAME_DASH="${DOMAIN_GAME_DASH:-game.dash.${SPARROWX_DOMAIN}}"
 DOMAIN_INFRA="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
+DOMAIN_AI="${DOMAIN_AI:-ai.${SPARROWX_DOMAIN}}"
+DOMAIN_DEPLOY="${DOMAIN_DEPLOY:-deploy.${SPARROWX_DOMAIN}}"
+DOMAIN_DPDP="${DOMAIN_DPDP:-dpdp.${SPARROWX_DOMAIN}}"
+DOMAIN_AGENTS="${DOMAIN_AGENTS:-agents.${SPARROWX_DOMAIN}}"
+DOMAIN_CONSOLE="${DOMAIN_CONSOLE:-console.${SPARROWX_DOMAIN}}"
+DOMAIN_ADMIN="${DOMAIN_ADMIN:-admin.${SPARROWX_DOMAIN}}"
+DOMAIN_PHP="${DOMAIN_PHP:-php.${SPARROWX_DOMAIN}}"
 DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
 GAMESEC_REPO_URL="${GAMESEC_REPO_URL:-https://github.com/cybersync-fxfx/sbs-detrion-landing.git}"
 GAMESEC_DIR="${GAMESEC_DIR:-/opt/sparrowx-gamesec}"
@@ -1639,6 +1706,13 @@ ensure_env_key "DOMAIN_GAME" "${DOMAIN_GAME}"
 ensure_env_key "DOMAIN_GAME_WEB" "${DOMAIN_GAME_WEB}"
 ensure_env_key "DOMAIN_GAME_DASH" "${DOMAIN_GAME_DASH}"
 ensure_env_key "DOMAIN_INFRA" "${DOMAIN_INFRA}"
+ensure_env_key "DOMAIN_AI" "${DOMAIN_AI}"
+ensure_env_key "DOMAIN_DEPLOY" "${DOMAIN_DEPLOY}"
+ensure_env_key "DOMAIN_DPDP" "${DOMAIN_DPDP}"
+ensure_env_key "DOMAIN_AGENTS" "${DOMAIN_AGENTS}"
+ensure_env_key "DOMAIN_CONSOLE" "${DOMAIN_CONSOLE}"
+ensure_env_key "DOMAIN_ADMIN" "${DOMAIN_ADMIN}"
+ensure_env_key "DOMAIN_PHP" "${DOMAIN_PHP}"
 ensure_env_key "DOMAIN_GAMESEC" "${DOMAIN_GAMESEC}"
 ensure_env_key "GAMESEC_PORT" "${GAMESEC_PORT}"
 ensure_env_key "GAMESEC_REPO_URL" "${GAMESEC_REPO_URL}"
@@ -1673,7 +1747,7 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${GOOGLE_CLIENT_ID:-}" ] && ensure_env_key "GOOGLE_CLIENT_ID" "${GOOGLE_CLIENT_ID}"
 [ -n "${GOOGLE_CLIENT_SECRET:-}" ] && ensure_env_key "GOOGLE_CLIENT_SECRET" "${GOOGLE_CLIENT_SECRET}"
 [ -n "${GOOGLE_REDIRECT_URI:-}" ] && ensure_env_key "GOOGLE_REDIRECT_URI" "${GOOGLE_REDIRECT_URI}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_INFRA DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_INFRA DOMAIN_AI DOMAIN_DEPLOY DOMAIN_DPDP DOMAIN_AGENTS DOMAIN_CONSOLE DOMAIN_ADMIN DOMAIN_PHP DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI
 
 log_ok "Environment validated (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -1824,12 +1898,6 @@ fi
 # ==============================================================================
 draw_progress 4 7 "SSL & Multi-Domain Nginx"
 
-# Auto-sync Cloudflare DNS records (A records + _dmarc TXT) when CF_DNS_API_TOKEN is set in .env
-if [ -f "${INSTALL_DIR}/deploy/cf-dns-sync.sh" ]; then
-  chmod +x "${INSTALL_DIR}/deploy/cf-dns-sync.sh" 2>/dev/null || true
-  bash "${INSTALL_DIR}/deploy/cf-dns-sync.sh" || log_warn "Cloudflare DNS sync returned non-zero (continuing update)."
-fi
-
 mkdir -p "${INSTALL_DIR}/ovh/ssl" "${INSTALL_DIR}/ovh/certbot-www/.well-known/acme-challenge" "${INSTALL_DIR}/data/users" "${INSTALL_DIR}/data/backups"
 
 SSL_CERT="${INSTALL_DIR}/ovh/ssl/fullchain.pem"
@@ -1840,7 +1908,7 @@ if [ ! -s "${SSL_CERT}" ] || [ ! -s "${SSL_KEY}" ] || ! openssl x509 -in "${SSL_
     -keyout "${SSL_KEY}" \
     -out "${SSL_CERT}" \
     -subj "/CN=${SPARROWX_DOMAIN}" \
-    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
+    -addext "subjectAltName=DNS:${SPARROWX_DOMAIN},DNS:*.${SPARROWX_DOMAIN},DNS:${DOMAIN_INFRA},DNS:${DOMAIN_AI},DNS:${DOMAIN_DEPLOY},DNS:${DOMAIN_DPDP},DNS:dpd.${SPARROWX_DOMAIN},DNS:${DOMAIN_AGENTS},DNS:${DOMAIN_CONSOLE},DNS:${DOMAIN_ADMIN},DNS:${DOMAIN_PHP},DNS:${DOMAIN_GAME_WEB},DNS:${DOMAIN_GAME_DASH},DNS:${DOMAIN_GAMESEC},DNS:${DOMAIN_NETSEC},DNS:${DOMAIN_GAME},DNS:panel.${SPARROWX_DOMAIN}" >/dev/null 2>&1; then
     openssl req -x509 -nodes -newkey rsa:2048 -days 3650 \
       -keyout "${SSL_KEY}" \
       -out "${SSL_CERT}" \
@@ -1852,7 +1920,7 @@ if is_pterodactyl_installed; then
   heal_pterodactyl_host_nginx
 fi
 
-for _cert_prefix in ptero game-web game-dash gamesec netsec; do
+for _cert_prefix in ptero game-web game-dash gamesec netsec infra php ai deploy dpdp agents console admin; do
   if [ ! -s "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/fullchain.pem" ]; then
     cp -f "${INSTALL_DIR}/ovh/ssl/fullchain.pem" "${INSTALL_DIR}/ovh/ssl/${_cert_prefix}-fullchain.pem" 2>/dev/null || true
   fi
@@ -2004,14 +2072,19 @@ render_sparrowx_nginx_conf() {
         proxy_pass http://${docker_host_ip}:${PTERO_PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Connection \$connection_upgrade;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header X-Forwarded-Host \$host;
         proxy_set_header X-Forwarded-Port \$server_port;
+        proxy_connect_timeout 30s;
+        proxy_send_timeout 300s;
         proxy_read_timeout 300s;
+        proxy_buffer_size 64k;
+        proxy_buffers 16 32k;
+        proxy_busy_buffers_size 64k;
     }"
   else
     ptero_backend="    location / {
@@ -2043,10 +2116,38 @@ render_sparrowx_nginx_conf() {
 
   cat > "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 # ============================================================================
-# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (L7 DDOS SHIELD ENABLED)
+# SPARROWX MULTI-SERVICE NGINX REVERSE PROXY (HTTP/2 + GZIP + L7 DDOS SHIELD)
 # ============================================================================
-limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=45r/s;
-limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=25r/s;
+http2 on;
+
+gzip on;
+gzip_vary on;
+gzip_proxied any;
+gzip_comp_level 5;
+gzip_min_length 256;
+gzip_types
+    text/plain
+    text/css
+    text/xml
+    text/javascript
+    application/javascript
+    application/x-javascript
+    application/json
+    application/xml
+    application/rss+xml
+    application/wasm
+    image/svg+xml
+    font/ttf
+    font/otf
+    application/vnd.ms-fontobject;
+
+map \$http_upgrade \$connection_upgrade {
+    default upgrade;
+    ''      '';
+}
+
+limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=250r/s;
+limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=120r/s;
 limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
 
 # 1. Master SparrowX Command Center & Default Fallback (${SPARROWX_DOMAIN})
@@ -2060,16 +2161,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2138,16 +2239,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2218,16 +2319,16 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
     client_max_body_size 150M;
-    client_body_timeout 10s;
-    client_header_timeout 10s;
-    send_timeout 15s;
-    keepalive_timeout 30s;
+    client_body_timeout 60s;
+    client_header_timeout 30s;
+    send_timeout 60s;
+    keepalive_timeout 65s;
     reset_timedout_connection on;
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2444,8 +2545,8 @@ server {
     server_tokens off;
     resolver 127.0.0.11 valid=5s ipv6=off;
 
-    limit_conn spx_conn_limit 40;
-    limit_req zone=spx_edge_req burst=90 nodelay;
+    limit_conn spx_conn_limit 200;
+    limit_req zone=spx_edge_req burst=500 nodelay;
     limit_req_status 429;
 
     add_header X-Frame-Options "SAMEORIGIN" always;
@@ -2460,7 +2561,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
+        set \$upstream_app http://sparrowx:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2531,10 +2632,18 @@ server {
 }
 EOF
 
-  # 11. Standalone Platform Subdomains (ai, deploy, dpdp, agents, console, admin)
-  local _sub _sub_dom _sub_cert _sub_key
+  # 11. Standalone Platform Subdomains (ai, deploy, dpdp+dpd, agents, console, admin)
+  local _sub _sub_dom _sub_server_names _sub_cert _sub_key _sub_extra_headers
   for _sub in ai deploy dpdp agents console admin; do
     _sub_dom="${_sub}.${SPARROWX_DOMAIN:-sparrowx.local}"
+    _sub_server_names="${_sub_dom}"
+    if [ "${_sub}" = "dpdp" ]; then
+      _sub_server_names="${_sub_dom} dpd.${SPARROWX_DOMAIN:-sparrowx.local}"
+    fi
+    _sub_extra_headers=""
+    if [ "${_sub}" = "admin" ] || [ "${_sub}" = "console" ]; then
+      _sub_extra_headers='    add_header X-Robots-Tag "noindex, nofollow" always;'
+    fi
     _sub_cert="/etc/nginx/ssl/fullchain.pem"
     _sub_key="/etc/nginx/ssl/privkey.pem"
     if [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-fullchain.pem" ] && [ -s "${INSTALL_DIR}/ovh/ssl/${_sub}-privkey.pem" ]; then
@@ -2543,10 +2652,11 @@ EOF
     fi
     cat >> "${INSTALL_DIR}/ovh/nginx.conf" <<EOF
 
+# 11.${_sub}. Platform Subdomain (${_sub_dom})
 server {
     listen 80;
     listen 443 ssl;
-    server_name ${_sub_dom};
+    server_name ${_sub_server_names};
     ssl_certificate ${_sub_cert};
     ssl_certificate_key ${_sub_key};
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -2561,6 +2671,7 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
     add_header X-SparrowX-Shield "PROTECTED" always;
+${_sub_extra_headers}
 
     location ^~ /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -2569,12 +2680,13 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
+        set \$upstream_app http://sparrowx:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_buffering off;
         proxy_cache off;
         proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
@@ -2589,6 +2701,10 @@ server {
         set \$fallback_app http://${docker_host_ip}:${APP_HOST_PORT:-3000};
         proxy_pass \$fallback_app;
         proxy_http_version 1.1;
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
@@ -2602,7 +2718,7 @@ EOF
 }
 
 render_sparrowx_nginx_conf
-log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_INFRA}, ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_NETSEC} & ${DOMAIN_GAME}"
+log_ok "Nginx reverse proxy configured for SparrowX + ${DOMAIN_INFRA}, ${DOMAIN_AI}, ${DOMAIN_DEPLOY}, ${DOMAIN_DPDP}, ${DOMAIN_ADMIN}, ${DOMAIN_AGENTS}, ${DOMAIN_CONSOLE}, ${DOMAIN_PHP}, ${DOMAIN_GAME_WEB}, ${DOMAIN_GAME_DASH}, ${DOMAIN_GAMESEC}, ${DOMAIN_NETSEC} & ${DOMAIN_GAME}"
 
 # ==============================================================================
 # STEP 5/7: Auto-Upgrade Systemd Daemon & CLI Symlinks
@@ -2721,6 +2837,12 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   free_docker_port_conflicts "${PGRST_HOST_PORT}" "sparrowx-postgrest"
   free_docker_port_conflicts "${APP_HOST_PORT}" "sparrowx-app"
 
+  # Remove conflicting Traefik proxy container if present so sparrowx-nginx exclusively owns :80/:443
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
+    log_warn "Stopping & removing conflicting sparrowx-traefik container (fighting sparrowx-nginx for :80/:443)..."
+    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
+  fi
+
   # Free HTTP/HTTPS ports if held by non-sparrowx-nginx processes
   for wp in "${HTTP_PORT}" "${HTTPS_PORT}"; do
     if port_held_by_other "${wp}" "sparrowx-nginx"; then
@@ -2741,13 +2863,11 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     APP_HOST_PORT="$(find_next_free_port 3010)"
     ensure_env_key "APP_HOST_PORT" "${APP_HOST_PORT}"
     export APP_HOST_PORT
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
+      ufw allow in from 172.16.0.0/12 to any port "${APP_HOST_PORT}" proto tcp >/dev/null 2>&1 || true
+    fi
+    render_sparrowx_nginx_conf
     log_warn "Shifted APP_HOST_PORT=${APP_HOST_PORT} to bypass port conflict"
-  fi
-
-  # Remove conflicting Traefik proxy container if present so sparrowx-nginx exclusively owns :80/:443
-  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-traefik"; then
-    log_warn "Stopping & removing conflicting sparrowx-traefik container (fighting sparrowx-nginx for :80/:443)..."
-    docker rm -f sparrowx-traefik >/dev/null 2>&1 || true
   fi
 
   reconcile_compose_containers
@@ -2934,8 +3054,18 @@ fi
 
 PGRST_STATUS="$(curl -fsS "http://127.0.0.1:${PGRST_HOST_PORT}/" >/dev/null 2>&1 && echo "ONLINE" || echo "STARTING")"
 EDGE_STATUS="$(curl -fsS -o /dev/null -w "%{http_code}" "http://127.0.0.1:${HTTP_PORT}/api/v1/health" 2>/dev/null | grep -qE "^(200|301|302)$" && echo "ONLINE" || echo "CHECK")"
+if [ -f "${INSTALL_DIR}/ovh/optimize-and-maintain.sh" ]; then
+  log_info "Applying SparrowX Performance Optimizations (BBR, PHP-FPM, OPcache, MariaDB, Laravel Cache) & 2-min Watchdog..."
+  bash "${INSTALL_DIR}/ovh/optimize-and-maintain.sh" --optimize || log_warn "Optimizer completed with non-fatal warnings."
+  bash "${INSTALL_DIR}/ovh/optimize-and-maintain.sh" --install-daemon || log_warn "Maintainer timer install had warnings."
+fi
+
 PTERO_STATUS="NOT INSTALLED"
 if is_pterodactyl_installed; then
+  if [ -f "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" ]; then
+    log_info "Syncing Lightweight Stellar Midnight Black Palette & Curated Game/Bot Eggs into Pterodactyl..."
+    bash "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" || log_warn "Pterodactyl eggs/theme sync had non-fatal warnings."
+  fi
   PTERO_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAME}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
   if ! echo "${PTERO_EDGE_CODE}" | grep -qE "^(200|301|302)$"; then
     heal_pterodactyl_host_nginx
@@ -2947,7 +3077,86 @@ if is_pterodactyl_installed; then
   PTERO_STATUS="$(echo "${PTERO_EDGE_CODE}" | grep -qE "^(200|301|302)$" && echo "ONLINE (:${PTERO_PORT})" || echo "CHECK (HTTP ${PTERO_EDGE_CODE})")"
 fi
 
+# Live Multi-Domain Edge Probe & Auto-Heal across ALL platform subdomains
+probe_platform_domain() {
+  local host_dom="$1"
+  local code
+  code="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${host_dom}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+  echo "${code}"
+}
+
+PLATFORM_DOMAINS_ALL=(
+  "${DOMAIN_INFRA}"
+  "${DOMAIN_AI}"
+  "${DOMAIN_DEPLOY}"
+  "${DOMAIN_DPDP}"
+  "dpd.${SPARROWX_DOMAIN}"
+  "${DOMAIN_ADMIN}"
+  "${DOMAIN_AGENTS}"
+  "${DOMAIN_CONSOLE}"
+  "db.${SPARROWX_DOMAIN}"
+  "sec.${SPARROWX_DOMAIN}"
+  "file.${SPARROWX_DOMAIN}"
+  "password.${SPARROWX_DOMAIN}"
+  "api.${SPARROWX_DOMAIN}"
+  "${DOMAIN_GAME_WEB}"
+  "${DOMAIN_GAME_DASH}"
+)
+
+FAILED_PLAT_DOMAINS=()
+for _pd in "${PLATFORM_DOMAINS_ALL[@]}"; do
+  _pc="$(probe_platform_domain "${_pd}")"
+  if ! echo "${_pc}" | grep -qE "^(200|301|302|307|308|401|403)$"; then
+    FAILED_PLAT_DOMAINS+=("${_pd}:${_pc}")
+  fi
+done
+
+if [ "${#FAILED_PLAT_DOMAINS[@]}" -gt 0 ]; then
+  log_warn "Platform subdomain probe detected failure(s): ${FAILED_PLAT_DOMAINS[*]} — auto-healing Nginx & app upstream"
+  if [ "${HAS_DOCKER}" = "true" ]; then
+    if ! docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-app"; then
+      docker start sparrowx-app >/dev/null 2>&1 || true
+    fi
+    render_sparrowx_nginx_conf
+    if docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
+      docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    else
+      docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    fi
+    sleep 2
+  fi
+  if ! curl -fsS --max-time 4 "http://127.0.0.1:${APP_HOST_PORT}/api/v1/health" >/dev/null 2>&1; then
+    ensure_native_fallback_running || true
+  fi
+  STILL_FAILED_PLAT=()
+  for _pd in "${PLATFORM_DOMAINS_ALL[@]}"; do
+    _pc="$(probe_platform_domain "${_pd}")"
+    if ! echo "${_pc}" | grep -qE "^(200|301|302|307|308|401|403)$"; then
+      STILL_FAILED_PLAT+=("${_pd}:${_pc}")
+    fi
+  done
+  if [ "${#STILL_FAILED_PLAT[@]}" -eq 0 ]; then
+    log_ok "Auto-healed all ${#PLATFORM_DOMAINS_ALL[@]} SparrowX platform subdomains successfully"
+  else
+    log_err "Subdomain(s) still returning errors after heal: ${STILL_FAILED_PLAT[*]}"
+  fi
+else
+  log_ok "All ${#PLATFORM_DOMAINS_ALL[@]} platform subdomains verified ONLINE over HTTPS (infra, ai, deploy, dpdp, admin, agents, console, db, sec, file, password, api, game)"
+fi
+
+INFRA_EDGE_CODE="$(probe_platform_domain "${DOMAIN_INFRA}")"
+AI_EDGE_CODE="$(probe_platform_domain "${DOMAIN_AI}")"
+DEPLOY_EDGE_CODE="$(probe_platform_domain "${DOMAIN_DEPLOY}")"
+DPDP_EDGE_CODE="$(probe_platform_domain "${DOMAIN_DPDP}")"
+ADMIN_EDGE_CODE="$(probe_platform_domain "${DOMAIN_ADMIN}")"
+PLAT_SUITE_STATUS="INFRA:${INFRA_EDGE_CODE} AI:${AI_EDGE_CODE} DEPLOY:${DEPLOY_EDGE_CODE} DPDP:${DPDP_EDGE_CODE} ADM:${ADMIN_EDGE_CODE}"
+
 GAMESEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAMESEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+if ! echo "${GAMESEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
+  ensure_gamesec_landing_running || true
+  sleep 2
+  GAMESEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAMESEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+fi
 if echo "${GAMESEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
   GAMESEC_STATUS="ONLINE (HTTP ${GAMESEC_EDGE_CODE} -> :${GAMESEC_PORT})"
 elif [ -n "${GAMESEC_UPSTREAM_URL:-}" ]; then
@@ -2956,6 +3165,11 @@ else
   GAMESEC_STATUS="CHECK (HTTP ${GAMESEC_EDGE_CODE} -> :${GAMESEC_PORT})"
 fi
 NETSEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_NETSEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+if ! echo "${NETSEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
+  ensure_netsec_dashboard_running || true
+  sleep 2
+  NETSEC_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_NETSEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+fi
 if echo "${NETSEC_EDGE_CODE}" | grep -qE "^(200|301|302|307|308)$"; then
   NETSEC_STATUS="ONLINE (HTTP ${NETSEC_EDGE_CODE} -> :${NETSEC_PORT})"
 elif [ -n "${NETSEC_UPSTREAM_URL:-}" ]; then
@@ -2973,6 +3187,7 @@ echo -e "${C_GREEN}╠═══════════════════�
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Git Commit" "$(git rev-parse --short HEAD 2>/dev/null || echo local) (origin/main)"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Auto-Healed Fixes" "${HEALED_COUNT} issue(s) resolved automatically"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Web / PostgREST / Edge" "$([ "${HEALTH_OK}" = "true" ] && echo "ONLINE" || echo "WARN") / ${PGRST_STATUS} / ${EDGE_STATUS}"
+printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Platform Domains" "${PLAT_SUITE_STATUS:0:44}"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Game DDoS Defense" "${GAMESEC_STATUS}"
 printf "${C_GREEN}║${C_RESET}  ${C_BOLD}%-24s${C_RESET} : %-44s ${C_GREEN}║${C_RESET}\n" "Net DDoS Dashboard" "${NETSEC_STATUS}"
 if is_pterodactyl_installed; then
@@ -2988,10 +3203,16 @@ printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} Password Vault   : ${
 printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Shield WAF/SOC   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://sec.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} REST API Gateway : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://api.${SPARROWX_DOMAIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Cloud Infra      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_INFRA}"
+printf "${C_GREEN}║${C_RESET}   ${C_MAGENTA}•${C_RESET} AI Gateway       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_AI}"
+printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Deploy PaaS      : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DEPLOY}"
+printf "${C_GREEN}║${C_RESET}   ${C_YELLOW}•${C_RESET} DPDP Compliance  : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_DPDP} (alias: dpd.)"
+printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Agents Runtime   : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_AGENTS}"
+printf "${C_GREEN}║${C_RESET}   ${C_BLUE}•${C_RESET} Admin Control    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_ADMIN}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Hosting     : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_WEB}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game Client Dash : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME_DASH}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Game DDoS Portal : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAMESEC}"
 printf "${C_GREEN}║${C_RESET}   ${C_CYAN}•${C_RESET} Net DDoS Dash    : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_NETSEC}"
+printf "${C_GREEN}║${C_RESET}   ${C_DIM}•${C_RESET} phpMyAdmin       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_PHP}"
 if is_pterodactyl_installed; then
   printf "${C_GREEN}║${C_RESET}   ${C_GREEN}•${C_RESET} Game Panel       : ${C_WHITE}%-49s${C_RESET} ${C_GREEN}║${C_RESET}\n" "https://${DOMAIN_GAME}"
 fi

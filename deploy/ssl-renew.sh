@@ -75,6 +75,7 @@ CANDIDATE_DOMAINS=(
   "ai.${DOMAIN_ROOT}"
   "agents.${DOMAIN_ROOT}"
   "dpdp.${DOMAIN_ROOT}"
+  "dpd.${DOMAIN_ROOT}"
   "console.${DOMAIN_ROOT}"
   "php.${DOMAIN_ROOT}"
   "admin.${DOMAIN_ROOT}"
@@ -249,9 +250,12 @@ fi
 if [ -n "${DOMAIN_INFRA:-}" ] && [[ "${DOMAIN_INFRA}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_INFRA} " ]]; then
   renew_dedicated_game_cert "${DOMAIN_INFRA}" "infra" "# 9\\. Cloud Infrastructure Storefront"
 fi
-for _plat_sub in php ai deploy dpdp agents console admin; do
+if [[ " ${VALID_DOMAINS[*]:-} " =~ " php.${DOMAIN_ROOT} " ]]; then
+  renew_dedicated_game_cert "php.${DOMAIN_ROOT}" "php" "# 10\\. phpMyAdmin Database Console"
+fi
+for _plat_sub in ai deploy dpdp agents console admin; do
   _plat_dom="${_plat_sub}.${DOMAIN_ROOT}"
   if [[ " ${VALID_DOMAINS[*]:-} " =~ " ${_plat_dom} " ]]; then
-    renew_dedicated_game_cert "${_plat_dom}" "${_plat_sub}" ""
+    renew_dedicated_game_cert "${_plat_dom}" "${_plat_sub}" "# 11\\.${_plat_sub}\\."
   fi
 done

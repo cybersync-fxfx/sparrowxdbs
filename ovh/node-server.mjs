@@ -656,7 +656,22 @@ const server = createServer(async (req, res) => {
     const isDeployHost = host.startsWith("deploy.");
     const isAiHost = host.startsWith("ai.");
     const isAgentsHost = host.startsWith("agents.");
-    const isDpdpHost = host.startsWith("dpdp.");
+    const isDpdpHost = host.startsWith("dpdp.") || host.startsWith("dpd.");
+    const isAdminHost = host.startsWith("admin.");
+    if (isAdminHost) {
+      res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    }
+
+    if ((req.method === "GET" || req.method === "HEAD") && host.startsWith("dpd.")) {
+      const qs = (reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "").replace(/[\r\n]/g, "");
+      const safePath = `/${pathname.replace(/^\/+/, "").replace(/[\r\n]/g, "")}`;
+      res.writeHead(301, {
+        Location: `https://dpdp.${SPARROWX_DOMAIN}${safePath === "/" ? "/" : safePath}${qs}`,
+        ...SECURITY_HEADERS,
+      });
+      res.end();
+      return;
+    }
 
     if ((req.method === "GET" || req.method === "HEAD") && pathname === "/") {
       const qs = reqUrl.includes("?") ? reqUrl.slice(reqUrl.indexOf("?")) : "";
@@ -736,6 +751,10 @@ const server = createServer(async (req, res) => {
           apis: "api.sparrowx.net",
           rest: "api.sparrowx.net",
           gateway: "api.sparrowx.net",
+          dpd: "dpdp.sparrowx.net",
+          aigw: "ai.sparrowx.net",
+          paas: "deploy.sparrowx.net",
+          adm: "admin.sparrowx.net",
         };
         if (sub === "docs" || sub === "doc") {
           const cleanP = pathname.replace(/\/+$/, "") || "/";

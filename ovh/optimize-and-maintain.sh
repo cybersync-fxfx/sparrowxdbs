@@ -20,6 +20,13 @@ PTERO_DIR="/var/www/pterodactyl"
 
 SPARROWX_DOMAIN="${SPARROWX_DOMAIN:-sparrowx.net}"
 DOMAIN_GAME="${DOMAIN_GAME:-game.panel.${SPARROWX_DOMAIN}}"
+DOMAIN_INFRA="${DOMAIN_INFRA:-infra.${SPARROWX_DOMAIN}}"
+DOMAIN_AI="${DOMAIN_AI:-ai.${SPARROWX_DOMAIN}}"
+DOMAIN_DEPLOY="${DOMAIN_DEPLOY:-deploy.${SPARROWX_DOMAIN}}"
+DOMAIN_DPDP="${DOMAIN_DPDP:-dpdp.${SPARROWX_DOMAIN}}"
+DOMAIN_ADMIN="${DOMAIN_ADMIN:-admin.${SPARROWX_DOMAIN}}"
+DOMAIN_GAMESEC="${DOMAIN_GAMESEC:-gamesec.${SPARROWX_DOMAIN}}"
+DOMAIN_NETSEC="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN}}"
 HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
 PTERO_PORT="${PTERO_PORT:-8090}"
@@ -215,6 +222,18 @@ run_maintain() {
     if [ "${missing_any}" = "yes" ] && [ -f "${INSTALL_DIR}/docker-compose.ovh.yml" ]; then
       docker compose -f "${INSTALL_DIR}/docker-compose.ovh.yml" up -d --no-build --remove-orphans >/dev/null 2>&1 || true
     fi
+    # Also ensure auxiliary DDoS portal containers stay running if provisioned
+    for aux_ctr in sparrowx-gamesec sparrowx-netsec; do
+      if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "${aux_ctr}"; then
+        local aux_state
+        aux_state="$(docker inspect -f '{{.State.Running}}' "${aux_ctr}" 2>/dev/null || echo "false")"
+        if [ "${aux_state}" != "true" ]; then
+          log_msg "HEAL" "Auxiliary container ${aux_ctr} was stopped — restarting..."
+          docker start "${aux_ctr}" >/dev/null 2>&1 || true
+          healed+=("docker:${aux_ctr}")
+        fi
+      fi
+    done
   fi
 
   # 2B. Check Host Services (MariaDB, Redis, PHP-FPM, Host Nginx, Pteroq, Wings)
@@ -255,6 +274,58 @@ run_maintain() {
       docker restart sparrowx-nginx >/dev/null 2>&1 || true
     fi
     healed+=("web-probe:${web_code}")
+  fi
+
+  # 2C-2. Live HTTPS Probe: All Platform Subdomains (infra, ai, deploy, dpdp, admin, db, sec, gamesec, netsec)
+  local plat_failed=()
+  local _sub_host _sub_code
+  for _sub_host in \
+    "${DOMAIN_INFRA}" \
+    "${DOMAIN_AI}" \
+    "${DOMAIN_DEPLOY}" \
+    "${DOMAIN_DPDP}" \
+    "${DOMAIN_ADMIN}" \
+    "db.${SPARROWX_DOMAIN}" \
+    "sec.${SPARROWX_DOMAIN}"; do
+    _sub_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 -H "Host: ${_sub_host}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+    if ! echo "${_sub_code}" | grep -qE "^(200|301|302|307|308|401|403)$"; then
+      plat_failed+=("${_sub_host}:${_sub_code}")
+    fi
+  done
+  if [ "${#plat_failed[@]}" -gt 0 ]; then
+    log_msg "HEAL" "Platform subdomain probe failed (${plat_failed[*]}) — restarting app/edge and validating nginx..."
+    if systemctl is-active --quiet sparrowx-native.service 2>/dev/null; then
+      systemctl restart sparrowx-native.service >/dev/null 2>&1 || true
+    else
+      docker restart sparrowx-app >/dev/null 2>&1 || true
+    fi
+    sleep 3
+    if docker exec sparrowx-nginx nginx -t >/dev/null 2>&1; then
+      docker exec sparrowx-nginx nginx -s reload >/dev/null 2>&1 || docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    else
+      docker restart sparrowx-nginx >/dev/null 2>&1 || true
+    fi
+    healed+=("subdomains:${plat_failed[*]}")
+  fi
+
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "sparrowx-gamesec"; then
+    local gs_code
+    gs_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 -H "Host: ${DOMAIN_GAMESEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+    if ! echo "${gs_code}" | grep -qE "^(200|301|302|307|308)$"; then
+      log_msg "HEAL" "GameSec (${DOMAIN_GAMESEC}) probe returned HTTP ${gs_code} — restarting sparrowx-gamesec..."
+      docker restart sparrowx-gamesec >/dev/null 2>&1 || true
+      healed+=("gamesec-probe:${gs_code}")
+    fi
+  fi
+
+  if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -qx "sparrowx-netsec"; then
+    local ns_code
+    ns_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 -H "Host: ${DOMAIN_NETSEC}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
+    if ! echo "${ns_code}" | grep -qE "^(200|301|302|307|308)$"; then
+      log_msg "HEAL" "NetSec (${DOMAIN_NETSEC}) probe returned HTTP ${ns_code} — restarting sparrowx-netsec..."
+      docker restart sparrowx-netsec >/dev/null 2>&1 || true
+      healed+=("netsec-probe:${ns_code}")
+    fi
   fi
 
   # 2D. Live HTTP Probe: Pterodactyl Panel (game.panel.sparrowx.net)
