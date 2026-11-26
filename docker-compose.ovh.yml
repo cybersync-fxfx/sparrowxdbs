@@ -66,6 +66,11 @@ services:
       - postgrest
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    env_file:
+      - path: .env
+        required: false
+      - path: /etc/sparrowx/app.env
+        required: false
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -89,48 +94,21 @@ services:
       SPARROWX_ADMIN_EMAIL: ${SPARROWX_ADMIN_EMAIL:-admin@localhost}
       SPARROWX_JWT_SECRET: ${SPARROWX_JWT_SECRET:-sparrowx_jwt_secret_key_32_characters_2026}
       SPARROWX_MASTER_SSO_SECRET: ${SPARROWX_MASTER_SSO_SECRET:-${SPARROWX_JWT_SECRET:-sparrowx_jwt_secret_key_32_characters_2026}}
-      SPARROWX_ADMIN_API_KEY: ${SPARROWX_ADMIN_API_KEY:-}
       SPARROWX_HTTP_PORT: ${HTTP_PORT:-80}
       SPARROWX_HTTPS_PORT: ${HTTPS_PORT:-443}
-      VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY:-}
       # Game Hosting Portal (/game & /game/dashboard)
       POSTGREST_URL: ${POSTGREST_URL:-http://postgrest:3001}
-      POSTGREST_API_KEY: ${POSTGREST_API_KEY:-}
       SESSION_SECRET: ${SESSION_SECRET:-${SPARROWX_JWT_SECRET:-sparrowx_jwt_secret_key_32_characters_2026}}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
-      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
-      DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
-      # Unified Google & GitHub OAuth 2.0 SSO across all *.sparrowx.net platforms
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
-      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      GITHUB_REDIRECT_URI: ${GITHUB_REDIRECT_URI:-}
       PTERO_URL: ${PTERO_URL:-https://game.panel.sparrowx.net}
       PTERO_INTERNAL_URL: ${PTERO_INTERNAL_URL:-http://host.docker.internal:${PTERO_PORT:-8090}}
-      PTERO_SSO_SECRET: ${PTERO_SSO_SECRET:-}
-      PTERO_APPLICATION_API_KEY: ${PTERO_APPLICATION_API_KEY:-}
-      PTERO_CLIENT_API_KEY: ${PTERO_CLIENT_API_KEY:-}
-      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
-      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
-      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
-      # Self-Hosted SparrowX Pay Gateway (Direct UPI + Binance Spot USDT Auto-Verify)
+      # Self-Hosted SparrowX Pay Gateway defaults (secrets loaded via env_file .env + /etc/sparrowx/app.env)
       SPARROWX_UPI_ID: ${SPARROWX_UPI_ID:-bm.atchuthakrishna@okhdfcbank}
       SPARROWX_MERCHANT_NAME: ${SPARROWX_MERCHANT_NAME:-SparrowX Technologies}
-      SPARROWX_UPI_BRIDGE_SECRET: ${SPARROWX_UPI_BRIDGE_SECRET:-}
-      SPARROWX_BINANCE_API_KEY: ${SPARROWX_BINANCE_API_KEY:-}
-      SPARROWX_BINANCE_API_SECRET: ${SPARROWX_BINANCE_API_SECRET:-}
-      SPARROWX_BINANCE_USDT_TRC20: ${SPARROWX_BINANCE_USDT_TRC20:-}
-      SPARROWX_BINANCE_USDT_BEP20: ${SPARROWX_BINANCE_USDT_BEP20:-}
       SPARROWX_INR_PER_USDT: ${SPARROWX_INR_PER_USDT:-86}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       # Self-Hosted Open-Source SMTP (Postfix + OpenDKIM) & Email Verification
       SMTP_HOST: ${SMTP_HOST:-smtp}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-SparrowX Security <noreply@${SPARROWX_DOMAIN:-sparrowx.net}>}
       SMTP_HELO_DOMAIN: ${SPARROWX_DOMAIN:-sparrowx.net}
     volumes:

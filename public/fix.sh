@@ -2033,6 +2033,10 @@ if [ -f "${INSTALL_DIR}/.env" ]; then
   # shellcheck disable=SC1090
   source "${INSTALL_DIR}/.env" 2>/dev/null || true
 fi
+if [ -f "/etc/sparrowx/app.env" ]; then
+  # shellcheck disable=SC1091
+  source "/etc/sparrowx/app.env" 2>/dev/null || true
+fi
 
 DETECTED_IP="$(curl -4 -fsS --max-time 4 https://api.ipify.org 2>/dev/null || curl -4 -fsS --max-time 4 https://ifconfig.me 2>/dev/null || hostname -I 2>/dev/null | awk '{print $1}' || echo "127.0.0.1")"
 SPARROWX_PUBLIC_IP="${SPARROWX_PUBLIC_IP:-${DETECTED_IP}}"

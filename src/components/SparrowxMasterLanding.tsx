@@ -81,10 +81,12 @@ function OperatorLoginDialog({
   open,
   onOpenChange,
   onSuccess,
+  externalAuthError,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: (user: AppUser) => void;
+  externalAuthError?: string;
 }) {
   const [authTab, setAuthTab] = useState<"signin" | "register">("signin");
   const [email, setEmail] = useState("");
@@ -267,6 +269,14 @@ function OperatorLoginDialog({
         </DialogHeader>
 
         <div className="px-6 pb-6 space-y-4">
+          {externalAuthError && (
+            <div
+              role="alert"
+              className="rounded-xl border border-red-500/40 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-200 leading-relaxed"
+            >
+              {externalAuthError}
+            </div>
+          )}
           <OAuthSignInButtons nextPath="/" />
           <p className="text-[11px] text-center text-zinc-400 leading-relaxed">
             Passwordless OAuth 2.0 SSO — your isolated workspace, database, and vault provision automatically on first sign-in.
@@ -300,6 +310,7 @@ export function SparrowxMasterLanding({
   onUserAuthenticated,
 }: SparrowxMasterLandingProps) {
   const [operatorModalOpen, setOperatorModalOpen] = useState(false);
+  const [oauthAuthError, setOauthAuthError] = useState("");
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
@@ -310,6 +321,19 @@ export function SparrowxMasterLanding({
 
   const onUserAuthenticatedRef = React.useRef(onUserAuthenticated);
   onUserAuthenticatedRef.current = onUserAuthenticated;
+
+  // Surface OAuth callback/configuration errors (?auth_error=...) inside the Sign In modal instead of silently looping
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const errMsg = url.searchParams.get("auth_error")?.trim();
+    if (errMsg) {
+      setOauthAuthError(errMsg);
+      setOperatorModalOpen(true);
+      url.searchParams.delete("auth_error");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+  }, []);
 
   // Hydrate authenticated session on client mount (local JWT or Google/Master SSO cookie).
   useEffect(() => {
@@ -1393,8 +1417,13 @@ export function SparrowxMasterLanding({
       {/* Operator Sign In & Account Creation Dialog */}
       <OperatorLoginDialog
         open={operatorModalOpen}
-        onOpenChange={setOperatorModalOpen}
+        onOpenChange={(nextOpen) => {
+          setOperatorModalOpen(nextOpen);
+          if (!nextOpen) setOauthAuthError("");
+        }}
+        externalAuthError={oauthAuthError}
         onSuccess={(user) => {
+          setOauthAuthError("");
           setSessionUser(user);
           if (onUserAuthenticated) {
             onUserAuthenticated(user);
