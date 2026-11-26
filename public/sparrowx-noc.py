@@ -59,12 +59,72 @@ except ImportError:
     curses = None  # Handled gracefully for --once mode on non-curses systems
 
 
-VERSION = "2.6.0"
+VERSION = "2.7.0"
 SPARK_CHARS = " ▁▂▃▄▅▆▇█"
 IS_LINUX = sys.platform.startswith("linux")
 THEMES = ("cyber", "emerald", "crimson")
+AUTOGUARD_MODES = ("monitor", "protect", "off")
 WHITELIST_FILE = Path("/opt/sparrowx/xdp/whitelist_ipv4.txt")
 BLOCKLIST_FILE = Path("/opt/sparrowx/xdp/blocked_ipv4.txt")
+AUTO_BAN_TTL_SEC = 1800          # 30 minutes max for any automated temporary mitigation
+STRICT_SYN_COOLDOWN_SEC = 60.0   # Minimum hold before relaxing auto-triggered strict SYN
+STRICT_MANUAL_DEBOUNCE_SEC = 1.5 # Prevent accidental rapid key-repeat flapping on [x]
+
+# Built-in infrastructure CIDRs that MUST NEVER be auto-banned or flagged as attackers
+INTERNAL_SAFE_CIDRS = tuple(
+    ipaddress.IPv4Network(c)
+    for c in (
+        "127.0.0.0/8",      # Loopback
+        "10.0.0.0/8",       # RFC1918 / WireGuard / K8s / Internal
+        "172.16.0.0/12",    # RFC1918 / Docker bridge networks
+        "192.168.0.0/16",   # RFC1918 / LAN
+        "100.64.0.0/10",    # CGNAT / Tailscale / ISP shared NAT
+        "169.254.0.0/16",   # Link-local / Cloud metadata
+        "224.0.0.0/4",      # Multicast
+    )
+)
+
+TRUSTED_SERVICE_CIDRS: Tuple[Tuple[ipaddress.IPv4Network, str], ...] = tuple(
+    (ipaddress.IPv4Network(cidr), label)
+    for cidr, label in (
+        # Public DNS Resolvers
+        ("1.1.1.1/32", "Cloudflare DNS"),
+        ("1.0.0.1/32", "Cloudflare DNS"),
+        ("8.8.8.8/32", "Google Public DNS"),
+        ("8.8.4.4/32", "Google Public DNS"),
+        ("9.9.9.9/32", "Quad9 DNS"),
+        ("149.112.112.112/32", "Quad9 DNS"),
+        # Cloudflare IPv4 Edge Network (official published ranges)
+        ("173.245.48.0/20", "Cloudflare Edge"),
+        ("103.21.244.0/22", "Cloudflare Edge"),
+        ("103.22.200.0/22", "Cloudflare Edge"),
+        ("103.31.4.0/22", "Cloudflare Edge"),
+        ("141.101.64.0/18", "Cloudflare Edge"),
+        ("108.162.192.0/18", "Cloudflare Edge"),
+        ("190.93.240.0/20", "Cloudflare Edge"),
+        ("188.114.96.0/20", "Cloudflare Edge"),
+        ("197.234.240.0/22", "Cloudflare Edge"),
+        ("198.41.128.0/17", "Cloudflare Edge"),
+        ("162.158.0.0/15", "Cloudflare Edge"),
+        ("104.16.0.0/13", "Cloudflare Edge"),
+        ("104.24.0.0/14", "Cloudflare Edge"),
+        ("172.64.0.0/13", "Cloudflare Edge"),
+        ("131.0.72.0/22", "Cloudflare Edge"),
+    )
+)
+
+# Major CDN, DNS, Search & Developer Platform ASNs (never auto-ban shared reverse proxies/services)
+TRUSTED_SERVICE_ASNS: Dict[str, str] = {
+    "AS13335": "Cloudflare CDN",
+    "AS15169": "Google Infrastructure",
+    "AS36459": "GitHub Services",
+    "AS54113": "Fastly CDN",
+    "AS20940": "Akamai CDN",
+    "AS714": "Apple Services",
+    "AS8075": "Microsoft Azure",
+    "AS32934": "Meta Infrastructure",
+    "AS19551": "Imperva / Incapsula",
+}
 GEO_CACHE_PATHS = (
     Path("/var/cache/sparrowx/noc_geo_cache.json"),
     Path("/tmp/sparrowx_noc_geo_cache.json"),
@@ -292,6 +352,9 @@ class FiltrationStats:
     fail2ban_banned: int = 0
     ufw_active: bool = False
     strict_mode: bool = False
+    autoguard_mode: str = "monitor"  # monitor | protect | off
+    safeguard_protected: int = 0
+    auto_banned_active: int = 0
     threat_level: str = "NORMAL"  # NORMAL | ELEVATED | UNDER ATTACK
 
 
@@ -319,7 +382,9 @@ class RemoteTalker:
     udp_conns: int
     ports: str
     process: str
-    risk: str  # WHITELIST | BLOCKED | FLOOD | WARN | OK
+    risk: str  # WHITELIST | ADMIN | INTERNAL | SERVICE | BLOCKED | FLOOD | WARN | OK
+    threat_score: int = 0
+    safe_reason: str = ""
 
 
 @dataclass
@@ -726,14 +791,237 @@ class IpGeoResolver:
 
 
 # ------------------------------------------------------------------------------
+# Smart Safe-Guard Engine (Prevents Banning Normal Users, Admins & Services)
+# ------------------------------------------------------------------------------
+
+class SafeIpGuard:
+    """
+    Continuously discovers host IPs, gateways, DNS resolvers, active SSH admin
+    sessions, WireGuard peer endpoints, Docker networks, client VPS backends,
+    and trusted CDN/service CIDRs/ASNs so the firewall and NOC NEVER ban
+    legitimate infrastructure or lock out the operator.
+    """
+
+    def __init__(self) -> None:
+        self.host_ips: Set[str] = set()
+        self.gateway_ips: Set[str] = set()
+        self.dns_ips: Set[str] = set()
+        self.admin_ssh_ips: Set[str] = set()
+        self.backend_ips: Set[str] = set()
+        self._last_refresh: float = 0.0
+        self._refresh_env_ssh()
+
+    def _refresh_env_ssh(self) -> None:
+        for env_key in ("SSH_CONNECTION", "SSH_CLIENT"):
+            raw = os.environ.get(env_key, "").strip()
+            if raw:
+                first = raw.split()[0].replace("::ffff:", "")
+                if is_valid_ipv4(first):
+                    self.admin_ssh_ips.add(first)
+
+    def refresh_dynamic(
+        self,
+        backends: Optional[List[ProtectedBackend]] = None,
+        active_ssh_ips: Optional[Set[str]] = None,
+        force: bool = False,
+    ) -> None:
+        now = time.monotonic()
+        self._refresh_env_ssh()
+        if active_ssh_ips:
+            for ip in active_ssh_ips:
+                if is_valid_ipv4(ip):
+                    self.admin_ssh_ips.add(ip)
+
+        if backends:
+            for b in backends:
+                for candidate in (b.tunnel_ip.split("/")[0], b.endpoint.rsplit(":", 1)[0]):
+                    cand = candidate.strip()
+                    if is_valid_ipv4(cand):
+                        self.backend_ips.add(cand)
+
+        if not force and (now - self._last_refresh) < 15.0:
+            return
+        self._last_refresh = now
+
+        if not IS_LINUX:
+            return
+
+        # 1. All local IPv4 addresses on this host
+        rc, out, _ = run_cmd(["ip", "-4", "-o", "addr", "show"], timeout=1.0)
+        if rc == 0:
+            found_host: Set[str] = set()
+            for m in re.finditer(r"inet\s+(\d+\.\d+\.\d+\.\d+)", out):
+                if is_valid_ipv4(m.group(1)):
+                    found_host.add(m.group(1))
+            if found_host:
+                self.host_ips = found_host
+
+        # 2. Default gateway IP(s)
+        rc, out, _ = run_cmd(["ip", "route", "show", "default"], timeout=1.0)
+        if rc == 0:
+            found_gw: Set[str] = set()
+            for m in re.finditer(r"\bvia\s+(\d+\.\d+\.\d+\.\d+)", out):
+                if is_valid_ipv4(m.group(1)):
+                    found_gw.add(m.group(1))
+            if found_gw:
+                self.gateway_ips = found_gw
+
+        # 3. Configured system DNS resolvers (/etc/resolv.conf)
+        resolv = Path("/etc/resolv.conf")
+        if resolv.exists():
+            try:
+                found_dns: Set[str] = set()
+                for line in resolv.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    parts = line.strip().split()
+                    if len(parts) >= 2 and parts[0] == "nameserver" and is_valid_ipv4(parts[1]):
+                        found_dns.add(parts[1])
+                if found_dns:
+                    self.dns_ips = found_dns
+            except OSError:
+                pass
+
+    @property
+    def total_dynamic_protected(self) -> int:
+        return len(self.host_ips | self.gateway_ips | self.dns_ips | self.admin_ssh_ips | self.backend_ips)
+
+    def classify(
+        self,
+        ip: str,
+        geo: Optional[IpGeoInfo] = None,
+        extra_whitelisted: Optional[Set[str]] = None,
+    ) -> Tuple[bool, str, str]:
+        """Returns (is_protected, category_tag, human_reason)."""
+        clean = ip.strip()
+        if not is_valid_ipv4(clean):
+            return False, "INVALID", "Invalid IPv4"
+
+        addr = ipaddress.IPv4Address(clean)
+
+        # 1. Explicit operator whitelist always wins
+        if extra_whitelisted and clean in extra_whitelisted:
+            return True, "WHITELIST", "Explicitly whitelisted operator IP"
+
+        # 2. Active SSH operator session (prevents self-lockout)
+        if clean in self.admin_ssh_ips:
+            return True, "ADMIN", "Active SSH operator session"
+
+        # 3. Host's own IPs, gateway, or system DNS resolvers
+        if clean in self.host_ips:
+            return True, "HOST", "Local server interface IP"
+        if clean in self.gateway_ips:
+            return True, "HOST", "Server default network gateway"
+        if clean in self.dns_ips:
+            return True, "SERVICE", "Host DNS resolver (/etc/resolv.conf)"
+
+        # 4. Internal / Docker / WireGuard / Loopback / CGNAT ranges
+        for net in INTERNAL_SAFE_CIDRS:
+            if addr in net:
+                if clean.startswith("127."):
+                    return True, "INTERNAL", "Loopback interface (127.0.0.0/8)"
+                if clean.startswith("172."):
+                    return True, "INTERNAL", "Docker / Private RFC1918 network"
+                if clean.startswith("100."):
+                    return True, "INTERNAL", "Carrier-Grade NAT / Tailscale subnet"
+                return True, "INTERNAL", "Private / WireGuard internal network"
+
+        # 5. Protected WireGuard peers & registered client VPS backends
+        if clean in self.backend_ips:
+            return True, "BACKEND", "Protected WireGuard peer / client backend"
+
+        # 6. Well-known critical CDN & public DNS CIDRs (Cloudflare, Google DNS, Quad9)
+        for net, label in TRUSTED_SERVICE_CIDRS:
+            if addr in net:
+                return True, "SERVICE", f"Trusted service infrastructure ({label})"
+
+        # 7. GeoIP ASN check for major CDNs / Cloud / Developer platforms
+        if geo and geo.status == "ok" and geo.asn:
+            asn_key = geo.asn.split()[0].upper()
+            if asn_key in TRUSTED_SERVICE_ASNS:
+                return True, "SERVICE", f"Trusted service ASN ({TRUSTED_SERVICE_ASNS[asn_key]} · {asn_key})"
+
+        return False, "PUBLIC", ""
+
+
+def evaluate_talker_behavior(
+    info: Dict[str, Any],
+    strike_count: int = 0,
+    log_evidence: Optional[Dict[str, str]] = None,
+) -> Tuple[int, str]:
+    """
+    Smart behavioral scoring (0-100) for a non-protected PUBLIC IP.
+    Designed to distinguish real volumetric/SYN/brute-force attackers from
+    normal high-concurrency browsers, mobile CGNAT carriers, and legitimate services.
+    """
+    total = int(info.get("total", 0))
+    est = int(info.get("est", 0))
+    syn = int(info.get("syn", 0))
+    tw = int(info.get("tw", 0))
+    udp = int(info.get("udp", 0))
+
+    score = 0
+
+    # 1. Half-open TCP SYN Flood signature (high SYN-RECV with very few completed handshakes)
+    if syn >= 25 and syn > max(est * 3, 15):
+        score += 65
+    elif syn >= 15 and syn > max(est * 2, 10):
+        score += 45
+    elif syn >= 10 and est == 0:
+        score += 30
+    elif syn >= 6 and est == 0:
+        score += 15
+
+    # 2. Connection exhaustion ONLY when established ratio is unhealthy or count is extreme
+    # Normal users / office NAT / HTTP2 browsers with 15-80 ESTAB sockets & low SYN are NOT flooders!
+    if total >= 250 and est < total * 0.25:
+        score += 45
+    elif total >= 140 and est < total * 0.30:
+        score += 25
+    elif total >= 80 and est == 0 and tw >= 60:
+        score += 30
+
+    # 3. High UDP socket churn from single public IP
+    if udp >= 120:
+        score += 35
+    elif udp >= 60:
+        score += 15
+
+    # 4. Established-Session Trust Credit: real browsers/apps hold clean ESTAB sockets with ~0 SYN-RECV
+    if est >= 3 and syn <= 3 and total < 160:
+        score = max(0, score - 25)
+
+    # 5. Multi-signal log correlation (SSH brute-force or heavy Nginx 429 abuse)
+    if log_evidence:
+        attempted = (log_evidence.get("attempted") or "").lower()
+        if "ssh brute-force" in attempted or "invalid ssh user" in attempted:
+            score += 35
+        elif "429" in attempted or "rate-limit" in attempted:
+            score += 20
+
+    # 6. Sustained persistence bonus (only consecutive attack ticks reach FLOOD)
+    if score >= 55 and strike_count >= 3:
+        score = min(100, score + 15)
+
+    score = max(0, min(100, score))
+
+    # Require sustained persistence (strike_count >= 2) before labeling FLOOD to eliminate 1s bursts
+    if score >= 75 and strike_count >= 2:
+        return score, "FLOOD"
+    if score >= 40:
+        return score, "WARN"
+    return score, "OK"
+
+
+# ------------------------------------------------------------------------------
 # Linux Telemetry Collectors (100% Real Kernel/System Data in Live Mode)
 # ------------------------------------------------------------------------------
 
 class TelemetryCollector:
-    def __init__(self, iface: Optional[str] = None, demo: bool = False):
+    def __init__(self, iface: Optional[str] = None, demo: bool = False, autoguard: str = "monitor"):
         self.demo = demo
         self.forced_iface = iface
         self.active_iface = iface or self._detect_default_iface()
+        self.autoguard_mode = autoguard if autoguard in AUTOGUARD_MODES else "monitor"
+        self.safe_guard = SafeIpGuard()
 
         self._prev_cpu: Optional[Tuple[int, int]] = None
         self._prev_net: Dict[str, Tuple[float, int, int, int, int, int, int]] = {}
@@ -742,6 +1030,15 @@ class TelemetryCollector:
         self._prev_wg_bytes: Dict[str, Tuple[float, int, int]] = {}
         self._peak_rx_bps: float = 0.0
         self._peak_tx_bps: float = 0.0
+
+        # Smart hysteresis & anti-flap state
+        self._ip_strikes: Dict[str, int] = {}
+        self._auto_bans: Dict[str, float] = {}  # ip -> expires_at_epoch
+        self._last_strict_toggle_mono: float = 0.0
+        self._strict_auto_engaged: bool = False
+        self._strict_high_ticks: int = 0
+        self._strict_low_ticks: int = 0
+        self._latest_whitelisted: Set[str] = set()
 
         self.rx_history: Deque[float] = collections.deque(maxlen=72)
         self.tx_history: Deque[float] = collections.deque(maxlen=72)
@@ -1174,20 +1471,22 @@ class TelemetryCollector:
                     except (json.JSONDecodeError, ValueError, TypeError):
                         pass
 
-            # XDP Whitelist map (`whitelist` in sparrowx_xdp_ddos.c)
+            # XDP Whitelist maps (`static_whitelist` permanent + `whitelist` dynamic LRU)
             for dump_cmd in (
+                ["bpftool", "-j", "map", "dump", "pinned", "/sys/fs/bpf/sparrowx/static_whitelist"],
+                ["bpftool", "-j", "map", "dump", "name", "static_whitelist"],
                 ["bpftool", "-j", "map", "dump", "pinned", "/sys/fs/bpf/sparrowx/whitelist"],
                 ["bpftool", "-j", "map", "dump", "name", "whitelist"],
             ):
                 rc, out, _ = run_cmd(dump_cmd, timeout=1.2)
                 if rc == 0 and out.strip().startswith("["):
                     try:
+                        lbl = "XDP static WL" if "static_whitelist" in dump_cmd[-1] else "XDP_PASS (fast-path)"
                         for entry in json.loads(out)[:80]:
                             ip = parse_hex_key_to_ipv4(entry.get("key"))
                             if ip and (ip, "XDP") not in seen_white:
-                                whitelisted.append(PolicyIpEntry(ip, "XDP", "XDP_PASS (fast-path)"))
+                                whitelisted.append(PolicyIpEntry(ip, "XDP", lbl))
                                 seen_white.add((ip, "XDP"))
-                        break
                     except (json.JSONDecodeError, ValueError, TypeError):
                         pass
 
@@ -1303,13 +1602,17 @@ class TelemetryCollector:
             except OSError:
                 pass
 
-        # Threat Level calculation from real telemetry
-        if fs.xdp_drop_pps >= 1000 or fs.syn_recv_count >= 50:
+        # Smart Threat Level calculation (higher, realistic thresholds so normal spikes don't alarm)
+        if fs.xdp_drop_pps >= 2000 or fs.syn_recv_count >= 60:
             fs.threat_level = "UNDER ATTACK"
-        elif fs.xdp_drop_pps >= 50 or fs.syn_recv_count >= 15 or fs.fail2ban_banned >= 20:
+        elif fs.xdp_drop_pps >= 200 or fs.syn_recv_count >= 25 or fs.fail2ban_banned >= 25:
             fs.threat_level = "ELEVATED"
         else:
             fs.threat_level = "NORMAL"
+
+        fs.autoguard_mode = self.autoguard_mode
+        fs.safeguard_protected = self.safe_guard.total_dynamic_protected + len(whitelisted)
+        fs.auto_banned_active = len(self._auto_bans)
 
         return fs, blocked, whitelisted
 
@@ -1848,14 +2151,42 @@ class TelemetryCollector:
             if entry["proc"] == "-" and proc != "-":
                 entry["proc"] = proc
 
+        active_ssh_ips: Set[str] = set()
+        for ip, info in agg.items():
+            if info["est"] > 0 and (info["proc"] == "sshd" or "22" in info["ports"]):
+                active_ssh_ips.add(ip)
+
+        self.safe_guard.refresh_dynamic(active_ssh_ips=active_ssh_ips)
+
+        # Track sustained strikes across ticks so 1-second legitimate spikes never flag as FLOOD
+        active_ips = set(agg.keys())
+        for stale_ip in [k for k in self._ip_strikes if k not in active_ips]:
+            self._ip_strikes[stale_ip] -= 1
+            if self._ip_strikes[stale_ip] <= 0:
+                del self._ip_strikes[stale_ip]
+
         talkers: List[RemoteTalker] = []
         for ip, info in agg.items():
-            if info["syn"] >= 8 or info["total"] >= 40:
-                risk = "FLOOD"
-            elif info["syn"] >= 3 or info["total"] >= 15:
-                risk = "WARN"
+            geo = self.geo_resolver.get_cached_or_queue(ip) if is_valid_ipv4(ip) else None
+            is_protected, category, safe_reason = self.safe_guard.classify(
+                ip, geo=geo, extra_whitelisted=self._latest_whitelisted
+            )
+            if is_protected:
+                self._ip_strikes.pop(ip, None)
+                risk = category  # WHITELIST | ADMIN | INTERNAL | SERVICE | HOST | BACKEND
+                score = 0
             else:
-                risk = "OK"
+                prelim_score, _ = evaluate_talker_behavior(info, strike_count=0)
+                if prelim_score >= 45:
+                    self._ip_strikes[ip] = min(20, self._ip_strikes.get(ip, 0) + 1)
+                else:
+                    self._ip_strikes[ip] = max(0, self._ip_strikes.get(ip, 0) - 1)
+                score, risk = evaluate_talker_behavior(
+                    info,
+                    strike_count=self._ip_strikes.get(ip, 0),
+                    log_evidence=self._evidence_cache.get(ip),
+                )
+
             ports_str = ",".join(sorted(info["ports"]))[:12] or "-"
             talkers.append(
                 RemoteTalker(
@@ -1868,10 +2199,12 @@ class TelemetryCollector:
                     ports=ports_str,
                     process=info["proc"][:10],
                     risk=risk,
+                    threat_score=score,
+                    safe_reason=safe_reason,
                 )
             )
 
-        talkers.sort(key=lambda t: (t.syn_recv * 10 + t.total_conns), reverse=True)
+        talkers.sort(key=lambda t: (t.threat_score * 10 + t.syn_recv * 5 + t.total_conns), reverse=True)
         return talkers[:60], syn_total, tw_total, est_total, total_sockets
 
     # -- Live Multi-Source Security Log Tailer ---------------------------------
@@ -1970,12 +2303,119 @@ class TelemetryCollector:
             pass
         return False
 
-    def ban_ip(self, ip: str, reason: str = "", attempted: str = "") -> str:
+    def cycle_autoguard(self) -> str:
+        idx = (AUTOGUARD_MODES.index(self.autoguard_mode) + 1) % len(AUTOGUARD_MODES)
+        self.autoguard_mode = AUTOGUARD_MODES[idx]
+        desc = {
+            "monitor": "MONITOR (Smart threat scoring + advisory only — zero auto-bans)",
+            "protect": "PROTECT (Zero-FP auto-mitigation: 30m temp-ban on score>=85 x4 ticks, Safe-Guard enforced)",
+            "off": "OFF (Manual NOC control only)",
+        }[self.autoguard_mode]
+        msg = f"Auto-Guard switched to {desc}"
+        self.push_event("SAFE", msg)
+        return msg
+
+    def _evaluate_smart_defense(
+        self,
+        talkers: List[RemoteTalker],
+        filtration: FiltrationStats,
+        blocked_set: Set[str],
+        whitelisted_set: Set[str],
+    ) -> None:
+        """
+        Smart zero-false-positive defense loop:
+          1. Automatically expires temporary auto-bans after AUTO_BAN_TTL_SEC (30m)
+          2. Auto-hysteresis for Strict-SYN mode (requires 3 sustained attack ticks to engage
+             and >= 60s cooldown + 5 quiet ticks to relax — eliminates flapping)
+          3. In PROTECT mode, auto-mitigates ONLY non-protected PUBLIC attackers with
+             threat_score >= 85 sustained for >= 4 consecutive ticks
+        """
+        now_epoch = time.time()
+        now_mono = time.monotonic()
+
+        # 1. Expire any temporary auto-bans whose 30m TTL has elapsed
+        expired = [ip for ip, exp in self._auto_bans.items() if now_epoch >= exp]
+        for ip in expired:
+            self._auto_bans.pop(ip, None)
+            self.unban_ip(ip, silent=True)
+            self.push_event("SAFE", f"Auto-ban expired (30m TTL) -> unbanned {ip}")
+
+        if self.autoguard_mode == "off":
+            return
+
+        # 2. Strict-SYN hysteresis (only auto-adjust in PROTECT mode; never flap!)
+        if self.autoguard_mode == "protect" and IS_LINUX and not self.demo:
+            under_syn_pressure = filtration.syn_recv_count >= 60 or filtration.xdp_drop_pps >= 2000
+            if under_syn_pressure:
+                self._strict_high_ticks += 1
+                self._strict_low_ticks = 0
+                if (
+                    self._strict_high_ticks >= 3
+                    and not filtration.strict_mode
+                    and (now_mono - self._last_strict_toggle_mono) >= STRICT_SYN_COOLDOWN_SEC
+                ):
+                    self.toggle_strict_mode(force_enable=True, auto=True)
+                    self._strict_auto_engaged = True
+            else:
+                self._strict_high_ticks = 0
+                if self._strict_auto_engaged and filtration.strict_mode:
+                    self._strict_low_ticks += 1
+                    if (
+                        self._strict_low_ticks >= 5
+                        and (now_mono - self._last_strict_toggle_mono) >= STRICT_SYN_COOLDOWN_SEC
+                    ):
+                        self.toggle_strict_mode(force_enable=False, auto=True)
+                        self._strict_auto_engaged = False
+                        self._strict_low_ticks = 0
+
+        # 3. Per-IP confirmed sustained attacker check
+        for tk in talkers:
+            if tk.ip in blocked_set or tk.ip in whitelisted_set:
+                continue
+            if tk.risk != "FLOOD" or tk.threat_score < 85:
+                continue
+            strikes = self._ip_strikes.get(tk.ip, 0)
+            if strikes < 4:
+                continue
+
+            # Double-check SafeIpGuard with latest GeoIP/ASN before touching ANY IP
+            geo = self.geo_resolver.get_cached_or_queue(tk.ip)
+            is_prot, cat, why = self.safe_guard.classify(tk.ip, geo=geo, extra_whitelisted=whitelisted_set)
+            if is_prot:
+                self.push_event("SAFE", f"Protected {tk.ip} [{cat}] from auto-mitigation ({why})")
+                continue
+
+            if self.autoguard_mode == "protect":
+                reason = f"Smart Auto-Guard (Score {tk.threat_score}/100, {strikes}x sustained)"
+                attempted = f"Sustained flood: SYN:{tk.syn_recv} EST:{tk.established} TOT:{tk.total_conns} on :{tk.ports}"
+                res = self.ban_ip(tk.ip, reason=reason, attempted=attempted)
+                if res.startswith("BANNED") or res.startswith("[DEMO] Banned"):
+                    self._auto_bans[tk.ip] = now_epoch + AUTO_BAN_TTL_SEC
+                    blocked_set.add(tk.ip)
+                    self.push_event("SAFE", f"Auto-mitigated {tk.ip} for 30m (score={tk.threat_score}, strikes={strikes})")
+            elif self.autoguard_mode == "monitor" and strikes == 4:
+                self.push_event(
+                    "SAFE",
+                    f"Advisory: {tk.ip} sustained score={tk.threat_score}/100 (SYN:{tk.syn_recv} EST:{tk.established}) — press [b] to ban or [a] for PROTECT",
+                )
+
+    def ban_ip(self, ip: str, reason: str = "", attempted: str = "", force: bool = False) -> str:
         ip = ip.strip()
         if not is_valid_ipv4(ip):
             msg = f"Invalid IPv4 address: {ip}"
             self.push_event("SYS", msg)
             return msg
+
+        # HARD SAFE-GUARD: Never ban internal/Docker/WireGuard, admin SSH, host/gateway, DNS, Cloudflare, or backends!
+        if not force:
+            geo = self.geo_resolver.get_cached_or_queue(ip)
+            is_prot, cat, why = self.safe_guard.classify(
+                ip, geo=geo, extra_whitelisted=self._latest_whitelisted
+            )
+            if is_prot:
+                msg = f"SAFEGUARD REFUSED ban of {ip} [{cat}]: {why}"
+                self.push_event("SAFE", msg)
+                return msg
 
         ban_reason = reason.strip() or "Manual NOC Operator Ban"
         ban_tried = attempted.strip() or "Manually blocked via SparrowX Master NOC"
@@ -2001,9 +2441,6 @@ class TelemetryCollector:
             msg = f"[DEMO] Banned {ip} across XDP + nftables + UFW"
             self.push_event("BAN", msg)
             return msg
-
-        # Ensure IP is removed from whitelist first to avoid policy conflict
-        self.unwhitelist_ip(ip, silent=True)
 
         applied: List[str] = []
         if shutil.which("bpftool"):
@@ -2109,16 +2546,38 @@ class TelemetryCollector:
         self.unban_ip(ip, silent=True)
 
         applied: List[str] = []
-        # 1. Inject into XDP whitelist map (`whitelist` per-CPU LRU or pinned)
+        # 1. Inject into XDP static_whitelist (permanent) & dynamic whitelist maps
         if shutil.which("bpftool"):
             hex_key = [f"{int(oct_):02x}" for oct_ in ip.split(".")]
-            ts_ns_hex = [f"{b:02x}" for b in struct.pack("<Q", int(time.time() * 1_000_000_000))]
+            epoch_hex = [f"{b:02x}" for b in struct.pack("<Q", int(time.time()))]
+            rc_s, _, _ = run_cmd(
+                ["bpftool", "map", "update", "name", "static_whitelist", "key", "hex", *hex_key, "value", "hex", *epoch_hex],
+                timeout=1.5,
+            )
+            if rc_s == 0:
+                applied.append("XDP:static_wl")
+            ts_ns_hex = [f"{b:02x}" for b in struct.pack("<Q", 0)]  # 0 = never-expiring entry
             rc, _, _ = run_cmd(
                 ["bpftool", "map", "update", "name", "whitelist", "key", "hex", *hex_key, "value", "hex", *ts_ns_hex],
                 timeout=1.5,
             )
             if rc == 0:
                 applied.append("XDP:whitelist")
+
+        # 1b. Also add IP to Fail2Ban ignoreip on active jails so F2B never re-bans a whitelisted user
+        if shutil.which("fail2ban-client"):
+            rc_f, out_f, _ = run_cmd(["fail2ban-client", "status"], timeout=1.0)
+            if rc_f == 0:
+                m_j = re.search(r"Jail list:\s*(.+)", out_f)
+                if m_j:
+                    jails = [j.strip() for j in m_j.group(1).split(",") if j.strip()]
+                    f2b_added = False
+                    for jail in jails[:8]:
+                        rc_i, _, _ = run_cmd(["fail2ban-client", "set", jail, "addignoreip", ip], timeout=1.0)
+                        if rc_i == 0:
+                            f2b_added = True
+                    if f2b_added:
+                        applied.append("fail2ban:ignore")
 
         # 2. nftables whitelist set (auto-create set if table exists)
         if shutil.which("nft"):
@@ -2175,9 +2634,10 @@ class TelemetryCollector:
         removed: List[str] = []
         if shutil.which("bpftool"):
             hex_key = [f"{int(oct_):02x}" for oct_ in ip.split(".")]
-            rc, _, _ = run_cmd(["bpftool", "map", "delete", "name", "whitelist", "key", "hex", *hex_key], timeout=1.5)
-            if rc == 0:
-                removed.append("XDP:whitelist")
+            for wl_map in ("static_whitelist", "whitelist"):
+                rc, _, _ = run_cmd(["bpftool", "map", "delete", "name", wl_map, "key", "hex", *hex_key], timeout=1.5)
+                if rc == 0:
+                    removed.append(f"XDP:{wl_map}")
 
         if shutil.which("nft"):
             rc, _, _ = run_cmd(["nft", "delete", "element", "inet", "sparrowx_shield", "whitelist", f"{{ {ip} }}"], timeout=1.2)
@@ -2197,9 +2657,14 @@ class TelemetryCollector:
             self.push_event("WHT", msg)
         return msg
 
-    def toggle_strict_mode(self) -> str:
+    def toggle_strict_mode(self, force_enable: Optional[bool] = None, auto: bool = False) -> str:
+        now_mono = time.monotonic()
+        if not auto and (now_mono - self._last_strict_toggle_mono) < STRICT_MANUAL_DEBOUNCE_SEC:
+            return "Strict SYN toggle debounced (wait 1.5s to prevent rapid flapping)"
+
         if self.demo:
-            self._demo_strict = not self._demo_strict
+            self._demo_strict = (not self._demo_strict) if force_enable is None else bool(force_enable)
+            self._last_strict_toggle_mono = now_mono
             state = "ENABLED" if self._demo_strict else "DISABLED"
             msg = f"[DEMO] Under-Attack Strict Mitigation {state}"
             self.push_event("XDP", msg)
@@ -2214,7 +2679,12 @@ class TelemetryCollector:
         except (OSError, ValueError):
             pass
 
-        if not currently_strict:
+        want_strict = (not currently_strict) if force_enable is None else bool(force_enable)
+        if want_strict == currently_strict:
+            return "Strict SYN mode already in requested state"
+
+        prefix = "[AUTO] " if auto else ""
+        if want_strict:
             cmds = [
                 ["sysctl", "-w", "net.ipv4.tcp_syncookies=1"],
                 ["sysctl", "-w", "net.ipv4.tcp_synack_retries=2"],
@@ -2222,7 +2692,7 @@ class TelemetryCollector:
             ]
             ok = all(run_cmd(c, timeout=1.0)[0] == 0 for c in cmds)
             msg = (
-                "UNDER-ATTACK STRICT MODE ENABLED (SYN cookies + backlog=16384)"
+                f"{prefix}UNDER-ATTACK STRICT MODE ENABLED (SYN cookies + backlog=16384)"
                 if ok
                 else "Strict mode toggle requires root privileges (sudo sparrowx-noc)"
             )
@@ -2233,10 +2703,14 @@ class TelemetryCollector:
             ]
             ok = all(run_cmd(c, timeout=1.0)[0] == 0 for c in cmds)
             msg = (
-                "Strict mode relaxed to standard SYN backlog profile"
+                f"{prefix}Strict mode relaxed to standard SYN backlog profile"
                 if ok
                 else "Strict mode toggle requires root privileges"
             )
+        if ok:
+            self._last_strict_toggle_mono = now_mono
+            if not auto:
+                self._strict_auto_engaged = False
         self.push_event("XDP", msg)
         return msg
 
@@ -2385,6 +2859,8 @@ class TelemetryCollector:
 
         host = self._collect_host()
         nic = self._collect_nic()
+        backends, listening_ports = self._collect_backends_and_ports()
+        self.safe_guard.refresh_dynamic(backends=backends)
         talkers, syn_recv, time_wait, established, total_sockets = self._collect_connections()
         filtration, blocked, whitelisted = self._collect_filtration_and_policies(
             syn_recv=syn_recv,
@@ -2395,16 +2871,23 @@ class TelemetryCollector:
         # Enrich every blocklisted IP with ban reason, attempted activity, and GeoIP/ISP
         self._enrich_blocked_entries(blocked, sync_geo=sync_geo)
 
-        # Cross-tag remote talkers with live WHITELIST / BLOCKED policy status
+        # Cross-tag remote talkers with live WHITELIST / BLOCKED / SAFE-GUARD status
         wl_set = {w.ip for w in whitelisted}
+        self._latest_whitelisted = wl_set
         bl_set = {b.ip for b in blocked}
         for tk in talkers:
             if tk.ip in wl_set:
                 tk.risk = "WHITELIST"
-            elif tk.ip in bl_set and tk.risk != "FLOOD":
+                tk.threat_score = 0
+            elif tk.ip in bl_set and tk.risk not in ("FLOOD", "ADMIN", "INTERNAL", "HOST", "SERVICE", "BACKEND"):
                 tk.risk = "BLOCKED"
 
-        backends, listening_ports = self._collect_backends_and_ports()
+        # Run smart zero-FP defense evaluation (TTL expiry, Strict-SYN hysteresis, sustained-attack guard)
+        self._evaluate_smart_defense(talkers, filtration, bl_set, wl_set)
+        filtration.autoguard_mode = self.autoguard_mode
+        filtration.safeguard_protected = self.safe_guard.total_dynamic_protected + len(wl_set)
+        filtration.auto_banned_active = len(self._auto_bans)
+
         self._poll_logs()
 
         return DashboardSnapshot(
@@ -2604,9 +3087,9 @@ class SparrowxCursesApp:
         sub = (
             f" CPU [{cpu_bar}] {snap.host.cpu_pct:4.1f}% ({snap.host.cpu_cores}c)  │  "
             f"RAM [{ram_bar}] {snap.host.mem_used_gb:.1f}/{snap.host.mem_total_gb:.1f}GB  │  "
-            f"LOAD {snap.host.load_1m:.2f}/{snap.host.load_5m:.2f}/{snap.host.load_15m:.2f}  │  "
             f"UP {snap.host.uptime_str}  │  "
-            f"⛔ {len(snap.blocked_ips)} BLOCKED  ·  ✓ {len(snap.whitelisted_ips)} WHITELISTED"
+            f"GUARD:{snap.filtration.autoguard_mode.upper()}  │  "
+            f"⛔ {len(snap.blocked_ips)} BLK · ✓ {len(snap.whitelisted_ips)} WL · 🛡️ {snap.filtration.safeguard_protected} SAFE"
         )
         self._safe_addstr(stdscr, 1, 0, sub, curses.color_pair(self.P_MUTED))
 
@@ -2767,7 +3250,7 @@ class SparrowxCursesApp:
             if row >= h - 1:
                 break
             t = talkers[idx]
-            if t.risk == "WHITELIST":
+            if t.risk in ("WHITELIST", "ADMIN", "INTERNAL", "HOST", "SERVICE", "BACKEND"):
                 attr = curses.color_pair(self.P_WHITELIST) | curses.A_BOLD
             elif t.risk in ("FLOOD", "BLOCKED"):
                 attr = curses.color_pair(self.P_DANGER) | curses.A_BOLD
@@ -2777,7 +3260,20 @@ class SparrowxCursesApp:
                 attr = curses.color_pair(self.P_TEXT)
             if idx == self.selected_talker_idx:
                 attr |= curses.A_REVERSE
-            badge = "✓ WL" if t.risk == "WHITELIST" else ("⛔ BLK" if t.risk == "BLOCKED" else t.risk)
+            if t.risk == "WHITELIST":
+                badge = "✓ WL"
+            elif t.risk == "ADMIN":
+                badge = "🛡 ADM"
+            elif t.risk == "INTERNAL":
+                badge = "🛡 INT"
+            elif t.risk in ("SERVICE", "HOST", "BACKEND"):
+                badge = "🛡 SVC"
+            elif t.risk == "BLOCKED":
+                badge = "⛔ BLK"
+            elif t.risk in ("FLOOD", "WARN") and t.threat_score > 0:
+                badge = f"{t.risk}({t.threat_score})"
+            else:
+                badge = t.risk
             line = (
                 f"{t.ip[:16]:<16} {t.total_conns:>4} {t.established:>4} {t.syn_recv:>4} "
                 f"{t.time_wait:>3} {t.udp_conns:>4} {t.ports[:10]:<10} {t.process[:8]:<8} {badge}"
@@ -2991,7 +3487,7 @@ class SparrowxCursesApp:
                 break
             if ev.tag in ("DROP", "BAN"):
                 tag_attr = curses.color_pair(self.P_DANGER) | curses.A_BOLD
-            elif ev.tag == "WHT":
+            elif ev.tag in ("WHT", "SAFE"):
                 tag_attr = curses.color_pair(self.P_WHITELIST) | curses.A_BOLD
             elif ev.tag == "XDP":
                 tag_attr = curses.color_pair(self.P_XDP) | curses.A_BOLD
@@ -3016,8 +3512,8 @@ class SparrowxCursesApp:
             pause_lbl = "RESUME" if self.paused else "PAUSE"
             filt_lbl = f" FILTER='{self.filter_text}'" if self.filter_text else ""
             bar = (
-                f" [1-5/0] Pane  [b] Ban  [u] Unban  [w] Whitelist  [W] UnWL  [t] WL/BL View  "
-                f"[x] StrictSYN  [c] Theme  [i] NIC  [p] {pause_lbl}  [/] Filter  [q] Quit{filt_lbl}"
+                f" [1-5/0] Pane  [b] Ban  [u] Unban  [w] WL  [W] UnWL  [a] AutoGuard  "
+                f"[x] StrictSYN  [t] View  [c] Theme  [i] NIC  [p] {pause_lbl}  [/] Filter  [q] Quit{filt_lbl}"
             )
             attr = curses.color_pair(self.P_HEADER_BAR) | curses.A_BOLD
         self._safe_addstr(stdscr, h - 1, 0, bar.ljust(max(1, w - 1)), attr)
@@ -3183,6 +3679,10 @@ class SparrowxCursesApp:
                 self.snapshot = self.collector.collect()
                 last_collect = time.monotonic()
                 self.set_banner(f"Monitoring interface: {new_if}")
+            elif ch in (ord("a"), ord("A")):
+                msg = self.collector.cycle_autoguard()
+                self.snapshot = self.collector.collect()
+                self.set_banner(msg, duration=6.0)
             elif ch in (ord("x"), ord("X")):
                 msg = self.collector.toggle_strict_mode()
                 self.snapshot = self.collector.collect()
@@ -3372,12 +3872,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--iface", "-i", default=None, help="Network interface to monitor (default: auto-detect)")
     parser.add_argument("--interval", "-t", type=float, default=1.0, help="Refresh interval in seconds (default: 1.0)")
     parser.add_argument("--theme", choices=THEMES, default="cyber", help="Aesthetic SOC color theme (cyber|emerald|crimson)")
+    parser.add_argument(
+        "--autoguard",
+        choices=AUTOGUARD_MODES,
+        default="monitor",
+        help="Smart zero-FP defense mode: monitor (default advisory), protect (30m temp-ban confirmed floods), or off",
+    )
     parser.add_argument("--once", action="store_true", help="Print a single ANSI terminal snapshot and exit")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors in --once mode")
     parser.add_argument("--demo", action="store_true", help="Run with simulated DDoS telemetry (opt-in preview)")
     args = parser.parse_args(argv)
 
-    collector = TelemetryCollector(iface=args.iface, demo=args.demo)
+    collector = TelemetryCollector(iface=args.iface, demo=args.demo, autoguard=args.autoguard)
 
     if args.once or curses is None or not sys.stdout.isatty():
         if not args.demo and IS_LINUX:

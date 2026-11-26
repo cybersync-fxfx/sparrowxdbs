@@ -63,6 +63,7 @@ describe("SparrowX Layer 3/4 XDP / eBPF Anti-DDoS Scrubber", () => {
       ["deploy/xdp/sparrowx_xdp_ddos.c", "public/xdp/sparrowx_xdp_ddos.c"],
       ["deploy/xdp/attach-xdp.sh", "public/xdp/attach-xdp.sh"],
       ["deploy/ddos-setup.sh", "public/ddos-setup.sh"],
+      ["deploy/sparrowx-noc.py", "public/sparrowx-noc.py"],
       ["fix.sh", "deploy/doctor-fix.sh"],
     ];
 
@@ -76,9 +77,10 @@ describe("SparrowX Layer 3/4 XDP / eBPF Anti-DDoS Scrubber", () => {
     expect(diskSource).toContain('SEC("xdp")');
     expect(diskSource).toContain("xdp_anti_ddos");
     expect(diskSource).toContain('SEC("license") = "GPL"');
-    expect(diskSource).toContain("SPARROWX_COOKIE_MAGIC");
-    expect(diskSource).toContain("compute_ipv4_csum");
-    expect(diskSource).toContain("compute_udp_challenge_csum");
+    expect(diskSource).toContain("static_whitelist");
+    expect(diskSource).toContain("is_internal_or_safe_ipv4");
+    expect(diskSource).toContain("is_critical_dns_ipv4");
+    expect(diskSource).toContain("ip_rate_map");
     expect(diskSource).toContain("blocked_ipv4");
     expect(diskSource).not.toContain("180000000000 ULL");
 

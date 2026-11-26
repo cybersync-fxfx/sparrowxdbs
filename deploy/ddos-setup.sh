@@ -187,24 +187,25 @@ if command -v apt-get >/dev/null 2>&1; then
 fi
 
 # ------------------------------------------------------------------------------
-# 2. Apply L3/L4 Kernel SYN-Cookie, UDP Buffer & Anti-Spoofing Hardening
+# 2. Apply L3/L4 Kernel SYN-Cookie, UDP Buffer & Safe Anti-Spoofing Hardening
 # ------------------------------------------------------------------------------
 cat > /etc/sysctl.d/99-sparrowx-hardening.conf <<'EOF'
-# SparrowX L3/L4 DDoS, SYN-Flood, UDP Game Flood & Anti-Spoofing Kernel Profile
+# SparrowX Smart L3/L4 DDoS, SYN-Flood, UDP Game Flood & Anti-Spoofing Kernel Profile
 net.ipv4.tcp_syncookies = 1
-net.ipv4.tcp_synack_retries = 2
-net.ipv4.tcp_syn_retries = 3
+net.ipv4.tcp_synack_retries = 3
+net.ipv4.tcp_syn_retries = 4
 net.ipv4.tcp_fin_timeout = 15
 net.ipv4.tcp_rfc1337 = 1
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
+# Loose reverse-path filtering (2) so WireGuard / multi-homed tunnels never drop valid traffic
+net.ipv4.conf.all.rp_filter = 2
+net.ipv4.conf.default.rp_filter = 2
 net.ipv4.icmp_echo_ignore_broadcasts = 1
 net.ipv4.icmp_ignore_bogus_error_responses = 1
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
 net.ipv4.conf.all.send_redirects = 0
 net.ipv4.conf.default.send_redirects = 0
-net.ipv4.conf.all.log_martians = 1
+net.ipv4.conf.all.log_martians = 0
 net.core.somaxconn = 65535
 net.core.netdev_max_backlog = 16384
 net.ipv4.tcp_max_syn_backlog = 65535
@@ -215,10 +216,10 @@ net.ipv4.tcp_congestion_control = bbr
 net.ipv4.ip_local_port_range = 10240 65000
 EOF
 sysctl --system >/dev/null 2>&1 || sysctl -p /etc/sysctl.d/99-sparrowx-hardening.conf >/dev/null 2>&1 || true
-log_ok "Applied /etc/sysctl.d/99-sparrowx-hardening.conf (SYN cookies, BBR, RP-filter, UDP buffers)"
+log_ok "Applied /etc/sysctl.d/99-sparrowx-hardening.conf (SYN cookies, BBR, loose RP-filter, UDP buffers)"
 
 # ------------------------------------------------------------------------------
-# 3. Fail2Ban DDoS & Brute-Force Protection + UFW Policy
+# 3. Smart Fail2Ban Protection (Protected ignoreip + Progressive Ban) & UFW
 # ------------------------------------------------------------------------------
 if command -v fail2ban-server >/dev/null 2>&1 || [ -d /etc/fail2ban ]; then
   mkdir -p /etc/fail2ban/jail.d /var/log /var/run/fail2ban
@@ -227,9 +228,34 @@ if command -v fail2ban-server >/dev/null 2>&1 || [ -d /etc/fail2ban ]; then
   if command -v python3 >/dev/null 2>&1 && python3 -c "import systemd.journal" >/dev/null 2>&1; then
     F2B_BACKEND="systemd"
   fi
+
+  # Auto-build safe ignoreip list so internal services, Docker, WireGuard, Cloudflare, DNS & admin SSH are NEVER banned
+  F2B_IGNORE="127.0.0.1/8 ::1 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 169.254.0.0/16"
+  F2B_IGNORE="${F2B_IGNORE} 1.1.1.1 1.0.0.1 8.8.8.8 8.8.4.4 9.9.9.9"
+  F2B_IGNORE="${F2B_IGNORE} 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22"
+  HOST_PUB_IP="$(ip -4 -o addr show dev "${IFACE}" 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -n 1 || true)"
+  GW_PUB_IP="$(ip route show default 2>/dev/null | awk '/default/ {print $3; exit}' || true)"
+  SSH_ADMIN_IP="$(echo "${SSH_CONNECTION:-${SSH_CLIENT:-}}" | awk '{print $1}' || true)"
+  for extra_ip in "${HOST_PUB_IP}" "${GW_PUB_IP}" "${SSH_ADMIN_IP}"; do
+    if [[ "${extra_ip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      F2B_IGNORE="${F2B_IGNORE} ${extra_ip}"
+    fi
+  done
+  if [ -f "/opt/sparrowx/xdp/whitelist_ipv4.txt" ]; then
+    while IFS= read -r raw_wl; do
+      wl_ip="$(echo "${raw_wl%%#*}" | tr -d ' \r\n')"
+      [[ "${wl_ip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] && F2B_IGNORE="${F2B_IGNORE} ${wl_ip}"
+    done < "/opt/sparrowx/xdp/whitelist_ipv4.txt"
+  fi
+
   cat > /etc/fail2ban/jail.d/sparrowx-ddos.conf <<EOF
 [DEFAULT]
-bantime = 3600
+# Never ban localhost, Docker, WireGuard, Cloudflare edges, public DNS, host IP, or admin SSH
+ignoreip = ${F2B_IGNORE}
+bantime = 600
+bantime.increment = true
+bantime.factor = 2
+bantime.maxtime = 86400
 findtime = 600
 maxretry = 8
 
@@ -237,14 +263,15 @@ maxretry = 8
 enabled = true
 backend = ${F2B_BACKEND}
 logpath = /var/log/auth.log
-maxretry = 5
-bantime = 7200
+maxretry = 6
+findtime = 600
+bantime = 900
 EOF
   systemctl unmask fail2ban >/dev/null 2>&1 || true
   systemctl daemon-reload >/dev/null 2>&1 || true
   systemctl enable --now fail2ban >/dev/null 2>&1 || true
   systemctl restart fail2ban >/dev/null 2>&1 || true
-  log_ok "Configured Fail2Ban DDoS/SSH jail (/etc/fail2ban/jail.d/sparrowx-ddos.conf)"
+  log_ok "Configured Smart Fail2Ban with protected ignoreip + progressive bans (/etc/fail2ban/jail.d/sparrowx-ddos.conf)"
 fi
 
 if command -v ufw >/dev/null 2>&1; then
@@ -281,13 +308,12 @@ mkdir -p "${XDP_REPO_DIR}" "${XDP_OUT_DIR}" /sys/fs/bpf/sparrowx 2>/dev/null || 
 
 XDP_SRC="${XDP_REPO_DIR}/sparrowx_xdp_ddos.c"
 if [ ! -s "${XDP_SRC}" ]; then
-  log_info "Writing embedded verifier-safe XDP/eBPF kernel filter -> ${XDP_SRC}..."
+  log_info "Writing smart zero-false-positive XDP/eBPF kernel filter -> ${XDP_SRC}..."
   cat > "${XDP_SRC}" <<'XDPCEOF'
 // SPDX-License-Identifier: GPL-2.0
 /*
- * SparrowX Shield — Layer 3/4 XDP / eBPF Kernel Anti-DDoS & Challenge Engine
+ * SparrowX Shield — Smart Zero-False-Positive Layer 3/4 XDP / eBPF Anti-DDoS Engine
  */
-
 #include <stddef.h>
 #include <linux/bpf.h>
 #include <linux/if_ether.h>
@@ -299,31 +325,26 @@ if [ ! -s "${XDP_SRC}" ]; then
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 
-#ifndef ETH_HLEN
-#define ETH_HLEN 14
-#endif
+#define WHITELIST_TTL_NS      300000000000ULL
+#define RATE_WINDOW_NS        1000000000ULL
+#define UDP_FLOOD_PPS_LIMIT   2500U
+#define SYN_FLOOD_PPS_LIMIT   600U
+#define ICMP_FLOOD_PPS_LIMIT  200U
 
-#define IP_CSUM_OFF  (ETH_HLEN + offsetof(struct iphdr, check))
-#define IPV6_CSUM_OFF (ETH_HLEN + sizeof(struct ipv6hdr) + offsetof(struct udphdr, check))
-#define XDP_CHALLENGE_PAYLOAD_LEN 8
-#define XDP_CHALLENGE_PKT_LEN (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + XDP_CHALLENGE_PAYLOAD_LEN)
-#define SPARROWX_COOKIE_MAGIC 0x53505831U
-#define WHITELIST_TTL_NS 180000000000ULL
-#define CHALLENGE_TTL_NS 5000000000ULL
-
-struct challenge {
-  __u64 timestamp;
-  __u32 cookie;
-  __u8 mac[6];
-  __u8 pad[2];
+struct ip_rate_state {
+  __u64 window_start_ns;
+  __u32 udp_pkts;
+  __u32 syn_pkts;
+  __u32 icmp_pkts;
+  __u32 pad;
 };
 
 struct {
-  __uint(type, BPF_MAP_TYPE_LRU_HASH);
+  __uint(type, BPF_MAP_TYPE_HASH);
   __type(key, __u32);
-  __type(value, struct challenge);
-  __uint(max_entries, 1000000);
-} challenge_sent SEC(".maps");
+  __type(value, __u64);
+  __uint(max_entries, 65536);
+} static_whitelist SEC(".maps");
 
 struct {
   __uint(type, BPF_MAP_TYPE_LRU_PERCPU_HASH);
@@ -340,6 +361,13 @@ struct {
 } blocked_ipv4 SEC(".maps");
 
 struct {
+  __uint(type, BPF_MAP_TYPE_LRU_PERCPU_HASH);
+  __type(key, __u32);
+  __type(value, struct ip_rate_state);
+  __uint(max_entries, 524288);
+} ip_rate_map SEC(".maps");
+
+struct {
   __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
   __type(key, __u32);
   __type(value, __u64);
@@ -348,296 +376,126 @@ struct {
 
 static __always_inline void stat_inc(__u32 idx) {
   __u64 *val = bpf_map_lookup_elem(&xdp_stats, &idx);
-  if (val) {
-    *val += 1;
-  }
+  if (val) *val += 1;
 }
 
-static __always_inline int is_legit_port(__u16 port_be) {
-  __u16 dport = bpf_ntohs(port_be);
-  if (dport == 53 || dport == 1194 || dport == 2300 || dport == 2896 ||
-      dport == 3659 || dport == 28015 || dport == 51820) {
-    return 1;
-  }
-  if (dport >= 4970 && dport <= 4980) return 1;
-  if (dport >= 7000 && dport <= 8999) return 1;
-  if (dport >= 9000 && dport <= 9999) return 1;
-  if (dport >= 22000 && dport <= 22126) return 1;
-  if (dport >= 27000 && dport <= 27500) return 1;
-  if (dport >= 30000 && dport <= 32000) return 1;
+static __always_inline int is_internal_or_safe_ipv4(__u32 saddr_be) {
+  __u32 ip = bpf_ntohl(saddr_be);
+  __u8 o1 = (__u8)(ip >> 24);
+  __u8 o2 = (__u8)((ip >> 16) & 0xff);
+  if (o1 == 127 || o1 == 10) return 1;
+  if (o1 == 172 && o2 >= 16 && o2 <= 31) return 1;
+  if (o1 == 192 && o2 == 168) return 1;
+  if (o1 == 100 && o2 >= 64 && o2 <= 127) return 1;
+  if (o1 == 169 && o2 == 254) return 1;
   return 0;
 }
 
-static __always_inline __u32 gen_cookie(__u16 src_port_be, __u64 ts) {
-  return bpf_get_prandom_u32() ^ (__u32)src_port_be ^ (__u32)(ts & 0xffffffffU);
-}
-
-static __always_inline __u16 fold_csum(__u32 sum) {
-  sum = (sum & 0xffffU) + (sum >> 16);
-  sum = (sum & 0xffffU) + (sum >> 16);
-  return (__u16)~sum;
-}
-
-static __always_inline __u16 compute_ipv4_csum(const struct iphdr *ip) {
-  const __u16 *words = (const __u16 *)ip;
-  __u32 sum = 0;
-#pragma unroll
-  for (int i = 0; i < (int)(sizeof(struct iphdr) / 2); i++) {
-    sum += words[i];
-  }
-  return fold_csum(sum);
-}
-
-static __always_inline __u16 compute_udp_challenge_csum(
-    __u32 saddr,
-    __u32 daddr,
-    const struct udphdr *udp,
-    const __u8 *payload) {
-  __u32 sum = 0;
-  const __u16 *udp_words = (const __u16 *)udp;
-  const __u16 *pay_words = (const __u16 *)payload;
-  sum += (saddr & 0xffffU) + (saddr >> 16);
-  sum += (daddr & 0xffffU) + (daddr >> 16);
-  sum += bpf_htons(IPPROTO_UDP);
-  sum += udp->len;
-#pragma unroll
-  for (int i = 0; i < (int)(sizeof(struct udphdr) / 2); i++) {
-    sum += udp_words[i];
-  }
-#pragma unroll
-  for (int i = 0; i < (XDP_CHALLENGE_PAYLOAD_LEN / 2); i++) {
-    sum += pay_words[i];
-  }
-  __u16 res = fold_csum(sum);
-  return res == 0 ? 0xffffU : res;
-}
-
-static __always_inline int payload_looks_legit(const void *data, const void *data_end, __u16 dport) {
-  const __u8 *p = (const __u8 *)data;
-  const __u8 *end = (const __u8 *)data_end;
-
-  if (dport == 53) {
-    if (p + 12 > end) return 0;
-    __u16 flags = ((__u16)p[2] << 8) | p[3];
-    return (flags & 0x8000U) == 0;
-  }
-  if (dport == 1194) {
-    if (p + 1 > end) return 0;
-    return ((p[0] & 0x38U) >> 3) == 7;
-  }
-  if (dport == 51820) {
-    if (p + 4 > end) return 0;
-    return p[0] == 1 && p[1] == 0 && p[2] == 0 && p[3] == 0;
-  }
-  if (dport == 28015) {
-    if (p + 1 > end) return 0;
-    return p[0] == 0x05;
-  }
-  if (dport == 7777 || (dport >= 7000 && dport <= 8999)) {
-    if (p + 1 > end) return 0;
-    if (p[0] == 0x01 || p[0] == 0x02) return 1;
-  }
-  if (dport == 7788 || (dport >= 7000 && dport <= 8999)) {
-    if (p + 4 <= end && p[0] == 'A' && p[1] == 'L' && p[2] == 'T' && p[3] == 0) return 1;
-  }
-  if (dport >= 30000 && dport <= 32000) {
-    if (p + 8 <= end && p[0] == 0xff && p[1] == 0xff && p[2] == 0xff && p[3] == 0xff) {
-      if (p + 11 <= end &&
-          p[4] == 'g' && p[5] == 'e' && p[6] == 't' && p[7] == 'i' &&
-          p[8] == 'n' && p[9] == 'f' && p[10] == 'o') return 1;
-      if (p[4] == 'i' && p[5] == 'n' && p[6] == 'f' && p[7] == 'o') return 1;
-    }
-    if (p + 15 <= end &&
-        p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0 &&
-        p[4] == 0 && p[5] == 0 && p[6] == 0 && p[7] == 0 &&
-        p[8] == 'c' && p[9] == 'o' && p[10] == 'n' && p[11] == 'n' &&
-        p[12] == 'e' && p[13] == 'c' && p[14] == 't') return 1;
-    return 0;
-  }
-  if ((dport >= 7000 && dport <= 8999) || dport == 15000 || dport == 27015) {
-    if (p + 4 <= end && p[0] <= 0x01 && p[1] == 0 && p[2] == 0 && p[3] == 0) return 1;
-  }
-  if (dport == 7787 || dport == 21114 || dport == 27165 || (dport >= 7000 && dport <= 8999)) {
-    if (p + 2 <= end && p[0] == 0x00 && p[1] == 0x00) return 1;
-  }
-  if (dport == 8778 || dport == 27015 || (dport >= 7000 && dport <= 8999)) {
-    if (p + 4 <= end && p[0] == 0 && p[1] == 0 && p[2] == 0 && p[3] == 0) return 1;
-  }
-  if (dport >= 27015 && dport <= 27030) {
-    if (p + 1 <= end && p[0] >= 0x05 && p[0] <= 0x0E) return 1;
-  }
-  if (dport >= 27000 && dport <= 27500) {
-    if (p + 4 <= end && p[0] == 0xff && p[1] == 0xff && p[2] == 0xff && p[3] == 0xff) return 1;
-    return 0;
-  }
-  if (dport >= 19132) {
-    if (p + 5 <= end &&
-        p[0] == 0xff && p[1] == 0xff && p[2] == 0xff && p[3] == 0xff && p[4] == 'T') return 1;
-  }
-  return 1;
+static __always_inline int is_critical_dns_ipv4(__u32 saddr_be) {
+  __u32 ip = bpf_ntohl(saddr_be);
+  if (ip == 0x01010101U || ip == 0x01000001U) return 1;
+  if (ip == 0x08080808U || ip == 0x08080404U) return 1;
+  if (ip == 0x09090909U || ip == 0x95707070U) return 1;
+  return 0;
 }
 
 SEC("xdp")
 int xdp_anti_ddos(struct xdp_md *ctx) {
   void *data = (void *)(long)ctx->data;
   void *data_end = (void *)(long)ctx->data_end;
-
   struct ethhdr *eth = data;
   if ((void *)(eth + 1) > data_end) return XDP_PASS;
 
   if (eth->h_proto == bpf_htons(ETH_P_IP)) {
     struct iphdr *ip = (void *)(eth + 1);
     if ((void *)(ip + 1) > data_end) return XDP_PASS;
+    if (ip->ihl < 5) { stat_inc(2); return XDP_DROP; }
+    __u32 ihl_bytes = (__u32)ip->ihl * 4;
+    if (ihl_bytes > 60) { stat_inc(2); return XDP_DROP; }
 
     __u32 src_ip = ip->saddr;
-    if (bpf_map_lookup_elem(&blocked_ipv4, &src_ip) != NULL) {
+    if (is_internal_or_safe_ipv4(src_ip) || is_critical_dns_ipv4(src_ip)) {
+      stat_inc(3);
+      return XDP_PASS;
+    }
+    if (bpf_map_lookup_elem(&static_whitelist, &src_ip) != NULL) {
+      stat_inc(3);
+      return XDP_PASS;
+    }
+    __u64 ts = bpf_ktime_get_ns();
+    __u64 *wl_ts = bpf_map_lookup_elem(&whitelist, &src_ip);
+    if (wl_ts && (*wl_ts == 0 || (ts >= *wl_ts && (ts - *wl_ts) < WHITELIST_TTL_NS))) {
+      stat_inc(3);
+      return XDP_PASS;
+    }
+    __u64 *blk = bpf_map_lookup_elem(&blocked_ipv4, &src_ip);
+    if (blk != NULL) {
+      __sync_fetch_and_add(blk, 1);
       stat_inc(2);
       return XDP_DROP;
     }
 
-    if (ip->ihl < 5) {
-      stat_inc(2);
-      return XDP_DROP;
-    }
-    __u32 ihl_bytes = (__u32)ip->ihl * 4;
-    if (ihl_bytes > 60) {
-      stat_inc(2);
-      return XDP_DROP;
-    }
-
-    if (ip->protocol == IPPROTO_UDP) {
+    __u8 proto = ip->protocol;
+    if (proto == IPPROTO_UDP) {
       struct udphdr *udp = (void *)((__u8 *)ip + ihl_bytes);
       if ((void *)(udp + 1) > data_end) return XDP_PASS;
-
-      if (!is_legit_port(udp->dest)) return XDP_PASS;
-
-      __u16 dport = bpf_ntohs(udp->dest);
-      __u64 ts = bpf_ktime_get_ns();
-
-      __u64 *wl_ts = bpf_map_lookup_elem(&whitelist, &src_ip);
-      if (wl_ts && ts > *wl_ts && (ts - *wl_ts) < WHITELIST_TTL_NS) {
-        stat_inc(3);
-        return XDP_PASS;
-      }
-
-      const void *payload = (const void *)(udp + 1);
-
-      if ((const __u8 *)data_end - (const __u8 *)payload >= XDP_CHALLENGE_PAYLOAD_LEN) {
-        __u32 maybe_cookie = 0;
-        __builtin_memcpy(&maybe_cookie, payload, sizeof(maybe_cookie));
-        struct challenge *ch = bpf_map_lookup_elem(&challenge_sent, &src_ip);
-        if (ch && ch->cookie == maybe_cookie && ts >= ch->timestamp &&
-            (ts - ch->timestamp) < CHALLENGE_TTL_NS) {
-          __u64 now = bpf_ktime_get_ns();
-          bpf_map_update_elem(&whitelist, &src_ip, &now, BPF_ANY);
-          bpf_map_delete_elem(&challenge_sent, &src_ip);
-          stat_inc(0);
-          return XDP_PASS;
-        }
-      }
-
-      if (!payload_looks_legit(payload, data_end, dport)) {
-        stat_inc(2);
-        return XDP_DROP;
-      }
-
-      __u32 dst_ip = ip->daddr;
-      __u16 src_port_be = udp->source;
-      __u16 dst_port_be = udp->dest;
-      __u32 cookie = gen_cookie(src_port_be, ts);
-
-      struct challenge ch = {
-        .timestamp = ts,
-        .cookie = cookie,
-      };
-      __builtin_memcpy(ch.mac, eth->h_source, ETH_ALEN);
-      bpf_map_update_elem(&challenge_sent, &src_ip, &ch, BPF_ANY);
-
-      int pkt_len = (int)((__u8 *)data_end - (__u8 *)data);
-      int delta = (int)XDP_CHALLENGE_PKT_LEN - pkt_len;
-      if (bpf_xdp_adjust_tail(ctx, delta) < 0) {
-        stat_inc(2);
-        return XDP_DROP;
-      }
-
-      data = (void *)(long)ctx->data;
-      data_end = (void *)(long)ctx->data_end;
-      eth = data;
-      if ((void *)(eth + 1) > data_end) return XDP_DROP;
-
-      __u8 tmp_mac[ETH_ALEN];
-      __builtin_memcpy(tmp_mac, eth->h_dest, ETH_ALEN);
-      __builtin_memcpy(eth->h_dest, eth->h_source, ETH_ALEN);
-      __builtin_memcpy(eth->h_source, tmp_mac, ETH_ALEN);
-      eth->h_proto = bpf_htons(ETH_P_IP);
-
-      struct iphdr *rip = (void *)(eth + 1);
-      if ((void *)(rip + 1) > data_end) return XDP_DROP;
-      rip->version = 4;
-      rip->ihl = 5;
-      rip->tos = 0;
-      rip->tot_len = bpf_htons(sizeof(struct iphdr) + sizeof(struct udphdr) + XDP_CHALLENGE_PAYLOAD_LEN);
-      rip->id = 0;
-      rip->frag_off = bpf_htons(0x4000);
-      rip->ttl = 64;
-      rip->protocol = IPPROTO_UDP;
-      rip->saddr = dst_ip;
-      rip->daddr = src_ip;
-      rip->check = 0;
-      rip->check = compute_ipv4_csum(rip);
-
-      struct udphdr *rudp = (void *)(rip + 1);
-      if ((void *)(rudp + 1) > data_end) return XDP_DROP;
-      rudp->source = dst_port_be;
-      rudp->dest = src_port_be;
-      rudp->len = bpf_htons(sizeof(struct udphdr) + XDP_CHALLENGE_PAYLOAD_LEN);
-      rudp->check = 0;
-
-      __u8 *pay_out = (__u8 *)(rudp + 1);
-      if (pay_out + XDP_CHALLENGE_PAYLOAD_LEN > (__u8 *)data_end) return XDP_DROP;
-
-      __u32 magic_be = bpf_htonl(SPARROWX_COOKIE_MAGIC);
-      __builtin_memcpy(pay_out, &cookie, sizeof(cookie));
-      __builtin_memcpy(pay_out + 4, &magic_be, sizeof(magic_be));
-      rudp->check = compute_udp_challenge_csum(rip->saddr, rip->daddr, rudp, pay_out);
-
-      stat_inc(1);
-      return XDP_TX;
-    }
-
-    if (ip->protocol == IPPROTO_TCP) {
-      struct tcphdr *tcp = (void *)((__u8 *)ip + ihl_bytes);
-      if ((void *)(tcp + 1) > data_end) return XDP_PASS;
-      __u16 dport = bpf_ntohs(tcp->dest);
-      if ((dport >= 30000 && dport <= 32000) || dport == 2895) {
-        if (tcp->syn && !tcp->ack) {
-          stat_inc(0);
-          return XDP_PASS;
-        }
-      }
-    }
-  } else if (eth->h_proto == bpf_htons(ETH_P_IPV6)) {
-    struct ipv6hdr *ip6 = (void *)(eth + 1);
-    if ((void *)(ip6 + 1) > data_end) return XDP_PASS;
-
-    if (ip6->nexthdr == IPPROTO_UDP) {
-      struct udphdr *udp6 = (void *)(ip6 + 1);
-      if ((void *)(udp6 + 1) > data_end) return XDP_PASS;
-      if (!is_legit_port(udp6->dest)) return XDP_PASS;
-
-      const void *payload6 = (const void *)(udp6 + 1);
-      if (!payload_looks_legit(payload6, data_end, bpf_ntohs(udp6->dest))) {
-        stat_inc(2);
-        return XDP_DROP;
+      if (bpf_ntohs(udp->len) < sizeof(struct udphdr)) { stat_inc(2); return XDP_DROP; }
+      if (bpf_ntohs(udp->source) == 53) { stat_inc(0); return XDP_PASS; }
+      struct ip_rate_state *st = bpf_map_lookup_elem(&ip_rate_map, &src_ip);
+      if (!st) {
+        struct ip_rate_state init_st = { .window_start_ns = ts, .udp_pkts = 1 };
+        bpf_map_update_elem(&ip_rate_map, &src_ip, &init_st, BPF_ANY);
+      } else if (ts > st->window_start_ns && (ts - st->window_start_ns) >= RATE_WINDOW_NS) {
+        st->window_start_ns = ts; st->udp_pkts = 1; st->syn_pkts = 0; st->icmp_pkts = 0;
+      } else {
+        st->udp_pkts += 1;
+        if (st->udp_pkts > UDP_FLOOD_PPS_LIMIT) { stat_inc(1); stat_inc(2); return XDP_DROP; }
       }
       stat_inc(0);
       return XDP_PASS;
     }
+    if (proto == IPPROTO_TCP) {
+      struct tcphdr *tcp = (void *)((__u8 *)ip + ihl_bytes);
+      if ((void *)(tcp + 1) > data_end) return XDP_PASS;
+      if (tcp->syn && !tcp->ack) {
+        struct ip_rate_state *st = bpf_map_lookup_elem(&ip_rate_map, &src_ip);
+        if (!st) {
+          struct ip_rate_state init_st = { .window_start_ns = ts, .syn_pkts = 1 };
+          bpf_map_update_elem(&ip_rate_map, &src_ip, &init_st, BPF_ANY);
+        } else if (ts > st->window_start_ns && (ts - st->window_start_ns) >= RATE_WINDOW_NS) {
+          st->window_start_ns = ts; st->udp_pkts = 0; st->syn_pkts = 1; st->icmp_pkts = 0;
+        } else {
+          st->syn_pkts += 1;
+          if (st->syn_pkts > SYN_FLOOD_PPS_LIMIT) { stat_inc(1); stat_inc(2); return XDP_DROP; }
+        }
+      }
+      stat_inc(0);
+      return XDP_PASS;
+    }
+    if (proto == IPPROTO_ICMP) {
+      struct ip_rate_state *st = bpf_map_lookup_elem(&ip_rate_map, &src_ip);
+      if (!st) {
+        struct ip_rate_state init_st = { .window_start_ns = ts, .icmp_pkts = 1 };
+        bpf_map_update_elem(&ip_rate_map, &src_ip, &init_st, BPF_ANY);
+      } else if (ts > st->window_start_ns && (ts - st->window_start_ns) >= RATE_WINDOW_NS) {
+        st->window_start_ns = ts; st->udp_pkts = 0; st->syn_pkts = 0; st->icmp_pkts = 1;
+      } else {
+        st->icmp_pkts += 1;
+        if (st->icmp_pkts > ICMP_FLOOD_PPS_LIMIT) { stat_inc(1); stat_inc(2); return XDP_DROP; }
+      }
+      stat_inc(0);
+      return XDP_PASS;
+    }
+    stat_inc(0);
+    return XDP_PASS;
+  } else if (eth->h_proto == bpf_htons(ETH_P_IPV6)) {
+    struct ipv6hdr *ip6 = (void *)(eth + 1);
+    if ((void *)(ip6 + 1) > data_end) return XDP_PASS;
+    stat_inc(0);
+    return XDP_PASS;
   }
-
   return XDP_PASS;
 }
-
 char _license[] SEC("license") = "GPL";
 XDPCEOF
 fi
@@ -674,18 +532,42 @@ if [ "${XDP_MODE}" != "off" ] && [ -n "${IFACE}" ]; then
       fi
 
       if [ "${XDP_ATTACHED}" != "no" ]; then
-        log_ok "Attached SparrowX XDP Anti-DDoS onto ${IFACE} (mode=${XDP_ATTACHED})"
+        log_ok "Attached SparrowX Smart XDP Anti-DDoS onto ${IFACE} (mode=${XDP_ATTACHED})"
+        if command -v bpftool >/dev/null 2>&1; then
+          WL_MAP_ID="$(bpftool map show 2>/dev/null | awk -F: '/static_whitelist/ {print $1; exit}' || true)"
+          if [ -n "${WL_MAP_ID}" ]; then
+            for safe_ip in "${HOST_PUB_IP:-}" "${GW_PUB_IP:-}" "${SSH_ADMIN_IP:-}"; do
+              [[ "${safe_ip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue
+              IFS='.' read -r o1 o2 o3 o4 <<<"${safe_ip}"
+              hex_bytes="$(printf '%02x %02x %02x %02x' "${o1}" "${o2}" "${o3}" "${o4}")"
+              bpftool map update id "${WL_MAP_ID}" key hex ${hex_bytes} value hex 01 00 00 00 00 00 00 00 >/dev/null 2>&1 || true
+            done
+            if [ -f "/opt/sparrowx/xdp/whitelist_ipv4.txt" ]; then
+              while IFS= read -r raw_wl; do
+                wl_ip="$(echo "${raw_wl%%#*}" | tr -d ' \r\n')"
+                [[ "${wl_ip}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue
+                IFS='.' read -r o1 o2 o3 o4 <<<"${wl_ip}"
+                hex_bytes="$(printf '%02x %02x %02x %02x' "${o1}" "${o2}" "${o3}" "${o4}")"
+                bpftool map update id "${WL_MAP_ID}" key hex ${hex_bytes} value hex 01 00 00 00 00 00 00 00 >/dev/null 2>&1 || true
+              done < "/opt/sparrowx/xdp/whitelist_ipv4.txt"
+            fi
+            log_ok "Seeded XDP static_whitelist map (id=${WL_MAP_ID}) with host, gateway, SSH & whitelist entries"
+          fi
+        fi
         if [ -f "${SYNC_FILE}" ] && command -v bpftool >/dev/null 2>&1; then
           MAP_ID="$(bpftool map show 2>/dev/null | awk -F: '/blocked_ipv4/ {print $1; exit}' || true)"
           if [ -n "${MAP_ID}" ]; then
             while IFS= read -r ip_addr; do
-              ip_clean="$(echo "${ip_addr}" | tr -d ' \r\n')"
+              ip_clean="$(echo "${ip_addr%%#*}" | tr -d ' \r\n')"
               [[ "${ip_clean}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || continue
+              # Never inject internal/private/DNS IPs into XDP blocked_ipv4
+              [[ "${ip_clean}" =~ ^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\.) ]] && continue
+              [[ "${ip_clean}" == "1.1.1.1" || "${ip_clean}" == "1.0.0.1" || "${ip_clean}" == "8.8.8.8" || "${ip_clean}" == "8.8.4.4" || "${ip_clean}" == "9.9.9.9" ]] && continue
               IFS='.' read -r o1 o2 o3 o4 <<<"${ip_clean}"
               hex_bytes="$(printf '%02x %02x %02x %02x' "${o1}" "${o2}" "${o3}" "${o4}")"
               bpftool map update id "${MAP_ID}" key hex ${hex_bytes} value hex 01 00 00 00 00 00 00 00 >/dev/null 2>&1 || true
             done < "${SYNC_FILE}"
-            log_ok "Synchronized ${SYNC_FILE} into XDP blocked_ipv4 map (id=${MAP_ID})"
+            log_ok "Synchronized safe public IPs from ${SYNC_FILE} into XDP blocked_ipv4 map (id=${MAP_ID})"
           fi
         fi
 
