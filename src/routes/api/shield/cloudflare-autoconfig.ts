@@ -1,7 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const CF_API_BASE = "https://api.cloudflare.com/client/v4";
-const EDGE_CNAME_TARGET = "edge.sparrowx.net";
+export const EDGE_CNAME_TARGET = "edge.sparrowx.net";
+const PROTECTED_PLATFORM_HOSTS = new Set([
+  "sparrowx.net",
+  "www.sparrowx.net",
+  "edge.sparrowx.net",
+  "sec.sparrowx.net",
+  "db.sparrowx.net",
+  "api.sparrowx.net",
+  "ai.sparrowx.net",
+  "deploy.sparrowx.net",
+  "infra.sparrowx.net",
+]);
 const VALID_DOMAIN_RE = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 const VALID_VERIFY_TOKEN_RE = /^spx-verify=[a-zA-Z0-9_-]{6,64}$/;
 
@@ -31,7 +42,14 @@ interface CloudflareDnsRecord {
   proxied?: boolean;
 }
 
-function normalizeDomain(raw: string): string {
+export interface ReplacedDnsBackup {
+  type: string;
+  name: string;
+  content: string;
+  proxied?: boolean;
+}
+
+export function normalizeCloudflareDomain(raw: string): string {
   return raw
     .trim()
     .toLowerCase()
@@ -41,7 +59,12 @@ function normalizeDomain(raw: string): string {
     .replace(/\.$/, "");
 }
 
-function isSafePublicDomain(host: string): boolean {
+export function isProtectedPlatformHost(domain: string): boolean {
+  const clean = normalizeCloudflareDomain(domain);
+  return PROTECTED_PLATFORM_HOSTS.has(clean);
+}
+
+export function isSafePublicDomain(host: string): boolean {
   if (!host || host.length > 253) return false;
   if (
     host === "localhost" ||
@@ -53,6 +76,50 @@ function isSafePublicDomain(host: string): boolean {
     return false;
   }
   return VALID_DOMAIN_RE.test(host);
+}
+
+/**
+ * Pre-flight DNS liveness verification: ensures `edge.sparrowx.net` resolves to a valid public IPv4
+ * BEFORE touching any customer's live A/AAAA record. Prevents dangling-CNAME customer outages!
+ */
+export async function verifyEdgeTargetResolvable(
+  edgeHost = EDGE_CNAME_TARGET,
+  fetchFn: typeof fetch = fetch,
+): Promise<{ healthy: boolean; resolvedIps: string[]; reason?: string }> {
+  try {
+    const res = await fetchFn(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(edgeHost)}&type=A`,
+      { headers: { Accept: "application/dns-json" } },
+    );
+    if (!res.ok) {
+      return {
+        healthy: false,
+        resolvedIps: [],
+        reason: `DoH lookup for ${edgeHost} returned HTTP ${res.status}`,
+      };
+    }
+    const json = (await res.json()) as {
+      Status?: number;
+      Answer?: Array<{ type?: number; data?: string }>;
+    };
+    const ips = (json.Answer ?? [])
+      .filter((a) => a.type === 1 && typeof a.data === "string" && /^\d{1,3}(\.\d{1,3}){3}$/.test(a.data))
+      .map((a) => a.data!);
+    if (ips.length === 0) {
+      return {
+        healthy: false,
+        resolvedIps: [],
+        reason: `${edgeHost} has no live A record in DNS yet. Aborted CNAME cutover to protect customer uptime.`,
+      };
+    }
+    return { healthy: true, resolvedIps: ips };
+  } catch (err) {
+    return {
+      healthy: false,
+      resolvedIps: [],
+      reason: err instanceof Error ? err.message : `Failed to verify ${edgeHost} DNS liveness`,
+    };
+  }
 }
 
 async function cfRequest<T>(
@@ -84,19 +151,18 @@ async function cfRequest<T>(
 
 async function findMatchingZone(apiToken: string, domain: string): Promise<CloudflareZone | null> {
   const labels = domain.split(".");
-  // Walk up from full domain to apex (e.g. sub.example.co.in -> example.co.in -> co.in)
   for (let i = 0; i <= labels.length - 2; i += 1) {
     const candidate = labels.slice(i).join(".");
     const res = await cfRequest<CloudflareZone[]>(
       apiToken,
       `/zones?name=${encodeURIComponent(candidate)}&per_page=5`,
     );
-    const active = res.result.find((z) => z.name.toLowerCase() === candidate && z.status === "active")
-      ?? res.result.find((z) => z.name.toLowerCase() === candidate);
+    const active =
+      res.result.find((z) => z.name.toLowerCase() === candidate && z.status === "active") ??
+      res.result.find((z) => z.name.toLowerCase() === candidate);
     if (active) return active;
   }
 
-  // Fallback: list accessible zones in token scope and find longest domain suffix match
   const listRes = await cfRequest<CloudflareZone[]>(apiToken, `/zones?per_page=50`);
   const matches = listRes.result
     .filter((z) => {
@@ -117,12 +183,12 @@ async function upsertDnsRecord(params: {
   proxied?: boolean;
   replaceExistingA?: boolean;
 }): Promise<{
-  status: "created" | "updated";
-  record: CloudflareDnsRecord;
-  replacedRecords: Array<{ type: string; name: string; content: string; proxied?: boolean }>;
+  status: "created" | "updated" | "skipped_safe_mode";
+  record?: CloudflareDnsRecord;
+  replacedRecords: ReplacedDnsBackup[];
 }> {
   const { apiToken, zoneId, type, name, content, ttl, proxied, replaceExistingA } = params;
-  const replacedRecords: Array<{ type: string; name: string; content: string; proxied?: boolean }> = [];
+  const replacedRecords: ReplacedDnsBackup[] = [];
 
   if (type === "TXT") {
     const existingRes = await cfRequest<CloudflareDnsRecord[]>(
@@ -182,13 +248,11 @@ async function upsertDnsRecord(params: {
   }
 
   if (conflictingAddr.length > 0) {
+    // Zero-downtime safety default: preserve live A/AAAA records unless operator explicitly opts in
     if (!replaceExistingA) {
-      throw new Error(
-        `Existing ${conflictingAddr.map((r) => `${r.type} (${r.content})`).join(", ")} record found on ${name}. Enable "Replace existing A/AAAA record" or remove it manually in Cloudflare first.`,
-      );
+      return { status: "skipped_safe_mode", replacedRecords };
     }
 
-    // Back up existing A/AAAA records before removing them so we can roll back if CNAME creation fails
     for (const rec of conflictingAddr) {
       replacedRecords.push({
         type: rec.type,
@@ -211,7 +275,7 @@ async function upsertDnsRecord(params: {
       );
       return { status: "updated", record: created.result, replacedRecords };
     } catch (err) {
-      // Transactional rollback: restore deleted A/AAAA records
+      // Transactional rollback: immediately restore deleted A/AAAA records
       for (const backup of replacedRecords) {
         await cfRequest<CloudflareDnsRecord>(
           apiToken,
@@ -246,17 +310,20 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
       POST: async ({ request }) => {
         try {
           const payload = (await request.json().catch(() => null)) as {
+            mode?: "configure" | "rollback";
             apiToken?: string;
             domain?: string;
             verifyToken?: string;
             replaceExistingA?: boolean;
             includeWww?: boolean;
+            restoreRecords?: ReplacedDnsBackup[];
           } | null;
 
           const apiToken = String(payload?.apiToken || "").trim();
-          const domain = normalizeDomain(String(payload?.domain || ""));
+          const domain = normalizeCloudflareDomain(String(payload?.domain || ""));
           const verifyToken = String(payload?.verifyToken || "").trim();
-          const replaceExistingA = payload?.replaceExistingA !== false;
+          // HARDENED DEFAULT: never overwrite live customer A/AAAA records unless explicitly opted in
+          const replaceExistingA = payload?.replaceExistingA === true;
           const includeWww = Boolean(payload?.includeWww);
 
           if (!apiToken || apiToken.length < 20) {
@@ -276,13 +343,6 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
             );
           }
 
-          if (!VALID_VERIFY_TOKEN_RE.test(verifyToken)) {
-            return Response.json(
-              { ok: false, error: "Invalid verification token format." },
-              { status: 400 },
-            );
-          }
-
           const zone = await findMatchingZone(apiToken, domain);
           if (!zone) {
             return Response.json(
@@ -294,6 +354,49 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
             );
           }
 
+          // 1-Click Emergency Rollback mode: deletes CNAME and restores previous A/AAAA records
+          if (payload?.mode === "rollback" && Array.isArray(payload.restoreRecords)) {
+            const restored: ReplacedDnsBackup[] = [];
+            for (const rec of payload.restoreRecords) {
+              const targetName = normalizeCloudflareDomain(rec.name);
+              const existingRes = await cfRequest<CloudflareDnsRecord[]>(
+                apiToken,
+                `/zones/${encodeURIComponent(zone.id)}/dns_records?type=CNAME&name=${encodeURIComponent(targetName)}`,
+              );
+              for (const cname of existingRes.result) {
+                await cfRequest<{ id: string }>(
+                  apiToken,
+                  `/zones/${encodeURIComponent(zone.id)}/dns_records/${encodeURIComponent(cname.id)}`,
+                  { method: "DELETE" },
+                );
+              }
+              await cfRequest<CloudflareDnsRecord>(
+                apiToken,
+                `/zones/${encodeURIComponent(zone.id)}/dns_records`,
+                {
+                  method: "POST",
+                  body: JSON.stringify({
+                    type: rec.type,
+                    name: targetName,
+                    content: rec.content,
+                    ttl: 1,
+                    proxied: Boolean(rec.proxied),
+                  }),
+                },
+              );
+              restored.push(rec);
+            }
+            return Response.json({ ok: true, restored });
+          }
+
+          if (!VALID_VERIFY_TOKEN_RE.test(verifyToken)) {
+            return Response.json(
+              { ok: false, error: "Invalid verification token format." },
+              { status: 400 },
+            );
+          }
+
+          // Always safe: create/update TXT ownership record first (zero downtime impact)
           const txtHost = `_sparrowx-verify.${domain}`;
           const txtResult = await upsertDnsRecord({
             apiToken,
@@ -303,6 +406,51 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
             content: verifyToken,
             ttl: 120,
           });
+
+          const actions: Array<{
+            type: "TXT" | "CNAME";
+            name: string;
+            target: string;
+            status: "created" | "updated" | "skipped_safe_mode";
+            proxied: boolean;
+          }> = [
+            {
+              type: "TXT",
+              name: txtHost,
+              target: verifyToken,
+              status: txtResult.status,
+              proxied: false,
+            },
+          ];
+
+          // SAFETY GUARD 1: Never point SparrowX's own apex/platform hosts to a circular CNAME
+          if (isProtectedPlatformHost(domain)) {
+            return Response.json(
+              {
+                ok: true,
+                zone: { id: zone.id, name: zone.name },
+                actions,
+                replacedRecords: [],
+                safetyNotice: `${domain} is already hosted directly on SparrowX Edge. Verified TXT ownership safely without modifying its A record.`,
+              },
+              { status: 200, headers: { "Cache-Control": "no-store" } },
+            );
+          }
+
+          // SAFETY GUARD 2: Pre-flight verify edge.sparrowx.net resolves BEFORE any CNAME cutover!
+          if (replaceExistingA) {
+            const edgeCheck = await verifyEdgeTargetResolvable(EDGE_CNAME_TARGET);
+            if (!edgeCheck.healthy) {
+              return Response.json(
+                {
+                  ok: false,
+                  error: `Zero-Downtime Safety Guard blocked CNAME cutover: ${edgeCheck.reason} Your existing A/AAAA records were NOT touched (TXT verification record was still added safely).`,
+                  actions,
+                },
+                { status: 503, headers: { "Cache-Control": "no-store" } },
+              );
+            }
+          }
 
           const cnameResult = await upsertDnsRecord({
             apiToken,
@@ -315,30 +463,15 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
             replaceExistingA,
           });
 
-          const actions: Array<{
-            type: "TXT" | "CNAME";
-            name: string;
-            target: string;
-            status: "created" | "updated";
-            proxied: boolean;
-          }> = [
-            {
-              type: "TXT",
-              name: txtHost,
-              target: verifyToken,
-              status: txtResult.status,
-              proxied: false,
-            },
-            {
-              type: "CNAME",
-              name: domain,
-              target: EDGE_CNAME_TARGET,
-              status: cnameResult.status,
-              proxied: false,
-            },
-          ];
+          actions.push({
+            type: "CNAME",
+            name: domain,
+            target: EDGE_CNAME_TARGET,
+            status: cnameResult.status,
+            proxied: false,
+          });
 
-          const replacedRecords = [...cnameResult.replacedRecords];
+          const replacedRecords: ReplacedDnsBackup[] = [...cnameResult.replacedRecords];
 
           if (includeWww && domain === zone.name.toLowerCase() && !domain.startsWith("www.")) {
             const wwwHost = `www.${domain}`;
@@ -362,12 +495,18 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
             replacedRecords.push(...wwwResult.replacedRecords);
           }
 
+          const safetyNotice =
+            cnameResult.status === "skipped_safe_mode"
+              ? `Zero-Downtime Safe Mode: Verified TXT ownership without overwriting ${domain}'s live A/AAAA record. Your website stayed 100% online. Use the 1-line Edge Script or enable CNAME cutover once origin routing is tested.`
+              : undefined;
+
           return Response.json(
             {
               ok: true,
               zone: { id: zone.id, name: zone.name },
               actions,
               replacedRecords,
+              ...(safetyNotice ? { safetyNotice } : {}),
             },
             {
               status: 200,

@@ -116,6 +116,14 @@ def ensure_record(rtype: str, name: str, content: str, proxied=None):
         "ttl": 1,  # Auto
     }
     if rtype.upper() == "A":
+        # If a conflicting CNAME exists on this exact hostname (e.g. accidental circular CNAME on apex),
+        # remove it first so the A record can be restored cleanly.
+        cname_cur = existing.get(("CNAME", name.lower()))
+        if cname_cur and cname_cur.get("id"):
+            st_del, res_del = cf_request("DELETE", f"/zones/{zone_id}/dns_records/{cname_cur['id']}")
+            if res_del.get("success"):
+                print(f"  [CF-DNS] REMOVED conflicting CNAME {name} -> {cname_cur.get('content')}")
+                existing.pop(("CNAME", name.lower()), None)
         # Preserve existing proxied flag if record already exists; default False for new records
         payload["proxied"] = bool(cur.get("proxied", False)) if (cur and proxied is None) else bool(proxied)
 
@@ -140,6 +148,7 @@ def ensure_record(rtype: str, name: str, content: str, proxied=None):
 a_hosts = [
     domain,
     f"www.{domain}",
+    f"edge.{domain}",
     f"db.{domain}",
     f"sec.{domain}",
     f"dpdp.{domain}",
@@ -162,8 +171,8 @@ a_hosts = [
 
 counts = {"created": 0, "updated": 0, "ok": 0, "deleted": 0, "failed": 0}
 for h in a_hosts:
-    # Force proxied=False for wildcards, php, panel, ingest, netsec, gamesec
-    force_direct = h.startswith("*.") or h.split(".")[0] in ("php", "panel", "ingest", "netsec", "gamesec")
+    # Force proxied=False for edge target, wildcards, php, panel, ingest, netsec, gamesec
+    force_direct = h.startswith("*.") or h.split(".")[0] in ("edge", "php", "panel", "ingest", "netsec", "gamesec")
     res = ensure_record("A", h, target_ip, proxied=False if force_direct else None)
     counts[res] += 1
 

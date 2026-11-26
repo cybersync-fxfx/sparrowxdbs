@@ -67,10 +67,11 @@ interface CloudflareConfigResult {
     type: "TXT" | "CNAME";
     name: string;
     target: string;
-    status: "created" | "updated";
+    status: "created" | "updated" | "skipped_safe_mode";
     proxied: boolean;
   }>;
   replacedRecords: Array<{ type: string; name: string; content: string; proxied?: boolean }>;
+  safetyNotice?: string;
 }
 
 interface DnsVerifyResult {
@@ -250,10 +251,10 @@ export function ShieldWafOnboardingView({
   const domainInputRef = useRef<HTMLInputElement | null>(null);
   const domainErrorId = useId();
 
-  // Cloudflare 1-Click Auto-Configuration state (token stays transient in RAM only)
+  // Cloudflare 1-Click Auto-Configuration state (Zero-Downtime Safe Mode: never replaces live A records by default)
   const [cfApiToken, setCfApiToken] = useState("");
   const [showCfToken, setShowCfToken] = useState(false);
-  const [cfReplaceA, setCfReplaceA] = useState(true);
+  const [cfReplaceA, setCfReplaceA] = useState(false);
   const [cfIncludeWww, setCfIncludeWww] = useState(false);
   const [cfSubmitting, setCfSubmitting] = useState(false);
   const [cfError, setCfError] = useState<string | null>(null);
@@ -524,6 +525,7 @@ export function ShieldWafOnboardingView({
         zone: data.zone,
         actions: data.actions,
         replacedRecords: data.replacedRecords ?? [],
+        safetyNotice: (data as { safetyNotice?: string }).safetyNotice,
       });
       // Immediately wipe the API token from component state after successful setup
       setCfApiToken("");
@@ -1228,7 +1230,7 @@ export function ShieldWafOnboardingView({
                             className="mt-0.5 size-4 rounded border-white/25 accent-[#F9103A] cursor-pointer"
                           />
                           <label htmlFor={cfReplaceAId} className="text-xs text-zinc-300 cursor-pointer leading-snug">
-                            Replace any existing <code className="font-mono text-white">A / AAAA</code> record on <code className="font-mono text-white">{provisionedTenant.primaryDomain}</code> with CNAME → <code className="font-mono text-emerald-300">edge.sparrowx.net</code> (your old IP is displayed below so you can restore anytime).
+                            <strong className="text-amber-300">Advanced CNAME Cutover (Off by default for Zero-Downtime Safety):</strong> Replace existing <code className="font-mono text-white">A / AAAA</code> on <code className="font-mono text-white">{provisionedTenant.primaryDomain}</code> with CNAME → <code className="font-mono text-emerald-300">edge.sparrowx.net</code>. Leave unchecked to safely verify TXT ownership without touching live site traffic.
                           </label>
                         </div>
 
@@ -1289,6 +1291,11 @@ export function ShieldWafOnboardingView({
                             Cloudflare zone <code className="font-mono text-white">{cfResult.zone.name}</code> configured automatically!
                           </span>
                         </div>
+                        {cfResult.safetyNotice && (
+                          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+                            {cfResult.safetyNotice}
+                          </div>
+                        )}
                         <ul className="space-y-1.5 text-xs font-mono text-zinc-200">
                           {cfResult.actions.map((act) => (
                             <li
