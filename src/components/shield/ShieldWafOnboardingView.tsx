@@ -7,9 +7,14 @@ import {
   Bot,
   Check,
   CheckCircle2,
+  Cloud,
   Code2,
   Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
   Globe,
+  Info,
   Layers,
   Lock,
   Radio,
@@ -18,7 +23,6 @@ import {
   Shield,
   ShieldCheck,
   Sparkles,
-  Terminal,
   Zap,
 } from "lucide-react";
 import {
@@ -53,7 +57,60 @@ export interface ShieldWafOnboardingViewProps {
 
 type TargetCategory = "web" | "api" | "ai" | "proxy";
 type ProtectionStrictness = "balanced" | "strict" | "monitor";
-type ConnectMethodTab = "dns" | "nginx" | "sdk";
+type ConnectMethodTab = "cloudflare" | "dns" | "sdk";
+
+interface CloudflareConfigResult {
+  zone: { id: string; name: string };
+  actions: Array<{
+    type: "TXT" | "CNAME";
+    name: string;
+    target: string;
+    status: "created" | "updated";
+    proxied: boolean;
+  }>;
+  replacedRecords: Array<{ type: string; name: string; content: string; proxied?: boolean }>;
+}
+
+interface DnsVerifyResult {
+  cnameVerified: boolean;
+  txtVerified: boolean;
+  flattenedMatch: boolean;
+  observedCnames: string[];
+  observedIps: string[];
+  observedTxts: string[];
+  checkedAt: string;
+}
+
+/**
+ * Splits a domain like "app.example.com" or "example.com" into the short Host/Name
+ * value expected by Cloudflare / Namecheap / GoDaddy DNS dashboards.
+ */
+function resolveDnsHostLabels(domain: string): {
+  isApex: boolean;
+  cnameHostShort: string;
+  txtHostShort: string;
+  cnameFqdn: string;
+  txtFqdn: string;
+} {
+  const clean = domain.trim().toLowerCase().replace(/\.$/, "");
+  const parts = clean.split(".").filter(Boolean);
+  const multiPartSlds = new Set(["co", "com", "org", "net", "gov", "ac", "edu"]);
+  const hasMultiPartTld =
+    parts.length >= 3 &&
+    parts[parts.length - 1]!.length === 2 &&
+    multiPartSlds.has(parts[parts.length - 2]!);
+  const apexPartCount = hasMultiPartTld ? 3 : 2;
+  const isApex = parts.length <= apexPartCount;
+  const subPrefix = isApex ? "" : parts.slice(0, parts.length - apexPartCount).join(".");
+
+  return {
+    isApex,
+    cnameHostShort: isApex ? "@" : subPrefix,
+    txtHostShort: isApex ? "_sparrowx-verify" : `_sparrowx-verify.${subPrefix}`,
+    cnameFqdn: clean || "yourdomain.com",
+    txtFqdn: `_sparrowx-verify.${clean || "yourdomain.com"}`,
+  };
+}
 
 const TARGET_STACKS: Array<{
   id: TargetCategory;
@@ -85,8 +142,8 @@ const TARGET_STACKS: Array<{
   },
   {
     id: "proxy",
-    label: "Nginx / Origin Server",
-    desc: "Bare-metal VPS, Docker & reverse proxy origin",
+    label: "Origin Server / VPS",
+    desc: "Bare-metal VPS, Docker & custom backend origin",
     serviceCategory: "Edge Origin Proxy",
     icon: Layers,
   },
@@ -181,13 +238,33 @@ export function ShieldWafOnboardingView({
 
   // Step 3: Provisioned credentials & verification
   const [provisionedTenant, setProvisionedTenant] = useState<ClientTenant | null>(null);
-  const [connectTab, setConnectTab] = useState<ConnectMethodTab>("dns");
+  const [connectTab, setConnectTab] = useState<ConnectMethodTab>("cloudflare");
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [copyStatusText, setCopyStatusText] = useState("");
   const lastAnnouncementRef = useRef("");
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const domainInputRef = useRef<HTMLInputElement | null>(null);
   const domainErrorId = useId();
+
+  // Cloudflare 1-Click Auto-Configuration state (token stays transient in RAM only)
+  const [cfApiToken, setCfApiToken] = useState("");
+  const [showCfToken, setShowCfToken] = useState(false);
+  const [cfReplaceA, setCfReplaceA] = useState(true);
+  const [cfIncludeWww, setCfIncludeWww] = useState(false);
+  const [cfSubmitting, setCfSubmitting] = useState(false);
+  const [cfError, setCfError] = useState<string | null>(null);
+  const [cfResult, setCfResult] = useState<CloudflareConfigResult | null>(null);
+  const cfTokenInputRef = useRef<HTMLInputElement | null>(null);
+  const cfTokenId = useId();
+  const cfTokenHelpId = useId();
+  const cfTokenErrorId = useId();
+  const cfReplaceAId = useId();
+  const cfIncludeWwwId = useId();
+
+  // Live DNS propagation verifier state
+  const [dnsChecking, setDnsChecking] = useState(false);
+  const [dnsVerifyResult, setDnsVerifyResult] = useState<DnsVerifyResult | null>(null);
+  const [dnsVerifyError, setDnsVerifyError] = useState<string | null>(null);
 
   const toggleModule = (mod: ServiceModuleId) => {
     setSelectedModules((prev) => {
@@ -345,26 +422,122 @@ export function ShieldWafOnboardingView({
     ? `spx-verify=${provisionedTenant.apiKey.slice(-14)}`
     : "spx-verify=pending";
 
-  const nginxSnippet = `# SparrowX Edge WAF Telemetry & Origin Shield for ${cleanHost || "yourdomain.com"}
-server {
-    listen 443 ssl http2;
-    server_name ${cleanHost || "yourdomain.com"};
+  const dnsLabels = resolveDnsHostLabels(provisionedTenant?.primaryDomain || cleanHost || "yourdomain.com");
 
-    add_header X-SparrowX-Shield "PROTECTED" always;
-    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
+  const handleVerifyDnsLive = async (overrideDomain?: string, overrideVerifyToken?: string) => {
+    const targetDomain = overrideDomain || provisionedTenant?.primaryDomain;
+    const targetToken = overrideVerifyToken || verifyToken;
+    if (!targetDomain || dnsChecking) return;
 
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-SparrowX-Key "${provisionedTenant?.apiKey ?? "spx_waf_key"}";
+    setDnsChecking(true);
+    setDnsVerifyError(null);
+    try {
+      const res = await fetch("/api/shield/dns-verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ domain: targetDomain, verifyToken: targetToken }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | ({ ok: true } & DnsVerifyResult)
+        | { ok: false; error?: string }
+        | null;
+
+      if (!res.ok || !data || !data.ok) {
+        throw new Error((data && "error" in data && data.error) || "Live DNS verification check failed.");
+      }
+
+      setDnsVerifyResult({
+        cnameVerified: data.cnameVerified,
+        txtVerified: data.txtVerified,
+        flattenedMatch: data.flattenedMatch,
+        observedCnames: data.observedCnames,
+        observedIps: data.observedIps,
+        observedTxts: data.observedTxts,
+        checkedAt: data.checkedAt,
+      });
+
+      if (data.cnameVerified && data.txtVerified) {
+        emitEngineToast(
+          `Both CNAME and TXT records are live for ${targetDomain}.`,
+          "success",
+          "DNS Verified Live",
+        );
+      }
+    } catch (err) {
+      setDnsVerifyError(
+        err instanceof Error ? err.message : "Could not check DNS propagation right now.",
+      );
+    } finally {
+      setDnsChecking(false);
     }
-}`;
+  };
 
-  const sdkSnippet = `<!-- Paste before </head> on ${cleanHost || "yourdomain.com"} for instant L7 telemetry -->
+  const handleCloudflareAutoConfigure = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!provisionedTenant || cfSubmitting) return;
+
+    const trimmedToken = cfApiToken.trim();
+    if (trimmedToken.length < 20) {
+      setCfError("Paste a valid Cloudflare API Token with Zone → DNS → Edit permission.");
+      cfTokenInputRef.current?.focus();
+      return;
+    }
+
+    setCfError(null);
+    setCfSubmitting(true);
+    try {
+      const res = await fetch("/api/shield/cloudflare-autoconfig", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiToken: trimmedToken,
+          domain: provisionedTenant.primaryDomain,
+          verifyToken,
+          replaceExistingA: cfReplaceA,
+          includeWww: dnsLabels.isApex ? cfIncludeWww : false,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | ({ ok: true } & CloudflareConfigResult)
+        | { ok: false; error?: string }
+        | null;
+
+      if (!res.ok || !data || !data.ok) {
+        const errMsg =
+          (data && "error" in data && data.error) ||
+          "Cloudflare DNS auto-configuration failed. Verify token permissions and try again.";
+        setCfError(errMsg);
+        cfTokenInputRef.current?.focus();
+        return;
+      }
+
+      setCfResult({
+        zone: data.zone,
+        actions: data.actions,
+        replacedRecords: data.replacedRecords ?? [],
+      });
+      // Immediately wipe the API token from component state after successful setup
+      setCfApiToken("");
+      setShowCfToken(false);
+      emitEngineToast(
+        `Configured ${data.actions.length} DNS record(s) in Cloudflare zone ${data.zone.name}.`,
+        "success",
+        "Cloudflare Auto-Configured",
+      );
+      void handleVerifyDnsLive(provisionedTenant.primaryDomain, verifyToken);
+    } catch (err) {
+      setCfError(
+        err instanceof Error
+          ? err.message
+          : "Network error reaching Cloudflare auto-config endpoint.",
+      );
+      cfTokenInputRef.current?.focus();
+    } finally {
+      setCfSubmitting(false);
+    }
+  };
+
+  const sdkSnippet = `<!-- Optional: Paste before </head> on ${cleanHost || "yourdomain.com"} for client-side telemetry -->
 <script
   src="https://sparrowx.net/sparrowx-shield.js"
   data-sparrowx-key="${provisionedTenant?.apiKey ?? "spx_waf_key"}"
@@ -849,7 +1022,7 @@ server {
         )}
 
         {/* ================================================================ */}
-        {/* STEP 3: DNS / PROXY / SDK CONNECTION & LAUNCH SOC WORKBENCH      */}
+        {/* STEP 3: CLOUDFLARE 1-CLICK & GUIDED DNS SETUP + LAUNCH WORKBENCH */}
         {/* ================================================================ */}
         {step === 3 && provisionedTenant && (
           <div className="space-y-6">
@@ -864,7 +1037,7 @@ server {
                     {provisionedTenant.primaryDomain} is armed for SparrowX WAF
                   </h1>
                   <p className="text-xs sm:text-sm text-emerald-100/85">
-                    Pick one connection method below (DNS CNAME, Nginx header, or 1-line Edge script), then launch your Autonomous SOC Workbench.
+                    No Nginx or server edits required — auto-configure your Cloudflare DNS in 1 click or follow the 3-step manual DNS guide below, then launch your Autonomous SOC Workbench.
                   </p>
                 </div>
               </div>
@@ -880,17 +1053,17 @@ server {
 
             {/* Connection Methods Card */}
             <div className="vibe-glass-panel rounded-2xl overflow-hidden">
-              {/* Method Tabs */}
+              {/* Method Tabs (DNS-first — no Nginx required) */}
               <div
                 role="tablist"
-                aria-label="WAF connection methods"
+                aria-label="WAF DNS connection methods"
                 className="border-b border-white/10 bg-[#070A12] px-4 sm:px-6 pt-4 flex flex-wrap gap-2"
               >
                 {(
                   [
-                    { id: "dns" as const, label: "1. DNS CNAME (Recommended)", icon: Globe },
-                    { id: "nginx" as const, label: "2. Nginx / Reverse Proxy", icon: Terminal },
-                    { id: "sdk" as const, label: "3. 1-Line Website Script", icon: Code2 },
+                    { id: "cloudflare" as const, label: "1. Cloudflare Auto-Setup (1-Click)", icon: Cloud },
+                    { id: "dns" as const, label: "2. Manual DNS Setup (Step-by-Step)", icon: Globe },
+                    { id: "sdk" as const, label: "3. 1-Line Website Script (Optional)", icon: Code2 },
                   ]
                 ).map((t) => {
                   const Icon = t.icon;
@@ -916,113 +1089,436 @@ server {
               </div>
 
               <div className="p-5 sm:p-6 space-y-5">
-                {connectTab === "dns" && (
-                  <div className="space-y-4">
-                    <p className="text-xs text-zinc-300 leading-relaxed">
-                      Add these DNS records at Cloudflare, Namecheap, GoDaddy, or Route53 to route traffic through SparrowX Edge WAF and verify domain ownership:
-                    </p>
-                    <div className="overflow-x-auto rounded-xl border border-white/10 bg-[#05070C]">
-                      <table className="w-full text-left text-xs font-mono">
-                        <thead className="border-b border-white/10 text-[11px] text-zinc-400 uppercase">
-                          <tr>
-                            <th className="px-4 py-3">Type</th>
-                            <th className="px-4 py-3">Host / Name</th>
-                            <th className="px-4 py-3">Value / Target</th>
-                            <th className="px-4 py-3 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/[0.06] text-zinc-200">
-                          <tr>
-                            <td className="px-4 py-3">
-                              <span className="rounded bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 text-sky-300 font-semibold">
-                                CNAME
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-white">{provisionedTenant.primaryDomain}</td>
-                            <td className="px-4 py-3 text-emerald-300">edge.sparrowx.net</td>
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyValue("cname", "edge.sparrowx.net", "CNAME target")}
-                                aria-label="Copy CNAME target edge.sparrowx.net"
-                                className="inline-flex min-h-8 min-w-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] px-2.5 text-[11px] text-zinc-200 cursor-pointer"
-                              >
-                                {copiedKey === "cname" ? (
-                                  <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
-                                ) : (
-                                  <Copy className="size-3.5" aria-hidden="true" />
-                                )}
-                                <span>{copiedKey === "cname" ? "Copied" : "Copy"}</span>
-                              </button>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-3">
-                              <span className="rounded bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-amber-300 font-semibold">
-                                TXT
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-white">_sparrowx-verify.{provisionedTenant.primaryDomain}</td>
-                            <td className="px-4 py-3 text-amber-200 break-all">{verifyToken}</td>
-                            <td className="px-4 py-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleCopyValue("txt", verifyToken, "TXT verification token")}
-                                aria-label="Copy TXT verification token"
-                                className="inline-flex min-h-8 min-w-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] px-2.5 text-[11px] text-zinc-200 cursor-pointer"
-                              >
-                                {copiedKey === "txt" ? (
-                                  <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
-                                ) : (
-                                  <Copy className="size-3.5" aria-hidden="true" />
-                                )}
-                                <span>{copiedKey === "txt" ? "Copied" : "Copy"}</span>
-                              </button>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {connectTab === "nginx" && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-zinc-300">
-                        Add this hardened reverse-proxy config on your origin server:
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyValue("nginx", nginxSnippet, "Nginx WAF config")}
-                        aria-label="Copy Nginx WAF configuration"
-                        className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] px-3 text-xs text-zinc-200 cursor-pointer"
+                {/* TAB 1: CLOUDFLARE 1-CLICK AUTO-CONFIGURATION */}
+                {connectTab === "cloudflare" && (
+                  <div className="space-y-5">
+                    <div className="rounded-xl border border-orange-500/30 bg-orange-500/[0.07] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-1">
+                        <h2
+                          id="cf-autoconfig-heading"
+                          className="text-sm font-semibold text-white flex items-center gap-2"
+                        >
+                          <Cloud className="size-4 text-orange-400 shrink-0" aria-hidden="true" />
+                          <span>1-Click Cloudflare DNS Auto-Configuration</span>
+                        </h2>
+                        <p className="text-xs text-zinc-300 leading-relaxed">
+                          Using Cloudflare for <code className="font-mono text-white">{provisionedTenant.primaryDomain}</code>? Paste a scoped Cloudflare API Token once and SparrowX automatically creates your <strong className="text-white">CNAME → edge.sparrowx.net</strong> (DNS Only / Grey Cloud) and <strong className="text-white">TXT verification</strong> records.
+                        </p>
+                      </div>
+                      <a
+                        href="https://dash.cloudflare.com/profile/api-tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-orange-400/40 bg-orange-500/15 hover:bg-orange-500/25 px-3.5 text-xs font-semibold text-orange-200 transition-colors shrink-0"
                       >
-                        {copiedKey === "nginx" ? (
-                          <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
-                        ) : (
-                          <Copy className="size-3.5" aria-hidden="true" />
-                        )}
-                        <span>{copiedKey === "nginx" ? "Copied" : "Copy Nginx Config"}</span>
-                      </button>
+                        <span>Open Cloudflare Tokens</span>
+                        <ExternalLink className="size-3.5" aria-hidden="true" />
+                      </a>
                     </div>
-                    <pre className="rounded-xl border border-white/10 bg-[#05070C] p-4 text-xs font-mono text-zinc-200 overflow-x-auto leading-relaxed">
-                      <code>{nginxSnippet}</code>
-                    </pre>
+
+                    {/* Non-exclusive step-by-step disclosure (no heading inside summary) */}
+                    <details
+                      open
+                      className="rounded-xl border border-white/10 bg-[#060910] px-4 py-3 text-xs text-zinc-300"
+                    >
+                      <summary className="cursor-pointer font-semibold text-zinc-100 select-none">
+                        How to create a safe, DNS-only Cloudflare API Token (takes 20 seconds)
+                      </summary>
+                      <ol className="mt-3 space-y-2 list-decimal list-inside text-zinc-300 leading-relaxed">
+                        <li>
+                          Click <strong className="text-white">Open Cloudflare Tokens</strong> above → click <strong className="text-white">Create Token</strong>.
+                        </li>
+                        <li>
+                          Next to the <strong className="text-white">Edit zone DNS</strong> template, click <strong className="text-white">Use template</strong>.
+                        </li>
+                        <li>
+                          Under <strong className="text-white">Zone Resources</strong>, select <strong className="text-white">Specific zone → {dnsLabels.cnameFqdn}</strong>, click <strong className="text-white">Continue to summary → Create Token</strong>, and paste it below.
+                        </li>
+                      </ol>
+                    </details>
+
+                    <form
+                      method="POST"
+                      action="/api/shield/cloudflare-autoconfig"
+                      noValidate
+                      aria-labelledby="cf-autoconfig-heading"
+                      onSubmit={handleCloudflareAutoConfigure}
+                      className="rounded-xl border border-white/12 bg-[#05070C] p-4 sm:p-5 space-y-4"
+                    >
+                      <div className="space-y-1.5">
+                        <label
+                          htmlFor={cfTokenId}
+                          className="block text-xs font-semibold text-zinc-200"
+                        >
+                          Cloudflare API Token (Edit zone DNS) <span aria-hidden="true" className="text-[#F9103A]">*</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            ref={cfTokenInputRef}
+                            id={cfTokenId}
+                            name="cfApiToken"
+                            type={showCfToken ? "text" : "password"}
+                            required
+                            autoComplete="off"
+                            spellCheck={false}
+                            autoCorrect="off"
+                            autoCapitalize="none"
+                            enterKeyHint="done"
+                            value={cfApiToken}
+                            onChange={(e) => {
+                              setCfApiToken(e.target.value);
+                              if (cfError) setCfError(null);
+                            }}
+                            aria-invalid={Boolean(cfError)}
+                            aria-describedby={cfError ? `${cfTokenHelpId} ${cfTokenErrorId}` : cfTokenHelpId}
+                            placeholder="Paste your Cloudflare API token here..."
+                            className={`w-full min-h-[48px] rounded-xl border bg-[#080B14] pl-4 pr-12 text-base sm:text-sm font-mono text-white placeholder-zinc-500 focus:outline-none focus-visible:ring-2 transition-colors ${
+                              cfError
+                                ? "border-red-500/70 focus-visible:ring-red-500/50"
+                                : "border-white/15 hover:border-white/30 focus-visible:border-orange-400 focus-visible:ring-orange-400/40"
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            aria-pressed={showCfToken}
+                            aria-label={showCfToken ? "Hide Cloudflare API token" : "Show Cloudflare API token"}
+                            onClick={() => setShowCfToken((prev) => !prev)}
+                            className="absolute right-2 inline-flex size-9 items-center justify-center rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.06] cursor-pointer"
+                          >
+                            {showCfToken ? (
+                              <EyeOff className="size-4" aria-hidden="true" />
+                            ) : (
+                              <Eye className="size-4" aria-hidden="true" />
+                            )}
+                          </button>
+                        </div>
+                        <p id={cfTokenHelpId} className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                          <Lock className="size-3 text-emerald-400 shrink-0" aria-hidden="true" />
+                          <span>Used once over HTTPS to upsert DNS records, then immediately discarded — never stored in our database or localStorage.</span>
+                        </p>
+                        {cfError && (
+                          <p
+                            id={cfTokenErrorId}
+                            role="alert"
+                            className="text-xs text-red-400 flex items-start gap-1.5 pt-1"
+                          >
+                            <AlertCircle className="size-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                            <span>{cfError}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2.5 pt-1">
+                        <div className="flex items-start gap-2.5">
+                          <input
+                            id={cfReplaceAId}
+                            name="replaceExistingA"
+                            type="checkbox"
+                            checked={cfReplaceA}
+                            onChange={(e) => setCfReplaceA(e.target.checked)}
+                            className="mt-0.5 size-4 rounded border-white/25 accent-[#F9103A] cursor-pointer"
+                          />
+                          <label htmlFor={cfReplaceAId} className="text-xs text-zinc-300 cursor-pointer leading-snug">
+                            Replace any existing <code className="font-mono text-white">A / AAAA</code> record on <code className="font-mono text-white">{provisionedTenant.primaryDomain}</code> with CNAME → <code className="font-mono text-emerald-300">edge.sparrowx.net</code> (your old IP is displayed below so you can restore anytime).
+                          </label>
+                        </div>
+
+                        {dnsLabels.isApex && (
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              id={cfIncludeWwwId}
+                              name="includeWww"
+                              type="checkbox"
+                              checked={cfIncludeWww}
+                              onChange={(e) => setCfIncludeWww(e.target.checked)}
+                              className="mt-0.5 size-4 rounded border-white/25 accent-[#F9103A] cursor-pointer"
+                            />
+                            <label htmlFor={cfIncludeWwwId} className="text-xs text-zinc-300 cursor-pointer leading-snug">
+                              Also route <code className="font-mono text-white">www.{provisionedTenant.primaryDomain}</code> through SparrowX Edge WAF.
+                            </label>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setConnectTab("dns")}
+                          className="text-xs text-zinc-400 hover:text-white underline underline-offset-4 cursor-pointer"
+                        >
+                          Not on Cloudflare? View step-by-step manual DNS guide
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={cfSubmitting}
+                          className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-60 px-5 text-xs sm:text-sm font-bold text-black transition-colors cursor-pointer"
+                        >
+                          {cfSubmitting ? (
+                            <>
+                              <RefreshCw className="size-4 animate-spin" aria-hidden="true" />
+                              <span>Configuring Cloudflare DNS...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Cloud className="size-4" aria-hidden="true" />
+                              <span>Auto-Configure Cloudflare DNS</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Live Cloudflare Auto-Config Success Summary */}
+                    {cfResult && (
+                      <div
+                        role="status"
+                        className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 space-y-3"
+                      >
+                        <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-emerald-300">
+                          <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+                          <span>
+                            Cloudflare zone <code className="font-mono text-white">{cfResult.zone.name}</code> configured automatically!
+                          </span>
+                        </div>
+                        <ul className="space-y-1.5 text-xs font-mono text-zinc-200">
+                          {cfResult.actions.map((act) => (
+                            <li
+                              key={`${act.type}-${act.name}`}
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 bg-[#05080E]/80 px-3 py-2"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 uppercase">
+                                  {act.status}
+                                </span>
+                                <span className="text-sky-300 font-semibold">{act.type}</span>
+                                <span className="text-white">{act.name}</span>
+                              </span>
+                              <span className="text-emerald-300 truncate max-w-full">
+                                → {act.target} {act.type === "CNAME" ? "(DNS Only)" : ""}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        {cfResult.replacedRecords.length > 0 && (
+                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100 space-y-1">
+                            <div className="font-semibold text-amber-300">
+                              Previous Origin Record Backed Up (save if you ever want to revert):
+                            </div>
+                            {cfResult.replacedRecords.map((rec, idx) => (
+                              <div key={`${rec.type}-${rec.content}-${idx}`} className="flex items-center justify-between gap-2 font-mono">
+                                <span>
+                                  {rec.type} {rec.name} → {rec.content}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyValue(`backup-${idx}`, rec.content, "Previous origin IP")}
+                                  className="inline-flex min-h-7 items-center gap-1 rounded border border-amber-400/30 px-2 text-[11px] text-amber-200 hover:bg-amber-400/15 cursor-pointer"
+                                >
+                                  <Copy className="size-3" aria-hidden="true" />
+                                  <span>{copiedKey === `backup-${idx}` ? "Copied" : "Copy IP"}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
+                {/* TAB 2: DETAILED STEP-BY-STEP MANUAL DNS SETUP */}
+                {connectTab === "dns" && (
+                  <div className="space-y-5">
+                    <div className="space-y-1.5">
+                      <h2 className="text-sm font-semibold text-white">
+                        Complete DNS Setup Guide — No Nginx or Server Changes Needed
+                      </h2>
+                      <p className="text-xs text-zinc-300 leading-relaxed">
+                        You only need to add <strong className="text-white">2 DNS records</strong> inside your DNS provider (Cloudflare, GoDaddy, Namecheap, Hostinger, or Route53). All traffic for <code className="font-mono text-white">{provisionedTenant.primaryDomain}</code> will flow directly through SparrowX Edge WAF.
+                      </p>
+                    </div>
+
+                    {/* Crucial Cloudflare Proxy Callout */}
+                    <div className="rounded-xl border border-amber-500/35 bg-amber-500/10 p-4 flex items-start gap-3 text-xs text-amber-100">
+                      <Info className="size-4 text-amber-300 shrink-0 mt-0.5" aria-hidden="true" />
+                      <div className="space-y-1 leading-relaxed">
+                        <div className="font-semibold text-amber-200">
+                          Important for Cloudflare Users: Set Proxy Status to &ldquo;DNS Only&rdquo; (Grey Cloud)
+                        </div>
+                        <p>
+                          When adding the <code className="font-mono text-white">CNAME</code> record in Cloudflare, click the orange cloud toggle to turn it <strong className="text-white">OFF (Grey Cloud / DNS Only)</strong>. Keeping Cloudflare Proxy ON double-proxies traffic and can cause SSL redirect loops. If you already have an <code className="font-mono text-white">A</code> record for <code className="font-mono text-white">{dnsLabels.cnameHostShort}</code>, note its IP and delete it before saving the CNAME.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Step-by-Step Cards */}
+                    <div className="space-y-3">
+                      {/* Step 1 */}
+                      <div className="rounded-xl border border-white/10 bg-[#060910] p-4 flex items-start gap-3">
+                        <span className="size-6 rounded-full bg-white/10 text-white text-xs font-mono font-bold grid place-items-center shrink-0">
+                          1
+                        </span>
+                        <div className="space-y-1 text-xs">
+                          <div className="font-semibold text-white">Open your domain&apos;s DNS Records page</div>
+                          <p className="text-zinc-400 leading-relaxed">
+                            <strong className="text-zinc-200">Cloudflare:</strong> Select your domain → <code className="text-zinc-200">DNS → Records → Add record</code>.{" "}
+                            <strong className="text-zinc-200">Namecheap:</strong> Domain List → Manage → <code className="text-zinc-200">Advanced DNS</code>.{" "}
+                            <strong className="text-zinc-200">GoDaddy:</strong> My Products → DNS → <code className="text-zinc-200">Add New Record</code>.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Step 2: CNAME Record */}
+                      <div className="rounded-xl border border-sky-500/25 bg-[#05070C] p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <span className="size-6 rounded-full bg-sky-500/20 border border-sky-500/40 text-sky-300 text-xs font-mono font-bold grid place-items-center shrink-0">
+                            2
+                          </span>
+                          <div className="space-y-0.5 text-xs">
+                            <div className="font-semibold text-white">
+                              Add the CNAME Record <span className="text-sky-300 font-normal">(Routes traffic through SparrowX Edge WAF)</span>
+                            </div>
+                            <p className="text-zinc-400">
+                              {dnsLabels.isApex
+                                ? `For a root domain, enter "@" in the Name/Host field (Cloudflare CNAME flattening handles root CNAMEs automatically).`
+                                : `Enter "${dnsLabels.cnameHostShort}" in the Name/Host field (your provider appends the root domain automatically).`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs font-mono">
+                          <div className="rounded-lg border border-white/10 bg-[#090D16] p-3">
+                            <div className="text-[10px] text-zinc-400 uppercase mb-1">Type</div>
+                            <span className="rounded bg-sky-500/15 border border-sky-500/30 px-2 py-0.5 text-sky-300 font-semibold">
+                              CNAME
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-[#090D16] p-3 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-zinc-400 uppercase mb-1">Name / Host</div>
+                              <div className="text-white font-semibold truncate">{dnsLabels.cnameHostShort}</div>
+                              <div className="text-[10px] text-zinc-500 truncate">{dnsLabels.cnameFqdn}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyValue("cname-host", dnsLabels.cnameHostShort, "CNAME host")}
+                              aria-label={`Copy CNAME host ${dnsLabels.cnameHostShort}`}
+                              className="inline-flex size-8 items-center justify-center rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] text-zinc-200 cursor-pointer shrink-0"
+                            >
+                              {copiedKey === "cname-host" ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                            </button>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-[#090D16] p-3 sm:col-span-2 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-zinc-400 uppercase mb-1">Target / Value · Proxy: DNS Only</div>
+                              <div className="text-emerald-300 font-semibold truncate">edge.sparrowx.net</div>
+                              <div className="text-[10px] text-zinc-500">TTL: Auto · Cloudflare Proxy: OFF (Grey Cloud)</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyValue("cname", "edge.sparrowx.net", "CNAME target")}
+                              aria-label="Copy CNAME target edge.sparrowx.net"
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] px-2.5 text-[11px] text-zinc-200 cursor-pointer shrink-0"
+                            >
+                              {copiedKey === "cname" ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                              <span>{copiedKey === "cname" ? "Copied" : "Copy"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: TXT Record */}
+                      <div className="rounded-xl border border-amber-500/25 bg-[#05070C] p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <span className="size-6 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-mono font-bold grid place-items-center shrink-0">
+                            3
+                          </span>
+                          <div className="space-y-0.5 text-xs">
+                            <div className="font-semibold text-white">
+                              Add the TXT Record <span className="text-amber-300 font-normal">(Verifies you own this domain)</span>
+                            </div>
+                            <p className="text-zinc-400">
+                              Proves ownership before SparrowX issues your automated TLS certificate and streams live WAF logs to your account.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs font-mono">
+                          <div className="rounded-lg border border-white/10 bg-[#090D16] p-3">
+                            <div className="text-[10px] text-zinc-400 uppercase mb-1">Type</div>
+                            <span className="rounded bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-amber-300 font-semibold">
+                              TXT
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-[#090D16] p-3 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-zinc-400 uppercase mb-1">Name / Host</div>
+                              <div className="text-white font-semibold truncate">{dnsLabels.txtHostShort}</div>
+                              <div className="text-[10px] text-zinc-500 truncate">{dnsLabels.txtFqdn}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyValue("txt-host", dnsLabels.txtHostShort, "TXT host")}
+                              aria-label={`Copy TXT host ${dnsLabels.txtHostShort}`}
+                              className="inline-flex size-8 items-center justify-center rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] text-zinc-200 cursor-pointer shrink-0"
+                            >
+                              {copiedKey === "txt-host" ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                            </button>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-[#090D16] p-3 sm:col-span-2 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-zinc-400 uppercase mb-1">Content / Value</div>
+                              <div className="text-amber-200 font-semibold break-all">{verifyToken}</div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyValue("txt", verifyToken, "TXT verification token")}
+                              aria-label="Copy TXT verification token"
+                              className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] px-2.5 text-[11px] text-zinc-200 cursor-pointer shrink-0"
+                            >
+                              {copiedKey === "txt" ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+                              <span>{copiedKey === "txt" ? "Copied" : "Copy"}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Non-exclusive DNS FAQ disclosures */}
+                    <div className="space-y-2">
+                      <details className="rounded-xl border border-white/10 bg-[#060910] px-4 py-3 text-xs text-zinc-300">
+                        <summary className="cursor-pointer font-medium text-zinc-200 select-none">
+                          How long does DNS propagation take?
+                        </summary>
+                        <p className="mt-2 text-zinc-400 leading-relaxed">
+                          Cloudflare updates in 15–60 seconds. GoDaddy, Namecheap, and other registrars typically propagate in 2–10 minutes. Click <strong className="text-white">Check DNS Live</strong> below to confirm immediately.
+                        </p>
+                      </details>
+                      <details className="rounded-xl border border-white/10 bg-[#060910] px-4 py-3 text-xs text-zinc-300">
+                        <summary className="cursor-pointer font-medium text-zinc-200 select-none">
+                          My DNS provider doesn&apos;t allow a CNAME on the root domain (@) — what should I do?
+                        </summary>
+                        <p className="mt-2 text-zinc-400 leading-relaxed">
+                          Cloudflare supports root CNAMEs natively via CNAME Flattening (free plan). If you use a traditional registrar like Namecheap or GoDaddy without ALIAS/ANAME support, point <code className="font-mono text-white">www</code> as a CNAME to <code className="font-mono text-emerald-300">edge.sparrowx.net</code> or move DNS to Cloudflare&apos;s free plan and use Tab 1 for 1-click setup.
+                        </p>
+                      </details>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: OPTIONAL 1-LINE WEBSITE SCRIPT */}
                 {connectTab === "sdk" && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-xs text-zinc-300">
-                        Drop this lightweight telemetry sensor into your website&apos;s <code className="text-white">&lt;head&gt;</code>:
+                        Optional client-side telemetry add-on — paste before <code className="text-white">&lt;/head&gt;</code> on <code className="text-white">{provisionedTenant.primaryDomain}</code> (no server or Nginx config needed):
                       </p>
                       <button
                         type="button"
                         onClick={() => handleCopyValue("sdk", sdkSnippet, "Website Shield script")}
                         aria-label="Copy Website Shield script snippet"
-                        className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] px-3 text-xs text-zinc-200 cursor-pointer"
+                        className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] px-3 text-xs text-zinc-200 cursor-pointer shrink-0"
                       >
                         {copiedKey === "sdk" ? (
                           <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
@@ -1037,6 +1533,68 @@ server {
                     </pre>
                   </div>
                 )}
+
+                {/* LIVE DNS PROPAGATION VERIFIER STRIP */}
+                <div className="rounded-xl border border-white/12 bg-[#060910] p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-semibold text-white">
+                        Live DNS Propagation Check
+                      </div>
+                      <p className="text-[11px] text-zinc-400">
+                        Checks public DNS &amp; Cloudflare DoH in real time for your CNAME and TXT records.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={dnsChecking}
+                      onClick={() => void handleVerifyDnsLive()}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-60 px-3.5 text-xs font-semibold text-emerald-200 cursor-pointer"
+                    >
+                      <RefreshCw className={`size-3.5 ${dnsChecking ? "animate-spin" : ""}`} aria-hidden="true" />
+                      <span>{dnsChecking ? "Checking Live DNS..." : "Check DNS Live"}</span>
+                    </button>
+                  </div>
+
+                  {dnsVerifyError && (
+                    <p role="alert" className="text-xs text-red-400 flex items-center gap-1.5">
+                      <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                      <span>{dnsVerifyError}</span>
+                    </p>
+                  )}
+
+                  {dnsVerifyResult && (
+                    <div role="status" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                      <div
+                        className={`rounded-lg border px-3 py-2.5 flex items-center justify-between gap-2 ${
+                          dnsVerifyResult.cnameVerified
+                            ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                        }`}
+                      >
+                        <span className="font-medium">
+                          CNAME → edge.sparrowx.net
+                          {dnsVerifyResult.flattenedMatch ? " (Flattened)" : ""}
+                        </span>
+                        <span className="font-mono font-bold">
+                          {dnsVerifyResult.cnameVerified ? "VERIFIED" : "PENDING"}
+                        </span>
+                      </div>
+                      <div
+                        className={`rounded-lg border px-3 py-2.5 flex items-center justify-between gap-2 ${
+                          dnsVerifyResult.txtVerified
+                            ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200"
+                            : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                        }`}
+                      >
+                        <span className="font-medium">TXT _sparrowx-verify</span>
+                        <span className="font-mono font-bold">
+                          {dnsVerifyResult.txtVerified ? "VERIFIED" : "PENDING"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Sensor Key Strip */}
                 <div className="rounded-xl border border-white/10 bg-[#060910] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -1069,6 +1627,11 @@ server {
                       setDomainInput("");
                       setWorkspaceLabel("");
                       setPreflightAudit(null);
+                      setCfApiToken("");
+                      setCfError(null);
+                      setCfResult(null);
+                      setDnsVerifyResult(null);
+                      setDnsVerifyError(null);
                       setStep(1);
                     }}
                     className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] px-4 text-xs font-medium text-zinc-200 cursor-pointer"
