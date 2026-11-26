@@ -42,6 +42,7 @@ import {
 } from "@/components/GrowthAndMonetizationHub";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
+import { ShieldEdgeCheckingPage } from "./ShieldEdgeCheckingPage";
 
 export interface ShieldWafOnboardingViewProps {
   activeUser: AppUser;
@@ -50,6 +51,7 @@ export interface ShieldWafOnboardingViewProps {
     service: ProtectedService;
     asset: Asset;
   }) => void;
+  onDomainVerified?: (tenant: ClientTenant) => void;
   onLaunchWorkbench: () => void;
   onBackToClientArea: () => void;
   onSignOut: () => void;
@@ -212,10 +214,12 @@ function legacyCopyFallback(text: string): boolean {
 export function ShieldWafOnboardingView({
   activeUser,
   onDomainConnected,
+  onDomainVerified,
   onLaunchWorkbench,
   onBackToClientArea,
   onSignOut,
 }: ShieldWafOnboardingViewProps) {
+  const [previewCheckingPage, setPreviewCheckingPage] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
   // Step 1: Domain target
@@ -456,9 +460,14 @@ export function ShieldWafOnboardingView({
         checkedAt: data.checkedAt,
       });
 
-      if (data.cnameVerified && data.txtVerified) {
+      if (data.cnameVerified || data.txtVerified) {
+        if (provisionedTenant && !provisionedTenant.sdkVerified) {
+          const verifiedTenant: ClientTenant = { ...provisionedTenant, sdkVerified: true };
+          setProvisionedTenant(verifiedTenant);
+          onDomainVerified?.(verifiedTenant);
+        }
         emitEngineToast(
-          `Both CNAME and TXT records are live for ${targetDomain}.`,
+          `Connection verified live for ${targetDomain} — saved to your active monitor list.`,
           "success",
           "DNS Verified Live",
         );
@@ -537,13 +546,13 @@ export function ShieldWafOnboardingView({
     }
   };
 
-  const sdkSnippet = `<!-- Optional: Paste before </head> on ${cleanHost || "yourdomain.com"} for client-side telemetry -->
+  const sdkSnippet = `<!-- Paste before </head> on ${cleanHost || "yourdomain.com"} for Cloudflare-style Edge Browser Checking + Live WAF Telemetry -->
 <script
-  src="https://sparrowx.net/sparrowx-shield.js"
-  data-sparrowx-key="${provisionedTenant?.apiKey ?? "spx_waf_key"}"
-  data-sparrowx-domain="${cleanHost || "yourdomain.com"}"
-  data-sparrowx-mode="${strictness}"
-  defer
+  src="https://sec.sparrowx.net/sparrowx-shield.js"
+  data-spx-key="${provisionedTenant?.apiKey ?? "spx_waf_key"}"
+  data-spx-tenant="${provisionedTenant?.id ?? "tnt_sparrowx"}"
+  data-spx-domain="${cleanHost || "yourdomain.com"}"
+  data-spx-challenge="${strictness === "strict" ? "always" : "true"}"
 ></script>`;
 
   const stepsMeta = [
@@ -1621,23 +1630,33 @@ export function ShieldWafOnboardingView({
 
                 {/* Bottom Launch Bar */}
                 <div className="pt-3 border-t border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDomainInput("");
-                      setWorkspaceLabel("");
-                      setPreflightAudit(null);
-                      setCfApiToken("");
-                      setCfError(null);
-                      setCfResult(null);
-                      setDnsVerifyResult(null);
-                      setDnsVerifyError(null);
-                      setStep(1);
-                    }}
-                    className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] px-4 text-xs font-medium text-zinc-200 cursor-pointer"
-                  >
-                    <span>+ Connect Another Domain</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDomainInput("");
+                        setWorkspaceLabel("");
+                        setPreflightAudit(null);
+                        setCfApiToken("");
+                        setCfError(null);
+                        setCfResult(null);
+                        setDnsVerifyResult(null);
+                        setDnsVerifyError(null);
+                        setStep(1);
+                      }}
+                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] px-4 text-xs font-medium text-zinc-200 cursor-pointer"
+                    >
+                      <span>+ Connect Another Domain</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewCheckingPage(true)}
+                      className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-xl border border-[#38BDF8]/35 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-4 text-xs font-semibold text-[#38BDF8] cursor-pointer"
+                    >
+                      <ShieldCheck className="size-4" aria-hidden="true" />
+                      <span>Preview Edge Checking Page</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={onLaunchWorkbench}
@@ -1653,6 +1672,14 @@ export function ShieldWafOnboardingView({
           </div>
         )}
       </main>
+
+      {previewCheckingPage && provisionedTenant ? (
+        <ShieldEdgeCheckingPage
+          domain={provisionedTenant.primaryDomain}
+          previewMode
+          onClosePreview={() => setPreviewCheckingPage(false)}
+        />
+      ) : null}
 
       <SparrowxFooter
         isAuthenticated={true}

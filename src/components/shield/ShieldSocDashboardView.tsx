@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   Copy,
   Download,
   Eye,
@@ -16,6 +17,7 @@ import {
   Server,
   Shield,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Trash2,
   User,
@@ -41,6 +43,7 @@ import {
   type WebhookConfig,
 } from "@/lib/advanced-features";
 import {
+  normalizeShieldDomain,
   persistIncidentToBackend,
   type AppUser,
   type Asset,
@@ -48,11 +51,16 @@ import {
   type Incident,
 } from "@/lib/supabase";
 import { GAMESEC_URL } from "./ShieldLandingView";
+import { ShieldEdgeCheckingPage } from "./ShieldEdgeCheckingPage";
 import { querySparrowxCrossSystemAi, type CrossSystemAiResponse } from "@/lib/sparrowx-ai-brain";
 
 export interface ShieldSocDashboardViewProps {
   activeUser: AppUser;
   tenants: ClientTenant[];
+  activeDomainId?: string;
+  onSelectDomain?: (domainId: string) => void;
+  onDeleteTenant?: (tenantId: string) => Promise<void> | void;
+  onPurgeZombies?: () => Promise<void> | void;
   incidents: Incident[];
   assets: Asset[];
   onIncidentsUpdated: (next: Incident[]) => void;
@@ -66,6 +74,10 @@ export interface ShieldSocDashboardViewProps {
 export function ShieldSocDashboardView({
   activeUser,
   tenants,
+  activeDomainId = "all",
+  onSelectDomain,
+  onDeleteTenant,
+  onPurgeZombies,
   incidents,
   assets,
   onIncidentsUpdated,
@@ -76,12 +88,98 @@ export function ShieldSocDashboardView({
   onSignOut,
 }: ShieldSocDashboardViewProps) {
   const [railMode, setRailMode] = useState<SocViewMode>("queue");
+  const [previewCheckingDomain, setPreviewCheckingDomain] = useState<string | null>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherTriggerId = useId();
+  const switcherMenuId = useId();
+  const switcherPopoverRef = useRef<HTMLDivElement | null>(null);
+  const switcherGroupRef = useRef<HTMLDivElement | null>(null);
+
+  const selectedTenant = useMemo(() => {
+    if (tenants.length === 0) return null;
+    if (activeDomainId === "all") return null;
+    return tenants.find((t) => t.id === activeDomainId) ?? tenants[0] ?? null;
+  }, [tenants, activeDomainId]);
+
+  const activeHost = useMemo(() => {
+    const t = selectedTenant ?? tenants[0];
+    return t ? normalizeShieldDomain(t.primaryDomain) : "";
+  }, [selectedTenant, tenants]);
+
+  const scopedIncidents = useMemo(() => {
+    if (!selectedTenant) return incidents;
+    const host = normalizeShieldDomain(selectedTenant.primaryDomain);
+    if (!host) return incidents;
+    return incidents.filter((inc) => {
+      const src = `${inc.source} ${inc.title} ${inc.summary}`.toLowerCase();
+      return src.includes(host);
+    });
+  }, [incidents, selectedTenant]);
+
+  const scopedAssets = useMemo(() => {
+    if (!selectedTenant) return assets;
+    const host = normalizeShieldDomain(selectedTenant.primaryDomain);
+    if (!host) return assets;
+    const matched = assets.filter((a) =>
+      `${a.endpoint} ${a.name}`.toLowerCase().includes(host),
+    );
+    return matched.length > 0
+      ? matched
+      : [
+          {
+            id: `ast-live-${selectedTenant.id}`,
+            name: selectedTenant.name || host,
+            type: "Web Application" as const,
+            endpoint: `https://${host}`,
+            owner: activeUser.email,
+            status: "Protected" as const,
+            riskScore: 14,
+            lastScanned: "Edge active",
+          },
+        ];
+  }, [assets, selectedTenant, activeUser.email]);
 
   // Origin Domain Audit state (Strict: starts clean until executed)
-  const [targetDomain, setTargetDomain] = useState(tenants[0]?.primaryDomain ?? "");
+  const [targetDomain, setTargetDomain] = useState(activeHost);
   const [auditing, setAuditing] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [liveAudit, setLiveAudit] = useState<LiveDomainAuditResult | null>(null);
+
+  useEffect(() => {
+    if (activeHost) {
+      setTargetDomain(activeHost);
+      setServerHost(activeHost);
+    }
+  }, [activeHost]);
+
+  // Modern Web Guidance `menu`: sync aria-expanded on native popover toggle + fallback ArrowDown/Escape handling
+  useEffect(() => {
+    const pop = switcherPopoverRef.current;
+    if (!pop) return;
+    const onToggle = (e: Event) => {
+      const te = e as ToggleEvent;
+      setSwitcherOpen(te.newState === "open");
+    };
+    pop.addEventListener("toggle", onToggle);
+    return () => pop.removeEventListener("toggle", onToggle);
+  }, []);
+
+  const closeDomainSwitcher = () => {
+    const pop = switcherPopoverRef.current;
+    if (pop && typeof pop.hidePopover === "function") {
+      try {
+        pop.hidePopover();
+      } catch {
+        // ignore if already closed
+      }
+    }
+    setSwitcherOpen(false);
+  };
+
+  const handleSelectDomainAndClose = (id: string) => {
+    onSelectDomain?.(id);
+    closeDomainSwitcher();
+  };
 
   // Prompt Injection & PII Firewall Sandbox + SparrowX AI Neural Copilot
   const [promptInput, setPromptInput] = useState("");
@@ -226,8 +324,33 @@ export function ShieldSocDashboardView({
       return `// SparrowX Single Server Node Middleware\nconst express = require('express');\nconst app = express();\n\napp.use((req, res, next) => {\n  res.setHeader('X-SparrowX-Shield', 'Active-v2');\n  const ua = req.headers['user-agent'] || '';\n  if (/sqlmap|nikto|acunetix|masscan/i.test(ua)) {\n    return res.status(403).json({ error: 'Blocked by SparrowX Perimeter WAF' });\n  }\n  next();\n});\n\napp.listen(${port}, () => console.log('Shielded on port ${port}'));`;
     }
 
-    // Default Nginx (Ubuntu / Debian)
-    return `# /etc/nginx/sites-available/sparrowx.conf\nlimit_req_zone $binary_remote_addr zone=spx_rate:10m rate=20r/s;\n\nserver {\n    server_name ${cleanHost};\n    listen 80;\n    listen 443 ssl http2;\n\n    # Hardened Security & Anti-Sniff Headers\n    add_header X-Content-Type-Options "nosniff" always;\n    add_header X-Frame-Options "SAMEORIGIN" always;\n    add_header X-SparrowX-Shield "Active-v2" always;\n\n    location / {\n        limit_req zone=spx_rate burst=40 nodelay;\n        proxy_pass http://127.0.0.1:${port};\n        proxy_set_header Host $host;\n        proxy_set_header X-Real-IP $remote_addr;\n        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n        proxy_set_header X-SparrowX-Key "${key}";\n    }\n}`;
+    // Default Nginx (Ubuntu / Debian) with Cloudflare-style SparrowX Edge Checking Page injection
+    return `# /etc/nginx/sites-available/sparrowx.conf
+limit_req_zone $binary_remote_addr zone=spx_rate:10m rate=20r/s;
+
+server {
+    server_name ${cleanHost};
+    listen 80;
+    listen 443 ssl http2;
+
+    # Hardened Security & Anti-Sniff Headers
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-SparrowX-Shield "Active-v3-Challenge" always;
+
+    # Inject Cloudflare-style SparrowX Checking Page before visitors reach your origin
+    sub_filter '</head>' '<script src="https://sec.sparrowx.net/sparrowx-shield.js" data-spx-key="${key}" data-spx-domain="${cleanHost}" data-spx-challenge="true"></script></head>';
+    sub_filter_once on;
+
+    location / {
+        limit_req zone=spx_rate burst=40 nodelay;
+        proxy_pass http://127.0.0.1:${port};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-SparrowX-Key "${key}";
+    }
+}`;
   }, [serverStack, serverHost, serverPort, tenants]);
 
   const handleDownloadFirewall = () => {
@@ -277,8 +400,8 @@ export function ShieldSocDashboardView({
     saveWebhooks(next);
   };
 
-  const openIncidentsCount = incidents.filter((inc) => inc.status !== "Contained").length;
-  const protectedAssetsCount = assets.filter((a) => a.status !== "Isolated").length;
+  const openIncidentsCount = scopedIncidents.filter((inc) => inc.status !== "Contained").length;
+  const protectedAssetsCount = scopedAssets.filter((a) => a.status !== "Isolated").length;
 
   return (
     <div className="font-soc min-h-screen bg-[#05070D] text-[#F4F6FA] flex flex-col selection:bg-[#E2E7F0] selection:text-[#05070D]">
@@ -305,15 +428,169 @@ export function ShieldSocDashboardView({
                 </span>
               </div>
             </div>
-            {onConnectDomain && (
-              <button
-                type="button"
-                onClick={onConnectDomain}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#F9103A]/45 bg-[#F9103A]/15 hover:bg-[#F9103A]/25 px-3 py-1.5 text-xs font-semibold text-white transition-colors cursor-pointer"
-              >
-                <Plus className="size-3.5 text-[#FF6B84]" aria-hidden="true" />
-                <span>Connect Domain</span>
-              </button>
+
+            {/* Domain Monitor Switcher (replaces repetitive '+ Connect Domain' once 1st domain is connected) */}
+            {tenants.length === 0 ? (
+              onConnectDomain ? (
+                <button
+                  type="button"
+                  onClick={onConnectDomain}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#F9103A]/45 bg-[#F9103A]/15 hover:bg-[#F9103A]/25 px-3 py-1.5 text-xs font-semibold text-white transition-colors cursor-pointer"
+                >
+                  <Plus className="size-3.5 text-[#FF6B84]" aria-hidden="true" />
+                  <span>Connect Domain</span>
+                </button>
+              ) : null
+            ) : (
+              <div className="relative">
+                <button
+                  id={switcherTriggerId}
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={switcherOpen}
+                  {...({
+                    commandfor: switcherMenuId,
+                    command: "toggle-popover",
+                  } as Record<string, string>)}
+                  onClick={() => {
+                    if (typeof HTMLButtonElement !== "undefined" && !("commandForElement" in HTMLButtonElement.prototype)) {
+                      const pop = switcherPopoverRef.current;
+                      if (pop && typeof pop.togglePopover === "function") {
+                        pop.togglePopover();
+                      } else {
+                        setSwitcherOpen((v) => !v);
+                      }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      const pop = switcherPopoverRef.current;
+                      if (pop && !switcherOpen && typeof pop.showPopover === "function") {
+                        pop.showPopover();
+                      }
+                      setSwitcherOpen(true);
+                      requestAnimationFrame(() => {
+                        const first = switcherGroupRef.current?.querySelector<HTMLButtonElement>("button");
+                        first?.focus();
+                      });
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[#10B981]/40 bg-[#10B981]/10 hover:bg-[#10B981]/20 px-3 py-1.5 text-xs font-mono font-semibold text-[#F4F6FA] transition-colors cursor-pointer"
+                >
+                  <span className="size-2 rounded-full bg-[#10B981] shrink-0" aria-hidden="true" />
+                  <span className="max-w-[170px] truncate">
+                    {selectedTenant
+                      ? normalizeShieldDomain(selectedTenant.primaryDomain)
+                      : `All Domains (${tenants.length})`}
+                  </span>
+                  {tenants.length > 1 ? (
+                    <span className="rounded bg-[#05070D]/80 px-1.5 py-0.5 text-[10px] text-[#10B981]">
+                      {tenants.length}
+                    </span>
+                  ) : null}
+                  <ChevronDown className="size-3.5 text-[#9EA7B8]" aria-hidden="true" />
+                </button>
+
+                {/* Immediately after trigger so browsers add no implicit aria-details (modern-web-guidance `menu`) */}
+                <div
+                  ref={switcherPopoverRef}
+                  id={switcherMenuId}
+                  popover="auto"
+                  className="spx-domain-menu-popover rounded-xl border border-white/15 bg-[#090B11] p-1.5 text-zinc-100 shadow-2xl min-w-[270px]"
+                >
+                  <div
+                    ref={switcherGroupRef}
+                    {...({ focusgroup: "menu nomemory" } as Record<string, string>)}
+                    aria-labelledby={switcherTriggerId}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        closeDomainSwitcher();
+                        document.getElementById(switcherTriggerId)?.focus();
+                      }
+                    }}
+                    className="space-y-0.5"
+                  >
+                    <div role="group" aria-label="Connected domains to monitor" className="space-y-0.5">
+                      {tenants.length > 1 ? (
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={activeDomainId === "all"}
+                          onClick={() => handleSelectDomainAndClose("all")}
+                          className="spx-menu-item w-full rounded-lg px-2.5 py-2 text-left text-xs font-mono text-zinc-200 hover:bg-[#10131C] cursor-pointer"
+                        >
+                          <span className="flex-1 truncate">All Connected Domains ({tenants.length})</span>
+                        </button>
+                      ) : null}
+
+                      {tenants.map((t) => {
+                        const host = normalizeShieldDomain(t.primaryDomain);
+                        const isSelected = selectedTenant?.id === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={isSelected}
+                            onClick={() => handleSelectDomainAndClose(t.id)}
+                            className="spx-menu-item w-full rounded-lg px-2.5 py-2 text-left text-xs font-mono text-zinc-100 hover:bg-[#10131C] cursor-pointer"
+                          >
+                            <span className="flex-1 truncate">{host}</span>
+                            <span className="hint text-[10px] text-[#10B981]">
+                              {t.sdkVerified ? "LIVE" : "ARMED"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <hr className="my-1 border-white/10" />
+
+                    {onConnectDomain ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeDomainSwitcher();
+                          onConnectDomain();
+                        }}
+                        className="spx-menu-item w-full rounded-lg px-2.5 py-2 text-left text-xs font-medium text-white hover:bg-[#10131C] cursor-pointer"
+                      >
+                        <Plus className="size-3.5 text-[#10B981]" aria-hidden="true" />
+                        <span>Add Another Domain</span>
+                      </button>
+                    ) : null}
+
+                    {activeHost ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeDomainSwitcher();
+                          setPreviewCheckingDomain(activeHost);
+                        }}
+                        className="spx-menu-item w-full rounded-lg px-2.5 py-2 text-left text-xs font-medium text-[#38BDF8] hover:bg-[#10131C] cursor-pointer"
+                      >
+                        <ShieldCheck className="size-3.5" aria-hidden="true" />
+                        <span>Preview Edge Checking Page</span>
+                      </button>
+                    ) : null}
+
+                    {onPurgeZombies ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          closeDomainSwitcher();
+                          void onPurgeZombies();
+                        }}
+                        className="spx-menu-item w-full rounded-lg px-2.5 py-2 text-left text-xs font-medium text-zinc-400 hover:text-white hover:bg-[#10131C] cursor-pointer"
+                      >
+                        <Sparkles className="size-3.5" aria-hidden="true" />
+                        <span>Drop Dead / Zombie Domains</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -343,16 +620,106 @@ export function ShieldSocDashboardView({
       </header>
 
       <main className="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* 1-Tap Connected Domain Swap Bar + Edge Checking Page Preview */}
+        {tenants.length > 0 ? (
+          <section
+            aria-label="Quick domain monitor switcher"
+            className="rounded-xl border border-[#C0C7D6]/16 bg-[#0B0F19] px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[#9EA7B8] mr-1">
+                Monitoring:
+              </span>
+              {tenants.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectDomain?.("all")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-mono transition-colors cursor-pointer border ${
+                    activeDomainId === "all"
+                      ? "border-white/30 bg-[#151C2C] text-white font-semibold"
+                      : "border-white/[0.08] bg-[#05070D] text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  All ({tenants.length})
+                </button>
+              ) : null}
+              {tenants.map((t) => {
+                const host = normalizeShieldDomain(t.primaryDomain);
+                const active = selectedTenant?.id === t.id;
+                return (
+                  <div key={t.id} className="inline-flex items-center rounded-lg border overflow-hidden border-white/[0.1] bg-[#05070D]">
+                    <button
+                      type="button"
+                      onClick={() => onSelectDomain?.(t.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono transition-colors cursor-pointer ${
+                        active
+                          ? "bg-[#10B981]/15 text-white font-semibold"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      <span
+                        className={`size-1.5 rounded-full ${active ? "bg-[#10B981]" : "bg-zinc-600"}`}
+                        aria-hidden="true"
+                      />
+                      <span>{host}</span>
+                    </button>
+                    {onDeleteTenant && tenants.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => void onDeleteTenant(t.id)}
+                        aria-label={`Remove ${host}`}
+                        title={`Remove ${host}`}
+                        className="px-2 py-1.5 text-zinc-500 hover:text-[#F9103A] border-l border-white/[0.08] cursor-pointer"
+                      >
+                        <Trash2 className="size-3" aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+              {onConnectDomain ? (
+                <button
+                  type="button"
+                  onClick={onConnectDomain}
+                  className="inline-flex items-center gap-1 rounded-lg border border-dashed border-white/20 hover:border-white/40 px-2.5 py-1.5 text-xs font-mono text-zinc-300 hover:text-white cursor-pointer"
+                >
+                  <Plus className="size-3" aria-hidden="true" />
+                  <span>Add Domain</span>
+                </button>
+              ) : null}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {activeHost ? (
+                <button
+                  type="button"
+                  onClick={() => setPreviewCheckingDomain(activeHost)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#38BDF8]/35 bg-[#38BDF8]/10 hover:bg-[#38BDF8]/20 px-3 py-1.5 text-xs font-mono text-[#38BDF8] transition-colors cursor-pointer"
+                >
+                  <ShieldCheck className="size-3.5" aria-hidden="true" />
+                  <span>Preview Edge Checking Page</span>
+                </button>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
         {/* Executive Midnight & Silver Security Posture Strip */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <div className="rounded-xl border border-[#C0C7D6]/16 bg-gradient-to-b from-[#101522] to-[#0A0E17] p-4 shadow-[0_12px_30px_rgba(0,0,0,0.45)]">
             <div className="flex items-center justify-between text-[11px] font-mono uppercase tracking-wider text-[#9EA7B8]">
-              <span>Protected Domains</span>
+              <span>{selectedTenant ? "Monitored Domain" : "Protected Domains"}</span>
               <Globe className="size-3.5 text-[#E2E7F0]" />
             </div>
-            <div className="mt-2 text-2xl font-bold text-[#F4F6FA]">{tenants.length}</div>
+            <div className="mt-2 text-2xl font-bold text-[#F4F6FA] truncate">
+              {selectedTenant ? normalizeShieldDomain(selectedTenant.primaryDomain) : tenants.length}
+            </div>
             <p className="mt-1 text-[11px] text-[#9EA7B8]">
-              {tenants.length > 0 ? tenants[0]?.primaryDomain : "Add a domain in Client Area to activate WAF"}
+              {selectedTenant
+                ? `Edge Checking Page Armed · ${tenants.length} connected total`
+                : tenants.length > 0
+                  ? `${tenants.map((t) => normalizeShieldDomain(t.primaryDomain)).join(", ")}`
+                  : "Connect a domain to activate Edge WAF"}
             </p>
           </div>
 
@@ -433,8 +800,8 @@ export function ShieldSocDashboardView({
           <div id="shield-soc-workbench">
             <SparrowxSentraSocWorkbench
               currentUser={activeUser}
-              incidents={incidents}
-              assets={assets}
+              incidents={scopedIncidents}
+              assets={scopedAssets}
               allowDemoFallback={false}
               activeRailMode={railMode}
               onSelectRailMode={handleRailSelect}
@@ -978,6 +1345,14 @@ export function ShieldSocDashboardView({
         onSignIn={() => {}}
         onSignOut={onSignOut}
       />
+
+      {previewCheckingDomain ? (
+        <ShieldEdgeCheckingPage
+          domain={previewCheckingDomain}
+          previewMode
+          onClosePreview={() => setPreviewCheckingDomain(null)}
+        />
+      ) : null}
     </div>
   );
 }

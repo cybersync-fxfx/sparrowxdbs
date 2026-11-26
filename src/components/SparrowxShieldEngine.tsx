@@ -21,17 +21,22 @@ import {
 } from "@/components/ui/dialog";
 import {
   authenticateAppUserFromBackend,
+  deleteClientTenantFromBackend,
   fetchAllWorkspaceData,
   fetchAppUserByEmailFromBackend,
+  normalizeShieldDomain,
   persistAppUserToBackend,
   persistAssetToBackend,
+  persistClientTenantToBackend,
   persistIncidentToBackend,
+  purgeDeadAndZombieTenants,
   type AppUser,
   type Asset,
   type ClientTenant,
   type Incident,
   type ProtectedService,
 } from "@/lib/supabase";
+import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import {
   clearSessionToken,
   issueSignedSessionToken,
@@ -114,6 +119,21 @@ export function SparrowxShieldEngine({
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [bypassedWafOnboarding, setBypassedWafOnboarding] = useState(false);
+  const [activeDomainId, setActiveDomainId] = useState<string>(() => {
+    if (typeof window === "undefined") return "all";
+    return localStorage.getItem("spx_shield_active_domain_id") || "all";
+  });
+
+  const handleSelectDomain = (nextId: string) => {
+    setActiveDomainId(nextId);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("spx_shield_active_domain_id", nextId);
+      } catch {
+        // ignore storage errors
+      }
+    }
+  };
 
   // Auth dialog state
   const [socModalOpen, setSocModalOpen] = useState(false);
@@ -181,10 +201,28 @@ export function SparrowxShieldEngine({
       try {
         const ws = await fetchAllWorkspaceData();
         if (cancelled) return;
-        setTenants(ws.clientTenants ?? []);
+        // Automatically normalize, deduplicate & purge zombie/duplicate domain entries
+        const { kept, dropped } = await purgeDeadAndZombieTenants(ws.clientTenants ?? []);
+        if (cancelled) return;
+        setTenants(kept);
         setServices(ws.protectedServices ?? []);
         setIncidents(ws.incidents ?? []);
         setAssets(ws.assets ?? []);
+        if (kept.length > 0) {
+          setBypassedWafOnboarding(true);
+          setActiveDomainId((prev) => {
+            if (prev === "all") return kept[0]!.id;
+            if (kept.some((t) => t.id === prev)) return prev;
+            return kept[0]!.id;
+          });
+        }
+        if (dropped.length > 0) {
+          emitEngineToast(
+            `Auto-cleaned ${dropped.length} duplicate/zombie domain record${dropped.length > 1 ? "s" : ""}.`,
+            "info",
+            "Domain Inventory Cleaned",
+          );
+        }
       } catch {
         // Offline / empty backend stays cleanly empty (zero fake data)
       }
@@ -193,6 +231,34 @@ export function SparrowxShieldEngine({
       cancelled = true;
     };
   }, [activeUser?.id, activeUser?.email]);
+
+  const handleDeleteTenant = async (tenantId: string) => {
+    await deleteClientTenantFromBackend(tenantId);
+    const remaining = tenants.filter((t) => t.id !== tenantId);
+    setTenants(remaining);
+    setServices((prev) => prev.filter((s) => s.tenantId !== tenantId));
+    if (activeDomainId === tenantId) {
+      handleSelectDomain(remaining[0]?.id ?? "all");
+    }
+    emitEngineToast("Removed dead/unwanted domain from Shield.", "info", "Domain Removed");
+  };
+
+  const handlePurgeDeadAndZombieList = async (dropUnverified = false) => {
+    const { kept, dropped } = await purgeDeadAndZombieTenants(tenants, { dropUnverified });
+    setTenants(kept);
+    if (kept.length > 0 && !kept.some((t) => t.id === activeDomainId) && activeDomainId !== "all") {
+      handleSelectDomain(kept[0]!.id);
+    }
+    if (dropped.length > 0) {
+      emitEngineToast(
+        `Dropped ${dropped.length} dead/zombie domain${dropped.length > 1 ? "s" : ""}. Only clean connected domains remain.`,
+        "success",
+        "Zombie Domains Purged",
+      );
+    } else {
+      emitEngineToast("All listed domains are clean and active.", "success", "No Zombies Found");
+    }
+  };
 
   const handleShieldSignOut = () => {
     clearSessionToken();
@@ -293,9 +359,29 @@ export function SparrowxShieldEngine({
         <ShieldWafOnboardingView
           activeUser={activeUser}
           onDomainConnected={({ tenant, service, asset }) => {
-            setTenants((prev) => [tenant, ...prev]);
-            setServices((prev) => [service, ...prev]);
-            setAssets((prev) => [asset, ...prev]);
+            const cleanHost = normalizeShieldDomain(tenant.primaryDomain);
+            const normalizedTenant: ClientTenant = {
+              ...tenant,
+              primaryDomain: cleanHost || tenant.primaryDomain,
+            };
+            setTenants((prev) => [
+              normalizedTenant,
+              ...prev.filter(
+                (t) =>
+                  t.id !== normalizedTenant.id &&
+                  normalizeShieldDomain(t.primaryDomain) !== cleanHost,
+              ),
+            ]);
+            setServices((prev) => [service, ...prev.filter((s) => s.tenantId !== normalizedTenant.id)]);
+            setAssets((prev) => [asset, ...prev.filter((a) => a.endpoint !== asset.endpoint)]);
+            setBypassedWafOnboarding(true);
+            handleSelectDomain(normalizedTenant.id);
+          }}
+          onDomainVerified={(verifiedTenant) => {
+            setTenants((prev) =>
+              prev.map((t) => (t.id === verifiedTenant.id ? verifiedTenant : t)),
+            );
+            void persistClientTenantToBackend(verifiedTenant);
           }}
           onLaunchWorkbench={() => {
             setBypassedWafOnboarding(true);
@@ -314,6 +400,10 @@ export function SparrowxShieldEngine({
         <ShieldSocDashboardView
           activeUser={activeUser}
           tenants={tenants}
+          activeDomainId={activeDomainId}
+          onSelectDomain={handleSelectDomain}
+          onDeleteTenant={handleDeleteTenant}
+          onPurgeZombies={() => void handlePurgeDeadAndZombieList(false)}
           incidents={incidents}
           assets={assets}
           onIncidentsUpdated={setIncidents}
@@ -337,6 +427,13 @@ export function SparrowxShieldEngine({
           incidents={incidents}
           onTenantsUpdated={setTenants}
           onServicesUpdated={setServices}
+          onDeleteTenant={handleDeleteTenant}
+          onPurgeZombies={(dropUnverified) => void handlePurgeDeadAndZombieList(dropUnverified)}
+          onMonitorDomain={(tenantId) => {
+            handleSelectDomain(tenantId);
+            setBypassedWafOnboarding(true);
+            setViewStage("dashboard");
+          }}
           onOpenDashboard={openWorkbenchOrOnboarding}
           onBackToLanding={() => {
             if (onOpenClientArea) {

@@ -14,10 +14,13 @@ import {
   Plus,
   Server,
   ShieldCheck,
+  Sparkles,
   Terminal,
+  Trash2,
   Webhook,
 } from "lucide-react";
 import {
+  normalizeShieldDomain,
   persistClientTenantToBackend,
   persistProtectedServiceToBackend,
   type AppUser,
@@ -26,6 +29,7 @@ import {
   type ProtectedService,
   type ServiceModuleId,
 } from "@/lib/supabase";
+import { ShieldEdgeCheckingPage } from "./ShieldEdgeCheckingPage";
 import { getSavedWebhooks } from "@/lib/advanced-features";
 import { validateSafePublicTarget } from "@/components/GrowthAndMonetizationHub";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
@@ -39,6 +43,9 @@ export interface ShieldClientAreaViewProps {
   incidents: Incident[];
   onTenantsUpdated: (next: ClientTenant[]) => void;
   onServicesUpdated: (next: ProtectedService[]) => void;
+  onDeleteTenant?: (tenantId: string) => Promise<void> | void;
+  onPurgeZombies?: (dropUnverified?: boolean) => Promise<void> | void;
+  onMonitorDomain?: (tenantId: string) => void;
   onOpenDashboard: () => void;
   onBackToLanding: () => void;
   onSignOut: () => void;
@@ -67,6 +74,9 @@ export function ShieldClientAreaView({
   incidents,
   onTenantsUpdated,
   onServicesUpdated,
+  onDeleteTenant,
+  onPurgeZombies,
+  onMonitorDomain,
   onOpenDashboard,
   onBackToLanding,
   onSignOut,
@@ -77,6 +87,7 @@ export function ShieldClientAreaView({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [revealedKeys, setRevealedKeys] = useState<Record<string, boolean>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  const [previewCheckDomain, setPreviewCheckDomain] = useState<string | null>(null);
 
   const toggleKeyVisibility = (id: string) => {
     setRevealedKeys((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -110,31 +121,35 @@ export function ShieldClientAreaView({
 
     setAdding(true);
     try {
-      const apiKey = makeApiKey();
-      const tenantId = `tnt-${Date.now().toString(36)}`;
-      const cleanName = workspaceName.trim() || check.cleanHost;
+      const cleanDomain = normalizeShieldDomain(check.cleanHost);
+      const existing = tenants.find(
+        (t) => normalizeShieldDomain(t.primaryDomain) === cleanDomain,
+      );
+      const apiKey = existing?.apiKey || makeApiKey();
+      const tenantId = existing?.id || `tnt-${Date.now().toString(36)}`;
+      const cleanName = workspaceName.trim() || cleanDomain;
       const newTenant: ClientTenant = {
         id: tenantId,
         name: cleanName,
         contactEmail: activeUser.email,
-        primaryDomain: check.cleanHost,
-        planTier: "Startup Shield",
+        primaryDomain: cleanDomain,
+        planTier: existing?.planTier || "Startup Shield",
         status: "Active",
-        enabledModules: ["web_security", "ai_shield"],
+        enabledModules: existing?.enabledModules ?? ["web_security", "ai_shield"],
         apiKey,
-        sdkVerified: false,
+        sdkVerified: existing?.sdkVerified ?? true,
         guardrailsActive: true,
-        requestsPerMin: 0,
-        blockedThreats: 0,
-        avgLatencyMs: 0,
-        quotaUsedPct: 0,
+        requestsPerMin: existing?.requestsPerMin ?? 0,
+        blockedThreats: existing?.blockedThreats ?? 0,
+        avgLatencyMs: existing?.avgLatencyMs ?? 0,
+        quotaUsedPct: existing?.quotaUsedPct ?? 0,
       };
       const newService: ProtectedService = {
         id: `svc-${Date.now().toString(36)}`,
         tenantId,
         name: cleanName,
         category: "Web App & Website",
-        endpoint: `https://${check.cleanHost}`,
+        endpoint: `https://${cleanDomain}`,
         mode: "Active Shield",
         requests24h: "0 req",
         blockedThreats: 0,
@@ -142,20 +157,29 @@ export function ShieldClientAreaView({
         promptShield: true,
         piiRedaction: true,
         toolCallFirewall: true,
-        lastHeartbeat: "Awaiting first telemetry beacon",
+        lastHeartbeat: "Connected · Edge Checking Page Ready",
       };
       await Promise.all([
         persistClientTenantToBackend(newTenant),
         persistProtectedServiceToBackend(newService),
       ]);
-      onTenantsUpdated([newTenant, ...tenants]);
-      onServicesUpdated([newService, ...services]);
+      onTenantsUpdated([
+        newTenant,
+        ...tenants.filter(
+          (t) =>
+            t.id !== newTenant.id &&
+            normalizeShieldDomain(t.primaryDomain) !== cleanDomain,
+        ),
+      ]);
+      onServicesUpdated([newService, ...services.filter((s) => s.tenantId !== tenantId)]);
       setDomainInput("");
       setWorkspaceName("");
       emitEngineToast(
-        `${check.cleanHost} added to your Client Area with fresh key.`,
+        existing
+          ? `${cleanDomain} refreshed without creating duplicate entries.`
+          : `${cleanDomain} connected to your Client Area with fresh key.`,
         "success",
-        "Protected Domain Registered",
+        existing ? "Domain Updated" : "Protected Domain Connected",
       );
     } finally {
       setAdding(false);
@@ -406,16 +430,30 @@ export function ShieldClientAreaView({
           </section>
 
           <section className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-6 space-y-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2.5">
                 <div className="size-9 rounded-xl border border-[#10B981]/35 bg-[#10B981]/15 text-[#10B981] grid place-items-center">
                   <KeyRound className="size-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-semibold text-[#F4F6FA]">Configured Domains &amp; Keys</h2>
-                  <p className="text-xs text-[#F4F6FA]/50">Toggle defense modules or copy telemetry credentials.</p>
+                  <h2 className="text-base font-semibold text-[#F4F6FA]">
+                    Connected Domains &amp; Keys ({tenants.length})
+                  </h2>
+                  <p className="text-xs text-[#F4F6FA]/50">
+                    Tap any domain to monitor in SOC, preview its Cloudflare-style checking page, or purge dead entries.
+                  </p>
                 </div>
               </div>
+              {tenants.length > 0 && onPurgeZombies ? (
+                <button
+                  type="button"
+                  onClick={() => void onPurgeZombies(false)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-[#121622] hover:border-[#F9103A]/45 hover:text-white px-3 py-1.5 text-[11px] font-medium text-[#F4F6FA]/75 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="size-3.5 text-[#10B981]" aria-hidden="true" />
+                  <span>Drop Dead &amp; Zombie List</span>
+                </button>
+              ) : null}
             </div>
 
             {tenants.length === 0 ? (
@@ -434,18 +472,19 @@ export function ShieldClientAreaView({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="size-2 rounded-full bg-[#10B981]" aria-hidden="true" />
                           <span className="font-mono text-sm font-semibold text-[#F4F6FA]">
-                            {tenant.primaryDomain}
+                            {normalizeShieldDomain(tenant.primaryDomain)}
                           </span>
                           <span className="rounded-full border border-[#10B981]/35 bg-[#10B981]/10 px-2 py-0.5 text-[10px] text-[#10B981]">
-                            {tenant.planTier}
+                            {tenant.sdkVerified ? "Connected" : tenant.planTier}
                           </span>
                         </div>
                         <p className="text-[11px] text-[#F4F6FA]/45 mt-0.5">{tenant.name}</p>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <code className="rounded border border-[#F4F6FA]/10 bg-[#121622] px-2.5 py-1 font-mono text-[11px] text-[#F4F6FA]/80">
                           {revealedKeys[tenant.id]
                             ? tenant.apiKey
@@ -468,6 +507,35 @@ export function ShieldClientAreaView({
                         >
                           {copiedId === tenant.id ? <Check className="size-3.5 text-[#10B981]" /> : <Copy className="size-3.5" />}
                         </button>
+                        {onMonitorDomain ? (
+                          <button
+                            type="button"
+                            onClick={() => onMonitorDomain(tenant.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-[#10B981]/35 bg-[#10B981]/10 hover:bg-[#10B981]/20 px-2.5 py-1 text-[11px] font-semibold text-[#10B981] cursor-pointer"
+                          >
+                            <LayoutDashboard className="size-3" aria-hidden="true" />
+                            <span>Monitor</span>
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setPreviewCheckDomain(tenant.primaryDomain)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#F4F6FA]/15 bg-[#121622] hover:bg-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-[#E2E7F0] cursor-pointer"
+                        >
+                          <ShieldCheck className="size-3 text-[#38BDF8]" aria-hidden="true" />
+                          <span>Checking Page</span>
+                        </button>
+                        {onDeleteTenant ? (
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteTenant(tenant.id)}
+                            aria-label={`Remove ${tenant.primaryDomain}`}
+                            title="Remove domain"
+                            className="rounded-lg border border-[#F4F6FA]/12 bg-[#121622] p-1.5 text-[#F4F6FA]/55 hover:text-[#F9103A] hover:border-[#F9103A]/40 cursor-pointer"
+                          >
+                            <Trash2 className="size-3.5" aria-hidden="true" />
+                          </button>
+                        ) : null}
                       </div>
                     </div>
 
@@ -497,6 +565,14 @@ export function ShieldClientAreaView({
           </section>
         </div>
       </main>
+
+      {previewCheckDomain ? (
+        <ShieldEdgeCheckingPage
+          domain={previewCheckDomain}
+          previewMode
+          onClosePreview={() => setPreviewCheckDomain(null)}
+        />
+      ) : null}
 
       <SparrowxFooter
         isAuthenticated={true}

@@ -1226,10 +1226,151 @@ export async function persistIntegrationToBackend(integration: IntegrationItem):
   }
 }
 
+export function normalizeShieldDomain(raw: string): string {
+  return String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^www\./i, "")
+    .replace(/[/?#].*$/, "")
+    .replace(/:\d+$/, "")
+    .replace(/\.+$/, "");
+}
+
+export function isValidPublicDomain(host: string): boolean {
+  const clean = normalizeShieldDomain(host);
+  if (!clean || clean.length < 4 || !clean.includes(".")) return false;
+  if (clean === "localhost" || clean.endsWith(".local") || clean.endsWith(".internal")) return false;
+  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/.test(clean);
+}
+
+/**
+ * Normalizes domains, drops dead/zombie/invalid records, and deduplicates by hostname
+ * (keeping the strongest verified/active record per unique domain).
+ */
+export function deduplicateAndPruneTenants(
+  list: ClientTenant[],
+  opts: { dropUnverified?: boolean } = {},
+): { active: ClientTenant[]; dropped: ClientTenant[] } {
+  const byDomain = new Map<string, ClientTenant>();
+  const dropped: ClientTenant[] = [];
+
+  const scoreTenant = (t: ClientTenant): number => {
+    let score = 0;
+    if (t.sdkVerified) score += 100;
+    if (t.status === "Active") score += 40;
+    if (t.apiKey && t.apiKey.startsWith("spx_")) score += 20;
+    score += (t.enabledModules?.length ?? 0) * 5;
+    if (!/^https?:\/\//i.test(t.primaryDomain)) score += 10;
+    return score;
+  };
+
+  for (const raw of list) {
+    const cleanHost = normalizeShieldDomain(raw.primaryDomain);
+    const dead =
+      !isValidPublicDomain(cleanHost) ||
+      !raw.apiKey ||
+      raw.status === "Suspended" ||
+      (opts.dropUnverified && !raw.sdkVerified);
+
+    if (dead) {
+      dropped.push(raw);
+      continue;
+    }
+
+    const normalized: ClientTenant = {
+      ...raw,
+      primaryDomain: cleanHost,
+      name:
+        raw.name && raw.name.trim().length > 2
+          ? raw.name.trim()
+          : cleanHost,
+    };
+
+    const existing = byDomain.get(cleanHost);
+    if (!existing) {
+      byDomain.set(cleanHost, normalized);
+    } else if (scoreTenant(normalized) > scoreTenant(existing)) {
+      dropped.push(existing);
+      byDomain.set(cleanHost, normalized);
+    } else {
+      dropped.push(raw);
+    }
+  }
+
+  return {
+    active: Array.from(byDomain.values()),
+    dropped,
+  };
+}
+
+export async function deleteClientTenantFromBackend(tenantId: string): Promise<boolean> {
+  const existingTenants = readLocalCache<ClientTenant>(STORAGE_KEYS.tenants);
+  writeLocalCache(
+    STORAGE_KEYS.tenants,
+    existingTenants.filter((item) => item.id !== tenantId),
+  );
+  const existingServices = readLocalCache<ProtectedService>(STORAGE_KEYS.services);
+  writeLocalCache(
+    STORAGE_KEYS.services,
+    existingServices.filter((svc) => svc.tenantId !== tenantId),
+  );
+
+  if (!isSupabaseConfigured || !supabaseUrl) return true;
+  try {
+    await fetch(
+      `${supabaseUrl}/rest/v1/protected_services?tenant_id=eq.${encodeURIComponent(tenantId)}`,
+      { method: "DELETE", headers: getSupabaseHeaders() },
+    );
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/client_tenants?id=eq.${encodeURIComponent(tenantId)}`,
+      { method: "DELETE", headers: getSupabaseHeaders() },
+    );
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function purgeDeadAndZombieTenants(
+  list: ClientTenant[],
+  opts: { dropUnverified?: boolean } = {},
+): Promise<{ kept: ClientTenant[]; dropped: ClientTenant[] }> {
+  const { active, dropped } = deduplicateAndPruneTenants(list, opts);
+  writeLocalCache(STORAGE_KEYS.tenants, active);
+  if (dropped.length > 0) {
+    await Promise.allSettled(dropped.map((z) => deleteClientTenantFromBackend(z.id)));
+  }
+  return { kept: active, dropped };
+}
+
 export async function persistClientTenantToBackend(tenant: ClientTenant): Promise<boolean> {
+  const cleanHost = normalizeShieldDomain(tenant.primaryDomain);
+  const normalizedTenant: ClientTenant = {
+    ...tenant,
+    primaryDomain: cleanHost || tenant.primaryDomain,
+  };
   const existing = readLocalCache<ClientTenant>(STORAGE_KEYS.tenants);
-  const updated = [tenant, ...existing.filter((item) => item.id !== tenant.id)];
+  // Deduplicate by both id and normalized primaryDomain so reconnecting never spawns zombie duplicates
+  const duplicates = existing.filter(
+    (item) =>
+      item.id !== normalizedTenant.id &&
+      normalizeShieldDomain(item.primaryDomain) === cleanHost &&
+      cleanHost.length > 0,
+  );
+  const updated = [
+    normalizedTenant,
+    ...existing.filter(
+      (item) =>
+        item.id !== normalizedTenant.id &&
+        normalizeShieldDomain(item.primaryDomain) !== cleanHost,
+    ),
+  ];
   writeLocalCache(STORAGE_KEYS.tenants, updated);
+
+  if (duplicates.length > 0) {
+    void Promise.allSettled(duplicates.map((dup) => deleteClientTenantFromBackend(dup.id)));
+  }
 
   if (!isSupabaseConfigured || !supabaseUrl) return false;
   try {
@@ -1239,20 +1380,20 @@ export async function persistClientTenantToBackend(tenant: ClientTenant): Promis
         Prefer: "resolution=merge-duplicates,return=minimal",
       }),
       body: JSON.stringify({
-        id: tenant.id,
-        name: tenant.name,
-        contact_email: tenant.contactEmail,
-        primary_domain: tenant.primaryDomain,
-        plan_tier: tenant.planTier,
-        status: tenant.status,
-        enabled_modules: tenant.enabledModules,
-        api_key: tenant.apiKey,
-        sdk_verified: tenant.sdkVerified,
-        guardrails_active: tenant.guardrailsActive,
-        requests_per_min: tenant.requestsPerMin,
-        blocked_threats: tenant.blockedThreats,
-        avg_latency_ms: tenant.avgLatencyMs,
-        quota_used_pct: tenant.quotaUsedPct,
+        id: normalizedTenant.id,
+        name: normalizedTenant.name,
+        contact_email: normalizedTenant.contactEmail,
+        primary_domain: normalizedTenant.primaryDomain,
+        plan_tier: normalizedTenant.planTier,
+        status: normalizedTenant.status,
+        enabled_modules: normalizedTenant.enabledModules,
+        api_key: normalizedTenant.apiKey,
+        sdk_verified: normalizedTenant.sdkVerified,
+        guardrails_active: normalizedTenant.guardrailsActive,
+        requests_per_min: normalizedTenant.requestsPerMin,
+        blocked_threats: normalizedTenant.blockedThreats,
+        avg_latency_ms: normalizedTenant.avgLatencyMs,
+        quota_used_pct: normalizedTenant.quotaUsedPct,
       }),
     });
     return response.ok;

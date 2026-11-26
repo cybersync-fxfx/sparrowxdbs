@@ -1193,3 +1193,43 @@ dialog.spx-ai-dialog::backdrop {
 .spx-ai-input:user-valid {
   border-color: #10b981;
 }
+
+
+/* ===== SparrowX Shield Domain Switcher Popup Menu (modern-web-guidance `menu`) ===== */
+@supports (position-area: block-end) {
+  .spx-domain-menu-popover {
+    position-area: block-end span-inline-end;
+    position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+    inset: auto;
+    margin-block-start: 0.375rem;
+  }
+}
+
+@supports not (position-area: block-end) {
+  .spx-domain-menu-popover {
+    inset: 4rem auto auto 1rem;
+    margin: 0;
+  }
+}
+
+.spx-domain-menu-popover [focusgroup~="menu"] {
+  --menu-icon-size: 1rem;
+}
+
+.spx-domain-menu-popover .spx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spx-domain-menu-popover [role="menuitemradio"]::before {
+  content: "";
+  flex: none;
+  inline-size: var(--menu-icon-size);
+  color: #10b981;
+  font-weight: 700;
+}
+
+.spx-domain-menu-popover [role="menuitemradio"][aria-checked="true"]::before {
+  content: "✓";
+}
