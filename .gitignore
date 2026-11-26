@@ -33,5 +33,10 @@ dist-ssr
 
 # Local persistent data directory
 data/
+backups/
+*.tar.gz
+*.tar.zst
+*.enc
+.env
 __pycache__/
 *.pyc

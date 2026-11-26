@@ -1560,6 +1560,7 @@ chmod +x \
   "${INSTALL_DIR}/setup.sh" \
   "${INSTALL_DIR}/update.sh" \
   "${INSTALL_DIR}/fix.sh" \
+  "${INSTALL_DIR}/mirror.sh" \
   "${INSTALL_DIR}/manage-db.sh" \
   "${INSTALL_DIR}/ovh/update.sh" \
   "${INSTALL_DIR}/ovh/fix.sh" \
@@ -1576,6 +1577,7 @@ if [ -d "/usr/local/bin" ]; then
   ln -sf "${INSTALL_DIR}/update.sh" /usr/local/bin/sparrowx-update 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || true
+  [ -f "${INSTALL_DIR}/mirror.sh" ] && ln -sf "${INSTALL_DIR}/mirror.sh" /usr/local/bin/sparrowx-mirror 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
   if [ -f "${INSTALL_DIR}/deploy/sparrowx-noc.py" ]; then
