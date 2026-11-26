@@ -6,6 +6,9 @@
 # SSL, Git, Disk/Swap OOM, PostgreSQL Role/Schema, and PostgREST layers.
 # ==============================================================================
 set -u
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
+UPSTREAM_APP_HOST="${UPSTREAM_APP_HOST:-sparrowx}"
 
 # Guard against CRLF if launched before strip runs
 AUTO_MODE="false"
@@ -61,6 +64,21 @@ cd "${INSTALL_DIR}" || exit 1
 # Auto-elevate to root when sudo is available
 if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
   exec sudo -E bash "$0" "$@"
+fi
+
+# Share deploy lock with update.sh & 5-min systemd auto-updater so Compose runs never collide
+DEPLOY_LOCK_FILE="/var/run/sparrowx-deploy.lock"
+[ -w /var/run ] || DEPLOY_LOCK_FILE="/tmp/sparrowx-deploy.lock"
+if [ "${SPARROWX_DEPLOY_LOCK_HELD:-0}" != "1" ] && command -v flock >/dev/null 2>&1; then
+  exec 9>"${DEPLOY_LOCK_FILE}"
+  if ! flock -n 9; then
+    if [ ! -t 0 ]; then
+      exit 0
+    fi
+    echo "Another SparrowX deploy/update is actively running; waiting for lock..."
+    flock 9
+  fi
+  export SPARROWX_DEPLOY_LOCK_HELD=1
 fi
 
 # Prevent concurrent fix.sh runs without ever killing an active run
@@ -2503,7 +2521,7 @@ render_sparrowx_nginx_conf() {
     }"
   else
     ptero_backend="    location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2575,7 +2593,7 @@ server {
 
     location /rest/v1/ {
         limit_req zone=spx_api_req burst=60 nodelay;
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -2591,7 +2609,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2655,7 +2673,7 @@ server {
 
     location /rest/v1/ {
         limit_req zone=spx_api_req burst=60 nodelay;
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -2671,7 +2689,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2737,7 +2755,7 @@ server {
 
     location /rest/v1/ {
         limit_req zone=spx_api_req burst=60 nodelay;
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Host \$host;
@@ -2753,7 +2771,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2819,7 +2837,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2864,7 +2882,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2953,7 +2971,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -3062,7 +3080,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_buffering off;
@@ -3124,7 +3142,8 @@ if [ "${HAS_DOCKER}" = "true" ]; then
     c_err_tail="$(tail -n 10 "${compose_err_file}" 2>/dev/null | tr '\n' ' ' || true)"
     log_fix "Compose startup hit an error (${c_err_tail:0:180}) — tearing down conflicting containers/networks & healing ports"
     compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
-    docker rm -f "${PG_CTR}" "${PGRST_CTR}" "${APP_CTR}" "${EDGE_CTR}" sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+    docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^[0-9a-f]{12}_sparrowx-' | xargs -r docker rm -f >/dev/null 2>&1 || true
+    docker rm -f "${PG_CTR}" "${PGRST_CTR}" "${APP_CTR}" "${EDGE_CTR}" sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-smtp sparrowx-phpmyadmin sparrowx-traefik sparrowx-nginx >/dev/null 2>&1 || true
     [ -n "${PGB_CTR}" ] && docker rm -f "${PGB_CTR}" >/dev/null 2>&1 || true
     [ -n "${REDIS_CTR}" ] && docker rm -f "${REDIS_CTR}" >/dev/null 2>&1 || true
     docker network rm sparrowx_default >/dev/null 2>&1 || true
@@ -3547,7 +3566,7 @@ server {
     resolver 127.0.0.11 valid=5s ipv6=off;
     location ^~ /.well-known/acme-challenge/ { root /var/www/certbot; allow all; }
     location /rest/v1/ {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
@@ -3557,7 +3576,7 @@ server {
         error_page 502 503 504 = @sparrowx_host_fallback;
     }
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;

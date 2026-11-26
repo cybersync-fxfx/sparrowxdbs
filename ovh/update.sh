@@ -12,6 +12,9 @@
 #  7. Verify PostgreSQL roles/schema, PostgREST, HTTP health & auto-invoke fix.sh
 # ==============================================================================
 set -u
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
+UPSTREAM_APP_HOST="${UPSTREAM_APP_HOST:-sparrowx}"
 
 AUTO_MODE="false"
 FORCE_DB_INSTALL="false"
@@ -65,6 +68,22 @@ cd "${INSTALL_DIR}" || exit 1
 
 if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
   exec sudo -E bash "$0" "$@"
+fi
+
+# Prevent overlapping update.sh / fix.sh / 5-min systemd auto-updater runs racing on Docker Compose
+DEPLOY_LOCK_FILE="/var/run/sparrowx-deploy.lock"
+[ -w /var/run ] || DEPLOY_LOCK_FILE="/tmp/sparrowx-deploy.lock"
+if [ "${SPARROWX_DEPLOY_LOCK_HELD:-0}" != "1" ] && command -v flock >/dev/null 2>&1; then
+  exec 9>"${DEPLOY_LOCK_FILE}"
+  if ! flock -n 9; then
+    if [ "${AUTO_MODE}" = "true" ]; then
+      echo "  [INFO]     Another SparrowX deploy/update is already running — skipping overlapping auto-update."
+      exit 0
+    fi
+    echo "  [INFO]     Another SparrowX update/auto-updater is active — waiting for it to finish cleanly..."
+    flock 9
+  fi
+  export SPARROWX_DEPLOY_LOCK_HELD=1
 fi
 
 if [ "${DELEGATE_FIX}" = "true" ] && [ -f "${INSTALL_DIR}/fix.sh" ]; then
@@ -1460,12 +1479,21 @@ reconcile_compose_containers() {
     fi
   fi
 
+  # Remove orphaned Compose temp-recreate containers (e.g. 593c0431fd4a_sparrowx-app) left by interrupted recreates
+  local orphan_tmp
+  orphan_tmp="$(docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^[0-9a-f]{12}_sparrowx-' || true)"
+  if [ -n "${orphan_tmp}" ]; then
+    echo "${orphan_tmp}" | xargs -r docker rm -f >/dev/null 2>&1 || true
+    log_warn "Cleared interrupted Compose recreate container(s): $(echo "${orphan_tmp}" | tr '\n' ' ')"
+  fi
+
   local target_proj="${COMPOSE_PROJECT_NAME:-${default_proj}}"
   local pair ctr expected_svc ctr_proj ctr_svc ctr_state
   for pair in \
     "sparrowx-postgres:postgres" \
     "sparrowx-postgrest:postgrest" \
     "sparrowx-app:${APP_SERVICE:-sparrowx}" \
+    "sparrowx-smtp:smtp" \
     "sparrowx-phpmyadmin:phpmyadmin" \
     "sparrowx-nginx:nginx"; do
     ctr="${pair%%:*}"
@@ -2814,16 +2842,27 @@ if [ "${HAS_DOCKER}" = "true" ]; then
   IS_PG_RUNNING="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-postgres" || true)"
   IS_PGRST_RUNNING="$(docker ps --format '{{.Names}}' 2>/dev/null | grep -Fx "sparrowx-postgrest" || true)"
 
+  BUILD_ARGS=("build")
+  [ "${FORCE_REBUILD}" = "true" ] && BUILD_ARGS+=("--no-cache")
+  BUILD_ARGS+=("${APP_SERVICE}")
+
   if [ -n "${IS_PG_RUNNING}" ] && [ -n "${IS_PGRST_RUNNING}" ] && [ "${FORCE_DB_INSTALL}" = "false" ]; then
     log_info "PostgreSQL & PostgREST running cleanly — rebuilding ${APP_SERVICE} container..."
-    BUILD_ARGS=("build")
-    [ "${FORCE_REBUILD}" = "true" ] && BUILD_ARGS+=("--no-cache")
-    BUILD_ARGS+=("${APP_SERVICE}")
-    if compose_cmd -f "${COMPOSE_FILE}" "${BUILD_ARGS[@]}" && compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
-      docker start sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
-      render_sparrowx_nginx_conf
-      docker restart sparrowx-nginx >/dev/null 2>&1 || true
-      log_ok "Rebuilt and restarted ${APP_SERVICE} + sparrowx-nginx zero-downtime"
+    if compose_cmd -f "${COMPOSE_FILE}" "${BUILD_ARGS[@]}"; then
+      if ! compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
+        log_warn "Compose recreate hit stale container conflict — clearing stale containers & retrying without rebuilding"
+        docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^[0-9a-f]{12}_sparrowx-' | xargs -r docker rm -f >/dev/null 2>&1 || true
+        docker rm -f sparrowx-app sparrowx-phpmyadmin sparrowx-smtp sparrowx-traefik sparrowx-nginx >/dev/null 2>&1 || true
+        if ! compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
+          BUILD_FAILED="true"
+        fi
+      fi
+      if [ "${BUILD_FAILED}" != "true" ]; then
+        docker start sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-nginx >/dev/null 2>&1 || true
+        render_sparrowx_nginx_conf
+        docker restart sparrowx-nginx >/dev/null 2>&1 || true
+        log_ok "Rebuilt and restarted ${APP_SERVICE} + sparrowx-nginx zero-downtime"
+      fi
     else
       BUILD_FAILED="true"
     fi
@@ -2839,25 +2878,30 @@ if [ "${HAS_DOCKER}" = "true" ]; then
       log_warn "Host port 5432 in use — reassigned PG_HOST_PORT=${PG_HOST_PORT} in .env"
     fi
 
-    log_info "Launching Full-Stack Docker fleet via $(basename "${COMPOSE_FILE}")..."
-    if ! compose_cmd -f "${COMPOSE_FILE}" up --build -d --remove-orphans; then
-      log_warn "Initial Compose startup hit conflict — cleaning bridge networks, stale containers & retrying"
-      compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
-      docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-phpmyadmin sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
-      docker network prune -f >/dev/null 2>&1 || true
-      free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
-      command -v fuser >/dev/null 2>&1 && fuser -k 5432/tcp >/dev/null 2>&1 || true
-      if is_port_busy "${PG_HOST_PORT}" || [ "${PG_HOST_PORT}" = "5432" ]; then
-        if is_port_busy 5432; then
-          PG_HOST_PORT="$(find_next_free_port 5433)"
-          ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
-          export PG_HOST_PORT
-          log_warn "Assigned clean PG_HOST_PORT=${PG_HOST_PORT}"
+    log_info "Building ${APP_SERVICE} image & launching Full-Stack Docker fleet via $(basename "${COMPOSE_FILE}")..."
+    if compose_cmd -f "${COMPOSE_FILE}" "${BUILD_ARGS[@]}"; then
+      if ! compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
+        log_warn "Initial Compose startup hit conflict — cleaning bridge networks, stale containers & retrying (reusing built image)"
+        compose_cmd -f "${COMPOSE_FILE}" down --remove-orphans >/dev/null 2>&1 || true
+        docker ps -a --format '{{.Names}}' 2>/dev/null | grep -E '^[0-9a-f]{12}_sparrowx-' | xargs -r docker rm -f >/dev/null 2>&1 || true
+        docker rm -f sparrowx-postgres sparrowx-postgrest sparrowx-app sparrowx-smtp sparrowx-phpmyadmin sparrowx-traefik sparrowx-nginx sparrowx_postgres sparrowx_postgrest sparrowx_studio sparrowx_edge_proxy >/dev/null 2>&1 || true
+        docker network prune -f >/dev/null 2>&1 || true
+        free_docker_port_conflicts "${PG_HOST_PORT}" "sparrowx-postgres"
+        command -v fuser >/dev/null 2>&1 && fuser -k 5432/tcp >/dev/null 2>&1 || true
+        if is_port_busy "${PG_HOST_PORT}" || [ "${PG_HOST_PORT}" = "5432" ]; then
+          if is_port_busy 5432; then
+            PG_HOST_PORT="$(find_next_free_port 5433)"
+            ensure_env_key "PG_HOST_PORT" "${PG_HOST_PORT}"
+            export PG_HOST_PORT
+            log_warn "Assigned clean PG_HOST_PORT=${PG_HOST_PORT}"
+          fi
+        fi
+        if ! compose_cmd -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans; then
+          BUILD_FAILED="true"
         fi
       fi
-      if ! compose_cmd -f "${COMPOSE_FILE}" up --build -d --remove-orphans; then
-        BUILD_FAILED="true"
-      fi
+    else
+      BUILD_FAILED="true"
     fi
     compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build postgres postgrest >/dev/null 2>&1 || true
     compose_cmd -f "${COMPOSE_FILE}" up -d --no-deps --no-build nginx >/dev/null 2>&1 || true
