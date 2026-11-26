@@ -55,10 +55,19 @@ export const Route = createFileRoute("/api/auth/github/login")({
 
         const redirectUri = resolveCanonicalGithubRedirectUri(origin);
 
+        const wantsRepoScope =
+          reqUrl.searchParams.get("scope") === "repo" ||
+          nextUrl.includes("/deploy") ||
+          nextUrl.includes("/projects") ||
+          nextUrl.includes("deploy.sparrowx.net");
+
         const githubAuthUrl = new URL("https://github.com/login/oauth/authorize");
         githubAuthUrl.searchParams.set("client_id", clientId);
         githubAuthUrl.searchParams.set("redirect_uri", redirectUri);
-        githubAuthUrl.searchParams.set("scope", "read:user user:email");
+        githubAuthUrl.searchParams.set(
+          "scope",
+          wantsRepoScope ? "read:user user:email repo" : "read:user user:email",
+        );
         githubAuthUrl.searchParams.set("state", signedState);
 
         const headers = new Headers();

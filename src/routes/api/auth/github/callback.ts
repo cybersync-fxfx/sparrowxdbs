@@ -159,6 +159,21 @@ export const Route = createFileRoute("/api/auth/github/callback")({
             googleSub: profile.id ? `github:${profile.id}` : null,
           });
 
+          // Store AES-256-GCM encrypted GitHub OAuth token for SparrowX Deploy repo import & webhooks
+          await import("@/lib/server/deploy-store.server")
+            .then(({ saveGithubOAuthToken }) =>
+              saveGithubOAuthToken({
+                email: user.email,
+                fullName: user.fullName,
+                userId: user.id,
+                providerAccountId: String(profile.id || verifiedEmail),
+                ...(profile.login ? { username: profile.login } : {}),
+                accessToken: tokenData.access_token!,
+                scope: "read:user user:email repo",
+              }),
+            )
+            .catch(() => {});
+
           // Proactively provision/link Pterodactyl Game Panel user on sign-in
           await import("@/lib/server/portal.server")
             .then(({ syncPteroAccountOnSignIn }) =>

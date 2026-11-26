@@ -7,6 +7,24 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+export const FREE_DEPLOY_PROJECT_LIMIT = 3;
+
+export class DeployQuotaExceededError extends Error {
+  readonly code = "FREE_PROJECT_LIMIT_REACHED";
+  readonly statusCode = 403;
+  readonly used: number;
+  readonly limit: number;
+
+  constructor(used: number, limit = FREE_DEPLOY_PROJECT_LIMIT) {
+    super(
+      `Free plan limit reached (${used}/${limit} projects). Delete an existing project or upgrade to Pro for unlimited deployments.`,
+    );
+    this.name = "DeployQuotaExceededError";
+    this.used = used;
+    this.limit = limit;
+  }
+}
+
 const BLOCKED_DEPLOY_ENV_KEY_RE =
   /^(PATH|LD_.*|DYLD_.*|NODE_OPTIONS|NODE_EXTRA_CA_CERTS|BASH_ENV|ENV|SHELL|GIT_.*|NPM_CONFIG_.*|HTTP_PROXY|HTTPS_PROXY|ALL_PROXY|NO_PROXY|POSTGRES_.*|PG.*|PVE_.*|PTERO_.*|RAZORPAY_.*|GOOGLE_.*|SPARROWX_.*|JWT_SECRET|SESSION_SECRET|DATABASE_URL|SUPABASE_.*)$/i;
 
@@ -341,6 +359,10 @@ export async function listDeployProjects(
 ): Promise<{
   projects: DeployProjectRecord[];
   hostDomain: string;
+  plan: "free";
+  projectLimit: number;
+  projectsUsed: number;
+  remainingSlots: number;
 }> {
   const projects = readStore().filter((p) => canManageProject(p, ownerEmail, isAdmin));
   const safe = projects.map((p) => ({
@@ -350,9 +372,17 @@ export async function listDeployProjects(
       value: v.value ? "••••••••••••" : "",
     })),
   }));
+  const cleanOwner = ownerEmail?.trim().toLowerCase();
+  const ownedCount = cleanOwner
+    ? readStore().filter((p) => p.ownerEmail?.toLowerCase() === cleanOwner).length
+    : safe.length;
   return {
     projects: safe,
     hostDomain: process.env.SPARROWX_DOMAIN?.trim() || "sparrowx.net",
+    plan: "free",
+    projectLimit: FREE_DEPLOY_PROJECT_LIMIT,
+    projectsUsed: ownedCount,
+    remainingSlots: Math.max(0, FREE_DEPLOY_PROJECT_LIMIT - ownedCount),
   };
 }
 
@@ -378,6 +408,12 @@ export async function createDeployProject(input: {
   const name = (input.name || "").trim() || sanitizeSlug(repoUrl);
   const cleanOwner = input.ownerEmail?.trim().toLowerCase();
   const existing = readStore();
+  const ownedCount = existing.filter((p) =>
+    cleanOwner ? p.ownerEmail?.toLowerCase() === cleanOwner : !p.ownerEmail,
+  ).length;
+  if (ownedCount >= FREE_DEPLOY_PROJECT_LIMIT) {
+    throw new DeployQuotaExceededError(ownedCount, FREE_DEPLOY_PROJECT_LIMIT);
+  }
   let slug = sanitizeSlug(name);
   if (existing.some((p) => p.slug === slug && p.ownerEmail?.toLowerCase() !== cleanOwner)) {
     slug = `${slug.slice(0, 24)}-${crypto.randomBytes(3).toString("hex")}`;
@@ -427,6 +463,12 @@ export async function createDeployProject(input: {
   };
 
   const latest = readStore();
+  const latestOwnedCount = latest.filter((p) =>
+    cleanOwner ? p.ownerEmail?.toLowerCase() === cleanOwner : !p.ownerEmail,
+  ).length;
+  if (latestOwnedCount >= FREE_DEPLOY_PROJECT_LIMIT) {
+    throw new DeployQuotaExceededError(latestOwnedCount, FREE_DEPLOY_PROJECT_LIMIT);
+  }
   writeStore([record, ...latest]);
 
   return {

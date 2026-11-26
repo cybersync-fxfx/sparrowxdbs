@@ -709,6 +709,7 @@ const server = createServer(async (req, res) => {
       !pathname.startsWith("/3d/") &&
       !pathname.startsWith("/xdp/") &&
       !pathname.startsWith("/f/") &&
+      !pathname.startsWith("/projects/") &&
       !/\.[a-z0-9]{1,8}$/i.test(pathname) &&
       (acceptsHtml || !req.headers["apikey"])
     ) {
@@ -775,7 +776,7 @@ const server = createServer(async (req, res) => {
         "/", "/db", "/infra", "/infra/dashboard", "/infra/configure", "/game", "/game/dashboard", "/game/panel-launch",
         "/shield", "/drop", "/keys", "/gateway", "/docs", "/docs/errors",
         "/docs/db", "/docs/infra", "/docs/shield", "/docs/game", "/docs/drop", "/docs/keys", "/docs/api",
-        "/errors", "/story", "/terms", "/refund", "/security", "/deploy", "/ai", "/agents", "/dpdp", "/f",
+        "/errors", "/story", "/terms", "/refund", "/security", "/deploy", "/deploy/new", "/deployments", "/domains", "/usage", "/login", "/ai", "/agents", "/dpdp", "/f",
       ]);
       const normPath = pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "").toLowerCase() || "/";
       if (!validPaths.has(normPath)) {

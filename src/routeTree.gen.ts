@@ -14,16 +14,21 @@ import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as DbRouteImport } from './routes/db'
 import { Route as DeployRouteImport } from './routes/deploy'
+import { Route as DeploymentsRouteImport } from './routes/deployments'
+import { Route as DomainsRouteImport } from './routes/domains'
 import { Route as DpdpRouteImport } from './routes/dpdp'
 import { Route as DropRouteImport } from './routes/drop'
 import { Route as ErrorsRouteImport } from './routes/errors'
 import { Route as GatewayRouteImport } from './routes/gateway'
 import { Route as KeysRouteImport } from './routes/keys'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as RefundRouteImport } from './routes/refund'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ShieldRouteImport } from './routes/shield'
 import { Route as StoryRouteImport } from './routes/story'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as UsageRouteImport } from './routes/usage'
+import { Route as DeployNewRouteImport } from './routes/deploy.new'
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsServiceRouteImport } from './routes/docs/$service'
 import { Route as DocsErrorsRouteImport } from './routes/docs/errors'
@@ -35,6 +40,9 @@ import { Route as GamePanelLaunchRouteImport } from './routes/game.panel-launch'
 import { Route as InfraIndexRouteImport } from './routes/infra.index'
 import { Route as InfraConfigureRouteImport } from './routes/infra.configure'
 import { Route as InfraDashboardRouteImport } from './routes/infra.dashboard'
+import { Route as ProjectsIdRouteImport } from './routes/projects.$id'
+import { Route as ApiAiAdminRouteImport } from './routes/api/ai/admin'
+import { Route as ApiAiInstancesRouteImport } from './routes/api/ai/instances'
 import { Route as ApiAuthMasterSsoRouteImport } from './routes/api/auth/master-sso'
 import { Route as ApiAuthVerifyEmailRouteImport } from './routes/api/auth/verify-email'
 import { Route as ApiClientProtectGenerateRouteImport } from './routes/api/client-protect/generate'
@@ -44,8 +52,11 @@ import { Route as ApiDbLifecycleRouteImport } from './routes/api/db/lifecycle'
 import { Route as ApiDbProvisionRouteImport } from './routes/api/db/provision'
 import { Route as ApiDbQueryRouteImport } from './routes/api/db/query'
 import { Route as ApiDbSummaryRouteImport } from './routes/api/db/summary'
+import { Route as ApiDeployDeploymentsRouteImport } from './routes/api/deploy/deployments'
+import { Route as ApiDeployDomainsRouteImport } from './routes/api/deploy/domains'
 import { Route as ApiDeployProjectsRouteImport } from './routes/api/deploy/projects'
 import { Route as ApiDeploySiteRouteImport } from './routes/api/deploy/site'
+import { Route as ApiDeployUsageRouteImport } from './routes/api/deploy/usage'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
 import { Route as ApiPayOrderRouteImport } from './routes/api/pay/order'
@@ -55,16 +66,21 @@ import { Route as ApiShieldCloudflareAutoconfigRouteImport } from './routes/api/
 import { Route as ApiShieldDnsVerifyRouteImport } from './routes/api/shield/dns-verify'
 import { Route as ApiSystemBackboneRouteImport } from './routes/api/system/backbone'
 import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
+import { Route as ApiWebhooksGithubRouteImport } from './routes/api/webhooks/github'
 import { Route as ApiAuthGithubCallbackRouteImport } from './routes/api/auth/github/callback'
 import { Route as ApiAuthGithubLoginRouteImport } from './routes/api/auth/github/login'
 import { Route as ApiAuthGoogleCallbackRouteImport } from './routes/api/auth/google/callback'
 import { Route as ApiAuthGoogleLoginRouteImport } from './routes/api/auth/google/login'
+import { Route as ApiDeployGithubReposRouteImport } from './routes/api/deploy/github.repos'
+import { Route as ApiDeployInternalAskRouteImport } from './routes/api/deploy/internal.ask'
+import { Route as ApiDeployProjectsIdRouteImport } from './routes/api/deploy/projects.$id'
 import { Route as ApiInfraServersIndexRouteImport } from './routes/api/infra/servers/index'
 import { Route as ApiInfraServersActionRouteImport } from './routes/api/infra/servers/action'
 import { Route as ApiInfraServersBackupRouteImport } from './routes/api/infra/servers/backup'
 import { Route as ApiInfraServersConsoleRouteImport } from './routes/api/infra/servers/console'
 import { Route as ApiInfraServersProvisionRouteImport } from './routes/api/infra/servers/provision'
 import { Route as ApiPublicRazorpayWebhookRouteImport } from './routes/api/public/razorpay/webhook'
+import { Route as ApiDeployDeploymentsIdStreamRouteImport } from './routes/api/deploy/deployments.$id.stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -89,6 +105,16 @@ const DbRoute = DbRouteImport.update({
 const DeployRoute = DeployRouteImport.update({
   id: '/deploy',
   path: '/deploy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeploymentsRoute = DeploymentsRouteImport.update({
+  id: '/deployments',
+  path: '/deployments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DomainsRoute = DomainsRouteImport.update({
+  id: '/domains',
+  path: '/domains',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DpdpRoute = DpdpRouteImport.update({
@@ -116,6 +142,11 @@ const KeysRoute = KeysRouteImport.update({
   path: '/keys',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RefundRoute = RefundRouteImport.update({
   id: '/refund',
   path: '/refund',
@@ -140,6 +171,16 @@ const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
   getParentRoute: () => rootRouteImport,
+} as any)
+const UsageRoute = UsageRouteImport.update({
+  id: '/usage',
+  path: '/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DeployNewRoute = DeployNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => DeployRoute,
 } as any)
 const DocsIndexRoute = DocsIndexRouteImport.update({
   id: '/docs/',
@@ -196,6 +237,21 @@ const InfraDashboardRoute = InfraDashboardRouteImport.update({
   path: '/infra/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProjectsIdRoute = ProjectsIdRouteImport.update({
+  id: '/projects/$id',
+  path: '/projects/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiAdminRoute = ApiAiAdminRouteImport.update({
+  id: '/api/ai/admin',
+  path: '/api/ai/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiInstancesRoute = ApiAiInstancesRouteImport.update({
+  id: '/api/ai/instances',
+  path: '/api/ai/instances',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthMasterSsoRoute = ApiAuthMasterSsoRouteImport.update({
   id: '/api/auth/master-sso',
   path: '/api/auth/master-sso',
@@ -243,6 +299,16 @@ const ApiDbSummaryRoute = ApiDbSummaryRouteImport.update({
   path: '/api/db/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDeployDeploymentsRoute = ApiDeployDeploymentsRouteImport.update({
+  id: '/api/deploy/deployments',
+  path: '/api/deploy/deployments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDeployDomainsRoute = ApiDeployDomainsRouteImport.update({
+  id: '/api/deploy/domains',
+  path: '/api/deploy/domains',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDeployProjectsRoute = ApiDeployProjectsRouteImport.update({
   id: '/api/deploy/projects',
   path: '/api/deploy/projects',
@@ -251,6 +317,11 @@ const ApiDeployProjectsRoute = ApiDeployProjectsRouteImport.update({
 const ApiDeploySiteRoute = ApiDeploySiteRouteImport.update({
   id: '/api/deploy/site',
   path: '/api/deploy/site',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDeployUsageRoute = ApiDeployUsageRouteImport.update({
+  id: '/api/deploy/usage',
+  path: '/api/deploy/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
@@ -299,6 +370,11 @@ const ApiTelemetryDiscordRoute = ApiTelemetryDiscordRouteImport.update({
   path: '/api/telemetry/discord',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiWebhooksGithubRoute = ApiWebhooksGithubRouteImport.update({
+  id: '/api/webhooks/github',
+  path: '/api/webhooks/github',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthGithubCallbackRoute = ApiAuthGithubCallbackRouteImport.update({
   id: '/api/auth/github/callback',
   path: '/api/auth/github/callback',
@@ -318,6 +394,21 @@ const ApiAuthGoogleLoginRoute = ApiAuthGoogleLoginRouteImport.update({
   id: '/api/auth/google/login',
   path: '/api/auth/google/login',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDeployGithubReposRoute = ApiDeployGithubReposRouteImport.update({
+  id: '/api/deploy/github/repos',
+  path: '/api/deploy/github/repos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDeployInternalAskRoute = ApiDeployInternalAskRouteImport.update({
+  id: '/api/deploy/internal/ask',
+  path: '/api/deploy/internal/ask',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDeployProjectsIdRoute = ApiDeployProjectsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => ApiDeployProjectsRoute,
 } as any)
 const ApiInfraServersIndexRoute = ApiInfraServersIndexRouteImport.update({
   id: '/api/infra/servers/',
@@ -351,23 +442,34 @@ const ApiPublicRazorpayWebhookRoute =
     path: '/api/public/razorpay/webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiDeployDeploymentsIdStreamRoute =
+  ApiDeployDeploymentsIdStreamRouteImport.update({
+    id: '/$id/stream',
+    path: '/$id/stream',
+    getParentRoute: () => ApiDeployDeploymentsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
   '/ai': typeof AiRoute
   '/db': typeof DbRoute
-  '/deploy': typeof DeployRoute
+  '/deploy': typeof DeployRouteWithChildren
+  '/deployments': typeof DeploymentsRoute
+  '/domains': typeof DomainsRoute
   '/dpdp': typeof DpdpRoute
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
   '/keys': typeof KeysRoute
+  '/login': typeof LoginRoute
   '/refund': typeof RefundRoute
   '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
   '/terms': typeof TermsRoute
+  '/usage': typeof UsageRoute
+  '/deploy/new': typeof DeployNewRoute
   '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
@@ -375,10 +477,13 @@ export interface FileRoutesByFullPath {
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/infra/configure': typeof InfraConfigureRoute
   '/infra/dashboard': typeof InfraDashboardRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/docs/': typeof DocsIndexRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
   '/infra/': typeof InfraIndexRoute
+  '/api/ai/admin': typeof ApiAiAdminRoute
+  '/api/ai/instances': typeof ApiAiInstancesRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/client-protect/generate': typeof ApiClientProtectGenerateRoute
@@ -388,8 +493,11 @@ export interface FileRoutesByFullPath {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
-  '/api/deploy/projects': typeof ApiDeployProjectsRoute
+  '/api/deploy/deployments': typeof ApiDeployDeploymentsRouteWithChildren
+  '/api/deploy/domains': typeof ApiDeployDomainsRoute
+  '/api/deploy/projects': typeof ApiDeployProjectsRouteWithChildren
   '/api/deploy/site': typeof ApiDeploySiteRoute
+  '/api/deploy/usage': typeof ApiDeployUsageRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/pay/order': typeof ApiPayOrderRoute
@@ -399,33 +507,43 @@ export interface FileRoutesByFullPath {
   '/api/shield/dns-verify': typeof ApiShieldDnsVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
+  '/api/webhooks/github': typeof ApiWebhooksGithubRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
   '/api/auth/github/login': typeof ApiAuthGithubLoginRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
+  '/api/deploy/github/repos': typeof ApiDeployGithubReposRoute
+  '/api/deploy/internal/ask': typeof ApiDeployInternalAskRoute
+  '/api/deploy/projects/$id': typeof ApiDeployProjectsIdRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
   '/api/infra/servers/backup': typeof ApiInfraServersBackupRoute
   '/api/infra/servers/console': typeof ApiInfraServersConsoleRoute
   '/api/infra/servers/provision': typeof ApiInfraServersProvisionRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/infra/servers/': typeof ApiInfraServersIndexRoute
+  '/api/deploy/deployments/$id/stream': typeof ApiDeployDeploymentsIdStreamRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agents': typeof AgentsRoute
   '/ai': typeof AiRoute
   '/db': typeof DbRoute
-  '/deploy': typeof DeployRoute
+  '/deploy': typeof DeployRouteWithChildren
+  '/deployments': typeof DeploymentsRoute
+  '/domains': typeof DomainsRoute
   '/dpdp': typeof DpdpRoute
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
   '/keys': typeof KeysRoute
+  '/login': typeof LoginRoute
   '/refund': typeof RefundRoute
   '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
   '/terms': typeof TermsRoute
+  '/usage': typeof UsageRoute
+  '/deploy/new': typeof DeployNewRoute
   '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
@@ -433,10 +551,13 @@ export interface FileRoutesByTo {
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/infra/configure': typeof InfraConfigureRoute
   '/infra/dashboard': typeof InfraDashboardRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/docs': typeof DocsIndexRoute
   '/f': typeof FIndexRoute
   '/game': typeof GameIndexRoute
   '/infra': typeof InfraIndexRoute
+  '/api/ai/admin': typeof ApiAiAdminRoute
+  '/api/ai/instances': typeof ApiAiInstancesRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/client-protect/generate': typeof ApiClientProtectGenerateRoute
@@ -446,8 +567,11 @@ export interface FileRoutesByTo {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
-  '/api/deploy/projects': typeof ApiDeployProjectsRoute
+  '/api/deploy/deployments': typeof ApiDeployDeploymentsRouteWithChildren
+  '/api/deploy/domains': typeof ApiDeployDomainsRoute
+  '/api/deploy/projects': typeof ApiDeployProjectsRouteWithChildren
   '/api/deploy/site': typeof ApiDeploySiteRoute
+  '/api/deploy/usage': typeof ApiDeployUsageRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/pay/order': typeof ApiPayOrderRoute
@@ -457,16 +581,21 @@ export interface FileRoutesByTo {
   '/api/shield/dns-verify': typeof ApiShieldDnsVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
+  '/api/webhooks/github': typeof ApiWebhooksGithubRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
   '/api/auth/github/login': typeof ApiAuthGithubLoginRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
+  '/api/deploy/github/repos': typeof ApiDeployGithubReposRoute
+  '/api/deploy/internal/ask': typeof ApiDeployInternalAskRoute
+  '/api/deploy/projects/$id': typeof ApiDeployProjectsIdRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
   '/api/infra/servers/backup': typeof ApiInfraServersBackupRoute
   '/api/infra/servers/console': typeof ApiInfraServersConsoleRoute
   '/api/infra/servers/provision': typeof ApiInfraServersProvisionRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/infra/servers': typeof ApiInfraServersIndexRoute
+  '/api/deploy/deployments/$id/stream': typeof ApiDeployDeploymentsIdStreamRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -474,17 +603,22 @@ export interface FileRoutesById {
   '/agents': typeof AgentsRoute
   '/ai': typeof AiRoute
   '/db': typeof DbRoute
-  '/deploy': typeof DeployRoute
+  '/deploy': typeof DeployRouteWithChildren
+  '/deployments': typeof DeploymentsRoute
+  '/domains': typeof DomainsRoute
   '/dpdp': typeof DpdpRoute
   '/drop': typeof DropRoute
   '/errors': typeof ErrorsRoute
   '/gateway': typeof GatewayRoute
   '/keys': typeof KeysRoute
+  '/login': typeof LoginRoute
   '/refund': typeof RefundRoute
   '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
   '/story': typeof StoryRoute
   '/terms': typeof TermsRoute
+  '/usage': typeof UsageRoute
+  '/deploy/new': typeof DeployNewRoute
   '/docs/$service': typeof DocsServiceRoute
   '/docs/errors': typeof DocsErrorsRoute
   '/f/$id': typeof FIdRoute
@@ -492,10 +626,13 @@ export interface FileRoutesById {
   '/game/panel-launch': typeof GamePanelLaunchRoute
   '/infra/configure': typeof InfraConfigureRoute
   '/infra/dashboard': typeof InfraDashboardRoute
+  '/projects/$id': typeof ProjectsIdRoute
   '/docs/': typeof DocsIndexRoute
   '/f/': typeof FIndexRoute
   '/game/': typeof GameIndexRoute
   '/infra/': typeof InfraIndexRoute
+  '/api/ai/admin': typeof ApiAiAdminRoute
+  '/api/ai/instances': typeof ApiAiInstancesRoute
   '/api/auth/master-sso': typeof ApiAuthMasterSsoRoute
   '/api/auth/verify-email': typeof ApiAuthVerifyEmailRoute
   '/api/client-protect/generate': typeof ApiClientProtectGenerateRoute
@@ -505,8 +642,11 @@ export interface FileRoutesById {
   '/api/db/provision': typeof ApiDbProvisionRoute
   '/api/db/query': typeof ApiDbQueryRoute
   '/api/db/summary': typeof ApiDbSummaryRoute
-  '/api/deploy/projects': typeof ApiDeployProjectsRoute
+  '/api/deploy/deployments': typeof ApiDeployDeploymentsRouteWithChildren
+  '/api/deploy/domains': typeof ApiDeployDomainsRoute
+  '/api/deploy/projects': typeof ApiDeployProjectsRouteWithChildren
   '/api/deploy/site': typeof ApiDeploySiteRoute
+  '/api/deploy/usage': typeof ApiDeployUsageRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/pay/order': typeof ApiPayOrderRoute
@@ -516,16 +656,21 @@ export interface FileRoutesById {
   '/api/shield/dns-verify': typeof ApiShieldDnsVerifyRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
+  '/api/webhooks/github': typeof ApiWebhooksGithubRoute
   '/api/auth/github/callback': typeof ApiAuthGithubCallbackRoute
   '/api/auth/github/login': typeof ApiAuthGithubLoginRoute
   '/api/auth/google/callback': typeof ApiAuthGoogleCallbackRoute
   '/api/auth/google/login': typeof ApiAuthGoogleLoginRoute
+  '/api/deploy/github/repos': typeof ApiDeployGithubReposRoute
+  '/api/deploy/internal/ask': typeof ApiDeployInternalAskRoute
+  '/api/deploy/projects/$id': typeof ApiDeployProjectsIdRoute
   '/api/infra/servers/action': typeof ApiInfraServersActionRoute
   '/api/infra/servers/backup': typeof ApiInfraServersBackupRoute
   '/api/infra/servers/console': typeof ApiInfraServersConsoleRoute
   '/api/infra/servers/provision': typeof ApiInfraServersProvisionRoute
   '/api/public/razorpay/webhook': typeof ApiPublicRazorpayWebhookRoute
   '/api/infra/servers/': typeof ApiInfraServersIndexRoute
+  '/api/deploy/deployments/$id/stream': typeof ApiDeployDeploymentsIdStreamRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -535,16 +680,21 @@ export interface FileRouteTypes {
     | '/ai'
     | '/db'
     | '/deploy'
+    | '/deployments'
+    | '/domains'
     | '/dpdp'
     | '/drop'
     | '/errors'
     | '/gateway'
     | '/keys'
+    | '/login'
     | '/refund'
     | '/security'
     | '/shield'
     | '/story'
     | '/terms'
+    | '/usage'
+    | '/deploy/new'
     | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
@@ -552,10 +702,13 @@ export interface FileRouteTypes {
     | '/game/panel-launch'
     | '/infra/configure'
     | '/infra/dashboard'
+    | '/projects/$id'
     | '/docs/'
     | '/f/'
     | '/game/'
     | '/infra/'
+    | '/api/ai/admin'
+    | '/api/ai/instances'
     | '/api/auth/master-sso'
     | '/api/auth/verify-email'
     | '/api/client-protect/generate'
@@ -565,8 +718,11 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/deploy/deployments'
+    | '/api/deploy/domains'
     | '/api/deploy/projects'
     | '/api/deploy/site'
+    | '/api/deploy/usage'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/pay/order'
@@ -576,16 +732,21 @@ export interface FileRouteTypes {
     | '/api/shield/dns-verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
+    | '/api/webhooks/github'
     | '/api/auth/github/callback'
     | '/api/auth/github/login'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
+    | '/api/deploy/github/repos'
+    | '/api/deploy/internal/ask'
+    | '/api/deploy/projects/$id'
     | '/api/infra/servers/action'
     | '/api/infra/servers/backup'
     | '/api/infra/servers/console'
     | '/api/infra/servers/provision'
     | '/api/public/razorpay/webhook'
     | '/api/infra/servers/'
+    | '/api/deploy/deployments/$id/stream'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -593,16 +754,21 @@ export interface FileRouteTypes {
     | '/ai'
     | '/db'
     | '/deploy'
+    | '/deployments'
+    | '/domains'
     | '/dpdp'
     | '/drop'
     | '/errors'
     | '/gateway'
     | '/keys'
+    | '/login'
     | '/refund'
     | '/security'
     | '/shield'
     | '/story'
     | '/terms'
+    | '/usage'
+    | '/deploy/new'
     | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
@@ -610,10 +776,13 @@ export interface FileRouteTypes {
     | '/game/panel-launch'
     | '/infra/configure'
     | '/infra/dashboard'
+    | '/projects/$id'
     | '/docs'
     | '/f'
     | '/game'
     | '/infra'
+    | '/api/ai/admin'
+    | '/api/ai/instances'
     | '/api/auth/master-sso'
     | '/api/auth/verify-email'
     | '/api/client-protect/generate'
@@ -623,8 +792,11 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/deploy/deployments'
+    | '/api/deploy/domains'
     | '/api/deploy/projects'
     | '/api/deploy/site'
+    | '/api/deploy/usage'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/pay/order'
@@ -634,16 +806,21 @@ export interface FileRouteTypes {
     | '/api/shield/dns-verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
+    | '/api/webhooks/github'
     | '/api/auth/github/callback'
     | '/api/auth/github/login'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
+    | '/api/deploy/github/repos'
+    | '/api/deploy/internal/ask'
+    | '/api/deploy/projects/$id'
     | '/api/infra/servers/action'
     | '/api/infra/servers/backup'
     | '/api/infra/servers/console'
     | '/api/infra/servers/provision'
     | '/api/public/razorpay/webhook'
     | '/api/infra/servers'
+    | '/api/deploy/deployments/$id/stream'
   id:
     | '__root__'
     | '/'
@@ -651,16 +828,21 @@ export interface FileRouteTypes {
     | '/ai'
     | '/db'
     | '/deploy'
+    | '/deployments'
+    | '/domains'
     | '/dpdp'
     | '/drop'
     | '/errors'
     | '/gateway'
     | '/keys'
+    | '/login'
     | '/refund'
     | '/security'
     | '/shield'
     | '/story'
     | '/terms'
+    | '/usage'
+    | '/deploy/new'
     | '/docs/$service'
     | '/docs/errors'
     | '/f/$id'
@@ -668,10 +850,13 @@ export interface FileRouteTypes {
     | '/game/panel-launch'
     | '/infra/configure'
     | '/infra/dashboard'
+    | '/projects/$id'
     | '/docs/'
     | '/f/'
     | '/game/'
     | '/infra/'
+    | '/api/ai/admin'
+    | '/api/ai/instances'
     | '/api/auth/master-sso'
     | '/api/auth/verify-email'
     | '/api/client-protect/generate'
@@ -681,8 +866,11 @@ export interface FileRouteTypes {
     | '/api/db/provision'
     | '/api/db/query'
     | '/api/db/summary'
+    | '/api/deploy/deployments'
+    | '/api/deploy/domains'
     | '/api/deploy/projects'
     | '/api/deploy/site'
+    | '/api/deploy/usage'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/pay/order'
@@ -692,16 +880,21 @@ export interface FileRouteTypes {
     | '/api/shield/dns-verify'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
+    | '/api/webhooks/github'
     | '/api/auth/github/callback'
     | '/api/auth/github/login'
     | '/api/auth/google/callback'
     | '/api/auth/google/login'
+    | '/api/deploy/github/repos'
+    | '/api/deploy/internal/ask'
+    | '/api/deploy/projects/$id'
     | '/api/infra/servers/action'
     | '/api/infra/servers/backup'
     | '/api/infra/servers/console'
     | '/api/infra/servers/provision'
     | '/api/public/razorpay/webhook'
     | '/api/infra/servers/'
+    | '/api/deploy/deployments/$id/stream'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -709,17 +902,21 @@ export interface RootRouteChildren {
   AgentsRoute: typeof AgentsRoute
   AiRoute: typeof AiRoute
   DbRoute: typeof DbRoute
-  DeployRoute: typeof DeployRoute
+  DeployRoute: typeof DeployRouteWithChildren
+  DeploymentsRoute: typeof DeploymentsRoute
+  DomainsRoute: typeof DomainsRoute
   DpdpRoute: typeof DpdpRoute
   DropRoute: typeof DropRoute
   ErrorsRoute: typeof ErrorsRoute
   GatewayRoute: typeof GatewayRoute
   KeysRoute: typeof KeysRoute
+  LoginRoute: typeof LoginRoute
   RefundRoute: typeof RefundRoute
   SecurityRoute: typeof SecurityRoute
   ShieldRoute: typeof ShieldRoute
   StoryRoute: typeof StoryRoute
   TermsRoute: typeof TermsRoute
+  UsageRoute: typeof UsageRoute
   DocsServiceRoute: typeof DocsServiceRoute
   DocsErrorsRoute: typeof DocsErrorsRoute
   FIdRoute: typeof FIdRoute
@@ -727,10 +924,13 @@ export interface RootRouteChildren {
   GamePanelLaunchRoute: typeof GamePanelLaunchRoute
   InfraConfigureRoute: typeof InfraConfigureRoute
   InfraDashboardRoute: typeof InfraDashboardRoute
+  ProjectsIdRoute: typeof ProjectsIdRoute
   DocsIndexRoute: typeof DocsIndexRoute
   FIndexRoute: typeof FIndexRoute
   GameIndexRoute: typeof GameIndexRoute
   InfraIndexRoute: typeof InfraIndexRoute
+  ApiAiAdminRoute: typeof ApiAiAdminRoute
+  ApiAiInstancesRoute: typeof ApiAiInstancesRoute
   ApiAuthMasterSsoRoute: typeof ApiAuthMasterSsoRoute
   ApiAuthVerifyEmailRoute: typeof ApiAuthVerifyEmailRoute
   ApiClientProtectGenerateRoute: typeof ApiClientProtectGenerateRoute
@@ -740,8 +940,11 @@ export interface RootRouteChildren {
   ApiDbProvisionRoute: typeof ApiDbProvisionRoute
   ApiDbQueryRoute: typeof ApiDbQueryRoute
   ApiDbSummaryRoute: typeof ApiDbSummaryRoute
-  ApiDeployProjectsRoute: typeof ApiDeployProjectsRoute
+  ApiDeployDeploymentsRoute: typeof ApiDeployDeploymentsRouteWithChildren
+  ApiDeployDomainsRoute: typeof ApiDeployDomainsRoute
+  ApiDeployProjectsRoute: typeof ApiDeployProjectsRouteWithChildren
   ApiDeploySiteRoute: typeof ApiDeploySiteRoute
+  ApiDeployUsageRoute: typeof ApiDeployUsageRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
   ApiPayOrderRoute: typeof ApiPayOrderRoute
@@ -751,10 +954,13 @@ export interface RootRouteChildren {
   ApiShieldDnsVerifyRoute: typeof ApiShieldDnsVerifyRoute
   ApiSystemBackboneRoute: typeof ApiSystemBackboneRoute
   ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
+  ApiWebhooksGithubRoute: typeof ApiWebhooksGithubRoute
   ApiAuthGithubCallbackRoute: typeof ApiAuthGithubCallbackRoute
   ApiAuthGithubLoginRoute: typeof ApiAuthGithubLoginRoute
   ApiAuthGoogleCallbackRoute: typeof ApiAuthGoogleCallbackRoute
   ApiAuthGoogleLoginRoute: typeof ApiAuthGoogleLoginRoute
+  ApiDeployGithubReposRoute: typeof ApiDeployGithubReposRoute
+  ApiDeployInternalAskRoute: typeof ApiDeployInternalAskRoute
   ApiInfraServersActionRoute: typeof ApiInfraServersActionRoute
   ApiInfraServersBackupRoute: typeof ApiInfraServersBackupRoute
   ApiInfraServersConsoleRoute: typeof ApiInfraServersConsoleRoute
@@ -800,6 +1006,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DeployRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/deployments': {
+      id: '/deployments'
+      path: '/deployments'
+      fullPath: '/deployments'
+      preLoaderRoute: typeof DeploymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/domains': {
+      id: '/domains'
+      path: '/domains'
+      fullPath: '/domains'
+      preLoaderRoute: typeof DomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dpdp': {
       id: '/dpdp'
       path: '/dpdp'
@@ -833,6 +1053,13 @@ declare module '@tanstack/react-router' {
       path: '/keys'
       fullPath: '/keys'
       preLoaderRoute: typeof KeysRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/refund': {
@@ -869,6 +1096,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/usage': {
+      id: '/usage'
+      path: '/usage'
+      fullPath: '/usage'
+      preLoaderRoute: typeof UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deploy/new': {
+      id: '/deploy/new'
+      path: '/new'
+      fullPath: '/deploy/new'
+      preLoaderRoute: typeof DeployNewRouteImport
+      parentRoute: typeof DeployRoute
     }
     '/docs/': {
       id: '/docs/'
@@ -947,6 +1188,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InfraDashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/projects/$id': {
+      id: '/projects/$id'
+      path: '/projects/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof ProjectsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai/admin': {
+      id: '/api/ai/admin'
+      path: '/api/ai/admin'
+      fullPath: '/api/ai/admin'
+      preLoaderRoute: typeof ApiAiAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai/instances': {
+      id: '/api/ai/instances'
+      path: '/api/ai/instances'
+      fullPath: '/api/ai/instances'
+      preLoaderRoute: typeof ApiAiInstancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/master-sso': {
       id: '/api/auth/master-sso'
       path: '/api/auth/master-sso'
@@ -1010,6 +1272,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDbSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/deploy/deployments': {
+      id: '/api/deploy/deployments'
+      path: '/api/deploy/deployments'
+      fullPath: '/api/deploy/deployments'
+      preLoaderRoute: typeof ApiDeployDeploymentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/deploy/domains': {
+      id: '/api/deploy/domains'
+      path: '/api/deploy/domains'
+      fullPath: '/api/deploy/domains'
+      preLoaderRoute: typeof ApiDeployDomainsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/deploy/projects': {
       id: '/api/deploy/projects'
       path: '/api/deploy/projects'
@@ -1022,6 +1298,13 @@ declare module '@tanstack/react-router' {
       path: '/api/deploy/site'
       fullPath: '/api/deploy/site'
       preLoaderRoute: typeof ApiDeploySiteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/deploy/usage': {
+      id: '/api/deploy/usage'
+      path: '/api/deploy/usage'
+      fullPath: '/api/deploy/usage'
+      preLoaderRoute: typeof ApiDeployUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/game/panel-sso': {
@@ -1087,6 +1370,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelemetryDiscordRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/webhooks/github': {
+      id: '/api/webhooks/github'
+      path: '/api/webhooks/github'
+      fullPath: '/api/webhooks/github'
+      preLoaderRoute: typeof ApiWebhooksGithubRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/github/callback': {
       id: '/api/auth/github/callback'
       path: '/api/auth/github/callback'
@@ -1114,6 +1404,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/auth/google/login'
       preLoaderRoute: typeof ApiAuthGoogleLoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/deploy/github/repos': {
+      id: '/api/deploy/github/repos'
+      path: '/api/deploy/github/repos'
+      fullPath: '/api/deploy/github/repos'
+      preLoaderRoute: typeof ApiDeployGithubReposRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/deploy/internal/ask': {
+      id: '/api/deploy/internal/ask'
+      path: '/api/deploy/internal/ask'
+      fullPath: '/api/deploy/internal/ask'
+      preLoaderRoute: typeof ApiDeployInternalAskRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/deploy/projects/$id': {
+      id: '/api/deploy/projects/$id'
+      path: '/$id'
+      fullPath: '/api/deploy/projects/$id'
+      preLoaderRoute: typeof ApiDeployProjectsIdRouteImport
+      parentRoute: typeof ApiDeployProjectsRoute
     }
     '/api/infra/servers/': {
       id: '/api/infra/servers/'
@@ -1157,25 +1468,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicRazorpayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/deploy/deployments/$id/stream': {
+      id: '/api/deploy/deployments/$id/stream'
+      path: '/$id/stream'
+      fullPath: '/api/deploy/deployments/$id/stream'
+      preLoaderRoute: typeof ApiDeployDeploymentsIdStreamRouteImport
+      parentRoute: typeof ApiDeployDeploymentsRoute
+    }
   }
 }
+
+interface DeployRouteChildren {
+  DeployNewRoute: typeof DeployNewRoute
+}
+
+const DeployRouteChildren: DeployRouteChildren = {
+  DeployNewRoute: DeployNewRoute,
+}
+
+const DeployRouteWithChildren =
+  DeployRoute._addFileChildren(DeployRouteChildren)
+
+interface ApiDeployDeploymentsRouteChildren {
+  ApiDeployDeploymentsIdStreamRoute: typeof ApiDeployDeploymentsIdStreamRoute
+}
+
+const ApiDeployDeploymentsRouteChildren: ApiDeployDeploymentsRouteChildren = {
+  ApiDeployDeploymentsIdStreamRoute: ApiDeployDeploymentsIdStreamRoute,
+}
+
+const ApiDeployDeploymentsRouteWithChildren =
+  ApiDeployDeploymentsRoute._addFileChildren(ApiDeployDeploymentsRouteChildren)
+
+interface ApiDeployProjectsRouteChildren {
+  ApiDeployProjectsIdRoute: typeof ApiDeployProjectsIdRoute
+}
+
+const ApiDeployProjectsRouteChildren: ApiDeployProjectsRouteChildren = {
+  ApiDeployProjectsIdRoute: ApiDeployProjectsIdRoute,
+}
+
+const ApiDeployProjectsRouteWithChildren =
+  ApiDeployProjectsRoute._addFileChildren(ApiDeployProjectsRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgentsRoute: AgentsRoute,
   AiRoute: AiRoute,
   DbRoute: DbRoute,
-  DeployRoute: DeployRoute,
+  DeployRoute: DeployRouteWithChildren,
+  DeploymentsRoute: DeploymentsRoute,
+  DomainsRoute: DomainsRoute,
   DpdpRoute: DpdpRoute,
   DropRoute: DropRoute,
   ErrorsRoute: ErrorsRoute,
   GatewayRoute: GatewayRoute,
   KeysRoute: KeysRoute,
+  LoginRoute: LoginRoute,
   RefundRoute: RefundRoute,
   SecurityRoute: SecurityRoute,
   ShieldRoute: ShieldRoute,
   StoryRoute: StoryRoute,
   TermsRoute: TermsRoute,
+  UsageRoute: UsageRoute,
   DocsServiceRoute: DocsServiceRoute,
   DocsErrorsRoute: DocsErrorsRoute,
   FIdRoute: FIdRoute,
@@ -1183,10 +1538,13 @@ const rootRouteChildren: RootRouteChildren = {
   GamePanelLaunchRoute: GamePanelLaunchRoute,
   InfraConfigureRoute: InfraConfigureRoute,
   InfraDashboardRoute: InfraDashboardRoute,
+  ProjectsIdRoute: ProjectsIdRoute,
   DocsIndexRoute: DocsIndexRoute,
   FIndexRoute: FIndexRoute,
   GameIndexRoute: GameIndexRoute,
   InfraIndexRoute: InfraIndexRoute,
+  ApiAiAdminRoute: ApiAiAdminRoute,
+  ApiAiInstancesRoute: ApiAiInstancesRoute,
   ApiAuthMasterSsoRoute: ApiAuthMasterSsoRoute,
   ApiAuthVerifyEmailRoute: ApiAuthVerifyEmailRoute,
   ApiClientProtectGenerateRoute: ApiClientProtectGenerateRoute,
@@ -1196,8 +1554,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDbProvisionRoute: ApiDbProvisionRoute,
   ApiDbQueryRoute: ApiDbQueryRoute,
   ApiDbSummaryRoute: ApiDbSummaryRoute,
-  ApiDeployProjectsRoute: ApiDeployProjectsRoute,
+  ApiDeployDeploymentsRoute: ApiDeployDeploymentsRouteWithChildren,
+  ApiDeployDomainsRoute: ApiDeployDomainsRoute,
+  ApiDeployProjectsRoute: ApiDeployProjectsRouteWithChildren,
   ApiDeploySiteRoute: ApiDeploySiteRoute,
+  ApiDeployUsageRoute: ApiDeployUsageRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
   ApiPayOrderRoute: ApiPayOrderRoute,
@@ -1207,10 +1568,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiShieldDnsVerifyRoute: ApiShieldDnsVerifyRoute,
   ApiSystemBackboneRoute: ApiSystemBackboneRoute,
   ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,
+  ApiWebhooksGithubRoute: ApiWebhooksGithubRoute,
   ApiAuthGithubCallbackRoute: ApiAuthGithubCallbackRoute,
   ApiAuthGithubLoginRoute: ApiAuthGithubLoginRoute,
   ApiAuthGoogleCallbackRoute: ApiAuthGoogleCallbackRoute,
   ApiAuthGoogleLoginRoute: ApiAuthGoogleLoginRoute,
+  ApiDeployGithubReposRoute: ApiDeployGithubReposRoute,
+  ApiDeployInternalAskRoute: ApiDeployInternalAskRoute,
   ApiInfraServersActionRoute: ApiInfraServersActionRoute,
   ApiInfraServersBackupRoute: ApiInfraServersBackupRoute,
   ApiInfraServersConsoleRoute: ApiInfraServersConsoleRoute,

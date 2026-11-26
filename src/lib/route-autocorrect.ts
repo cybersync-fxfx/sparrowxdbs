@@ -151,6 +151,11 @@ export const VALID_STATIC_PATHS = new Set<string>([
   "/refund",
   "/security",
   "/deploy",
+  "/deploy/new",
+  "/deployments",
+  "/domains",
+  "/usage",
+  "/login",
   "/ai",
   "/agents",
   "/dpdp",
@@ -576,6 +581,7 @@ export function resolveAutoCorrectedPath(
     rawPathname.startsWith("/3d/") ||
     rawPathname.startsWith("/xdp/") ||
     rawPathname.startsWith("/f/") ||
+    rawPathname.startsWith("/projects/") ||
     /\.[a-z0-9]{1,8}$/i.test(rawPathname)
   ) {
     return null;
