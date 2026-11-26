@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# SPARROWX HOSTING — SAFE PTERODACTYL PANEL BRANDING & THEME INSTALLER
+# SPARROWX HOSTING — LIGHTWEIGHT STELLAR MIDNIGHT BLACK THEME INSTALLER
 # ==============================================================================
-# Applies official SparrowX logos, subtle logo watermark background, Midnight
-# Black glassmorphic styling, and "SparrowX Hosting" branding to Pterodactyl
-# Panel WITHOUT modifying React source or running yarn build (zero crash risk).
+# Keeps 100% of Stellar Theme's native components, layout, sidebar & UI intact,
+# removes all slow overlapping CSS/JS/MutationObserver/blur theme layers, and
+# applies ONE clean ~2 KB pure-CSS Midnight Black palette + official favicons.
 #
 # Usage:
-#   sudo bash deploy/ptero-brand-sparrowx.sh             # Apply branding safely
-#   sudo bash deploy/ptero-brand-sparrowx.sh --rollback  # Restore original files
+#   sudo bash deploy/ptero-brand-sparrowx.sh             # Clean & apply Midnight Black
+#   sudo bash deploy/ptero-brand-sparrowx.sh --remove    # Remove Midnight Black CSS (pure Stellar)
+#   sudo bash deploy/ptero-brand-sparrowx.sh --rollback  # Restore latest backup
 # ==============================================================================
 set -euo pipefail
 
@@ -19,6 +20,8 @@ BRAND_ASSET_DIR="${PTERO_DIR}/public/sparrowx"
 BACKUP_ROOT="${PTERO_DIR}/.sparrowx-brand-backups"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP_DIR="${BACKUP_ROOT}/${TIMESTAMP}"
+THEME_CSS_SRC="${REPO_DIR}/ovh/ptero-midnight-theme.css"
+THEME_VERSION="2026-midnight-v2"
 
 green() { printf "\033[32m[OK]\033[0m   %s\n" "$1"; }
 info()  { printf "\033[36m[INFO]\033[0m %s\n" "$1"; }
@@ -36,7 +39,40 @@ clear_ptero_caches() {
   chmod -R 775 "${PTERO_DIR}/storage" "${PTERO_DIR}/bootstrap/cache" 2>/dev/null || true
   (cd "$PTERO_DIR" && sudo -u www-data env HOME=/tmp php artisan view:clear >/dev/null 2>&1 || true)
   (cd "$PTERO_DIR" && sudo -u www-data env HOME=/tmp php artisan config:clear >/dev/null 2>&1 || true)
+  (cd "$PTERO_DIR" && sudo -u www-data env HOME=/tmp php artisan view:cache >/dev/null 2>&1 || true)
 }
+
+strip_all_sparrowx_layers() {
+  local target_file="$1"
+  [[ -f "$target_file" ]] || return 0
+  python3 - "$target_file" <<'PY'
+import re, sys
+path = sys.argv[1]
+txt = open(path, "r", encoding="utf-8").read()
+txt = re.sub(r"\n?<!-- SPARROWX-BRAND:START -->.*?<!-- SPARROWX-BRAND:END -->\n?", "\n", txt, flags=re.S)
+txt = re.sub(r"\n?<!-- SPARROWX-STELLAR-MIDNIGHT:START -->.*?<!-- SPARROWX-STELLAR-MIDNIGHT:END -->\n?", "\n", txt, flags=re.S)
+txt = re.sub(r'^[ \t]*<link[^>]+/sparrowx/(?:sparrowx-theme|ptero-midnight-theme)\.css[^>]*>\s*\n?', "", txt, flags=re.M)
+txt = re.sub(r'^[ \t]*<script[^>]+/sparrowx/(?:sparrowx-brand|ptero-sparrowx-bridge)\.js[^>]*></script>\s*\n?', "", txt, flags=re.M)
+open(path, "w", encoding="utf-8").write(txt)
+PY
+}
+
+# ------------------------------------------------------------------------------
+# REMOVE MODE (Pure unmodified Stellar theme — zero SparrowX overlays)
+# ------------------------------------------------------------------------------
+if [[ "${1:-}" == "--remove" ]]; then
+  info "Removing all SparrowX theme overlays & scripts (keeping native Stellar theme)..."
+  strip_all_sparrowx_layers "${PTERO_DIR}/resources/views/templates/wrapper.blade.php"
+  strip_all_sparrowx_layers "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
+  rm -f \
+    "${BRAND_ASSET_DIR}/sparrowx-theme.css" \
+    "${BRAND_ASSET_DIR}/sparrowx-brand.js" \
+    "${BRAND_ASSET_DIR}/ptero-sparrowx-bridge.js" \
+    "${BRAND_ASSET_DIR}/ptero-midnight-theme.css"
+  clear_ptero_caches
+  green "All SparrowX overlays removed. Pure Stellar theme is active."
+  exit 0
+fi
 
 # ------------------------------------------------------------------------------
 # ROLLBACK MODE
@@ -47,21 +83,21 @@ if [[ "${1:-}" == "--rollback" ]]; then
     err "No backup found in ${BACKUP_ROOT}"
     exit 1
   fi
-  info "Restoring original Pterodactyl files from ${LATEST}..."
+  info "Restoring Pterodactyl files from ${LATEST}..."
   [[ -f "${LATEST}/wrapper.blade.php" ]] && cp -a "${LATEST}/wrapper.blade.php" "${PTERO_DIR}/resources/views/templates/wrapper.blade.php"
   [[ -f "${LATEST}/core.blade.php" ]] && cp -a "${LATEST}/core.blade.php" "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
   [[ -f "${LATEST}/.env" ]] && cp -a "${LATEST}/.env" "${PTERO_DIR}/.env"
   [[ -d "${LATEST}/favicons" ]] && cp -a "${LATEST}/favicons/." "${PTERO_DIR}/public/favicons/"
   rm -rf "$BRAND_ASSET_DIR"
   clear_ptero_caches
-  green "Rollback complete. Original Pterodactyl panel restored."
+  green "Rollback complete. Original Pterodactyl templates restored."
   exit 0
 fi
 
 # ------------------------------------------------------------------------------
-# 1. BACKUP ORIGINAL FILES BEFORE MAKING ANY CHANGES
+# 1. BACKUP TEMPLATES BEFORE EDITING
 # ------------------------------------------------------------------------------
-info "Backing up original Pterodactyl templates & favicons to ${BACKUP_DIR}..."
+info "Backing up Pterodactyl templates & favicons to ${BACKUP_DIR}..."
 mkdir -p "$BACKUP_DIR"
 [[ -f "${PTERO_DIR}/resources/views/templates/wrapper.blade.php" ]] && cp -a "${PTERO_DIR}/resources/views/templates/wrapper.blade.php" "${BACKUP_DIR}/wrapper.blade.php"
 [[ -f "${PTERO_DIR}/resources/views/templates/auth/core.blade.php" ]] && cp -a "${PTERO_DIR}/resources/views/templates/auth/core.blade.php" "${BACKUP_DIR}/core.blade.php"
@@ -70,14 +106,17 @@ mkdir -p "$BACKUP_DIR"
 green "Backup saved safely."
 
 # ------------------------------------------------------------------------------
-# 2. COPY OFFICIAL SPARROWX LOGOS & FAVICONS
+# 2. REMOVE SLOW OVERLAPPING ASSETS & INSTALL FAVICONS + LIGHTWEIGHT CSS
 # ------------------------------------------------------------------------------
-info "Installing official SparrowX logos & favicons..."
 mkdir -p "$BRAND_ASSET_DIR"
+rm -f \
+  "${BRAND_ASSET_DIR}/sparrowx-theme.css" \
+  "${BRAND_ASSET_DIR}/sparrowx-brand.js" \
+  "${BRAND_ASSET_DIR}/ptero-sparrowx-bridge.js" \
+  "${BRAND_ASSET_DIR}/watermark.png"
+green "Removed heavy overlapping CSS/JS layers (sparrowx-theme.css, sparrowx-brand.js, ptero-sparrowx-bridge.js)."
 
 LOGO_MAIN="${REPO_DIR}/public/logos/sparrowx-main.png"
-LOGO_SILVER="${REPO_DIR}/public/logos/sparrowx-silver.png"
-
 if [[ -f "$LOGO_MAIN" ]]; then
   cp -f "$LOGO_MAIN" "${BRAND_ASSET_DIR}/logo.png"
   if [[ -d "${PTERO_DIR}/public/favicons" ]]; then
@@ -85,384 +124,59 @@ if [[ -f "$LOGO_MAIN" ]]; then
     cp -f "$LOGO_MAIN" "${PTERO_DIR}/public/favicons/favicon-16x16.png"
     cp -f "$LOGO_MAIN" "${PTERO_DIR}/public/favicons/apple-touch-icon.png"
   fi
-  green "Installed SparrowX primary logo & favicons."
-else
-  warn "Logo not found at ${LOGO_MAIN} — skipping logo copy."
+  green "Synced SparrowX logo & favicons."
 fi
 
-if [[ -f "$LOGO_SILVER" ]]; then
-  cp -f "$LOGO_SILVER" "${BRAND_ASSET_DIR}/watermark.png"
-  green "Installed SparrowX silver watermark logo."
-elif [[ -f "${BRAND_ASSET_DIR}/logo.png" ]]; then
-  cp -f "${BRAND_ASSET_DIR}/logo.png" "${BRAND_ASSET_DIR}/watermark.png"
-fi
-
-# ------------------------------------------------------------------------------
-# 3. UPDATE APP_NAME IN PTERODACTYL .env
-# ------------------------------------------------------------------------------
 if [[ -f "${PTERO_DIR}/.env" ]]; then
   if grep -q '^APP_NAME=' "${PTERO_DIR}/.env"; then
     sed -i "s|^APP_NAME=.*|APP_NAME=\"${BRAND_NAME}\"|" "${PTERO_DIR}/.env"
   else
     printf '\nAPP_NAME="%s"\n' "$BRAND_NAME" >> "${PTERO_DIR}/.env"
   fi
-  green "Updated APP_NAME=\"${BRAND_NAME}\" in ${PTERO_DIR}/.env"
+  green "Verified APP_NAME=\"${BRAND_NAME}\" in ${PTERO_DIR}/.env"
 fi
 
-# ------------------------------------------------------------------------------
-# 4. WRITE SPARROWX MIDNIGHT BLACK + LOGO WATERMARK CSS THEME
-# ------------------------------------------------------------------------------
-info "Writing SparrowX custom theme CSS (${BRAND_ASSET_DIR}/sparrowx-theme.css)..."
-cat > "${BRAND_ASSET_DIR}/sparrowx-theme.css" <<'EOF'
-/* ============================================================================
- * SPARROWX HOSTING — PTERODACTYL PANEL CUSTOM THEME (MIDNIGHT BLACK + SILVER)
- * Safe CSS-only layer: never breaks React components, console, or modals.
- * ============================================================================ */
-
-:root {
-  --spx-bg: #05060a;
-  --spx-surface: #0b0e15;
-  --spx-surface-elevated: #111622;
-  --spx-border: rgba(244, 246, 250, 0.1);
-  --spx-border-strong: rgba(56, 189, 248, 0.35);
-  --spx-text: #f4f6fa;
-  --spx-accent: #f96246;
-  --spx-cyan: #38bdf8;
-}
-
-html,
-body {
-  background-color: var(--spx-bg) !important;
-  color: var(--spx-text) !important;
-  min-height: 100vh;
-}
-
-/* Subtle centered SparrowX Logo Watermark + Midnight Ambient Glow */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image:
-    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(56, 189, 248, 0.1), transparent 65%),
-    radial-gradient(circle at 88% 85%, rgba(249, 98, 70, 0.08), transparent 45%),
-    url("/sparrowx/watermark.png");
-  background-repeat: no-repeat, no-repeat, no-repeat;
-  background-position: center top, right bottom, center center;
-  background-size: 100% 100%, 100% 100%, min(420px, 55vw) auto;
-  opacity: 0.08;
-}
-
-#app {
-  position: relative;
-  z-index: 1;
-}
-
-/* Top Navigation Bar & Sidebar Surfaces */
-header,
-nav,
-[class*="NavigationBar"],
-[class*="SubNavigation"] {
-  background-color: rgba(9, 11, 17, 0.88) !important;
-  backdrop-filter: blur(14px);
-  border-color: var(--spx-border) !important;
-}
-
-/* Cards, Panels, Modals, and Inputs */
-[class*="GreyRowBox"],
-[class*="TitledGreyBox"],
-[class*="ContentBox"],
-[class*="ServerRow"] {
-  background-color: rgba(11, 14, 21, 0.88) !important;
-  border: 1px solid var(--spx-border) !important;
-  backdrop-filter: blur(10px);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-
-[class*="ServerRow"]:hover {
-  border-color: var(--spx-border-strong) !important;
-  box-shadow: 0 8px 30px rgba(56, 189, 248, 0.1) !important;
-}
-
-/* Branded Login Card Container */
-.spx-login-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 0 auto 20px auto;
-  padding-top: 24px;
-  text-align: center;
-}
-
-.spx-login-brand img {
-  width: 64px;
-  height: 64px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 22px rgba(56, 189, 248, 0.35));
-}
-
-.spx-login-brand-title {
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--spx-text);
-}
-
-.spx-login-brand-sub {
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--spx-cyan);
-  opacity: 0.9;
-}
-
-/* Branded Logo Badge injected next to Pterodactyl's top-left brand link */
-.spx-nav-logo {
-  width: 28px;
-  height: 28px;
-  object-fit: contain;
-  margin-right: 10px;
-  border-radius: 6px;
-  filter: drop-shadow(0 2px 10px rgba(249, 98, 70, 0.35));
-  vertical-align: middle;
-  display: inline-block;
-}
-
-/* Subtle SparrowX Footer + WhatsApp Support Dock */
-.spx-footer-dock {
-  position: fixed;
-  right: 14px;
-  bottom: 12px;
-  z-index: 30;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.spx-whatsapp-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 9999px;
-  background: rgba(16, 185, 129, 0.16);
-  border: 1px solid rgba(16, 185, 129, 0.45);
-  color: #6ee7b7;
-  font-size: 11px;
-  font-weight: 600;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-decoration: none;
-  backdrop-filter: blur(8px);
-  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
-}
-
-.spx-whatsapp-btn:hover {
-  background: #10b981;
-  border-color: #10b981;
-  color: #05060a;
-}
-
-.spx-footer-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 9999px;
-  background: rgba(9, 11, 17, 0.85);
-  border: 1px solid var(--spx-border);
-  color: rgba(244, 246, 250, 0.72);
-  font-size: 11px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  text-decoration: none;
-  backdrop-filter: blur(8px);
-}
-
-.spx-footer-badge:hover {
-  border-color: var(--spx-accent);
-  color: #ffffff;
-}
-
-.spx-footer-badge img {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-}
-
-/* Custom Dark Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #05060a;
-}
-::-webkit-scrollbar-thumb {
-  background: #1f2937;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #38bdf8;
-}
-EOF
-green "Wrote ${BRAND_ASSET_DIR}/sparrowx-theme.css"
+if [[ ! -f "$THEME_CSS_SRC" ]]; then
+  err "Missing ${THEME_CSS_SRC} — run git pull in ${REPO_DIR} first."
+  exit 1
+fi
+cp -f "$THEME_CSS_SRC" "${BRAND_ASSET_DIR}/ptero-midnight-theme.css"
+green "Installed lightweight Midnight Black palette (${BRAND_ASSET_DIR}/ptero-midnight-theme.css)."
 
 # ------------------------------------------------------------------------------
-# 5. WRITE SAFE NON-BLOCKING BRAND ENHANCER SCRIPT
+# 3. IDEMPOTENTLY INJECT SINGLE PURE-CSS LINK (ZERO JS)
 # ------------------------------------------------------------------------------
-cat > "${BRAND_ASSET_DIR}/sparrowx-brand.js" <<'EOF'
-(function () {
-  var BRAND = "SparrowX Hosting";
-  var LOGO_URL = "/sparrowx/logo.png";
-
-  function enhanceNavLogo() {
-    var brandLink =
-      document.querySelector('a[href="/"] span') ||
-      document.querySelector('nav a[href="/"]') ||
-      document.querySelector('header a[href="/"]') ||
-      document.querySelector('aside a[href="/"]');
-    if (!brandLink) return;
-    var container = brandLink.tagName === "A" ? brandLink : brandLink.parentElement;
-    if (!container) return;
-
-    // Replace any existing (or broken) theme <img> inside the brand header with our official SparrowX logo
-    var existingImgs = container.querySelectorAll("img:not(.spx-nav-logo)");
-    if (existingImgs.length > 0) {
-      existingImgs.forEach(function (el, idx) {
-        if (idx === 0) {
-          el.src = LOGO_URL;
-          el.alt = BRAND;
-          el.className = "spx-nav-logo";
-        } else {
-          el.style.display = "none";
-        }
-      });
-    } else if (!container.querySelector(".spx-nav-logo")) {
-      var img = document.createElement("img");
-      img.src = LOGO_URL;
-      img.alt = BRAND;
-      img.className = "spx-nav-logo";
-      container.insertBefore(img, container.firstChild);
-    }
-
-    // Normalize "Sparrowxhosting" brand text to clean "SparrowX Hosting"
-    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-    var node;
-    while ((node = walker.nextNode())) {
-      if (node.nodeValue && /sparrowxhosting/i.test(node.nodeValue)) {
-        node.nodeValue = node.nodeValue.replace(/sparrowxhosting/gi, BRAND);
-      }
-    }
-  }
-
-  function fixBrokenBrandImages() {
-    document.querySelectorAll("header img, nav img, aside img").forEach(function (img) {
-      if (img.classList.contains("spx-nav-logo")) return;
-      if (img.complete && img.naturalWidth === 0) {
-        img.style.display = "none";
-      }
-    });
-  }
-
-  function enhanceLoginHeader() {
-    if (!window.location.pathname.startsWith("/auth")) return;
-    if (document.querySelector(".spx-login-brand")) return;
-    var form = document.querySelector("form");
-    if (!form || !form.parentElement) return;
-    var header = document.createElement("div");
-    header.className = "spx-login-brand";
-    header.innerHTML =
-      '<img src="' + LOGO_URL + '" alt="' + BRAND + '" />' +
-      '<div class="spx-login-brand-title">SPARROWX HOSTING</div>' +
-      '<div class="spx-login-brand-sub">Sovereign Game &amp; Cloud Control Panel</div>';
-    form.parentElement.insertBefore(header, form);
-  }
-
-  function ensureFooterPill() {
-    if (document.querySelector(".spx-footer-dock")) return;
-    var dock = document.createElement("div");
-    dock.className = "spx-footer-dock";
-
-    var wa = document.createElement("a");
-    wa.href = "https://wa.me/919025056678?text=Hi%20SparrowX%20Hosting%20Support%2C%20I%20need%20help%20with%20my%20game%20server.";
-    wa.target = "_blank";
-    wa.rel = "noopener noreferrer";
-    wa.className = "spx-whatsapp-btn";
-    wa.innerHTML = '<span>WhatsApp Support · +91 90250 56678</span>';
-
-    var brand = document.createElement("a");
-    brand.href = "https://sparrowx.net";
-    brand.target = "_blank";
-    brand.rel = "noopener noreferrer";
-    brand.className = "spx-footer-badge";
-    brand.innerHTML = '<img src="' + LOGO_URL + '" alt="" /><span>SparrowX Hosting</span>';
-
-    dock.appendChild(wa);
-    dock.appendChild(brand);
-    document.body.appendChild(dock);
-  }
-
-  function run() {
-    enhanceNavLogo();
-    fixBrokenBrandImages();
-    enhanceLoginHeader();
-    ensureFooterPill();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run);
-  } else {
-    run();
-  }
-
-  var observer = new MutationObserver(run);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
-})();
-EOF
-green "Wrote ${BRAND_ASSET_DIR}/sparrowx-brand.js"
-
-# ------------------------------------------------------------------------------
-# 6. IDEMPOTENTLY INJECT INTO PTERODACTYL BLADE TEMPLATES
-# ------------------------------------------------------------------------------
-inject_snippet() {
+inject_midnight_palette() {
   local target_file="$1"
-  if [[ ! -f "$target_file" ]]; then
-    return 0
-  fi
+  [[ -f "$target_file" ]] || return 0
+  strip_all_sparrowx_layers "$target_file"
 
-  # Strip any previous SparrowX brand block first (idempotent re-runs)
-  python3 - "$target_file" <<'PY'
-import re, sys
-path = sys.argv[1]
+  python3 - "$target_file" "$THEME_VERSION" <<'PY'
+import sys
+path, ver = sys.argv[1], sys.argv[2]
 txt = open(path, "r", encoding="utf-8").read()
-txt = re.sub(r"\n?<!-- SPARROWX-BRAND:START -->.*?<!-- SPARROWX-BRAND:END -->\n?", "", txt, flags=re.S)
 
-snippet = """
-<!-- SPARROWX-BRAND:START -->
-<link rel="icon" type="image/png" href="/sparrowx/logo.png?v=2026c">
-<link rel="stylesheet" href="/sparrowx/sparrowx-theme.css?v=2026c">
-<script src="/sparrowx/sparrowx-brand.js?v=2026c" defer></script>
-<!-- SPARROWX-BRAND:END -->
-"""
+snippet = (
+    "<!-- SPARROWX-STELLAR-MIDNIGHT:START -->\n"
+    f'    <link rel="stylesheet" href="/sparrowx/ptero-midnight-theme.css?v={ver}" />\n'
+    "<!-- SPARROWX-STELLAR-MIDNIGHT:END -->\n"
+)
 
 if "</head>" in txt:
     txt = txt.replace("</head>", snippet + "</head>", 1)
 else:
-    txt = txt + snippet
+    txt = txt + "\n" + snippet
 
 open(path, "w", encoding="utf-8").write(txt)
 PY
-  green "Injected SparrowX branding into ${target_file}"
+  green "Linked lightweight Midnight Black CSS in ${target_file}"
 }
 
-inject_snippet "${PTERO_DIR}/resources/views/templates/wrapper.blade.php"
-inject_snippet "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
+inject_midnight_palette "${PTERO_DIR}/resources/views/templates/wrapper.blade.php"
+inject_midnight_palette "${PTERO_DIR}/resources/views/templates/auth/core.blade.php"
 
 # ------------------------------------------------------------------------------
-# 7. CLEAR CACHES & VERIFY PANEL HEALTH (AUTO-ROLLBACK ON FAILURE)
+# 4. CLEAR & RE-WARM CACHES + HEALTH CHECK
 # ------------------------------------------------------------------------------
 clear_ptero_caches
 
@@ -471,10 +185,11 @@ HTTP_CODE="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 8 https://game.p
 if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "302" ]]; then
   green "Pterodactyl Panel health check PASSED (HTTP ${HTTP_CODE})!"
   echo ""
-  echo "  Brand Name : ${BRAND_NAME}"
-  echo "  Theme CSS  : /sparrowx/sparrowx-theme.css"
-  echo "  Backup Dir : ${BACKUP_DIR}"
+  echo "  Theme Mode : Native Stellar UI + Pure-CSS Midnight Black Palette (Zero JS)"
+  echo "  CSS File   : /sparrowx/ptero-midnight-theme.css"
+  echo "  Tip        : For 100% native Stellar colors, also set Stellar Admin dark bg to #05060A and card bg to #0C0F18."
+  echo "  Remove CSS : sudo bash ${REPO_DIR}/deploy/ptero-brand-sparrowx.sh --remove"
   echo "  Rollback   : sudo bash ${REPO_DIR}/deploy/ptero-brand-sparrowx.sh --rollback"
 else
-  warn "Health check returned HTTP ${HTTP_CODE:-ERR} (if Traefik/Nginx is restarting, check manually; rollback available via --rollback)."
+  warn "Health check returned HTTP ${HTTP_CODE:-ERR} (check manually; --remove or --rollback available)."
 fi

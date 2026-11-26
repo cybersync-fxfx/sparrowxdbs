@@ -1,133 +1,160 @@
 /* ============================================================================
-   SPARROWX PTERODACTYL MIDNIGHT BLACK THEME + PER-SERVER DYNAMIC ACCENTS
-   Injected into game.panel.sparrowx.net by ovh/ptero-eggs-sync.sh
-   ============================================================================ */
-:root {
+ * SPARROWX HOSTING — LIGHTWEIGHT MIDNIGHT BLACK PALETTE FOR STELLAR THEME
+ * ============================================================================
+ * Pure CSS color-only layer (~2 KB).
+ * - Keeps 100% of Stellar's native components, layout, sidebar, modals & UI.
+ * - ZERO JavaScript, ZERO MutationObserver, ZERO backdrop-filter blur,
+ *   ZERO full-screen watermarks or floating docks (eliminates UI lag).
+ * - Respects Stellar's native light-mode toggle when active.
+ * ============================================================================ */
+
+:root:not(.light):not([data-theme="light"]) {
   color-scheme: dark;
-  --spx-bg: #000000;
-  --spx-surface: #07090f;
-  --spx-surface-elevated: #0d111a;
-  --spx-border: rgba(255, 255, 255, 0.09);
-  --spx-accent: #f96246;
-  --spx-accent-glow: rgba(249, 98, 70, 0.25);
+
+  /* SparrowX Midnight Black Tokens */
+  --spx-bg: #05060a;
+  --spx-sidebar: #080a10;
+  --spx-surface: #0c0f18;
+  --spx-surface-elevated: #111624;
+  --spx-input: #0e121d;
+  --spx-border: rgba(255, 255, 255, 0.08);
+  --spx-border-hover: rgba(255, 255, 255, 0.16);
+  --spx-text: #f4f6fa;
+  --spx-text-muted: #94a3b8;
+
+  /* Common Stellar / Pterodactyl Dark Theme CSS Variables */
+  --background: var(--spx-bg);
+  --bg: var(--spx-bg);
+  --base-background: var(--spx-bg);
+  --primary-background: var(--spx-bg);
+  --secondary-background: var(--spx-surface);
+  --sidebar-background: var(--spx-sidebar);
+  --sidebar-bg: var(--spx-sidebar);
+  --card-background: var(--spx-surface);
+  --card-bg: var(--spx-surface);
+  --panel-bg: var(--spx-bg);
+  --dark-background: var(--spx-bg);
+  --dark-secondary: var(--spx-surface);
+  --color-background: var(--spx-bg);
+  --color-surface: var(--spx-surface);
+  --border-color: var(--spx-border);
 }
 
-/* Per-server dynamic themes */
-:root[data-spx-theme="minecraft"] {
-  --spx-accent: #84cc16;
-  --spx-accent-glow: rgba(132, 204, 22, 0.25);
-}
-:root[data-spx-theme="fivem"] {
-  --spx-accent: #ff6b00;
-  --spx-accent-glow: rgba(255, 107, 0, 0.28);
-}
-:root[data-spx-theme="samp"] {
-  --spx-accent: #f59e0b;
-  --spx-accent-glow: rgba(245, 158, 11, 0.26);
-}
-:root[data-spx-theme="discord"] {
-  --spx-accent: #6366f1;
-  --spx-accent-glow: rgba(99, 102, 241, 0.28);
-}
-
-html,
-#app {
+/* Base Canvas — Solid Midnight Black (no heavy gradients or fixed overlays) */
+html:not(.light):not([data-theme="light"]),
+html:not(.light):not([data-theme="light"]) body,
+html:not(.light):not([data-theme="light"]) #app {
   background-color: var(--spx-bg) !important;
-  color: #f4f6fa !important;
+  background-image: none !important;
+  color: var(--spx-text);
 }
 
-body {
-  background-color: var(--spx-bg) !important;
-  background-image: radial-gradient(
-    ellipse 70% 35% at 50% -8%,
-    var(--spx-accent-glow),
-    transparent 65%
-  ) !important;
-  background-repeat: no-repeat !important;
-  color: #f4f6fa !important;
+/* Remove any leftover pseudo-element overlays */
+html:not(.light):not([data-theme="light"]) body::before {
+  content: none !important;
+  display: none !important;
 }
 
-/* Override Pterodactyl default slate/neutral cards with Midnight Black glass */
-div[class*="GreyRowBox"],
-div[class*="TitledGreyBox"],
-div[class*="ContentBox"],
-nav[class*="NavigationBar"],
-div[class*="SubNavigation"] {
+/* Stellar Sidebar, Top Bar & Sub-Navigation — Recolor Only (keep Stellar layout intact) */
+html:not(.light):not([data-theme="light"]) aside,
+html:not(.light):not([data-theme="light"]) #sidebar,
+html:not(.light):not([data-theme="light"]) .sidebar,
+html:not(.light):not([data-theme="light"]) [class*="Sidebar"],
+html:not(.light):not([data-theme="light"]) [class*="SideBar"],
+html:not(.light):not([data-theme="light"]) header,
+html:not(.light):not([data-theme="light"]) [class*="NavigationBar"],
+html:not(.light):not([data-theme="light"]) [class*="SubNavigation"],
+html:not(.light):not([data-theme="light"]) [class*="TopBar"] {
+  background-color: var(--spx-sidebar) !important;
+  border-color: var(--spx-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Main Content Area */
+html:not(.light):not([data-theme="light"]) main,
+html:not(.light):not([data-theme="light"]) #content-wrapper,
+html:not(.light):not([data-theme="light"]) [class*="PageContentBlock"] {
+  background-color: transparent;
+}
+
+/* Cards, Server Rows, Boxes & Modals — Crisp Flat Midnight Surfaces (zero blur) */
+html:not(.light):not([data-theme="light"]) [class*="GreyRowBox"],
+html:not(.light):not([data-theme="light"]) [class*="TitledGreyBox"],
+html:not(.light):not([data-theme="light"]) [class*="ContentBox"],
+html:not(.light):not([data-theme="light"]) [class*="ServerRow"],
+html:not(.light):not([data-theme="light"]) [class*="Dialog"] [class*="Panel"],
+html:not(.light):not([data-theme="light"]) [role="dialog"] > div {
   background-color: var(--spx-surface) !important;
   border-color: var(--spx-border) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
-div[class*="SubNavigation"] a.active,
-div[class*="SubNavigation"] a:hover {
-  border-bottom-color: var(--spx-accent) !important;
-  color: #ffffff !important;
+html:not(.light):not([data-theme="light"]) [class*="ServerRow"]:hover {
+  background-color: var(--spx-surface-elevated) !important;
+  border-color: var(--spx-border-hover) !important;
 }
 
-/* SparrowX Floating Smart Suggestion Toaster */
-#spx-ptero-toast-root {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
-  z-index: 99999;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-width: 360px;
-  font-family: "Inter", system-ui, sans-serif;
+/* Standard Pterodactyl / Tailwind Dark Surface Utilities -> Midnight Black */
+html:not(.light):not([data-theme="light"]) .bg-neutral-900,
+html:not(.light):not([data-theme="light"]) .bg-gray-900,
+html:not(.light):not([data-theme="light"]) .bg-slate-900,
+html:not(.light):not([data-theme="light"]) .bg-zinc-900 {
+  background-color: var(--spx-sidebar) !important;
 }
 
-.spx-ptero-toast {
-  background: rgba(8, 10, 16, 0.96);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--spx-accent);
-  border-left-width: 4px;
-  border-radius: 12px;
-  padding: 12px 14px;
-  color: #f8fafc;
-  box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.85);
-  font-size: 12.5px;
-  line-height: 1.45;
-  will-change: transform, opacity;
-  animation: spxToastIn 220ms cubic-bezier(0.22, 1, 0.36, 1);
+html:not(.light):not([data-theme="light"]) .bg-neutral-800,
+html:not(.light):not([data-theme="light"]) .bg-gray-800,
+html:not(.light):not([data-theme="light"]) .bg-slate-800,
+html:not(.light):not([data-theme="light"]) .bg-zinc-800 {
+  background-color: var(--spx-surface) !important;
 }
 
-.spx-ptero-toast-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-weight: 700;
-  margin-bottom: 4px;
-  color: #ffffff;
+html:not(.light):not([data-theme="light"]) .bg-neutral-700,
+html:not(.light):not([data-theme="light"]) .bg-gray-700,
+html:not(.light):not([data-theme="light"]) .bg-slate-700,
+html:not(.light):not([data-theme="light"]) .bg-zinc-700 {
+  background-color: var(--spx-surface-elevated) !important;
 }
 
-.spx-ptero-toast-badge {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 2px 7px;
-  border-radius: 9999px;
-  background: var(--spx-accent-glow);
-  color: var(--spx-accent);
+/* Search Bar & Text Inputs — Preserve Toggles, Checkboxes & Buttons */
+html:not(.light):not([data-theme="light"]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+html:not(.light):not([data-theme="light"]) textarea,
+html:not(.light):not([data-theme="light"]) select {
+  background-color: var(--spx-input) !important;
+  border-color: var(--spx-border) !important;
+  color: var(--spx-text) !important;
 }
 
-.spx-ptero-toast-close {
-  background: transparent;
-  border: none;
-  color: #94a3b8;
-  cursor: pointer;
-  font-size: 15px;
-  line-height: 1;
+html:not(.light):not([data-theme="light"]) input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+html:not(.light):not([data-theme="light"]) textarea:focus,
+html:not(.light):not([data-theme="light"]) select:focus {
+  border-color: rgba(255, 255, 255, 0.28) !important;
 }
 
-@keyframes spxToastIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+/* Keep Xterm Server Console Native & Fast */
+.xterm,
+.xterm-viewport,
+.xterm-screen {
+  background-color: #05060a !important;
+}
+
+/* Minimal Midnight Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: #05060a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c2233;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2e3750;
 }

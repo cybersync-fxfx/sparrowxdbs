@@ -3030,7 +3030,7 @@ fi
 PTERO_STATUS="NOT INSTALLED"
 if is_pterodactyl_installed; then
   if [ -f "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" ]; then
-    log_info "Syncing SparrowX Midnight Theme, Toast Bridge & Curated Game/Bot Eggs into Pterodactyl..."
+    log_info "Syncing Lightweight Stellar Midnight Black Palette & Curated Game/Bot Eggs into Pterodactyl..."
     bash "${INSTALL_DIR}/ovh/ptero-eggs-sync.sh" || log_warn "Pterodactyl eggs/theme sync had non-fatal warnings."
   fi
   PTERO_EDGE_CODE="$(curl -sk -o /dev/null -w "%{http_code}" --max-time 4 -H "Host: ${DOMAIN_GAME}" "https://127.0.0.1:${HTTPS_PORT}/" 2>/dev/null || echo "000")"
