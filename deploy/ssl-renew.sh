@@ -70,6 +70,14 @@ CANDIDATE_DOMAINS=(
   "keys.${DOMAIN_ROOT}"
   "${DOMAIN_API}"
   "${DOMAIN_INFRA}"
+  "metal.${DOMAIN_ROOT}"
+  "deploy.${DOMAIN_ROOT}"
+  "ai.${DOMAIN_ROOT}"
+  "agents.${DOMAIN_ROOT}"
+  "dpdp.${DOMAIN_ROOT}"
+  "console.${DOMAIN_ROOT}"
+  "php.${DOMAIN_ROOT}"
+  "admin.${DOMAIN_ROOT}"
   "${DOMAIN_GAME_WEB}"
   "${DOMAIN_GAME_DASH}"
   "${DOMAIN_GAME}"
@@ -103,17 +111,33 @@ if [ "${#VALID_DOMAINS[@]}" -eq 0 ]; then
 else
   log_ssl "Requesting/renewing Let's Encrypt SSL for: ${VALID_DOMAINS[*]}"
 
+  LIVE_DIR="/etc/letsencrypt/live/${DOMAIN_ROOT}"
+  MISSING_SAN="false"
+  if [ -s "${LIVE_DIR}/fullchain.pem" ] && command -v openssl >/dev/null 2>&1; then
+    CERT_SANS="$(openssl x509 -in "${LIVE_DIR}/fullchain.pem" -noout -text 2>/dev/null | grep -oE 'DNS:[^, ]+' | sed 's/^DNS://' || true)"
+    for d in "${VALID_DOMAINS[@]}"; do
+      if ! printf '%s\n' "${CERT_SANS}" | grep -Fxiq "${d}"; then
+        MISSING_SAN="true"
+        log_ssl "Detected subdomain missing from active SAN cert: ${d} — forcing cert expansion"
+        break
+      fi
+    done
+  fi
+
+  RENEW_FLAGS=(--expand --keep-until-expiring)
+  if [ "${MISSING_SAN}" = "true" ]; then
+    RENEW_FLAGS=(--expand)
+  fi
+
   if certbot certonly \
     --webroot -w "${WEBROOT}" \
     --non-interactive \
     --agree-tos \
-    --expand \
-    --keep-until-expiring \
+    "${RENEW_FLAGS[@]}" \
     --cert-name "${DOMAIN_ROOT}" \
     -m "${SPARROWX_ADMIN_EMAIL}" \
     "${CERTBOT_ARGS[@]}" >> "${LOG_FILE}" 2>&1; then
 
-    LIVE_DIR="/etc/letsencrypt/live/${DOMAIN_ROOT}"
     if [ -f "${LIVE_DIR}/fullchain.pem" ] && [ -f "${LIVE_DIR}/privkey.pem" ]; then
       cp -fL "${LIVE_DIR}/fullchain.pem" "${SSL_DIR}/fullchain.pem"
       cp -fL "${LIVE_DIR}/privkey.pem" "${SSL_DIR}/privkey.pem"
@@ -225,3 +249,9 @@ fi
 if [ -n "${DOMAIN_INFRA:-}" ] && [[ "${DOMAIN_INFRA}" != *.local ]] && [[ " ${VALID_DOMAINS[*]:-} " =~ " ${DOMAIN_INFRA} " ]]; then
   renew_dedicated_game_cert "${DOMAIN_INFRA}" "infra" "# 9\\. Cloud Infrastructure Storefront"
 fi
+for _plat_sub in php ai deploy dpdp agents console admin; do
+  _plat_dom="${_plat_sub}.${DOMAIN_ROOT}"
+  if [[ " ${VALID_DOMAINS[*]:-} " =~ " ${_plat_dom} " ]]; then
+    renew_dedicated_game_cert "${_plat_dom}" "${_plat_sub}" ""
+  fi
+done

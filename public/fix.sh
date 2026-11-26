@@ -1630,31 +1630,73 @@ ensure_core_letsencrypt_ssl() {
 
   local -a candidate_domains=(
     "${root_domain}"
+    "www.${root_domain}"
     "db.${root_domain}"
     "sec.${root_domain}"
+    "shield.${root_domain}"
     "file.${root_domain}"
+    "drop.${root_domain}"
     "password.${root_domain}"
+    "keys.${root_domain}"
     "api.${root_domain}"
     "infra.${root_domain}"
+    "metal.${root_domain}"
+    "deploy.${root_domain}"
+    "ai.${root_domain}"
+    "agents.${root_domain}"
+    "dpdp.${root_domain}"
+    "console.${root_domain}"
+    "php.${root_domain}"
+    "admin.${root_domain}"
+    "game.${root_domain}"
+    "game.dash.${root_domain}"
+    "game.panel.${root_domain}"
+    "panel.${root_domain}"
+    "gamesec.${root_domain}"
+    "netsec.${root_domain}"
   )
-  if getent ahosts "www.${root_domain}" >/dev/null 2>&1; then
-    candidate_domains+=("www.${root_domain}")
+
+  local pub_ip="${SPARROWX_PUBLIC_IP:-}"
+  if [ -z "${pub_ip}" ]; then
+    pub_ip="$(curl -4 -fsS --max-time 4 https://api.ipify.org 2>/dev/null || true)"
   fi
 
   local -a domain_args=()
-  local d
+  local -a resolved_domains=()
+  local d r_ip
   for d in "${candidate_domains[@]}"; do
-    if ! command -v getent >/dev/null 2>&1 || getent ahosts "${d}" >/dev/null 2>&1; then
+    r_ip=""
+    if command -v dig >/dev/null 2>&1; then
+      r_ip="$(dig +short A "${d}" @1.1.1.1 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)"
+    fi
+    if [ -z "${r_ip}" ] && command -v getent >/dev/null 2>&1; then
+      r_ip="$(getent ahostsv4 "${d}" 2>/dev/null | awk '{print $1; exit}' || true)"
+    fi
+    if [ -n "${r_ip}" ] && { [ -z "${pub_ip}" ] || [ "${r_ip}" = "${pub_ip}" ]; }; then
+      resolved_domains+=("${d}")
       domain_args+=("-d" "${d}")
     fi
   done
 
   if [ "${#domain_args[@]}" -eq 0 ]; then
+    resolved_domains=("${root_domain}")
     domain_args=("-d" "${root_domain}")
   fi
 
-  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ]; then
-    log_scan "Requesting Let's Encrypt SAN SSL for ${root_domain} & core subdomains via HTTP-01..."
+  local missing_san="false"
+  if [ -s "${live_dir}/fullchain.pem" ] && command -v openssl >/dev/null 2>&1; then
+    local cert_sans
+    cert_sans="$(openssl x509 -in "${live_dir}/fullchain.pem" -noout -text 2>/dev/null | grep -oE 'DNS:[^, ]+' | sed 's/^DNS://' || true)"
+    for d in "${resolved_domains[@]}"; do
+      if ! printf '%s\n' "${cert_sans}" | grep -Fxiq "${d}"; then
+        missing_san="true"
+        break
+      fi
+    done
+  fi
+
+  if [ ! -s "${live_dir}/fullchain.pem" ] || [ ! -s "${live_dir}/privkey.pem" ] || [ "${missing_san}" = "true" ]; then
+    log_scan "Requesting/expanding Let's Encrypt SAN SSL for ${root_domain} (${#resolved_domains[@]} resolved domains) via HTTP-01..."
     local cb_err=""
     if cb_err="$(certbot certonly \
       --webroot -w "${webroot}" \
@@ -1703,7 +1745,7 @@ ensure_core_letsencrypt_ssl() {
   else
     certbot certonly \
       --webroot -w "${webroot}" \
-      --non-interactive --agree-tos --keep-until-expiring \
+      --non-interactive --agree-tos --expand --keep-until-expiring \
       -m "${ssl_email}" \
       --cert-name "${root_domain}" \
       "${domain_args[@]}" >/dev/null 2>&1 || true
@@ -2055,7 +2097,10 @@ ensure_env_key "PTERO_SSO_SECRET" "${PTERO_SSO_SECRET}"
 [ -n "${GOOGLE_CLIENT_ID:-}" ] && ensure_env_key "GOOGLE_CLIENT_ID" "${GOOGLE_CLIENT_ID}"
 [ -n "${GOOGLE_CLIENT_SECRET:-}" ] && ensure_env_key "GOOGLE_CLIENT_SECRET" "${GOOGLE_CLIENT_SECRET}"
 [ -n "${GOOGLE_REDIRECT_URI:-}" ] && ensure_env_key "GOOGLE_REDIRECT_URI" "${GOOGLE_REDIRECT_URI}"
-export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI
+[ -n "${GITHUB_CLIENT_ID:-}" ] && ensure_env_key "GITHUB_CLIENT_ID" "${GITHUB_CLIENT_ID}"
+[ -n "${GITHUB_CLIENT_SECRET:-}" ] && ensure_env_key "GITHUB_CLIENT_SECRET" "${GITHUB_CLIENT_SECRET}"
+[ -n "${GITHUB_REDIRECT_URI:-}" ] && ensure_env_key "GITHUB_REDIRECT_URI" "${GITHUB_REDIRECT_URI}"
+export SPARROWX_DOMAIN SPARROWX_STUDIO_DOMAIN DOMAIN_GAME DOMAIN_GAME_WEB DOMAIN_GAME_DASH DOMAIN_GAMESEC GAMESEC_PORT GAMESEC_REPO_URL GAMESEC_DIR GAMESEC_UPSTREAM_URL DOMAIN_NETSEC NETSEC_PORT NETSEC_REPO_URL NETSEC_DIR NETSEC_UPSTREAM_URL PTERO_PORT SPARROWX_PUBLIC_IP SPARROWX_ADMIN_EMAIL PTERO_ADMIN_EMAIL PTERO_ADMIN_USER PTERO_ADMIN_FIRSTNAME PTERO_ADMIN_LASTNAME PTERO_ADMIN_PASSWORD PTERO_DB_NAME PTERO_DB_USER PTERO_DB_PASSWORD PTERO_TIMEZONE HTTP_PORT HTTPS_PORT APP_HOST_PORT PGRST_HOST_PORT PG_HOST_PORT POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB SPARROWX_JWT_SECRET SPARROWX_MASTER_SSO_SECRET SPARROWX_REDIS_SECRET PTERO_URL PTERO_SSO_SECRET GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI GITHUB_CLIENT_ID GITHUB_CLIENT_SECRET GITHUB_REDIRECT_URI
 
 log_ok "Verified .env (${SPARROWX_DOMAIN} @ ${SPARROWX_PUBLIC_IP})"
 
@@ -2908,7 +2953,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -3017,7 +3062,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://sparrowx:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_buffering off;

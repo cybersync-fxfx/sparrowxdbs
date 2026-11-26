@@ -728,7 +728,7 @@ server {
 server {
     listen 80;
     listen 443 ssl;
-    server_name ${DOMAIN_FILE} drop.${DOMAIN_ROOT} ${DOMAIN_PASSWORD} passwd.${DOMAIN_ROOT} keys.${DOMAIN_ROOT} ${DOMAIN_SEC} shield.${DOMAIN_ROOT} ${DOMAIN_API} rest.${DOMAIN_ROOT} infra.${DOMAIN_ROOT} metal.${DOMAIN_ROOT};
+    server_name ${DOMAIN_FILE} drop.${DOMAIN_ROOT} ${DOMAIN_PASSWORD} passwd.${DOMAIN_ROOT} keys.${DOMAIN_ROOT} ${DOMAIN_SEC} shield.${DOMAIN_ROOT} ${DOMAIN_API} rest.${DOMAIN_ROOT} infra.${DOMAIN_ROOT} metal.${DOMAIN_ROOT} deploy.${DOMAIN_ROOT} ai.${DOMAIN_ROOT} agents.${DOMAIN_ROOT} dpdp.${DOMAIN_ROOT} console.${DOMAIN_ROOT} admin.${DOMAIN_ROOT};
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
