@@ -11,8 +11,11 @@
 #  • Live Ping & HTTP/HTTPS Endpoint Detector with Auto-Fix + Watchdog Cron
 # ==============================================================================
 set -u
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
+UPSTREAM_APP_HOST="${UPSTREAM_APP_HOST:-sparrowx}"
 
-REPO_URL="https://github.com/cybersync-fxfx/sparrowxdbs.git"
+REPO_URL="https://github.com/sparrowxtech/sparrowxdbs.git"
 LOG_FILE="/var/log/sparrowx-install.log"
 
 AUTO_MODE="false"

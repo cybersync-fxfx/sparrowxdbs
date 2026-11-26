@@ -12,6 +12,9 @@
 #  7. Verify PostgreSQL roles/schema, PostgREST, HTTP health & auto-invoke fix.sh
 # ==============================================================================
 set -u
+export GIT_TERMINAL_PROMPT=0
+export GCM_INTERACTIVE=never
+UPSTREAM_APP_HOST="${UPSTREAM_APP_HOST:-sparrowx}"
 
 AUTO_MODE="false"
 FORCE_DB_INSTALL="false"
@@ -2432,7 +2435,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -2541,7 +2544,7 @@ server {
     }
 
     location / {
-        set \$upstream_app http://${UPSTREAM_APP_HOST}:3000;
+        set \$upstream_app http://${UPSTREAM_APP_HOST:-sparrowx}:3000;
         proxy_pass \$upstream_app;
         proxy_http_version 1.1;
         proxy_buffering off;
