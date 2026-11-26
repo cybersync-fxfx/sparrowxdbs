@@ -86,6 +86,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 dbName,
                 actor,
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, ...creds });
             }
@@ -95,6 +96,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 actor,
                 body.label || "Manual Snapshot",
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, snapshot });
             }
@@ -103,6 +105,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 dbName,
                 actor,
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, snapshots });
             }
@@ -118,6 +121,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 { planId: body.planId },
                 actor,
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, database: updated });
             }
@@ -127,6 +131,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 { status: "Suspended" },
                 actor,
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, database: updated });
             }
@@ -136,6 +141,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 { status: "Active" },
                 actor,
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, database: updated });
             }
@@ -144,6 +150,7 @@ export const Route = createFileRoute("/api/db/lifecycle")({
                 dbName,
                 actor,
                 auth.isAdmin,
+                auth.tenantId,
               );
               return Response.json({ ok: true, ...result });
             }

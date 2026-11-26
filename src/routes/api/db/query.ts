@@ -67,15 +67,32 @@ export const Route = createFileRoute("/api/db/query")({
             sql,
             auth.actorEmail || (auth.actorId === "studio-user" || auth.isAdmin ? email || auth.actorId : auth.actorId),
             auth.isAdmin,
+            auth.tenantId,
           );
           return Response.json(result);
         } catch (err) {
-          const status =
-            err instanceof Error && "statusCode" in err
-              ? Number((err as { statusCode: number }).statusCode)
-              : 400;
+          const pgErr = err as {
+            statusCode?: number;
+            message?: string;
+            pgCode?: string;
+            code?: string;
+            detail?: string;
+            hint?: string;
+            position?: string;
+          };
+          const status = pgErr?.statusCode ? Number(pgErr.statusCode) : 400;
           const message = err instanceof Error ? err.message : "Query execution failed";
-          return Response.json({ ok: false, error: message }, { status });
+          return Response.json(
+            {
+              ok: false,
+              error: message,
+              ...(pgErr?.pgCode || pgErr?.code ? { pgCode: pgErr.pgCode || pgErr.code } : {}),
+              ...(pgErr?.detail ? { detail: pgErr.detail } : {}),
+              ...(pgErr?.hint ? { hint: pgErr.hint } : {}),
+              ...(pgErr?.position ? { position: pgErr.position } : {}),
+            },
+            { status },
+          );
         }
       },
     },

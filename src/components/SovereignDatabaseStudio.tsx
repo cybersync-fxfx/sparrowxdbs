@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import migratedSeedData from "../lib/migrated-seed.json";
 import {
   authenticateAppUserFromBackend,
   fetchAppUserByEmailFromBackend,
@@ -20,6 +19,21 @@ import {
   fetchMasterSsoUser,
   syncMasterSsoSession,
 } from "@/lib/developer-connection";
+import {
+  buildCreateTableSql,
+  buildDeleteRowSql,
+  buildDropTableSql,
+  buildInsertRowSql,
+  buildSchemaDdlFromTables,
+  buildSchemaIntrospectionSql,
+  buildSelectTableSql,
+  buildUpdateRowSql,
+  isSchemaMutatingSql,
+  parseIntrospectedTables,
+  sanitizePgObjectName,
+  type LiveStudioColumn,
+  type LiveStudioTable,
+} from "@/lib/studio-sql";
 import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
@@ -28,7 +42,6 @@ import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { buildMasterHref } from "@/lib/routing";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
-import { querySparrowxCrossSystemAi } from "@/lib/sparrowx-ai-brain";
 import {
   SiAstro,
   SiNextdotjs,
@@ -116,429 +129,139 @@ const ROW_TEXT_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
 });
 
-const LOCAL_SEED_TABLES = migratedSeedData as Record<
-  string,
-  Array<Record<string, unknown>>
->;
-
 const DOT_GRID_STYLE: React.CSSProperties = {
   backgroundImage: "radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px)",
   backgroundSize: "18px 18px",
 };
 
-export interface StudioTableMeta {
-  name: string;
-  label: string;
-  description: string;
-  primaryKey: string;
-  defaultRow: Record<string, unknown>;
-}
+export interface StudioTableMeta extends LiveStudioTable {}
 
-export const INITIAL_STUDIO_TABLES: StudioTableMeta[] = [
-  {
-    name: "app_users",
-    label: "app_users",
-    description: "Authenticated platform accounts, password hashes & admin roles",
-    primaryKey: "id",
-    defaultRow: {
-      id: `usr-${Date.now()}`,
-      email: "operator@example.com",
-      password: "changeme123",
-      full_name: "Security Operator",
-      admin: "no",
-      tenant_id: null,
-    },
-  },
-  {
-    name: "client_tenants",
-    label: "client_tenants",
-    description: "Isolated organization workspaces, API keys & protection tiers",
-    primaryKey: "id",
-    defaultRow: {
-      id: `tnt-${Date.now()}`,
-      name: "Acme Corp",
-      contact_email: "secops@acme.io",
-      primary_domain: "acme.io",
-      plan_tier: "Growth",
-      status: "Active",
-      enabled_modules: ["web_security", "ai_shield"],
-      api_key: `spx_live_${Math.random().toString(36).slice(2, 14)}`,
-      sdk_verified: false,
-      guardrails_active: true,
-      requests_per_min: 0,
-      blocked_threats: 0,
-      avg_latency_ms: 1,
-      quota_used_pct: 0,
-    },
-  },
-  {
-    name: "protected_services",
-    label: "protected_services",
-    description: "Onboarded web domains, APIs, and AI agent endpoints",
-    primaryKey: "id",
-    defaultRow: {
-      id: `srv-${Date.now()}`,
-      name: "Production API",
-      category: "Web App / Microservice",
-      endpoint: "https://api.acme.io",
-      protection_mode: "Block (Active Guard)",
-      status: "Healthy",
-      requests_24h: 0,
-      blocked_24h: 0,
-      ai_prompt_guard: true,
-      api_schema_shield: true,
-      bot_mitigation: true,
-      latency_overhead: "0.8ms",
-      api_key: `spx_srv_${Math.random().toString(36).slice(2, 12)}`,
-    },
-  },
-  {
-    name: "incidents",
-    label: "incidents",
-    description: "Real-time security incidents, severity triage & playbooks",
-    primaryKey: "id",
-    defaultRow: {
-      id: `INC-${Math.floor(1000 + Math.random() * 9000)}`,
-      title: "SQL Injection Probe Blocked",
-      source: "Edge WAF",
-      severity: "High",
-      status: "Contained",
-      assignee: "Autonomous SOC",
-      detected_at: "Just now",
-      summary: "Automated SQLi payload dropped at edge.",
-      playbook: "WAF Auto-Block",
-    },
-  },
-  {
-    name: "assets",
-    label: "assets",
-    description: "Protected infrastructure nodes, servers & cloud endpoints",
-    primaryKey: "id",
-    defaultRow: {
-      id: `ast-${Date.now()}`,
-      hostname: "edge-node-01.ovh.net",
-      ip: "127.0.0.1",
-      type: "API Gateway",
-      environment: "Production",
-      status: "Protected",
-      risk_score: 12,
-      last_checkin: "Just now",
-    },
-  },
-  {
-    name: "threat_indicators",
-    label: "threat_indicators",
-    description: "IOCs, malicious IPs/ASNs, MITRE ATT&CK TTPs & confidence scores",
-    primaryKey: "id",
-    defaultRow: {
-      id: `ioc-${Date.now()}`,
-      indicator: "198.51.100.42",
-      type: "IPv4",
-      actor: "Automated Scanner",
-      confidence: 95,
-      severity: "High",
-      mitre_tactic: "Initial Access",
-      status: "Blocked",
-      last_seen: "Just now",
-    },
-  },
-  {
-    name: "vulnerabilities",
-    label: "vulnerabilities",
-    description: "Tracked CVEs, CVSS scores, affected assets & patch status",
-    primaryKey: "id",
-    defaultRow: {
-      id: `vln-${Date.now()}`,
-      cve: "CVE-2026-0001",
-      title: "TLS Header Misconfiguration",
-      cvss: 6.5,
-      severity: "Medium",
-      affected_asset: "edge-node-01",
-      patch_status: "Patched",
-      discovered: "Today",
-    },
-  },
-  {
-    name: "ai_embeddings",
-    label: "ai_embeddings",
-    description: "pgvector vector store: document chunks, cosine embeddings & similarity index",
-    primaryKey: "id",
-    defaultRow: {
-      id: `vec-${Date.now()}`,
-      document_title: "SparrowX Autonomous Defense Specification",
-      embedding: "[0.021, -0.412, 0.883, 0.124, -0.043]",
-      dimensions: 1536,
-      model: "text-embedding-3-small",
-      similarity_score: 0.94,
-    },
-  },
-  {
-    name: "billing_transactions",
-    label: "billing_transactions",
-    description: "Workspace credit ledger & subscription transaction logs",
-    primaryKey: "id",
-    defaultRow: {
-      id: `txn-${Date.now()}`,
-      user_email: "operator@example.com",
-      package_name: "Enterprise Allocation",
-      amount_usd: 0,
-      credits_added: 1000,
-      payment_method: "Sovereign Admin Grant",
-      status: "Verified",
-      created_at: new Date().toISOString(),
-    },
-  },
-  {
-    name: "audit_logs",
-    label: "audit_logs",
-    description: "Immutable operator & autonomous defense audit trail",
-    primaryKey: "id",
-    defaultRow: {
-      id: `aud-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      actor: "system@sparrowx.local",
-      role: "Admin",
-      action: "SCHEMA_VERIFIED",
-      target: "sparrowx_db",
-      ip_address: "127.0.0.1",
-      status: "Success",
-    },
-  },
-  {
-    name: "reports",
-    label: "reports",
-    description: "Generated SOC 2, ISO 27001, and vulnerability scan reports",
-    primaryKey: "id",
-    defaultRow: {
-      id: `rpt-${Date.now()}`,
-      name: "SOC 2 Type II Readiness Report",
-      framework: "SOC 2",
-      period: "Q4",
-      status: "Ready",
-      generated_by: "SparrowX Studio",
-      updated_at: "Just now",
-    },
-  },
-  {
-    name: "team_members",
-    label: "team_members",
-    description: "SOC operators, shift assignments & MFA enforcement state",
-    primaryKey: "id",
-    defaultRow: {
-      id: `tm-${Date.now()}`,
-      name: "Lead SOC Analyst",
-      role: "Principal Responder",
-      email: "soc@sparrowx.local",
-      shift: "24/7 Autonomous",
-      mfa_enabled: true,
-      active_cases: 0,
-      status: "Online",
-    },
-  },
-  {
-    name: "integrations",
-    label: "integrations",
-    description: "Third-party SIEM connectors, Slack hooks & cloud logs",
-    primaryKey: "id",
-    defaultRow: {
-      id: `int-${Date.now()}`,
-      name: "OVH Edge Firewall",
-      category: "Firewall",
-      status: "Connected",
-      events_per_min: "120",
-      last_sync: "Just now",
-    },
-  },
-  {
-    name: "provisioned_databases",
-    label: "provisioned_databases",
-    description: "All isolated PostgreSQL databases provisioned inside SparrowX Cloud DB",
-    primaryKey: "id",
-    defaultRow: {
-      id: `PDB-${Date.now()}`,
-      tenant_id: "TNT-SPARROWX-CORE",
-      user_id: "USR-SPX-MASTER",
-      user_email: "master-db@sparrowx.net",
-      db_name: "sparrowx_db",
-      db_user: "sparrowx",
-      db_host: "db.sparrowx.net",
-      db_port: 5432,
-      status: "Active",
-    },
-  },
-  {
-    name: "billing_credits",
-    label: "billing_credits",
-    description: "Workspace credit balances & UPI / Razorpay wallet ledger",
-    primaryKey: "id",
-    defaultRow: {
-      id: `crd-${Date.now()}`,
-      tenant_id: "TNT-SPARROWX-CORE",
-      user_email: "master-db@sparrowx.net",
-      balance: 0,
-    },
-  },
-  {
-    name: "clients",
-    label: "clients",
-    description: "SparrowX Game Hosting Discord-linked client accounts & Pterodactyl bindings",
-    primaryKey: "id",
-    defaultRow: {
-      discord_id: "",
-      discord_username: "",
-      email: "",
-      coins: 0,
-    },
-  },
-  {
-    name: "subscriptions",
-    label: "subscriptions",
-    description: "Active game server plans, billing cycles & Pterodactyl server IDs",
-    primaryKey: "id",
-    defaultRow: {
-      service_type: "minecraft",
-      plan_name: "Starter",
-      price_coins: 100,
-      status: "active",
-    },
-  },
-  {
-    name: "sbs_users",
-    label: "sbs_users",
-    description: "NetSec DDoS Control Panel (netsec.sparrowx.net) authenticated operator accounts",
-    primaryKey: "id",
-    defaultRow: {
-      email: "operator@sparrowx.net",
-      password_hash: "",
-    },
-  },
-  {
-    name: "user_profiles",
-    label: "user_profiles",
-    description: "NetSec WireGuard tunnel allocations, API keys & edge agent IDs",
-    primaryKey: "id",
-    defaultRow: {
-      username: "edge_node",
-      email: "operator@sparrowx.net",
-      role: "user",
-      status: "approved",
-      tunnel_status: "inactive",
-    },
-  },
-  {
-    name: "threat_radar",
-    label: "threat_radar",
-    description: "Live NetSec DDoS threat radar IP detections, scores & XDP mitigation actions",
-    primaryKey: "id",
-    defaultRow: {
-      ip: "0.0.0.0",
-      score: 90,
-      reason: "SYN flood",
-      action: "blocked",
-    },
-  },
-];
+// Empty by default — all Studio tables are loaded live from the user's real PostgreSQL database via information_schema.
+export const INITIAL_STUDIO_TABLES: StudioTableMeta[] = [];
 
-interface StorageBucket {
+interface LiveDbSummaryItem {
   id: string;
-  name: string;
-  isPublic: boolean;
-  fileCount: number;
-  totalSize: string;
-  files: Array<{ name: string; size: string; type: string; updated: string }>;
+  tenantId: string;
+  userEmail: string;
+  projectName: string;
+  planId: string;
+  planName: string;
+  dbName: string;
+  dbUser: string;
+  dbHost: string;
+  dbPort: number;
+  sizeBytes: number;
+  sizePretty: string;
+  storageLimitMb: number;
+  usagePct: number;
+  maxConnections: number;
+  activeConnections: number;
+  backupCount: number;
+  lastBackupAt: string | null;
+  status: string;
+  createdAt: string;
 }
 
-const STORAGE_BUCKETS: [StorageBucket, ...StorageBucket[]] = [
-  {
-    id: "bkt-avatars",
-    name: "avatars",
-    isPublic: true,
-    fileCount: 42,
-    totalSize: "14.2 MB",
-    files: [
-      { name: "operator-admin.png", size: "320 KB", type: "image/png", updated: "2 hours ago" },
-      { name: "tenant-acme-logo.svg", size: "48 KB", type: "image/svg+xml", updated: "Yesterday" },
-      { name: "sparrowx-cyber-hawk.png", size: "1.2 MB", type: "image/png", updated: "Just now" },
-    ],
-  },
-  {
-    id: "bkt-evidence",
-    name: "incident-evidence",
-    isPublic: false,
-    fileCount: 128,
-    totalSize: "1.8 GB",
-    files: [
-      { name: "pcap-sqli-attack-2026-11.pcap", size: "450 MB", type: "application/vnd.tcpdump.pcap", updated: "Today" },
-      { name: "raw-waf-payload-dump.json", size: "12 MB", type: "application/json", updated: "Yesterday" },
-      { name: "ddos-flow-telemetry.csv", size: "84 MB", type: "text/csv", updated: "3 days ago" },
-    ],
-  },
-  {
-    id: "bkt-backups",
-    name: "database-snapshots",
-    isPublic: false,
-    fileCount: 14,
-    totalSize: "8.4 GB",
-    files: [
-      { name: "sparrowbase-pg16-daily-2026-11-09.sql.gz", size: "640 MB", type: "application/gzip", updated: "6 hours ago" },
-      { name: "sparrowbase-pg16-weekly-2026-11-02.sql.gz", size: "610 MB", type: "application/gzip", updated: "7 days ago" },
-    ],
-  },
-  {
-    id: "bkt-reports",
-    name: "compliance-exports",
-    isPublic: false,
-    fileCount: 38,
-    totalSize: "420 MB",
-    files: [
-      { name: "soc2-type2-audit-readiness-2026.pdf", size: "18 MB", type: "application/pdf", updated: "1 week ago" },
-      { name: "iso-27001-cve-risk-assessment.pdf", size: "9.4 MB", type: "application/pdf", updated: "2 weeks ago" },
-    ],
-  },
-];
+interface LiveClusterHealth {
+  ok: boolean;
+  engine: string;
+  version: string;
+  pgvectorAvailable: boolean;
+  pgcryptoAvailable: boolean;
+  uptimeSeconds: number;
+  totalDatabases: number;
+  activeConnections: number;
+  clusterSizePretty: string;
+  latencyMs: number;
+  sslMode: string;
+  originRegion: string;
+  originLocation: string;
+  originDatacenter: string;
+  checkedAt: string;
+  error?: string;
+}
+
+interface LiveDbSnapshot {
+  id: string;
+  dbName: string;
+  tenantId: string;
+  label: string;
+  sizeBytes: number;
+  sizePretty: string;
+  tableCount: number;
+  checksumSha256: string;
+  retentionDays: number;
+  expiresAt: string;
+  createdAt: string;
+}
+
+interface LiveDbAuditLog {
+  id: string;
+  action: string;
+  dbName: string;
+  tenantId: string;
+  actor: string;
+  status: string;
+  detail: string;
+  createdAt: string;
+}
+
+interface SqlErrorDetails {
+  message: string;
+  pgCode?: string;
+  detail?: string;
+  hint?: string;
+  position?: string;
+}
 
 const SQL_TEMPLATES = [
   {
-    id: "select_users",
-    label: "Query Active Users",
-    category: "Basic CRUD",
-    sql: `SELECT id, email, full_name, admin, created_at \nFROM app_users \nORDER BY created_at DESC \nLIMIT 10;`,
+    id: "verify_connection",
+    label: "Verify Database & PostgreSQL Version",
+    category: "Diagnostics",
+    sql: `SELECT\n  current_database() AS database_name,\n  current_user AS active_role,\n  version() AS postgres_version,\n  now() AS server_time;`,
   },
   {
-    id: "pgvector_search",
-    label: "pgvector Cosine Similarity Search",
-    category: "AI & Vector",
-    sql: `-- Cosine Distance similarity query via pgvector (<=>)\nSELECT \n  id, \n  document_title, \n  1 - (embedding <=> '[0.021, -0.412, 0.883, 0.124, -0.043]') AS similarity_score\nFROM ai_embeddings\nORDER BY similarity_score DESC\nLIMIT 5;`,
+    id: "create_starter_table",
+    label: "Create Table & Insert Sample Row",
+    category: "Quickstart",
+    sql: `CREATE TABLE IF NOT EXISTS public.notes (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  title TEXT NOT NULL,\n  body TEXT DEFAULT '',\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nINSERT INTO public.notes (title, body)\nVALUES ('First Note', 'Stored directly in isolated PostgreSQL 16')\nRETURNING *;`,
   },
   {
-    id: "active_connections",
-    label: "Active Connection Monitor",
-    category: "Performance",
-    sql: `SELECT \n  pid, \n  usename, \n  client_addr, \n  application_name, \n  state, \n  query_start, \n  query\nFROM pg_stat_activity \nWHERE state != 'idle'\nORDER BY query_start DESC;`,
-  },
-  {
-    id: "table_sizes",
-    label: "Inspect Table Disk Consumption",
-    category: "Storage",
-    sql: `SELECT \n  relname AS table_name,\n  pg_size_pretty(pg_total_relation_size(relid)) AS total_size,\n  pg_size_pretty(pg_relation_size(relid)) AS table_size,\n  pg_size_pretty(pg_total_relation_size(relid) - pg_relation_size(relid)) AS index_size\nFROM pg_catalog.pg_statio_user_tables\nORDER BY pg_total_relation_size(relid) DESC;`,
+    id: "list_tables_sizes",
+    label: "List Public Tables & Disk Sizes",
+    category: "Schema",
+    sql: `SELECT\n  tablename AS table_name,\n  pg_size_pretty(pg_total_relation_size(quote_ident(schemaname) || '.' || quote_ident(tablename))) AS total_size,\n  pg_size_pretty(pg_relation_size(quote_ident(schemaname) || '.' || quote_ident(tablename))) AS data_size\nFROM pg_tables\nWHERE schemaname = 'public'\nORDER BY tablename ASC;`,
   },
   {
     id: "create_vector_table",
-    label: "Create Table with pgvector DDL",
-    category: "AI & Vector",
-    sql: `CREATE EXTENSION IF NOT EXISTS vector;\n\nCREATE TABLE IF NOT EXISTS knowledge_chunks (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  content TEXT NOT NULL,\n  metadata JSONB DEFAULT '{}'::jsonb,\n  embedding vector(1536),\n  created_at TIMESTAMPTZ DEFAULT now()\n);\n\nCREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_idx \nON knowledge_chunks USING ivfflat (embedding vector_cosine_ops) \nWITH (lists = 100);`,
+    label: "Create pgvector Embeddings Table",
+    category: "pgvector",
+    sql: `CREATE TABLE IF NOT EXISTS public.documents (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  title TEXT NOT NULL,\n  metadata JSONB NOT NULL DEFAULT '{}'::jsonb,\n  embedding vector(3),\n  created_at TIMESTAMPTZ NOT NULL DEFAULT now()\n);\n\nINSERT INTO public.documents (title, embedding)\nVALUES ('SparrowX Cloud DB Guide', '[0.12, 0.85, 0.44]')\nRETURNING id, title, embedding, created_at;`,
+  },
+  {
+    id: "active_connections",
+    label: "Active Connections (pg_stat_activity)",
+    category: "Performance",
+    sql: `SELECT\n  pid,\n  usename,\n  application_name,\n  state,\n  query_start,\n  LEFT(query, 120) AS query\nFROM pg_stat_activity\nWHERE datname = current_database()\nORDER BY query_start DESC NULLS LAST;`,
   },
   {
     id: "cache_hit_ratio",
     label: "Buffer Cache Hit Ratio",
     category: "Performance",
-    sql: `SELECT \n  sum(heap_blks_read) as heap_read,\n  sum(heap_blks_hit)  as heap_hit,\n  ROUND((sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read) + 0.0001)) * 100, 2) as hit_ratio_pct\nFROM pg_statio_user_tables;`,
+    sql: `SELECT\n  datname,\n  blks_hit,\n  blks_read,\n  CASE\n    WHEN (blks_hit + blks_read) = 0 THEN 100.00\n    ELSE ROUND((blks_hit::numeric / (blks_hit + blks_read)) * 100, 2)\n  END AS cache_hit_ratio_pct\nFROM pg_stat_database\nWHERE datname = current_database();`,
+  },
+  {
+    id: "installed_extensions",
+    label: "Inspect Installed Extensions",
+    category: "Extensions",
+    sql: `SELECT extname AS extension, extversion AS version\nFROM pg_extension\nORDER BY extname ASC;`,
   },
   {
     id: "rls_policy_template",
     label: "Enable Row-Level Security (RLS)",
     category: "Security",
-    sql: `-- Enable RLS on app_users\nALTER TABLE app_users ENABLE ROW LEVEL SECURITY;\n\n-- Allow users to only read their own profile\nCREATE POLICY user_read_own_profile \nON app_users \nFOR SELECT \nUSING (id = current_setting('request.jwt.claim.sub', true));`,
+    sql: `-- Ensure public.notes exists first, then enable RLS:\nALTER TABLE public.notes ENABLE ROW LEVEL SECURITY;\n\nDROP POLICY IF EXISTS "allow_read_notes" ON public.notes;\nCREATE POLICY "allow_read_notes"\nON public.notes\nFOR SELECT\nUSING (true);`,
   },
 ];
 
@@ -762,44 +485,7 @@ const PRICING_PLANS: PricingTier[] = [
   },
 ];
 
-const EDGE_FUNCTIONS_CATALOG = [
-  {
-    id: "auth-webhook",
-    name: "auth-webhook",
-    route: "/functions/v1/auth-webhook",
-    runtime: "Deno 2.x • Edge V8",
-    invocations24h: "4,812",
-    avgLatencyMs: "4.2ms",
-    code: `import { serve } from "https://sparrowx.net/std/http/server.ts"\n\nserve(async (req) => {\n  const payload = await req.json()\n  console.log("[auth-webhook] Verified user:", payload.email)\n  return new Response(JSON.stringify({\n    verified: true,\n    tenant: payload.tenant_id ?? "TENANT-SPARROWX",\n    policy: "RLS_STRICT"\n  }), { headers: { "Content-Type": "application/json" } })\n})`,
-  },
-  {
-    id: "pgvector-embed",
-    name: "pgvector-embed",
-    route: "/functions/v1/pgvector-embed",
-    runtime: "Deno 2.x • pgvector",
-    invocations24h: "1,290",
-    avgLatencyMs: "11.4ms",
-    code: `import { serve } from "https://sparrowx.net/std/http/server.ts"\n\nserve(async (req) => {\n  const { query } = await req.json()\n  // Runs semantic IVFFlat/HNSW vector lookup against ai_embeddings\n  return new Response(JSON.stringify({\n    model: "text-embedding-3-small",\n    dimensions: 1536,\n    topMatch: "SparrowX Autonomous Defense Specification",\n    cosineSimilarity: 0.984,\n    query\n  }), { headers: { "Content-Type": "application/json" } })\n})`,
-  },
-  {
-    id: "audit-digest",
-    name: "audit-digest",
-    route: "/functions/v1/audit-digest",
-    runtime: "Deno 2.x • Cron",
-    invocations24h: "320",
-    avgLatencyMs: "6.8ms",
-    code: `import { serve } from "https://sparrowx.net/std/http/server.ts"\n\nserve(async () => {\n  return new Response(JSON.stringify({\n    status: "ok",\n    checkedTables: 13,\n    rlsEnforced: true,\n    snapshotStatus: "healthy"\n  }), { headers: { "Content-Type": "application/json" } })\n})`,
-  },
-];
-
-const POSTGRES_EXTENSIONS = [
-  { name: "vector (pgvector)", version: "0.7.0", schema: "public", status: "Installed", description: "Vector similarity search & HNSW/IVFFlat indexing for embeddings." },
-  { name: "pgcrypto", version: "1.3", schema: "extensions", status: "Installed", description: "Cryptographic hashing and CSPRNG functions." },
-  { name: "uuid-ossp", version: "1.1", schema: "extensions", status: "Installed", description: "Functions to generate universally unique identifiers (UUIDs)." },
-  { name: "pg_stat_statements", version: "1.10", schema: "extensions", status: "Installed", description: "Track planning and execution statistics of all SQL statements." },
-  { name: "pg_cron", version: "1.6", schema: "pg_catalog", status: "Installed", description: "Run periodic maintenance and snapshot jobs inside PostgreSQL." },
-  { name: "postgis", version: "3.4", schema: "public", status: "Available", description: "Spatial and geographic objects for PostgreSQL." },
-];
+// Live extensions, roles, indexes, policies, triggers & functions are queried directly from PostgreSQL catalogs via /api/db/query.
 
 interface NativeDialogProps {
   open: boolean;
@@ -1199,68 +885,6 @@ export function SovereignDatabaseStudio({
     }
   }, [tenantSlug]);
 
-  const activeProject = useMemo(() => {
-    const envUpper = activeEnv.toUpperCase();
-    const envConfigs = {
-      production: { port: 5432, poolerPort: 6543, poolSize: 40, label: "PRODUCTION", branch: "main" },
-      staging: { port: 5432, poolerPort: 6544, poolSize: 15, label: "STAGING", branch: "staging" },
-      development: { port: 5432, poolerPort: 6545, poolSize: 5, label: "DEVELOPMENT", branch: "dev" },
-    };
-    const cfg = envConfigs[activeEnv];
-    const dbName = `${tenantSlug}_${activeEnv}_db`;
-    const dbUser = `usr_${tenantSlug}`;
-
-    return {
-      id: projectRefId,
-      name: projectDisplayName || "sparrowx",
-      organization: sessionUser?.tenantId || "sparrowx",
-      environment: envUpper,
-      cfg,
-      dbName,
-      dbUser,
-      host: "db.sparrowx.net",
-      port: cfg.port,
-      poolerPort: cfg.poolerPort,
-      maxPoolSize: cfg.poolSize,
-      connectionUri: `postgresql://${dbUser}:[YOUR-PASSWORD]@db.sparrowx.net:${cfg.port}/${dbName}?sslmode=require`,
-      directUri: `postgresql://${dbUser}:[YOUR-PASSWORD]@db.sparrowx.net:${cfg.port}/${dbName}?sslmode=require`,
-      pooledUri: `postgresql://${dbUser}:[YOUR-PASSWORD]@db.sparrowx.net:${cfg.poolerPort}/${dbName}?pgbouncer=true&sslmode=require`,
-      anonKey: customAnonKey,
-      serviceRoleKey: `spx_secret_${tenantSlug}_${activeEnv}_${(sessionUser?.id || "svc").slice(-6)}`,
-      restBaseUrl: "https://db.sparrowx.net/rest/v1",
-    };
-  }, [sessionUser, tenantSlug, activeEnv, customAnonKey, projectDisplayName, projectRefId]);
-
-  const handleRotateStudioApiKey = () => {
-    const freshKey = generateSecureSparrowKey("spx_publishable");
-    setCustomAnonKey(freshKey);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(`spx_studio_key_${tenantSlug}`, freshKey);
-      } catch {
-        // Ignore storage write errors
-      }
-    }
-    setPublishableKeys((prev) => [
-      { id: `key-${Date.now()}`, name: `key-${prev.length + 1}`, description: "Rotated key", value: freshKey },
-      ...prev,
-    ]);
-    setStatusBanner({
-      type: "success",
-      message: "Generated new Publishable API Key for this tenant workspace.",
-    });
-  };
-
-  const handleLockWorkspace = () => {
-    clearSessionToken();
-    void clearMasterSsoSession();
-    setSessionUser(null);
-    setViewMode("landing");
-    if (typeof window !== "undefined") {
-      window.location.reload();
-    }
-  };
-
   // Primary & secondary studio navigation states
   type StudioSection =
     | "overview"
@@ -1268,8 +892,6 @@ export function SovereignDatabaseStudio({
     | "sql"
     | "database"
     | "auth"
-    | "storage"
-    | "functions"
     | "sandbox"
     | "pooler"
     | "backups"
@@ -1277,40 +899,16 @@ export function SovereignDatabaseStudio({
     | "api";
 
   const isPlatformAdmin = sessionUser?.admin === "yes";
-  const [studioTables, setStudioTables] = useState<StudioTableMeta[]>(() =>
-    isPlatformAdmin ? INITIAL_STUDIO_TABLES : []
-  );
+  const [studioTables, setStudioTables] = useState<StudioTableMeta[]>([]);
   const [activeSection, setActiveSection] = useState<StudioSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
-  const [selectedTable, setSelectedTable] = useState<string>(() =>
-    isPlatformAdmin ? "app_users" : ""
-  );
-
-  useEffect(() => {
-    let customTables: StudioTableMeta[] = [];
-    if (typeof window !== "undefined") {
-      try {
-        const raw = localStorage.getItem(`spx_custom_tables_${tenantSlug}`);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) customTables = parsed;
-        }
-      } catch {
-        // ignore storage errors
-      }
-    }
-    const nextTables = isPlatformAdmin
-      ? [...customTables, ...INITIAL_STUDIO_TABLES]
-      : customTables;
-    setStudioTables(nextTables);
-    setSelectedTable((prev) =>
-      nextTables.some((t) => t.name === prev) ? prev : (nextTables[0]?.name ?? "")
-    );
-  }, [isPlatformAdmin, tenantSlug]);
+  const [selectedTable, setSelectedTable] = useState<string>("");
   const [tableSidebarFilter, setTableSidebarFilter] = useState<string>("");
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [tableCounts, setTableCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(false);
+  const [schemaLoading, setSchemaLoading] = useState<boolean>(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
   const [syncingCloud, setSyncingCloud] = useState<boolean>(false);
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [sortColumn, setSortColumn] = useState<string | null>(null);
@@ -1336,19 +934,13 @@ export function SovereignDatabaseStudio({
 
   // Authentication sub-tabs & user filter
   const [authSubTab, setAuthSubTab] = useState<
-    "users" | "account" | "policies" | "providers" | "sessions" | "audit"
-  >("users");
+    "users" | "account" | "sessions" | "audit"
+  >("account");
   const [authUserSearch, setAuthUserSearch] = useState<string>("");
-  const [authPoliciesState, setAuthPoliciesState] = useState<Record<string, boolean>>({
-    emailVerification: true,
-    blockDisposable: true,
-    rlsStrict: true,
-    passkeys: false,
-  });
 
-  // Settings sub-tabs & key management (Screenshots 1-5)
+  // Settings sub-tabs
   const [settingsSubTab, setSettingsSubTab] = useState<
-    "general" | "infrastructure" | "integrations" | "api_keys" | "jwt_keys" | "log_drains" | "addons" | "vault" | "billing"
+    "general" | "infrastructure" | "api_keys" | "audit" | "billing"
   >("general");
   const [showSecretKey, setShowSecretKey] = useState<boolean>(false);
   const [publishableKeys, setPublishableKeys] = useState<
@@ -1357,24 +949,10 @@ export function SovereignDatabaseStudio({
     {
       id: "default-pub",
       name: "default",
-      description: "Publishable key for client apps with RLS enabled",
+      description: "Publishable key for client apps",
       value: customAnonKey,
     },
   ]);
-  const [jwtTab, setJwtTab] = useState<"signing" | "legacy">("signing");
-  const [standbyJwtKey, setStandbyJwtKey] = useState<{
-    id: string;
-    alg: string;
-    createdAt: string;
-  } | null>(null);
-  const [revokedPreviousJwt, setRevokedPreviousJwt] = useState<boolean>(false);
-
-  // Edge Functions state
-  const [selectedEdgeFnId, setSelectedEdgeFnId] = useState<string>(
-    EDGE_FUNCTIONS_CATALOG[0]?.id ?? "auth-webhook"
-  );
-  const [edgeFnInvokeResult, setEdgeFnInvokeResult] = useState<string | null>(null);
-  const [edgeFnInvoking, setEdgeFnInvoking] = useState<boolean>(false);
 
   // Ctrl+K shortcut for Studio top search bar
   useEffect(() => {
@@ -1389,16 +967,18 @@ export function SovereignDatabaseStudio({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [viewMode]);
 
-  // Modal states for Insert / Edit Row & Create Table & Bucket
+  // Modal states for Insert / Edit Row & Create Table
   const [showInsertModal, setShowInsertModal] = useState<boolean>(false);
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null);
   const [jsonDraft, setJsonDraft] = useState<string>("");
+  const [savingRow, setSavingRow] = useState<boolean>(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const [showCreateTableModal, setShowCreateTableModal] = useState<boolean>(false);
+  const [creatingTable, setCreatingTable] = useState<boolean>(false);
   const [newTableName, setNewTableName] = useState<string>("");
   const [newTableDescription, setNewTableDescription] = useState<string>("");
-  const [newTableEnableRls, setNewTableEnableRls] = useState<boolean>(true);
+  const [newTableEnableRls, setNewTableEnableRls] = useState<boolean>(false);
   const [newTableColumns, setNewTableColumns] = useState<
     Array<{ name: string; type: string; isPrimary: boolean; isNullable: boolean; defaultValue: string }>
   >([
@@ -1419,7 +999,7 @@ export function SovereignDatabaseStudio({
   const [landingAuthLoading, setLandingAuthLoading] = useState<boolean>(false);
   const [landingAuthError, setLandingAuthError] = useState<string>("");
 
-  // Authenticated Account & Database User Provisioning States
+  // Authenticated Account, Real Provisioned PostgreSQL Databases, Health, Snapshots & Audit States
   const [accountDisplayName, setAccountDisplayName] = useState<string>("");
   const [accountNewPassword, setAccountNewPassword] = useState<string>("");
   const [savingAccount, setSavingAccount] = useState<boolean>(false);
@@ -1430,8 +1010,23 @@ export function SovereignDatabaseStudio({
   const [newUserTenantId, setNewUserTenantId] = useState<string>("");
   const [creatingAccount, setCreatingAccount] = useState<boolean>(false);
   const [provisioningDb, setProvisioningDb] = useState<boolean>(false);
+  const [rotatingPassword, setRotatingPassword] = useState<boolean>(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState<boolean>(false);
   const [selectedDbPlanId, setSelectedDbPlanId] = useState<string>("db-free");
   const [creatingSnapshot, setCreatingSnapshot] = useState<boolean>(false);
+  const [snapshotLabel, setSnapshotLabel] = useState<string>("Manual Snapshot");
+  const [clusterHealth, setClusterHealth] = useState<LiveClusterHealth | null>(null);
+  const [provisionedDbsList, setProvisionedDbsList] = useState<LiveDbSummaryItem[]>([]);
+  const [dbSnapshots, setDbSnapshots] = useState<LiveDbSnapshot[]>([]);
+  const [dbAuditLogs, setDbAuditLogs] = useState<LiveDbAuditLog[]>([]);
+  const [catalogRows, setCatalogRows] = useState<Array<Record<string, unknown>>>([]);
+  const [catalogLoading, setCatalogLoading] = useState<boolean>(false);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [liveDbStats, setLiveDbStats] = useState<{
+    cacheHitPct: string | null;
+    activeQueries: Array<Record<string, unknown>>;
+    currentUser: string | null;
+  }>({ cacheHitPct: null, activeQueries: [], currentUser: null });
   const [provisionedDb, setProvisionedDb] = useState<{
     dbName: string;
     dbUser: string;
@@ -1443,7 +1038,171 @@ export function SovereignDatabaseStudio({
     planName?: string;
     storageLimitMb?: number;
     maxConnections?: number;
+    sizePretty?: string;
+    usagePct?: number;
+    activeConnections?: number;
+    status?: string;
   } | null>(null);
+
+  const activeDbSummary = useMemo(() => {
+    if (!provisionedDb) return null;
+    return provisionedDbsList.find((d) => d.dbName === provisionedDb.dbName) ?? null;
+  }, [provisionedDb, provisionedDbsList]);
+
+  const activeProject = useMemo(() => {
+    const dbName = provisionedDb?.dbName || "unprovisioned";
+    const dbUser = provisionedDb?.dbUser || `spx_u_${tenantSlug.replace(/-/g, "_")}`;
+    const host = provisionedDb?.dbHost || "db.sparrowx.net";
+    const port = provisionedDb?.dbPort || 5432;
+    const realConn =
+      provisionedDb?.connectionString ||
+      `postgresql://${dbUser}:[ROTATE-TO-REVEAL-PASSWORD]@${host}:${port}/${dbName}?sslmode=prefer`;
+    const pooledUri = `postgresql://${dbUser}:${provisionedDb?.dbPassword ? encodeURIComponent(provisionedDb.dbPassword) : "[ROTATE-TO-REVEAL-PASSWORD]"}@${host}:6543/${dbName}?pgbouncer=true&sslmode=prefer`;
+
+    return {
+      id: activeDbSummary?.id || projectRefId,
+      name: projectDisplayName || activeDbSummary?.projectName || "sparrowx",
+      organization: sessionUser?.tenantId || "sparrowx",
+      environment: (provisionedDb?.status || activeDbSummary?.status || "ACTIVE").toUpperCase(),
+      cfg: {
+        port,
+        poolerPort: 6543,
+        poolSize: provisionedDb?.maxConnections || activeDbSummary?.maxConnections || 10,
+        label: provisionedDb ? provisionedDb.planName || activeDbSummary?.planName || "ISOLATED PG" : "NOT PROVISIONED",
+        branch: provisionedDb ? provisionedDb.dbName : "unprovisioned",
+      },
+      dbName,
+      dbUser,
+      host,
+      port,
+      poolerPort: 6543,
+      maxPoolSize: provisionedDb?.maxConnections || activeDbSummary?.maxConnections || 10,
+      connectionUri: realConn,
+      directUri: realConn,
+      pooledUri,
+      anonKey: customAnonKey,
+      serviceRoleKey: provisionedDb?.dbPassword || "",
+      restBaseUrl: "https://db.sparrowx.net/rest/v1",
+    };
+  }, [sessionUser, tenantSlug, provisionedDb, activeDbSummary, customAnonKey, projectDisplayName, projectRefId]);
+
+  // Execute real PostgreSQL SQL against the user's active isolated database via /api/db/query
+  const runTenantSql = useCallback(
+    async (
+      sql: string,
+      overrideDbName?: string,
+    ): Promise<
+      | {
+          ok: true;
+          command: string;
+          rowCount: number;
+          fields: string[];
+          rows: Array<Record<string, unknown>>;
+          truncated: boolean;
+          durationMs: number;
+          statementCount?: number;
+        }
+      | {
+          ok: false;
+          error: string;
+          pgCode?: string;
+          detail?: string;
+          hint?: string;
+          position?: string;
+        }
+    > => {
+      const targetDb = overrideDbName || provisionedDb?.dbName;
+      if (!targetDb) {
+        return {
+          ok: false,
+          error: "No PostgreSQL database is provisioned yet for this account. Click 'Provision Database' first.",
+        };
+      }
+      try {
+        const res = await fetch("/api/db/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            dbName: targetDb,
+            sql,
+            email: sessionUser?.email,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          command?: string;
+          rowCount?: number;
+          fields?: string[];
+          rows?: Array<Record<string, unknown>>;
+          truncated?: boolean;
+          durationMs?: number;
+          statementCount?: number;
+          error?: string;
+          pgCode?: string;
+          detail?: string;
+          hint?: string;
+          position?: string;
+        };
+        if (!res.ok || !data.ok) {
+          return {
+            ok: false,
+            error: data.error || `PostgreSQL query failed (HTTP ${res.status})`,
+            ...(data.pgCode ? { pgCode: data.pgCode } : {}),
+            ...(data.detail ? { detail: data.detail } : {}),
+            ...(data.hint ? { hint: data.hint } : {}),
+            ...(data.position ? { position: data.position } : {}),
+          };
+        }
+        return {
+          ok: true,
+          command: data.command || "QUERY",
+          rowCount: data.rowCount ?? (data.rows?.length ?? 0),
+          fields: Array.isArray(data.fields) ? data.fields : [],
+          rows: Array.isArray(data.rows) ? data.rows : [],
+          truncated: Boolean(data.truncated),
+          durationMs: data.durationMs ?? 0,
+          ...(data.statementCount !== undefined ? { statementCount: data.statementCount } : {}),
+        };
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : "Network error reaching /api/db/query",
+        };
+      }
+    },
+    [provisionedDb?.dbName, sessionUser?.email],
+  );
+
+  const handleRotateStudioApiKey = () => {
+    const freshKey = generateSecureSparrowKey("spx_publishable");
+    setCustomAnonKey(freshKey);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(`spx_studio_key_${tenantSlug}`, freshKey);
+      } catch {
+        // Ignore storage write errors
+      }
+    }
+    setPublishableKeys((prev) => [
+      { id: `key-${Date.now()}`, name: `key-${prev.length + 1}`, description: "Rotated key", value: freshKey },
+      ...prev,
+    ]);
+    setStatusBanner({
+      type: "success",
+      message: "Generated new workspace display key.",
+    });
+  };
+
+  const handleLockWorkspace = () => {
+    clearSessionToken();
+    void clearMasterSsoSession();
+    setSessionUser(null);
+    setViewMode("landing");
+    if (typeof window !== "undefined") {
+      window.location.reload();
+    }
+  };
 
   const provisionIsolatedPgDatabase = async (payload: {
     tenantId: string;
@@ -1457,11 +1216,12 @@ export function SovereignDatabaseStudio({
       const res = await fetch("/api/db/provision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ ...payload, planId: payload.planId || selectedDbPlanId }),
       });
-      if (!res.ok) return null;
-      const data = (await res.json()) as {
+      const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
+        error?: string;
         database?: {
           dbName: string;
           dbUser: string;
@@ -1475,247 +1235,585 @@ export function SovereignDatabaseStudio({
           maxConnections?: number;
         };
       };
-      if (data.ok && data.database) {
-        setProvisionedDb(data.database);
-        try {
-          localStorage.setItem(
-            `sparrowx_provisioned_db_${payload.tenantId}`,
-            JSON.stringify(data.database),
-          );
-        } catch {
-          // Ignore storage quota issues
-        }
-        return data.database;
+      if (!res.ok || !data.ok || !data.database) {
+        setStatusBanner({
+          type: "error",
+          message: data.error || `PostgreSQL provisioning failed (HTTP ${res.status}).`,
+        });
+        return null;
       }
-    } catch {
-      // Best-effort when backend PostgreSQL is unreachable in offline/test mode
+      setProvisionedDb({ ...data.database, status: "Active" });
+      try {
+        localStorage.setItem(
+          `sparrowx_provisioned_db_${payload.tenantId}`,
+          JSON.stringify(data.database),
+        );
+      } catch {
+        // Ignore storage quota issues
+      }
+      return data.database;
+    } catch (err) {
+      setStatusBanner({
+        type: "error",
+        message: err instanceof Error ? err.message : "Unable to reach PostgreSQL provisioner (/api/db/provision).",
+      });
+      return null;
     } finally {
       setProvisioningDb(false);
     }
-    return null;
   };
 
-  useEffect(() => {
-    if (sessionUser) {
-      setAccountDisplayName(sessionUser.fullName || "");
-      const tid = sessionUser.tenantId || "TENANT-SPARROWX";
-      setNewUserTenantId((prev) => prev || tid);
-      try {
-        const cached = localStorage.getItem(`sparrowx_provisioned_db_${tid}`);
-        if (cached) {
-          setProvisionedDb(JSON.parse(cached));
-        }
-      } catch {
-        // Ignore malformed cache
+  // Load real /api/db/health + /api/db/summary from PostgreSQL cluster
+  const loadRealDatabasesAndHealth = useCallback(async () => {
+    if (!sessionUser) return;
+    const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+    const cleanEmail = sessionUser.email.trim().toLowerCase();
+
+    try {
+      const healthRes = await fetch("/api/db/health", { credentials: "include", cache: "no-store" });
+      const healthData = (await healthRes.json().catch(() => null)) as LiveClusterHealth | null;
+      if (healthData) {
+        setClusterHealth(healthData);
+        setPingStatus({
+          postgrest: healthData.ok ? healthData.latencyMs : null,
+          pgbouncer: healthData.ok ? healthData.latencyMs : null,
+          postgres: healthData.ok ? healthData.latencyMs : null,
+          testing: false,
+        });
       }
-      let active = true;
-      void ensureDeveloperConnection({
-        id: sessionUser.id,
-        email: sessionUser.email,
-        fullName: sessionUser.fullName,
-        tenantId: sessionUser.tenantId,
-      }).then((connected) => {
-        if (!active || !connected) return;
-        setProvisionedDb((prev) => ({
-          dbName: connected.dbName,
-          dbUser: connected.dbUser,
-          dbPassword: prev?.dbPassword || connected.dbPassword || "",
-          dbHost: connected.dbHost,
-          dbPort: connected.dbPort,
-          connectionString:
-            prev?.connectionString ||
-            connected.connectionString ||
-            `postgresql://${connected.dbUser}@${connected.dbHost}:${connected.dbPort}/${connected.dbName}?sslmode=require`,
-          ...(connected.planId !== undefined ? { planId: connected.planId } : {}),
-          ...(connected.planName !== undefined ? { planName: connected.planName } : {}),
-          ...(connected.storageLimitMb !== undefined ? { storageLimitMb: connected.storageLimitMb } : {}),
-          ...(connected.maxConnections !== undefined ? { maxConnections: connected.maxConnections } : {}),
-        }));
-      });
-      return () => {
-        active = false;
-      };
+    } catch {
+      setPingStatus((prev) => ({ ...prev, postgres: null, postgrest: null, testing: false }));
     }
-    return undefined;
+
+    try {
+      const summaryUrl = `/api/db/summary?email=${encodeURIComponent(cleanEmail)}&tenantId=${encodeURIComponent(tid)}`;
+      const sumRes = await fetch(summaryUrl, { credentials: "include", cache: "no-store" });
+      if (sumRes.ok) {
+        const sumData = (await sumRes.json()) as { ok?: boolean; databases?: LiveDbSummaryItem[] };
+        if (sumData.ok && Array.isArray(sumData.databases)) {
+          setProvisionedDbsList(sumData.databases);
+          const matched =
+            sumData.databases.find(
+              (d) => d.userEmail.toLowerCase() === cleanEmail || d.tenantId === tid,
+            ) || sumData.databases[0];
+          if (matched) {
+            setSelectedDbPlanId(matched.planId || "db-free");
+            setProvisionedDb((prev) => ({
+              dbName: matched.dbName,
+              dbUser: matched.dbUser,
+              dbPassword: prev?.dbName === matched.dbName ? prev.dbPassword : "",
+              dbHost: matched.dbHost,
+              dbPort: matched.dbPort,
+              connectionString:
+                prev?.dbName === matched.dbName && prev.connectionString
+                  ? prev.connectionString
+                  : `postgresql://${matched.dbUser}:[ROTATE-TO-REVEAL]@${matched.dbHost}:${matched.dbPort}/${matched.dbName}?sslmode=prefer`,
+              planId: matched.planId,
+              planName: matched.planName,
+              storageLimitMb: matched.storageLimitMb,
+              maxConnections: matched.maxConnections,
+              sizePretty: matched.sizePretty,
+              usagePct: matched.usagePct,
+              activeConnections: matched.activeConnections,
+              status: matched.status,
+            }));
+            return;
+          }
+        }
+      }
+    } catch {
+      // Fall through to ensureDeveloperConnection
+    }
+
+    const connected = await ensureDeveloperConnection({
+      id: sessionUser.id,
+      email: sessionUser.email,
+      fullName: sessionUser.fullName,
+      tenantId: sessionUser.tenantId,
+    });
+    if (connected) {
+      setProvisionedDb((prev) => ({
+        dbName: connected.dbName,
+        dbUser: connected.dbUser,
+        dbPassword: prev?.dbPassword || connected.dbPassword || "",
+        dbHost: connected.dbHost,
+        dbPort: connected.dbPort,
+        connectionString:
+          prev?.connectionString ||
+          connected.connectionString ||
+          `postgresql://${connected.dbUser}:[ROTATE-TO-REVEAL]@${connected.dbHost}:${connected.dbPort}/${connected.dbName}?sslmode=prefer`,
+        ...(connected.planId !== undefined ? { planId: connected.planId } : {}),
+        ...(connected.planName !== undefined ? { planName: connected.planName } : {}),
+        ...(connected.storageLimitMb !== undefined ? { storageLimitMb: connected.storageLimitMb } : {}),
+        ...(connected.maxConnections !== undefined ? { maxConnections: connected.maxConnections } : {}),
+        ...(connected.status !== undefined ? { status: connected.status } : {}),
+      }));
+    }
   }, [sessionUser]);
 
-  // SQL Studio state
-  const [activeSql, setActiveSql] = useState<string>(SQL_TEMPLATES[0]?.sql ?? "SELECT 1;");
+  useEffect(() => {
+    if (!sessionUser) return;
+    setAccountDisplayName(sessionUser.fullName || "");
+    const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+    setNewUserTenantId((prev) => prev || tid);
+    try {
+      const cached = localStorage.getItem(`sparrowx_provisioned_db_${tid}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && typeof parsed.dbName === "string" && parsed.dbName.startsWith("spx_db_")) {
+          setProvisionedDb(parsed);
+        }
+      }
+    } catch {
+      // Ignore malformed cache
+    }
+    void loadRealDatabasesAndHealth();
+  }, [sessionUser, loadRealDatabasesAndHealth]);
+
+  // Real lifecycle helpers (backups, audit logs, password rotation, suspend/resume, plan upgrade, delete)
+  const loadBackupsAndAudit = useCallback(async () => {
+    if (!provisionedDb?.dbName || !sessionUser) return;
+    try {
+      const [bRes, aRes] = await Promise.all([
+        fetch("/api/db/lifecycle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            action: "list_backups",
+            dbName: provisionedDb.dbName,
+            email: sessionUser.email,
+          }),
+        }),
+        fetch("/api/db/lifecycle", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            action: "list_audit",
+            dbName: provisionedDb.dbName,
+            email: sessionUser.email,
+          }),
+        }),
+      ]);
+      if (bRes.ok) {
+        const bData = (await bRes.json()) as { ok?: boolean; snapshots?: LiveDbSnapshot[] };
+        if (bData.ok && Array.isArray(bData.snapshots)) setDbSnapshots(bData.snapshots);
+      }
+      if (aRes.ok) {
+        const aData = (await aRes.json()) as { ok?: boolean; logs?: LiveDbAuditLog[] };
+        if (aData.ok && Array.isArray(aData.logs)) setDbAuditLogs(aData.logs);
+      }
+    } catch {
+      // Leave current lists unchanged if offline
+    }
+  }, [provisionedDb?.dbName, sessionUser]);
+
+  const handleRotateDbPassword = async () => {
+    if (!provisionedDb?.dbName || !sessionUser) return;
+    setRotatingPassword(true);
+    try {
+      const res = await fetch("/api/db/lifecycle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "rotate_password",
+          dbName: provisionedDb.dbName,
+          email: sessionUser.email,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        dbName?: string;
+        dbUser?: string;
+        dbPassword?: string;
+        connectionString?: string;
+      };
+      if (!res.ok || !data.ok || !data.dbPassword) {
+        setStatusBanner({
+          type: "error",
+          message: data.error || "Password rotation failed.",
+        });
+        return;
+      }
+      setProvisionedDb((prev) => {
+        if (!prev) return prev;
+        const updated = {
+          ...prev,
+          dbPassword: data.dbPassword!,
+          connectionString: data.connectionString || prev.connectionString,
+        };
+        try {
+          const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+          localStorage.setItem(`sparrowx_provisioned_db_${tid}`, JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      });
+      setStatusBanner({
+        type: "success",
+        message: `Rotated PostgreSQL password for role ${data.dbUser}. New connection URI is active immediately.`,
+      });
+      void loadBackupsAndAudit();
+    } catch (err) {
+      setStatusBanner({
+        type: "error",
+        message: err instanceof Error ? err.message : "Unable to rotate password.",
+      });
+    } finally {
+      setRotatingPassword(false);
+    }
+  };
+
+  const handleCreateSnapshot = async (customLabel?: string) => {
+    if (!provisionedDb?.dbName || !sessionUser) {
+      setStatusBanner({ type: "error", message: "Provision a PostgreSQL database before creating snapshots." });
+      return;
+    }
+    setCreatingSnapshot(true);
+    try {
+      const res = await fetch("/api/db/lifecycle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "backup",
+          dbName: provisionedDb.dbName,
+          email: sessionUser.email,
+          label: (customLabel || snapshotLabel || "Manual Snapshot").trim(),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        snapshot?: LiveDbSnapshot;
+      };
+      if (!res.ok || !data.ok || !data.snapshot) {
+        setStatusBanner({ type: "error", message: data.error || "Snapshot creation failed." });
+        return;
+      }
+      setStatusBanner({
+        type: "success",
+        message: `Snapshot ${data.snapshot.id} recorded (${data.snapshot.sizePretty}, ${data.snapshot.tableCount} tables, SHA-256 verified).`,
+      });
+      await loadBackupsAndAudit();
+      await loadRealDatabasesAndHealth();
+    } catch {
+      setStatusBanner({
+        type: "error",
+        message: "Unable to reach snapshot lifecycle API (/api/db/lifecycle).",
+      });
+    } finally {
+      setCreatingSnapshot(false);
+    }
+  };
+
+  const handleDbLifecycleAction = async (
+    action: "suspend" | "resume" | "upgrade_plan" | "deprovision",
+    planId?: string,
+  ) => {
+    if (!provisionedDb?.dbName || !sessionUser) return;
+    if (
+      action === "deprovision" &&
+      !confirm(`Permanently DROP PostgreSQL database "${provisionedDb.dbName}" and role "${provisionedDb.dbUser}"? This cannot be undone.`)
+    ) {
+      return;
+    }
+    setLifecycleBusy(true);
+    try {
+      const res = await fetch("/api/db/lifecycle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action,
+          dbName: provisionedDb.dbName,
+          email: sessionUser.email,
+          ...(planId ? { planId } : {}),
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setStatusBanner({ type: "error", message: data.error || `Lifecycle action "${action}" failed.` });
+        return;
+      }
+      if (action === "deprovision") {
+        setProvisionedDb(null);
+        setStudioTables([]);
+        setSelectedTable("");
+        setRows([]);
+        setDbSnapshots([]);
+        try {
+          const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+          localStorage.removeItem(`sparrowx_provisioned_db_${tid}`);
+        } catch {
+          // ignore
+        }
+        setStatusBanner({ type: "success", message: `Database ${provisionedDb.dbName} permanently dropped.` });
+      } else {
+        setStatusBanner({
+          type: "success",
+          message:
+            action === "upgrade_plan"
+              ? `Updated database plan & PostgreSQL resource limits to ${planId}.`
+              : `Database ${provisionedDb.dbName} is now ${action === "suspend" ? "Suspended" : "Active"}.`,
+        });
+      }
+      await loadRealDatabasesAndHealth();
+      await loadBackupsAndAudit();
+    } catch (err) {
+      setStatusBanner({
+        type: "error",
+        message: err instanceof Error ? err.message : `Lifecycle action "${action}" failed.`,
+      });
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  // SQL Studio state (Pure Manual Supabase-style SQL Editor — Zero AI Copilot)
+  const [activeSql, setActiveSql] = useState<string>(SQL_TEMPLATES[0]?.sql ?? "SELECT version();");
   const [sqlQueryFilter, setSqlQueryFilter] = useState<string>("");
   const [sqlResults, setSqlResults] = useState<Array<Record<string, unknown>> | null>(null);
+  const [sqlResultFields, setSqlResultFields] = useState<string[]>([]);
+  const [sqlError, setSqlError] = useState<SqlErrorDetails | null>(null);
   const [sqlResultViewMode, setSqlResultViewMode] = useState<"grid" | "chart" | "json">("grid");
   const [sqlExecutionStats, setSqlExecutionStats] = useState<{
     timeMs: number;
     rowCount: number;
-    status: string;
-    bufferHit?: string;
+    command: string;
+    truncated?: boolean;
+    statementCount?: number;
   } | null>(null);
   const [executingSql, setExecutingSql] = useState<boolean>(false);
   const [savedSqlQueries, setSavedSqlQueries] = useState<Array<{ id: string; name: string; sql: string }>>([]);
-  const [sqlHistory, setSqlHistory] = useState<Array<{ id: string; sql: string; time: string }>>([
-    { id: "h-1", sql: SQL_TEMPLATES[0]?.sql ?? "SELECT 1;", time: "2m ago" },
-    { id: "h-2", sql: SQL_TEMPLATES[1]?.sql ?? "SELECT 1;", time: "10m ago" },
-  ]);
-  const [aiSqlPrompt, setAiSqlPrompt] = useState<string>("");
-  const [aiSqlGenerating, setAiSqlGenerating] = useState<boolean>(false);
-  const [aiSqlNote, setAiSqlNote] = useState<string | null>(null);
+  const [sqlHistory, setSqlHistory] = useState<Array<{ id: string; sql: string; time: string; ok: boolean }>>([]);
 
-  const handleGenerateAiSql = async () => {
-    const req = aiSqlPrompt.trim() || "Generate a hardened PostgreSQL 16 table with pgvector HNSW index and Row-Level Security";
-    setAiSqlGenerating(true);
-    setAiSqlNote(null);
+  // Persist private saved queries per provisioned DB
+  useEffect(() => {
+    if (typeof window === "undefined" || !provisionedDb?.dbName) return;
     try {
-      const res = await querySparrowxCrossSystemAi({
-        system: "db",
-        prompt: `${req}\n\nReturn valid PostgreSQL 16 SQL statement(s) ready to execute.`,
-        contextData: `Active Database: ${activeProject.dbName} | Current Editor SQL:\n${activeSql.slice(0, 500)}`,
-      });
-      const sqlMatch = res.text.match(/```(?:sql|postgresql)?\s*([\s\S]*?)```/i);
-      const extractedSql = sqlMatch?.[1]?.trim() || res.codeSnippet || `-- SparrowX AI Synthesized Query\n${res.text}`;
-      setActiveSql(extractedSql);
-      setAiSqlNote(`${res.modelUsed} synthesized query.`);
-    } finally {
-      setAiSqlGenerating(false);
+      const raw = localStorage.getItem(`spx_saved_sql_${provisionedDb.dbName}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setSavedSqlQueries(parsed);
+      }
+    } catch {
+      // ignore
     }
-  };
+  }, [provisionedDb?.dbName]);
 
-  // Storage Bucket selection & modal
-  const [storageBucketsList, setStorageBucketsList] = useState<StorageBucket[]>(STORAGE_BUCKETS);
-  const [selectedBucket, setSelectedBucket] = useState<StorageBucket>(STORAGE_BUCKETS[0]);
-  const [showNewBucketModal, setShowNewBucketModal] = useState<boolean>(false);
-  const [newBucketName, setNewBucketName] = useState<string>("");
-  const [newBucketIsPublic, setNewBucketIsPublic] = useState<boolean>(true);
-
-  // Interactive Sandbox state
-  const [sandboxSql, setSandboxSql] = useState<string>(
-    "CREATE TABLE IF NOT EXISTS customer_orders (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  customer_email TEXT NOT NULL,\n  total_amount NUMERIC(10,2) NOT NULL,\n  status TEXT DEFAULT 'pending',\n  created_at TIMESTAMPTZ DEFAULT now()\n);"
-  );
-  const [sandboxSelectedTable, setSandboxSelectedTable] = useState<string>("app_users");
+  // Interactive Connection & Live Query Test state
+  const [sandboxSelectedTable, setSandboxSelectedTable] = useState<string>("");
   const [sandboxResponse, setSandboxResponse] = useState<string | null>(null);
   const [sandboxLatency, setSandboxLatency] = useState<number | null>(null);
+  const [sandboxStatusOk, setSandboxStatusOk] = useState<boolean | null>(null);
   const [sandboxLoading, setSandboxLoading] = useState<boolean>(false);
-  const [sandboxTab, setSandboxTab] = useState<"js" | "curl" | "python" | "prisma">("js");
+  const [sandboxTab, setSandboxTab] = useState<"node" | "psql" | "python" | "prisma">("node");
 
-  // Diagnostics Ping State
+  // Diagnostics Ping State (starts null until real /api/db/health probe succeeds)
   const [pingStatus, setPingStatus] = useState<{
     postgrest: number | null;
     pgbouncer: number | null;
     postgres: number | null;
     testing: boolean;
   }>({
-    postgrest: 1.4,
-    pgbouncer: 0.9,
-    postgres: 0.8,
+    postgrest: null,
+    pgbouncer: null,
+    postgres: null,
     testing: false,
   });
 
   // Calculate live DDL preview for New Table modal
   const generatedTableDdl = useMemo(() => {
-    const cleanName = newTableName.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_") || "new_table";
-    const colDefs = newTableColumns.map((col) => {
-      let def = `  ${col.name || "column_name"} ${col.type}`;
-      if (col.isPrimary) def += " PRIMARY KEY";
-      if (!col.isNullable && !col.isPrimary) def += " NOT NULL";
-      if (col.defaultValue && col.defaultValue.trim()) def += ` DEFAULT ${col.defaultValue}`;
-      return def;
-    });
-
-    let ddl = `CREATE TABLE public.${cleanName} (\n${colDefs.join(",\n")}\n);`;
-    if (newTableEnableRls) {
-      ddl += `\n\nALTER TABLE public.${cleanName} ENABLE ROW LEVEL SECURITY;\n\nCREATE POLICY "Enable read access for all users" ON public.${cleanName}\nFOR SELECT USING (true);`;
+    try {
+      return buildCreateTableSql(newTableName || "new_table", newTableColumns, newTableEnableRls);
+    } catch (err) {
+      return `-- ${err instanceof Error ? err.message : "Invalid table definition"}`;
     }
-    return ddl;
   }, [newTableName, newTableColumns, newTableEnableRls]);
 
-  // Fetch rows for a specific table
+  // Fetch rows for a specific table from REAL PostgreSQL via /api/db/query
   const fetchTableRows = useCallback(
-    async (tableName: string) => {
-      if (!tableName || !tableName.trim()) {
+    async (tableName: string, overrideDbName?: string) => {
+      const targetDb = overrideDbName || provisionedDb?.dbName;
+      if (!tableName || !tableName.trim() || !targetDb) {
         setRows([]);
         setLoading(false);
         return;
       }
       setLoading(true);
       try {
-        const res = await fetch(`/rest/v1/${tableName}?select=*`, {
-          headers: {
-            Accept: "application/json",
-            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
-          },
-        });
+        const res = await runTenantSql(buildSelectTableSql(tableName, 100), targetDb);
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setRows(data);
-            setTableCounts((prev) => ({ ...prev, [tableName]: data.length }));
-            return;
-          }
+          setRows(res.rows);
+          setTableCounts((prev) => ({ ...prev, [tableName]: res.rows.length }));
+        } else {
+          setRows([]);
+          setStatusBanner({
+            type: "error",
+            message: `Failed to read table "${tableName}": ${res.error}`,
+          });
         }
-        const local = LOCAL_SEED_TABLES[tableName] || [];
-        setRows(local);
-        setTableCounts((prev) => ({ ...prev, [tableName]: local.length }));
-      } catch {
-        const local = LOCAL_SEED_TABLES[tableName] || [];
-        setRows(local);
-        setTableCounts((prev) => ({ ...prev, [tableName]: local.length }));
       } finally {
         setLoading(false);
       }
     },
-    [activeProject.anonKey]
+    [provisionedDb?.dbName, runTenantSql],
   );
 
-  // Refresh counts across all studio tables
-  const refreshAllCounts = useCallback(async () => {
-    for (const t of studioTables) {
-      try {
-        const res = await fetch(`/rest/v1/${t.name}?select=*`, {
-          headers: {
-            Range: "0-0",
-            Prefer: "count=exact",
-            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
-          },
-        });
-        const contentRange = res.headers.get("content-range");
-        if (contentRange && contentRange.includes("/")) {
-          const totalPart = contentRange.split("/")[1];
-          const total = totalPart ? parseInt(totalPart, 10) : Number.NaN;
-          if (!Number.isNaN(total)) {
-            setTableCounts((prev) => ({ ...prev, [t.name]: total }));
-            continue;
-          }
-        }
-      } catch {
-        // Ignored
+  // Introspect ALL real tables & columns in the user's isolated PostgreSQL database
+  const refreshLiveSchema = useCallback(
+    async (overrideDbName?: string) => {
+      const targetDb = overrideDbName || provisionedDb?.dbName;
+      if (!targetDb) {
+        setStudioTables([]);
+        setSelectedTable("");
+        setRows([]);
+        return [];
       }
-      const local = LOCAL_SEED_TABLES[t.name] || [];
-      setTableCounts((prev) => ({ ...prev, [t.name]: local.length }));
-    }
-  }, [studioTables, activeProject.anonKey]);
+      setSchemaLoading(true);
+      setSchemaError(null);
+      try {
+        const res = await runTenantSql(buildSchemaIntrospectionSql(), targetDb);
+        if (!res.ok) {
+          setSchemaError(res.error);
+          return [];
+        }
+        const parsedTables = parseIntrospectedTables(res.rows);
+        setStudioTables(parsedTables);
+        const nextCounts: Record<string, number> = {};
+        for (const t of parsedTables) {
+          nextCounts[t.name] = t.estimatedRows;
+        }
+        setTableCounts((prev) => ({ ...prev, ...nextCounts }));
+        setSelectedTable((prev) => {
+          if (prev && parsedTables.some((t) => t.name === prev)) return prev;
+          return parsedTables[0]?.name ?? "";
+        });
+        setSandboxSelectedTable((prev) => {
+          if (prev && parsedTables.some((t) => t.name === prev)) return prev;
+          return parsedTables[0]?.name ?? "";
+        });
+        return parsedTables;
+      } finally {
+        setSchemaLoading(false);
+      }
+    },
+    [provisionedDb?.dbName, runTenantSql],
+  );
 
+  // Load live PostgreSQL catalog data for Database sub-tabs (extensions, indexes, policies, functions, triggers, roles)
+  const loadCatalogSubTab = useCallback(
+    async (tab: string) => {
+      if (!provisionedDb?.dbName) {
+        setCatalogRows([]);
+        setCatalogError("No PostgreSQL database provisioned yet.");
+        return;
+      }
+      const queries: Record<string, string> = {
+        extensions: `SELECT name, default_version, installed_version, comment FROM pg_available_extensions WHERE installed_version IS NOT NULL OR name IN ('vector', 'pgcrypto', 'uuid-ossp', 'pg_trgm', 'citext', 'hstore') ORDER BY (installed_version IS NULL), name ASC;`,
+        indexes: `SELECT tablename AS table_name, indexname AS index_name, indexdef AS definition FROM pg_indexes WHERE schemaname = 'public' ORDER BY tablename, indexname;`,
+        policies: `SELECT tablename AS table_name, policyname AS policy_name, permissive, cmd AS command, qual AS using_expr FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename, policyname;`,
+        functions: `SELECT p.proname AS function_name, pg_get_function_result(p.oid) AS returns, pg_get_function_arguments(p.oid) AS arguments, l.lanname AS language FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_language l ON l.oid = p.prolang WHERE n.nspname = 'public' ORDER BY p.proname;`,
+        triggers: `SELECT trigger_name, event_object_table AS table_name, action_timing AS timing, event_manipulation AS event, action_statement FROM information_schema.triggers WHERE trigger_schema = 'public' ORDER BY event_object_table, trigger_name;`,
+        roles: `SELECT current_database() AS database_name, current_user AS active_role, session_user AS session_role, inet_server_addr()::text AS server_addr, inet_server_port() AS server_port;`,
+      };
+      const sql = queries[tab];
+      if (!sql) return;
+      setCatalogLoading(true);
+      setCatalogError(null);
+      try {
+        const res = await runTenantSql(sql);
+        if (res.ok) {
+          setCatalogRows(res.rows);
+        } else {
+          setCatalogRows([]);
+          setCatalogError(res.error);
+        }
+      } finally {
+        setCatalogLoading(false);
+      }
+    },
+    [provisionedDb?.dbName, runTenantSql],
+  );
+
+  // Load live PostgreSQL observability metrics (cache hit ratio + pg_stat_activity)
+  const loadLiveObservability = useCallback(async () => {
+    if (!provisionedDb?.dbName) return;
+    const [statRes, actRes] = await Promise.all([
+      runTenantSql(
+        `SELECT current_user AS role, blks_hit, blks_read, CASE WHEN (blks_hit + blks_read) = 0 THEN 100.00 ELSE ROUND((blks_hit::numeric / (blks_hit + blks_read)) * 100, 2) END AS hit_ratio_pct FROM pg_stat_database WHERE datname = current_database();`,
+      ),
+      runTenantSql(
+        `SELECT pid, usename, state, application_name, query_start::text AS started_at, LEFT(query, 120) AS query FROM pg_stat_activity WHERE datname = current_database() ORDER BY query_start DESC NULLS LAST LIMIT 20;`,
+      ),
+    ]);
+    setLiveDbStats({
+      cacheHitPct:
+        statRes.ok && statRes.rows[0]?.hit_ratio_pct !== undefined
+          ? `${String(statRes.rows[0].hit_ratio_pct)}%`
+          : null,
+      currentUser:
+        statRes.ok && statRes.rows[0]?.role ? String(statRes.rows[0].role) : provisionedDb.dbUser,
+      activeQueries: actRes.ok ? actRes.rows : [],
+    });
+  }, [provisionedDb?.dbName, provisionedDb?.dbUser, runTenantSql]);
+
+  // Whenever active real PostgreSQL database changes, introspect schema & load backups/audit
   useEffect(() => {
-    fetchTableRows(selectedTable);
-    refreshAllCounts();
-  }, [selectedTable, fetchTableRows, refreshAllCounts]);
+    if (!provisionedDb?.dbName || viewMode !== "studio") return;
+    void refreshLiveSchema(provisionedDb.dbName);
+    void loadBackupsAndAudit();
+  }, [provisionedDb?.dbName, viewMode, refreshLiveSchema, loadBackupsAndAudit]);
 
-  const activeTableMeta = useMemo(() => {
+  // Whenever selectedTable changes, query real rows from PostgreSQL
+  useEffect(() => {
+    if (!provisionedDb?.dbName || !selectedTable || viewMode !== "studio") {
+      setRows([]);
+      return;
+    }
+    void fetchTableRows(selectedTable, provisionedDb.dbName);
+  }, [selectedTable, provisionedDb?.dbName, viewMode, fetchTableRows]);
+
+  // Load catalog data when switching Database sub-tabs or Observability
+  useEffect(() => {
+    if (viewMode !== "studio" || !provisionedDb?.dbName) return;
+    if (
+      activeSection === "database" &&
+      ["extensions", "indexes", "policies", "functions", "triggers", "roles"].includes(databaseSubTab)
+    ) {
+      void loadCatalogSubTab(databaseSubTab);
+    } else if (activeSection === "pooler" || activeSection === "overview") {
+      void loadLiveObservability();
+    } else if (activeSection === "backups" || databaseSubTab === "backups" || activeSection === "auth" || activeSection === "settings") {
+      void loadBackupsAndAudit();
+    }
+  }, [activeSection, databaseSubTab, viewMode, provisionedDb?.dbName, loadCatalogSubTab, loadLiveObservability, loadBackupsAndAudit]);
+
+  const activeTableMeta = useMemo<StudioTableMeta>(() => {
     return (
       studioTables.find((t) => t.name === selectedTable) || {
         name: selectedTable,
         label: selectedTable,
-        description: "PostgreSQL relational table",
+        description: "PostgreSQL table",
         primaryKey: "id",
+        columns: [],
+        estimatedRows: 0,
+        sizePretty: "0 bytes",
         defaultRow: {},
       }
     );
   }, [studioTables, selectedTable]);
 
-  // Navigate helper so selecting Auth or Settings aligns selectedTable/tabs
+  // Navigate helper
   const navigateStudioSection = (sec: StudioSection) => {
     setActiveSection(sec);
     if (sec === "auth") {
-      setSelectedTable("app_users");
-      setAuthSubTab("users");
+      setAuthSubTab("account");
     } else if (sec === "api") {
       setSettingsSubTab("api_keys");
     } else if (sec === "backups") {
@@ -1723,66 +1821,69 @@ export function SovereignDatabaseStudio({
     }
   };
 
-  // Cloud to local sync
-  const handleShiftCloudToLocal = async () => {
+  // Refresh live PostgreSQL schema, cluster health, and database summary
+  const handleSyncLiveDatabase = async () => {
     setSyncingCloud(true);
     try {
-      const res = await fetch("/api/shift-cloud-to-local", { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      await loadRealDatabasesAndHealth();
+      if (provisionedDb?.dbName) {
+        const refreshed = await refreshLiveSchema(provisionedDb.dbName);
+        if (selectedTable) {
+          await fetchTableRows(selectedTable, provisionedDb.dbName);
+        }
+        await loadBackupsAndAudit();
         setStatusBanner({
           type: "success",
-          message: `Synchronized ${data.syncedTables} tables and ${data.totalRows} records into local PostgreSQL 16!`,
+          message: `Synced live PostgreSQL database ${provisionedDb.dbName} (${refreshed.length} public table${refreshed.length === 1 ? "" : "s"}).`,
         });
-        fetchTableRows(selectedTable);
-        refreshAllCounts();
       } else {
         setStatusBanner({
           type: "info",
-          message: "All 13 tables are loaded and operating with local zero-latency persistence.",
+          message: "Cluster health checked. Provision a PostgreSQL database to start creating tables.",
         });
       }
-    } catch {
-      setStatusBanner({
-        type: "info",
-        message: "PostgreSQL 16 engine connected and operational.",
-      });
     } finally {
       setSyncingCloud(false);
     }
   };
 
-  // Run diagnostics ping
+  // Run REAL latency & health diagnostics via GET /api/db/health
   const handleRunPingDiagnostics = async () => {
     setPingStatus((prev) => ({ ...prev, testing: true }));
     const t0 = performance.now();
     try {
-      await fetch("/rest/v1/", {
-        method: "HEAD",
-        headers: { apikey: activeProject.anonKey || "spx_ovh_sovereign_key" },
-      }).catch(() => {});
-      const pRest = Math.max(0.8, Math.round((performance.now() - t0) * 10) / 10);
-      setPingStatus({
-        postgrest: pRest,
-        pgbouncer: 0.9,
-        postgres: 0.7,
-        testing: false,
-      });
-      setStatusBanner({
-        type: "success",
-        message: `Latency diagnostics complete: PostgREST ${pRest}ms | PgBouncer 0.9ms | PostgreSQL 0.7ms.`,
-      });
+      const res = await fetch("/api/db/health", { credentials: "include", cache: "no-store" });
+      const data = (await res.json().catch(() => null)) as LiveClusterHealth | null;
+      const roundTripMs = Math.max(1, Math.round(performance.now() - t0));
+      if (res.ok && data?.ok) {
+        setClusterHealth(data);
+        setPingStatus({
+          postgrest: roundTripMs,
+          pgbouncer: data.latencyMs,
+          postgres: data.latencyMs,
+          testing: false,
+        });
+        setStatusBanner({
+          type: "success",
+          message: `${data.version} healthy — DB query latency ${data.latencyMs}ms (HTTP RTT ${roundTripMs}ms, ${data.activeConnections} active conns).`,
+        });
+      } else {
+        setPingStatus({ postgrest: null, pgbouncer: null, postgres: null, testing: false });
+        setStatusBanner({
+          type: "error",
+          message: data?.error || `PostgreSQL cluster health check failed (HTTP ${res.status}).`,
+        });
+      }
     } catch {
-      setPingStatus({
-        postgrest: 1.2,
-        pgbouncer: 0.9,
-        postgres: 0.8,
-        testing: false,
+      setPingStatus({ postgrest: null, pgbouncer: null, postgres: null, testing: false });
+      setStatusBanner({
+        type: "error",
+        message: "Unable to reach /api/db/health. Check PostgreSQL server connectivity.",
       });
     }
   };
 
-  // Account Management: Update current user's display name and/or password in database + session
+  // Account Management: Update current user's display name and/or password
   const handleUpdateOwnAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!sessionUser) return;
@@ -1810,6 +1911,13 @@ export function SovereignDatabaseStudio({
         tenantId: sessionUser.tenantId,
       };
       const syncedToPg = await persistAppUserToBackend(updatedUser);
+      if (!syncedToPg) {
+        setStatusBanner({
+          type: "error",
+          message: "Failed to persist account update to PostgreSQL backend.",
+        });
+        return;
+      }
       const safeUser: AppUser = { ...updatedUser, password: "" };
       setSessionUser(safeUser);
       issueSignedSessionToken({
@@ -1823,13 +1931,9 @@ export function SovereignDatabaseStudio({
         onUserAuthenticated(safeUser);
       }
       setAccountNewPassword("");
-      await fetchTableRows("app_users");
-      await refreshAllCounts();
       setStatusBanner({
         type: "success",
-        message: syncedToPg
-          ? "Account credentials saved and synced to PostgreSQL app_users."
-          : "Account credentials updated in local workspace cache.",
+        message: "Account credentials saved to PostgreSQL.",
       });
     } catch {
       setStatusBanner({ type: "error", message: "Failed to save account changes." });
@@ -1838,7 +1942,7 @@ export function SovereignDatabaseStudio({
     }
   };
 
-  // Account Management: Provision a new database account with strict email/password validation & hashing
+  // Account Management: Provision a new database account (Admin only)
   const handleProvisionDatabaseUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = newUserEmail.trim().toLowerCase();
@@ -1865,7 +1969,7 @@ export function SovereignDatabaseStudio({
       if (duplicate) {
         setStatusBanner({
           type: "error",
-          message: `Account ${cleanEmail} already exists in app_users.`,
+          message: `Account ${cleanEmail} already exists.`,
         });
         return;
       }
@@ -1876,29 +1980,33 @@ export function SovereignDatabaseStudio({
         password: newUserPassword,
         fullName: cleanName,
         admin: newUserRole,
-        tenantId: newUserTenantId.trim() || sessionUser?.tenantId || "TENANT-SPARROWX",
+        tenantId: newUserTenantId.trim() || `TNT-${Date.now().toString().slice(-4)}`,
       };
       const synced = await persistAppUserToBackend(createdUser);
-      await fetch("/api/db/provision", {
+      if (!synced) {
+        setStatusBanner({ type: "error", message: "Backend rejected account creation." });
+        return;
+      }
+      const provRes = await fetch("/api/db/provision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
-          tenantId: createdUser.tenantId || "TENANT-SPARROWX",
+          tenantId: createdUser.tenantId,
           userId: createdUser.id,
           email: createdUser.email,
           projectName: createdUser.fullName,
         }),
-      }).catch(() => null);
+      });
       setNewUserFullName("");
       setNewUserEmail("");
       setNewUserPassword("");
-      await fetchTableRows("app_users");
-      await refreshAllCounts();
+      await loadRealDatabasesAndHealth();
       setStatusBanner({
-        type: "success",
-        message: synced
-          ? `Provisioned verified user ${cleanEmail} into PostgreSQL app_users.`
-          : `Provisioned user ${cleanEmail} into local workspace store.`,
+        type: provRes.ok ? "success" : "info",
+        message: provRes.ok
+          ? `Provisioned account ${cleanEmail} and dedicated isolated PostgreSQL database.`
+          : `Created account ${cleanEmail}, but isolated DB provisioning returned HTTP ${provRes.status}.`,
       });
     } catch {
       setStatusBanner({ type: "error", message: "Unable to create database user." });
@@ -1907,221 +2015,220 @@ export function SovereignDatabaseStudio({
     }
   };
 
-  // Insert or Update Row
+  // REAL Insert or Update Row directly against PostgreSQL via /api/db/query
   const handleSaveRow = async () => {
+    if (!selectedTable || !provisionedDb?.dbName) {
+      setStatusBanner({ type: "error", message: "Select a real table in your provisioned database first." });
+      return;
+    }
     let parsed: Record<string, unknown>;
     try {
       parsed = JSON.parse(jsonDraft);
-    } catch {
-      setStatusBanner({ type: "error", message: "Invalid JSON format." });
-      return;
-    }
-
-    if (selectedTable === "app_users") {
-      const rawEmail = String(parsed.email ?? "").trim().toLowerCase();
-      if (!DB_EMAIL_PATTERN.test(rawEmail)) {
-        setStatusBanner({ type: "error", message: "app_users requires a valid email address." });
-        return;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Row payload must be a JSON object.");
       }
-      const rawPassword = String(parsed.password ?? "");
-      if (!editingRow && rawPassword.length < 6) {
-        setStatusBanner({
-          type: "error",
-          message: "New app_users records require a password of at least 6 characters.",
-        });
-        return;
-      }
-      if (!editingRow) {
-        const existing = await fetchAppUserByEmailFromBackend(rawEmail);
-        if (existing) {
-          setStatusBanner({
-            type: "error",
-            message: `An account with email ${rawEmail} already exists.`,
-          });
-          return;
-        }
-      }
-      const passwordChanged =
-        !editingRow || (rawPassword.length > 0 && rawPassword !== String(editingRow.password ?? ""));
-      const userPayload: AppUser = {
-        id: String(parsed.id ?? editingRow?.id ?? `USR-${Date.now().toString().slice(-4)}`),
-        email: rawEmail,
-        password: passwordChanged ? rawPassword : "",
-        fullName: String(parsed.full_name ?? parsed.fullName ?? rawEmail.split("@")[0] ?? "Operator"),
-        admin: String(parsed.admin ?? "no").toLowerCase() === "yes" ? "yes" : "no",
-        tenantId: parsed.tenant_id
-          ? String(parsed.tenant_id)
-          : parsed.tenantId
-            ? String(parsed.tenantId)
-            : null,
-      };
-      await persistAppUserToBackend(userPayload);
-      setShowInsertModal(false);
-      setEditingRow(null);
-      await fetchTableRows("app_users");
-      await refreshAllCounts();
-      setStatusBanner({
-        type: "success",
-        message: editingRow
-          ? `Updated account ${rawEmail} cleanly.`
-          : `Inserted hashed account ${rawEmail} into app_users.`,
-      });
-      return;
-    }
-
-    try {
-      if (editingRow) {
-        const pkCol = activeTableMeta.primaryKey;
-        const pkVal = editingRow[pkCol];
-        const res = await fetch(`/rest/v1/${selectedTable}?${pkCol}=eq.${encodeURIComponent(String(pkVal))}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
-          },
-          body: JSON.stringify(parsed),
-        });
-
-        if (res.ok) {
-          setStatusBanner({ type: "success", message: "Row updated successfully." });
-        } else {
-          setRows((prev) => prev.map((r) => (r[pkCol] === pkVal ? { ...r, ...parsed } : r)));
-          setStatusBanner({ type: "success", message: "Row updated in memory." });
-        }
-      } else {
-        const res = await fetch(`/rest/v1/${selectedTable}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-            apikey: activeProject.anonKey || "spx_ovh_sovereign_key",
-          },
-          body: JSON.stringify(parsed),
-        });
-
-        if (res.ok) {
-          setStatusBanner({ type: "success", message: "New row inserted into PostgreSQL!" });
-        } else {
-          setRows((prev) => [parsed, ...prev]);
-          setStatusBanner({ type: "success", message: "New row staged into local table." });
-        }
-      }
-      setShowInsertModal(false);
-      setEditingRow(null);
-      fetchTableRows(selectedTable);
-      refreshAllCounts();
-    } catch {
-      setRows((prev) => [parsed, ...prev]);
-      setShowInsertModal(false);
-      setEditingRow(null);
-      setStatusBanner({ type: "success", message: "Row saved." });
-    }
-  };
-
-  // Delete row
-  const handleDeleteRow = async (row: Record<string, unknown>) => {
-    const col = activeTableMeta.primaryKey;
-    const val = row[col];
-    if (!confirm(`Delete record with ${col}=${String(val)}?`)) return;
-
-    try {
-      const res = await fetch(`/rest/v1/${selectedTable}?${col}=eq.${encodeURIComponent(String(val))}`, {
-        method: "DELETE",
-        headers: { apikey: activeProject.anonKey || "spx_ovh_sovereign_key" },
-      });
-      if (res.ok) {
-        setStatusBanner({ type: "success", message: `Record deleted from ${selectedTable}.` });
-      } else {
-        setRows((prev) => prev.filter((r) => r[col] !== val));
-        setStatusBanner({ type: "success", message: "Record removed." });
-      }
-      fetchTableRows(selectedTable);
-      refreshAllCounts();
     } catch (err) {
       setStatusBanner({
         type: "error",
-        message: `Delete failed: ${String(err)}`,
+        message: err instanceof Error ? err.message : "Invalid JSON format.",
       });
+      return;
+    }
+
+    setSavingRow(true);
+    try {
+      let sql: string;
+      if (editingRow) {
+        const pkCol = activeTableMeta.primaryKey;
+        const pkVal = editingRow[pkCol];
+        sql = buildUpdateRowSql(selectedTable, pkCol, pkVal, parsed);
+      } else {
+        sql = buildInsertRowSql(selectedTable, parsed);
+      }
+      const res = await runTenantSql(sql);
+      if (!res.ok) {
+        setStatusBanner({
+          type: "error",
+          message: `PostgreSQL rejected ${editingRow ? "UPDATE" : "INSERT"}: ${res.error}${res.detail ? ` (${res.detail})` : ""}`,
+        });
+        return;
+      }
+      setShowInsertModal(false);
+      setEditingRow(null);
+      await fetchTableRows(selectedTable);
+      setStatusBanner({
+        type: "success",
+        message: editingRow
+          ? `Updated row in public.${selectedTable} (${res.durationMs}ms).`
+          : `Inserted row into public.${selectedTable} (${res.durationMs}ms).`,
+      });
+    } catch (err) {
+      setStatusBanner({
+        type: "error",
+        message: err instanceof Error ? err.message : "Failed to save row.",
+      });
+    } finally {
+      setSavingRow(false);
     }
   };
 
-  // Handle Create New Custom Table
-  const handleCreateNewTable = () => {
-    if (!newTableName.trim()) return;
-    const cleanName = newTableName.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
-    const primaryCol = newTableColumns.find((c) => c.isPrimary)?.name || "id";
-    const defaultObj: Record<string, unknown> = {};
-    for (const c of newTableColumns) {
-      if (c.type === "UUID") defaultObj[c.name] = `id-${Date.now()}`;
-      else if (c.type === "INTEGER" || c.type === "BIGINT") defaultObj[c.name] = 0;
-      else if (c.type === "BOOLEAN") defaultObj[c.name] = false;
-      else if (c.type === "TIMESTAMPTZ") defaultObj[c.name] = new Date().toISOString();
-      else if (c.type === "vector(1536)") defaultObj[c.name] = "[0.012, -0.045, 0.883, 0.124]";
-      else defaultObj[c.name] = "Sample Value";
+  // REAL Delete Row directly against PostgreSQL via /api/db/query
+  const handleDeleteRow = async (row: Record<string, unknown>) => {
+    if (!selectedTable || !provisionedDb?.dbName) return;
+    const col = activeTableMeta.primaryKey;
+    const val = row[col];
+    if (!confirm(`Delete row from public.${selectedTable} where ${col} = ${String(val)}?`)) return;
+
+    const sql = buildDeleteRowSql(selectedTable, col, val);
+    const res = await runTenantSql(sql);
+    if (!res.ok) {
+      setStatusBanner({
+        type: "error",
+        message: `PostgreSQL DELETE failed: ${res.error}`,
+      });
+      return;
     }
-
-    const newMeta: StudioTableMeta = {
-      name: cleanName,
-      label: cleanName,
-      description: newTableDescription.trim() || `User-created table ${cleanName}`,
-      primaryKey: primaryCol,
-      defaultRow: defaultObj,
-    };
-
-    setStudioTables((prev) => {
-      const next = [newMeta, ...prev];
-      if (typeof window !== "undefined") {
-        try {
-          const customOnly = next.filter(
-            (t) => !INITIAL_STUDIO_TABLES.some((init) => init.name === t.name)
-          );
-          localStorage.setItem(`spx_custom_tables_${tenantSlug}`, JSON.stringify(customOnly));
-        } catch {
-          // ignore storage errors
-        }
-      }
-      return next;
-    });
-    setSelectedTable(cleanName);
-    setRows([defaultObj]);
-    setTableCounts((prev) => ({ ...prev, [cleanName]: 1 }));
-    setShowCreateTableModal(false);
-    setNewTableName("");
-    setNewTableDescription("");
+    await fetchTableRows(selectedTable);
     setStatusBanner({
       type: "success",
-      message: `Table "public.${cleanName}" created with RLS enabled and published to PostgREST REST API!`,
+      message: `Deleted ${res.rowCount} row(s) from public.${selectedTable} (${res.durationMs}ms).`,
     });
   };
 
-  // Execute SQL in Scratchpad
+  // REAL Create New Table via CREATE TABLE DDL against PostgreSQL
+  const handleCreateNewTable = async () => {
+    if (!provisionedDb?.dbName) {
+      setStatusBanner({
+        type: "error",
+        message: "Provision your PostgreSQL database first before creating tables.",
+      });
+      return;
+    }
+    if (!newTableName.trim()) {
+      setStatusBanner({ type: "error", message: "Table name is required." });
+      return;
+    }
+
+    let safeTableName: string;
+    let ddl: string;
+    try {
+      safeTableName = sanitizePgObjectName(newTableName);
+      ddl = buildCreateTableSql(safeTableName, newTableColumns, newTableEnableRls);
+    } catch (err) {
+      setStatusBanner({
+        type: "error",
+        message: err instanceof Error ? err.message : "Invalid table definition.",
+      });
+      return;
+    }
+
+    setCreatingTable(true);
+    try {
+      const res = await runTenantSql(ddl);
+      if (!res.ok) {
+        setStatusBanner({
+          type: "error",
+          message: `CREATE TABLE failed: ${res.error}${res.detail ? ` (${res.detail})` : ""}`,
+        });
+        return;
+      }
+      await refreshLiveSchema();
+      setSelectedTable(safeTableName);
+      setShowCreateTableModal(false);
+      setNewTableName("");
+      setNewTableDescription("");
+      setStatusBanner({
+        type: "success",
+        message: `Created real PostgreSQL table "public.${safeTableName}" in ${provisionedDb.dbName} (${res.durationMs}ms).`,
+      });
+    } finally {
+      setCreatingTable(false);
+    }
+  };
+
+  // REAL Drop Table via DROP TABLE against PostgreSQL
+  const handleDropTable = async (tableName: string) => {
+    if (!provisionedDb?.dbName) return;
+    if (!confirm(`Permanently DROP table "public.${tableName}" and all its rows from ${provisionedDb.dbName}?`)) {
+      return;
+    }
+    const res = await runTenantSql(buildDropTableSql(tableName));
+    if (!res.ok) {
+      setStatusBanner({ type: "error", message: `DROP TABLE failed: ${res.error}` });
+      return;
+    }
+    const remaining = await refreshLiveSchema();
+    setSelectedTable(remaining[0]?.name ?? "");
+    setStatusBanner({
+      type: "success",
+      message: `Dropped table "public.${tableName}" from ${provisionedDb.dbName} (${res.durationMs}ms).`,
+    });
+  };
+
+  // REAL SQL Execution directly against PostgreSQL via /api/db/query (Zero Mock Fallback!)
   const handleExecuteSql = async () => {
+    const queryToRun = activeSql.trim();
+    if (!queryToRun) {
+      setSqlError({ message: "Enter a PostgreSQL query before clicking Run." });
+      return;
+    }
     setExecutingSql(true);
     setSqlExecutionStats(null);
-    const start = performance.now();
+    setSqlError(null);
     try {
-      await new Promise((r) => setTimeout(r, 120));
-      const targetTable = selectedTable;
-      const resultRows = rows.length > 0 ? rows.slice(0, 15) : (LOCAL_SEED_TABLES[targetTable] || []).slice(0, 15);
-      const elapsed = Math.round(performance.now() - start);
-      setSqlResults(resultRows);
+      let targetDb = provisionedDb?.dbName;
+      if (!targetDb && sessionUser) {
+        const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+        const autoProv = await provisionIsolatedPgDatabase({
+          tenantId: tid,
+          userId: sessionUser.id,
+          email: sessionUser.email,
+          projectName: sessionUser.fullName,
+          planId: selectedDbPlanId,
+        });
+        targetDb = autoProv?.dbName;
+      }
+
+      const res = await runTenantSql(queryToRun, targetDb);
+      if (!res.ok) {
+        setSqlResults(null);
+        setSqlResultFields([]);
+        setSqlError({
+          message: res.error,
+          ...(res.pgCode ? { pgCode: res.pgCode } : {}),
+          ...(res.detail ? { detail: res.detail } : {}),
+          ...(res.hint ? { hint: res.hint } : {}),
+          ...(res.position ? { position: res.position } : {}),
+        });
+        setSqlHistory((prev) => [
+          { id: `h-${Date.now()}`, sql: queryToRun, time: "Just now", ok: false },
+          ...prev.slice(0, 14),
+        ]);
+        return;
+      }
+
+      setSqlResults(res.rows);
+      setSqlResultFields(res.fields);
       setSqlExecutionStats({
-        timeMs: elapsed,
-        rowCount: resultRows.length,
-        status: "200 OK • Query executed successfully",
-        bufferHit: "99.8%",
+        timeMs: res.durationMs,
+        rowCount: res.rowCount,
+        command: res.command,
+        truncated: res.truncated,
+        ...(res.statementCount !== undefined ? { statementCount: res.statementCount } : {}),
       });
       setSqlHistory((prev) => [
-        { id: `h-${Date.now()}`, sql: activeSql, time: "Just now" },
-        ...prev.slice(0, 9),
+        { id: `h-${Date.now()}`, sql: queryToRun, time: "Just now", ok: true },
+        ...prev.slice(0, 14),
       ]);
-    } catch (err) {
-      setSqlExecutionStats({
-        timeMs: Math.round(performance.now() - start),
-        rowCount: 0,
-        status: `Error: ${String(err)}`,
-      });
+
+      // Auto-refresh live schema & table rows when DDL/DML ran
+      if (isSchemaMutatingSql(queryToRun) && targetDb) {
+        void refreshLiveSchema(targetDb).then((updatedTables) => {
+          if (selectedTable && updatedTables.some((t) => t.name === selectedTable)) {
+            void fetchTableRows(selectedTable, targetDb);
+          }
+        });
+      }
     } finally {
       setExecutingSql(false);
     }
@@ -2129,37 +2236,91 @@ export function SovereignDatabaseStudio({
 
   const handleSaveSqlQuery = () => {
     const snippetName = `query_${savedSqlQueries.length + 1}.sql`;
-    setSavedSqlQueries((prev) => [{ id: `sq-${Date.now()}`, name: snippetName, sql: activeSql }, ...prev]);
+    setSavedSqlQueries((prev) => {
+      const next = [{ id: `sq-${Date.now()}`, name: snippetName, sql: activeSql }, ...prev];
+      if (typeof window !== "undefined" && provisionedDb?.dbName) {
+        try {
+          localStorage.setItem(`spx_saved_sql_${provisionedDb.dbName}`, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
     setStatusBanner({ type: "success", message: `Saved SQL snippet as ${snippetName} in Private folder.` });
+  };
+
+  const handleDeleteSavedSqlQuery = (id: string) => {
+    setSavedSqlQueries((prev) => {
+      const next = prev.filter((q) => q.id !== id);
+      if (typeof window !== "undefined" && provisionedDb?.dbName) {
+        try {
+          localStorage.setItem(`spx_saved_sql_${provisionedDb.dbName}`, JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
   };
 
   const handleSqlKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
-      handleExecuteSql();
+      void handleExecuteSql();
     } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       handleSaveSqlQuery();
     }
   };
 
-  // Execute Sandbox REST Test
+  // REAL Live Database Query Test in Connection & SDK tab
   const handleTestSandboxEndpoint = async () => {
     setSandboxLoading(true);
+    setSandboxStatusOk(null);
     const t0 = performance.now();
     try {
-      await new Promise((r) => setTimeout(r, 120));
-      const targetRows = rows.length > 0 ? rows.slice(0, 5) : (LOCAL_SEED_TABLES[sandboxSelectedTable] || []).slice(0, 5);
-      const elapsed = Math.round(performance.now() - t0);
+      const testSql = sandboxSelectedTable
+        ? buildSelectTableSql(sandboxSelectedTable, 5)
+        : `SELECT current_database() AS database, current_user AS role, version(), now() AS server_time;`;
+      const res = await runTenantSql(testSql);
+      const elapsed = res.ok ? res.durationMs : Math.round(performance.now() - t0);
       setSandboxLatency(elapsed);
-      setSandboxResponse(JSON.stringify(targetRows, null, 2));
-      setStatusBanner({
-        type: "success",
-        message: `REST 200 OK response received from PostgREST in ${elapsed}ms.`,
-      });
-    } catch {
-      setSandboxLatency(1);
-      setSandboxResponse(JSON.stringify({ status: 200, message: "Connected to PostgREST" }, null, 2));
+      if (res.ok) {
+        setSandboxStatusOk(true);
+        setSandboxResponse(
+          JSON.stringify(
+            {
+              database: provisionedDb?.dbName,
+              command: res.command,
+              rowCount: res.rowCount,
+              durationMs: res.durationMs,
+              rows: res.rows,
+            },
+            null,
+            2,
+          ),
+        );
+        setStatusBanner({
+          type: "success",
+          message: `Live PostgreSQL query succeeded (${res.rowCount} rows in ${res.durationMs}ms).`,
+        });
+      } else {
+        setSandboxStatusOk(false);
+        setSandboxResponse(
+          JSON.stringify(
+            {
+              ok: false,
+              error: res.error,
+              ...(res.pgCode ? { pgCode: res.pgCode } : {}),
+              ...(res.detail ? { detail: res.detail } : {}),
+            },
+            null,
+            2,
+          ),
+        );
+        setStatusBanner({ type: "error", message: `Live query failed: ${res.error}` });
+      }
     } finally {
       setSandboxLoading(false);
     }
@@ -2171,7 +2332,7 @@ export function SovereignDatabaseStudio({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sparrowbase-${selectedTable}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${activeProject.dbName}-${selectedTable || "table"}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     setStatusBanner({ type: "success", message: `Exported ${rows.length} rows as JSON.` });
@@ -2180,7 +2341,10 @@ export function SovereignDatabaseStudio({
   // Export current table as CSV
   const handleExportCsv = () => {
     const firstRow = rows[0];
-    if (!firstRow) return;
+    if (!firstRow) {
+      setStatusBanner({ type: "info", message: "No rows to export from this table." });
+      return;
+    }
     const headers = Object.keys(firstRow);
     const csvLines = [headers.join(",")];
     for (const r of rows) {
@@ -2196,38 +2360,14 @@ export function SovereignDatabaseStudio({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sparrowbase-${selectedTable}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `${activeProject.dbName}-${selectedTable || "table"}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
     setStatusBanner({ type: "success", message: `Exported ${rows.length} rows as CSV.` });
   };
 
-  // Build Full DDL string (reused by Copy as SQL + Export DDL)
-  const buildFullSchemaDdl = () => {
-    let ddl = `-- =====================================================================\n`;
-    ddl += `-- SPARROWX CLOUD DB: POSTGRESQL 16 + PGVECTOR SCHEMA\n`;
-    ddl += `-- Generated at: ${new Date().toISOString()}\n`;
-    ddl += `-- =====================================================================\n\n`;
-    ddl += `CREATE EXTENSION IF NOT EXISTS "uuid-ossp";\n`;
-    ddl += `CREATE EXTENSION IF NOT EXISTS "pgcrypto";\n`;
-    ddl += `CREATE EXTENSION IF NOT EXISTS "vector";\n\n`;
-
-    for (const tbl of studioTables) {
-      ddl += `-- Table: public.${tbl.name} (${tbl.description})\n`;
-      const cols = tbl.defaultRow ? Object.keys(tbl.defaultRow) : ["id"];
-      const colDefs = cols.map((c) => {
-        const colType = inferColumnType(c, tbl.primaryKey, tbl.defaultRow?.[c]).toUpperCase();
-        if (c === tbl.primaryKey) return `  ${c} ${colType} PRIMARY KEY`;
-        if (colType === "BOOL") return `  ${c} BOOLEAN DEFAULT false`;
-        if (colType === "JSONB") return `  ${c} JSONB DEFAULT '{}'::jsonb`;
-        return `  ${c} ${colType}`;
-      });
-      ddl += `CREATE TABLE IF NOT EXISTS public.${tbl.name} (\n${colDefs.join(",\n")}\n);\n\n`;
-      ddl += `ALTER TABLE public.${tbl.name} ENABLE ROW LEVEL SECURITY;\n`;
-      ddl += `CREATE POLICY "Allow authenticated read" ON public.${tbl.name} FOR SELECT USING (true);\n\n`;
-    }
-    return ddl;
-  };
+  // Build Full DDL string from REAL introspected PostgreSQL tables
+  const buildFullSchemaDdl = () => buildSchemaDdlFromTables(studioTables, activeProject.dbName);
 
   const handleExportFullSchemaSql = () => {
     const ddl = buildFullSchemaDdl();
@@ -2235,30 +2375,37 @@ export function SovereignDatabaseStudio({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sparrowbase-schema-${new Date().toISOString().slice(0, 10)}.sql`;
+    a.download = `${activeProject.dbName}-schema-${new Date().toISOString().slice(0, 10)}.sql`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatusBanner({ type: "success", message: "Complete PostgreSQL 16 schema DDL exported successfully!" });
+    setStatusBanner({ type: "success", message: `Exported live PostgreSQL schema DDL (${studioTables.length} tables).` });
   };
 
-  const handleExportFullDatabaseJson = () => {
-    const fullDump: Record<string, unknown> = {
-      version: "SparrowX-PostgreSQL-16-Dump-v1",
-      exported_at: new Date().toISOString(),
-      tables: {},
-    };
-    for (const t of studioTables) {
-      (fullDump.tables as Record<string, unknown>)[t.name] =
-        t.name === selectedTable ? rows : LOCAL_SEED_TABLES[t.name] || [t.defaultRow];
+  // Export live data dump of current database tables via real PostgreSQL queries
+  const handleExportFullDatabaseJson = async () => {
+    if (!provisionedDb?.dbName) {
+      setStatusBanner({ type: "error", message: "No provisioned PostgreSQL database to export." });
+      return;
     }
+    const tablesDump: Record<string, unknown> = {};
+    for (const t of studioTables) {
+      const res = await runTenantSql(buildSelectTableSql(t.name, 500));
+      tablesDump[t.name] = res.ok ? res.rows : [];
+    }
+    const fullDump = {
+      database: provisionedDb.dbName,
+      exported_at: new Date().toISOString(),
+      table_count: studioTables.length,
+      tables: tablesDump,
+    };
     const blob = new Blob([JSON.stringify(fullDump, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sparrowbase-full-snapshot-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${provisionedDb.dbName}-dump-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatusBanner({ type: "success", message: "Complete multi-table database snapshot exported as JSON!" });
+    setStatusBanner({ type: "success", message: `Exported live JSON dump of ${studioTables.length} PostgreSQL table(s).` });
   };
 
   // Copy helper
@@ -2270,7 +2417,7 @@ export function SovereignDatabaseStudio({
     setTimeout(() => setCopiedKey(null), 2000);
   };
 
-  // Filtered & sorted rows (using Intl.Collator for deterministic numeric/natural string sorting)
+  // Filtered & sorted rows
   const processedRows = useMemo(() => {
     let result = [...rows];
     if (searchFilter.trim()) {
@@ -2302,19 +2449,23 @@ export function SovereignDatabaseStudio({
     return processedRows.slice(start, start + pageSize);
   }, [processedRows, currentPage, pageSize]);
 
-  // Dynamic columns with inferred Postgres types
+  // Real PostgreSQL columns from information_schema (even when table has 0 rows!)
   const tableColumns = useMemo(() => {
+    if (activeTableMeta.columns && activeTableMeta.columns.length > 0) {
+      return activeTableMeta.columns.map((c: LiveStudioColumn) => ({
+        name: c.name,
+        type: c.udtName === "vector" ? "vector" : c.udtName || c.dataType,
+        isPrimary: c.isPrimary,
+      }));
+    }
     const colSet = new Set<string>();
     paginatedRows.forEach((r) => {
       Object.keys(r).forEach((k) => colSet.add(k));
     });
-    if (colSet.size === 0 && activeTableMeta.defaultRow) {
-      Object.keys(activeTableMeta.defaultRow).forEach((k) => colSet.add(k));
-    }
     const cols = Array.from(colSet);
     const pk = activeTableMeta.primaryKey;
     const ordered = cols.includes(pk) ? [pk, ...cols.filter((c) => c !== pk)] : cols;
-    const sampleRow = paginatedRows[0] || activeTableMeta.defaultRow || {};
+    const sampleRow = paginatedRows[0] || {};
     return ordered.map((col) => ({
       name: col,
       type: inferColumnType(col, pk, sampleRow[col]),
@@ -2322,29 +2473,16 @@ export function SovereignDatabaseStudio({
     }));
   }, [paginatedRows, activeTableMeta]);
 
-  // Users filtered in Authentication tab
-  const filteredAuthUsers = useMemo(() => {
-    const list = selectedTable === "app_users" ? rows : LOCAL_SEED_TABLES["app_users"] || [];
-    const q = authUserSearch.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (u) =>
-        String(u.email ?? "").toLowerCase().includes(q) ||
-        String(u.full_name ?? u.fullName ?? "").toLowerCase().includes(q) ||
-        String(u.id ?? "").toLowerCase().includes(q)
-    );
-  }, [rows, selectedTable, authUserSearch]);
-
-  // Code snippets for Sandbox & Connect modal
+  // Real PostgreSQL connection snippets for Connection & SDK tab + Connect modal
   const sandboxSnippets = useMemo(() => {
-    const tbl = sandboxSelectedTable;
-    const apiBase = activeProject.restBaseUrl;
-    const apiKey = activeProject.anonKey;
+    const tbl = sandboxSelectedTable || "notes";
+    const uri = activeProject.directUri;
     return {
-      js: `// 1. Initialize the SparrowX Database Client\nimport { createClient } from '@sparrowx/client';\n\nconst sparrowx = createClient(\n  '${apiBase.replace("/rest/v1", "")}',\n  '${apiKey}'\n);\n\n// 2. Query sovereign data with Row Level Security\nconst { data, error } = await sparrowx\n  .from('${tbl}')\n  .select('*')\n  .limit(10);`,
-      curl: `# Query PostgREST REST API Gateway directly\ncurl -X GET "${apiBase}/${tbl}?select=*&limit=10" \\\n  -H "apikey: ${apiKey}" \\\n  -H "Authorization: Bearer ${apiKey}" \\\n  -H "Accept: application/json"`,
-      python: `# Python SDK (sparrowx-py)\nfrom sparrowx import create_client\n\nsparrowx = create_client("${apiBase.replace("/rest/v1", "")}", "${apiKey}")\nresponse = sparrowx.table("${tbl}").select("*").limit(10).execute()\nprint("Data:", response.data)`,
-      prisma: `// Prisma Schema Definition for ${tbl}\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL") // postgresql://${activeProject.dbUser}:[YOUR-PASSWORD]@db.sparrowx.net:6543/${activeProject.dbName}?pgbouncer=true\n}\n\nmodel ${tbl.charAt(0).toUpperCase() + tbl.slice(1).replace(/_([a-z])/g, (_, l) => l.toUpperCase())} {\n  id        String   @id @default(uuid())\n  createdAt DateTime @default(now()) @map("created_at")\n}`,
+      node: `// Node.js (pg) — Direct PostgreSQL 16 Connection\nimport { Pool } from "pg";\n\nconst pool = new Pool({\n  connectionString: process.env.DATABASE_URL, // ${uri}\n  ssl: { rejectUnauthorized: false },\n});\n\nconst { rows } = await pool.query('SELECT * FROM "public"."${tbl}" LIMIT 10;');\nconsole.log(rows);`,
+      psql: `# Connect directly via PostgreSQL CLI (psql)\npsql "${uri}"\n\n# Inspect tables & query rows:\n\\dt public.*\nSELECT * FROM "public"."${tbl}" LIMIT 10;`,
+      python: `# Python (psycopg 3)\nimport os, psycopg\n\nwith psycopg.connect("${uri}") as conn:\n    with conn.cursor() as cur:\n        cur.execute('SELECT * FROM "public"."${tbl}" LIMIT 10;')\n        print(cur.fetchall())`,
+      prisma: `// prisma/schema.prisma\ndatasource db {\n  provider = "postgresql"\n  url      = env("DATABASE_URL")\n}\n\n// .env\n// DATABASE_URL="${uri}"`,
+      js: `// Node.js / Next.js Server Route (pg)\nimport { Pool } from "pg";\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL });\nconst { rows } = await pool.query('SELECT * FROM "public"."${tbl}" LIMIT 10;');`,
     };
   }, [sandboxSelectedTable, activeProject]);
 
@@ -3348,7 +3486,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
     );
   }
 
-  // Sidebar items matching Screenshot 10
+  // Sidebar items — every single tab is backed by live PostgreSQL
   const PRIMARY_NAV_GROUPS: Array<{
     group: string;
     items: Array<{ id: StudioSection; label: string; icon: React.ComponentType<{ className?: string }>; badge?: string }>;
@@ -3362,20 +3500,18 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
       ],
     },
     {
-      group: "Platform",
+      group: "Database",
       items: [
         { id: "database", label: "Database", icon: Database },
-        { id: "auth", label: "Authentication", icon: Users },
-        { id: "storage", label: "Storage", icon: HardDrive },
-        { id: "functions", label: "Edge Functions", icon: Zap },
-        { id: "sandbox", label: "Realtime & REST", icon: Code2 },
+        { id: "backups", label: "Backups & DDL", icon: Archive },
+        { id: "sandbox", label: "Connect & SDK", icon: Code2 },
       ],
     },
     {
       group: "Monitor",
       items: [
-        { id: "pooler", label: "Observability", icon: Activity, badge: "NEW" },
-        { id: "backups", label: "Backups & DDL", icon: Archive },
+        { id: "pooler", label: "Observability", icon: Activity },
+        { id: "auth", label: "Account & Access", icon: Users },
       ],
     },
     {
@@ -3392,17 +3528,6 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
     return !q || t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q);
   });
 
-  const activeEdgeFn = EDGE_FUNCTIONS_CATALOG.find((fn) => fn.id === selectedEdgeFnId) ??
-    EDGE_FUNCTIONS_CATALOG[0] ?? {
-      id: "auth-webhook",
-      name: "auth-webhook",
-      route: "/functions/v1/auth-webhook",
-      runtime: "Deno 2.x • Edge V8",
-      invocations24h: "0",
-      avgLatencyMs: "0ms",
-      code: "",
-    };
-
   const isDatabaseOrBackups = activeSection === "database" || activeSection === "backups";
   const isSettingsOrApi = activeSection === "settings" || activeSection === "api";
   const effectiveSettingsTab = activeSection === "api" ? "api_keys" : settingsSubTab;
@@ -3412,7 +3537,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
     <div className="flex h-screen w-full flex-col bg-[#05060A] text-white font-sans selection:bg-[#A3E635] selection:text-black overflow-hidden">
       {/* STUDIO TOP BREADCRUMB & COMMAND HEADER */}
       <header className="h-12 border-b border-white/10 bg-[#05060A] px-3 sm:px-4 flex items-center justify-between shrink-0 gap-2 z-30">
-        {/* Left Breadcrumbs + Connect */}
+        {/* Left Breadcrumbs + Real Database Selector + Connect */}
         <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
@@ -3431,33 +3556,72 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
           <span className="text-zinc-600 font-light hidden sm:inline">/</span>
 
-          <div className="flex items-center gap-1.5 text-xs truncate">
-            <span className="font-semibold text-white truncate max-w-[120px]">{activeProject.name}</span>
-          </div>
-
-          {/* Environment Switcher Pill */}
-          <div className="flex items-center gap-0.5 bg-[#0A0D14] border border-white/15 rounded-md p-0.5 text-[10px] font-mono ml-1">
-            {(["production", "staging", "development"] as const).map((env) => (
-              <button
-                key={env}
-                type="button"
-                onClick={() => {
-                  setActiveEnv(env);
-                  setStatusBanner({
-                    type: "info",
-                    message: `Switched branch to ${env.toUpperCase()} (${tenantSlug}_${env}_db).`,
-                  });
-                }}
-                className={`px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                  activeEnv === env
-                    ? "bg-[#A3E635]/15 text-[#A3E635] border border-[#A3E635]/40 font-semibold"
-                    : "text-zinc-400 hover:text-white"
-                }`}
-              >
-                {env === "production" ? "PROD" : env === "staging" ? "STAGE" : "DEV"}
-              </button>
-            ))}
-          </div>
+          {/* Active Real PostgreSQL Database Selector / Status */}
+          {provisionedDbsList.length > 1 ? (
+            <select
+              aria-label="Select provisioned PostgreSQL database"
+              value={provisionedDb?.dbName || ""}
+              onChange={(e) => {
+                const picked = provisionedDbsList.find((d) => d.dbName === e.target.value);
+                if (!picked) return;
+                setProvisionedDb({
+                  dbName: picked.dbName,
+                  dbUser: picked.dbUser,
+                  dbPassword: "",
+                  dbHost: picked.dbHost,
+                  dbPort: picked.dbPort,
+                  connectionString: `postgresql://${picked.dbUser}:[ROTATE-TO-REVEAL]@${picked.dbHost}:${picked.dbPort}/${picked.dbName}?sslmode=prefer`,
+                  planId: picked.planId,
+                  planName: picked.planName,
+                  storageLimitMb: picked.storageLimitMb,
+                  maxConnections: picked.maxConnections,
+                  sizePretty: picked.sizePretty,
+                  usagePct: picked.usagePct,
+                  activeConnections: picked.activeConnections,
+                  status: picked.status,
+                });
+                setSelectedTable("");
+                setRows([]);
+                setSqlResults(null);
+                setSqlError(null);
+              }}
+              className="h-7 rounded-md border border-[#A3E635]/40 bg-[#0A0D14] px-2 font-mono text-[11px] text-[#A3E635] focus:outline-none"
+            >
+              {provisionedDbsList.map((d) => (
+                <option key={d.dbName} value={d.dbName}>
+                  {d.dbName} ({d.sizePretty})
+                </option>
+              ))}
+            </select>
+          ) : provisionedDb ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-[#A3E635]/35 bg-[#A3E635]/10 px-2.5 py-0.5 text-[11px] font-mono text-[#A3E635] truncate max-w-[200px]">
+              <span className="size-1.5 rounded-full bg-[#A3E635]" />
+              <span className="truncate">{provisionedDb.dbName}</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={provisioningDb}
+              onClick={async () => {
+                const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+                const created = await provisionIsolatedPgDatabase({
+                  tenantId: tid,
+                  userId: sessionUser.id,
+                  email: sessionUser.email,
+                  projectName: sessionUser.fullName,
+                  planId: selectedDbPlanId,
+                });
+                if (created) {
+                  await loadRealDatabasesAndHealth();
+                  await refreshLiveSchema(created.dbName);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 px-2.5 py-0.5 text-[11px] font-mono text-amber-300 cursor-pointer disabled:opacity-50"
+            >
+              <Plus className="size-3" />
+              <span>{provisioningDb ? "Provisioning..." : "Provision PostgreSQL DB"}</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -3478,7 +3642,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               type="text"
               value={studioSearchQuery}
               onChange={(e) => setStudioSearchQuery(e.target.value)}
-              placeholder="Search..."
+              placeholder="Search tables..."
               aria-label="Search tables or press Ctrl+K"
               className="h-7 w-40 lg:w-48 rounded-md border border-white/15 bg-[#0A0D14] pl-8 pr-12 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
             />
@@ -3492,10 +3656,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             onClick={handleRunPingDiagnostics}
             disabled={pingStatus.testing}
             className="hidden lg:inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-[#0A0D14] hover:border-white/30 px-2 py-1 text-xs text-zinc-300 cursor-pointer"
-            title="Test PostgreSQL / PostgREST latency"
+            title="Test live PostgreSQL cluster health (/api/db/health)"
           >
-            <Activity className={`size-3.5 text-[#A3E635] ${pingStatus.testing ? "animate-spin" : ""}`} />
-            <span className="font-mono text-[11px]">{pingStatus.postgrest ?? 1.2}ms</span>
+            <Activity className={`size-3.5 ${pingStatus.postgres !== null ? "text-[#A3E635]" : "text-amber-400"} ${pingStatus.testing ? "animate-spin" : ""}`} />
+            <span className="font-mono text-[11px]">
+              {pingStatus.postgres !== null ? `${pingStatus.postgres}ms` : "Probe PG"}
+            </span>
           </button>
 
           {!isStandaloneDomain && onOpenClientArea && (
@@ -3628,10 +3794,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             {!sidebarCollapsed && (
               <button
                 type="button"
-                onClick={handleShiftCloudToLocal}
+                onClick={handleSyncLiveDatabase}
                 disabled={syncingCloud}
                 className="hidden md:inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-mono text-zinc-400 hover:text-[#A3E635] cursor-pointer"
-                title="Sync & verify PostgreSQL cluster"
+                title="Refresh live PostgreSQL schema & health"
               >
                 <RefreshCw className={`size-3 ${syncingCloud ? "animate-spin" : ""}`} />
                 <span>Sync DB</span>
@@ -3641,7 +3807,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
         </aside>
 
         {/* SECONDARY SIDEBARS */}
-        {/* A. Table Editor Secondary Sidebar (Screenshot 6) */}
+        {/* A. Table Editor Secondary Sidebar */}
         {activeSection === "tables" && (
           <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0">
             <div className="p-3 border-b border-[#242424] space-y-2.5">
@@ -3650,13 +3816,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <button
                   type="button"
                   onClick={() => {
-                    fetchTableRows(selectedTable);
-                    refreshAllCounts();
+                    void refreshLiveSchema();
+                    if (selectedTable) void fetchTableRows(selectedTable);
                   }}
                   className="p-1 rounded hover:bg-[#242424] text-zinc-400 hover:text-white cursor-pointer"
-                  title="Refresh schema"
+                  title="Refresh live PostgreSQL schema"
                 >
-                  <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`size-3.5 ${loading || schemaLoading ? "animate-spin" : ""}`} />
                 </button>
               </div>
               <div className="rounded-md border border-[#2E2E2E] bg-[#1D1D1D] px-2.5 py-1.5 text-xs font-mono text-zinc-300 flex items-center justify-between">
@@ -3684,43 +3850,53 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-              {visibleSidebarTables.map((t) => {
-                const count = tableCounts[t.name] ?? "-";
-                const isSelected = selectedTable === t.name;
-                return (
-                  <button
-                    key={t.name}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTable(t.name);
-                      setCurrentPage(1);
-                      setSearchFilter("");
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-mono transition-colors text-left cursor-pointer ${
-                      isSelected
-                        ? "bg-[#262629] text-white font-semibold border-l-2 border-[#A3E635]"
-                        : "text-zinc-400 hover:bg-[#101520] hover:text-zinc-200"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Table2 className={`size-3.5 shrink-0 ${isSelected ? "text-[#A3E635]" : "text-zinc-500"}`} />
-                      <span className="truncate">{t.label}</span>
-                      <Globe className="size-2.5 text-zinc-600 shrink-0" />
-                    </div>
-                    <span className="text-[10px] text-zinc-500 shrink-0 ml-1">{count}</span>
-                  </button>
-                );
-              })}
+              {visibleSidebarTables.length === 0 ? (
+                <div className="p-3 text-[11px] font-mono text-zinc-500">
+                  {schemaLoading
+                    ? "Introspecting public schema..."
+                    : provisionedDb
+                      ? "No tables in public schema yet."
+                      : "Provision a PostgreSQL database to view tables."}
+                </div>
+              ) : (
+                visibleSidebarTables.map((t) => {
+                  const count = tableCounts[t.name] ?? t.estimatedRows;
+                  const isSelected = selectedTable === t.name;
+                  return (
+                    <button
+                      key={t.name}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTable(t.name);
+                        setCurrentPage(1);
+                        setSearchFilter("");
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded text-xs font-mono transition-colors text-left cursor-pointer ${
+                        isSelected
+                          ? "bg-[#262629] text-white font-semibold border-l-2 border-[#A3E635]"
+                          : "text-zinc-400 hover:bg-[#101520] hover:text-zinc-200"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Table2 className={`size-3.5 shrink-0 ${isSelected ? "text-[#A3E635]" : "text-zinc-500"}`} />
+                        <span className="truncate">{t.label}</span>
+                      </div>
+                      <span className="text-[10px] text-zinc-500 shrink-0 ml-1">{count}</span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </aside>
         )}
 
-        {/* B. SQL Editor Secondary Sidebar (Screenshot 7) */}
+        {/* B. SQL Editor Secondary Sidebar (Pure Manual Supabase Style) */}
         {activeSection === "sql" && (
           <aside className="hidden md:flex w-60 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0">
             <div className="p-3 border-b border-[#242424] space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-zinc-200">SQL Editor</span>
+                <span className="text-[10px] font-mono text-[#A3E635]">MANUAL</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="relative flex-1">
@@ -3735,7 +3911,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveSql("-- New PostgreSQL 16 query\nSELECT * FROM app_users LIMIT 10;")}
+                  onClick={() => {
+                    setActiveSql("-- Write manual PostgreSQL 16 SQL here\nSELECT current_database(), current_user, now();");
+                    setSqlError(null);
+                  }}
                   className="p-1.5 rounded-md border border-[#2E2E2E] bg-[#1D1D1D] hover:bg-[#262626] text-zinc-200 cursor-pointer"
                   title="New Query"
                 >
@@ -3747,42 +3926,33 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
             <div className="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">
-                  SHARED &amp; FAVORITES
-                </div>
-                <div className="space-y-1">
-                  {SQL_TEMPLATES.slice(0, 2).map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setActiveSql(t.sql)}
-                      className="w-full text-left px-2 py-1 rounded text-zinc-400 hover:text-white hover:bg-[#222222] truncate cursor-pointer"
-                    >
-                      ★ {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">
                   PRIVATE ({savedSqlQueries.length})
                 </div>
                 {savedSqlQueries.length === 0 ? (
                   <div className="rounded-lg border border-[#242428] bg-[#131315] p-3 text-[11px] text-zinc-500 space-y-1">
-                    <div className="text-zinc-300 font-medium">No private queries saved yet</div>
-                    <p>Click Save (Ctrl+S) in the editor to pin a query here.</p>
+                    <div className="text-zinc-300 font-medium">No saved queries yet</div>
+                    <p>Press Ctrl+S or click Save to pin a query here.</p>
                   </div>
                 ) : (
                   <div className="space-y-1">
                     {savedSqlQueries.map((sq) => (
-                      <button
-                        key={sq.id}
-                        type="button"
-                        onClick={() => setActiveSql(sq.sql)}
-                        className="w-full text-left px-2 py-1 rounded text-zinc-300 hover:bg-[#222222] font-mono text-[11px] truncate cursor-pointer"
-                      >
-                        {sq.name}
-                      </button>
+                      <div key={sq.id} className="flex items-center gap-1 group">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSql(sq.sql)}
+                          className="flex-1 text-left px-2 py-1 rounded text-zinc-300 hover:bg-[#222222] font-mono text-[11px] truncate cursor-pointer"
+                        >
+                          {sq.name}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSavedSqlQuery(sq.id)}
+                          className="p-1 rounded text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 cursor-pointer"
+                          title="Delete saved query"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -3790,7 +3960,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1.5">
-                  REFERENCE TEMPLATES
+                  SQL QUICKSTART TEMPLATES
                 </div>
                 <div className="space-y-1">
                   {SQL_TEMPLATES.filter(
@@ -3802,7 +3972,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <button
                       key={tmpl.id}
                       type="button"
-                      onClick={() => setActiveSql(tmpl.sql)}
+                      onClick={() => {
+                        setActiveSql(tmpl.sql);
+                        setSqlError(null);
+                      }}
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-zinc-400 hover:text-white hover:bg-[#222222] cursor-pointer"
                     >
                       <FileText className="size-3.5 text-zinc-500 shrink-0" />
@@ -3901,45 +4074,21 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           </aside>
         )}
 
-        {/* D. Authentication Secondary Sidebar (Screenshot 9) */}
+        {/* D. Account & Access Secondary Sidebar */}
         {activeSection === "auth" && (
           <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0 overflow-y-auto">
             <div className="p-3.5 border-b border-[#242424] text-xs font-semibold text-white">
-              Authentication
+              Account &amp; Access
             </div>
             <div className="p-2.5 space-y-5 text-xs">
               <div>
                 <div className="px-2 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                  MANAGE
+                  INSTANCE &amp; PROFILE
                 </div>
                 {[
-                  { id: "users" as const, label: "Users" },
-                  { id: "account" as const, label: "My Account & Provisioning" },
-                ].map((sub) => (
-                  <button
-                    key={sub.id}
-                    type="button"
-                    onClick={() => setAuthSubTab(sub.id)}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer transition-colors ${
-                      authSubTab === sub.id
-                        ? "bg-[#262629] text-white font-medium"
-                        : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
-                    }`}
-                  >
-                    {sub.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="border-t border-[#242424] pt-3">
-                <div className="px-2 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                  CONFIGURATION
-                </div>
-                {[
-                  { id: "policies" as const, label: "Policies" },
-                  { id: "providers" as const, label: "Sign In / Providers" },
-                  { id: "sessions" as const, label: "Sessions" },
-                  { id: "audit" as const, label: "Audit Logs" },
+                  { id: "account" as const, label: "Database & Profile" },
+                  { id: "sessions" as const, label: "Active Session" },
+                  { id: "audit" as const, label: "PostgreSQL Audit Logs" },
                 ].map((sub) => (
                   <button
                     key={sub.id}
@@ -3959,7 +4108,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           </aside>
         )}
 
-        {/* E. Settings Secondary Sidebar (Screenshots 1-5) */}
+        {/* E. Settings Secondary Sidebar */}
         {isSettingsOrApi && (
           <aside className="hidden md:flex w-56 border-r border-[#2E2E2E] bg-[#080A10] flex-col shrink-0 overflow-y-auto">
             <div className="p-3.5 border-b border-[#242424] text-xs font-semibold text-white">
@@ -3971,13 +4120,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   CONFIGURATION
                 </div>
                 {[
-                  { id: "general" as const, label: "General" },
+                  { id: "general" as const, label: "General & Lifecycle" },
                   { id: "infrastructure" as const, label: "Infrastructure" },
-                  { id: "integrations" as const, label: "Integrations" },
-                  { id: "api_keys" as const, label: "API Keys" },
-                  { id: "jwt_keys" as const, label: "JWT Keys" },
-                  { id: "log_drains" as const, label: "Log Drains" },
-                  { id: "addons" as const, label: "Add-ons" },
+                  { id: "api_keys" as const, label: "Credentials & URI" },
+                  { id: "audit" as const, label: "Audit Trail" },
+                  { id: "billing" as const, label: "Plan & Storage Quota" },
                 ].map((sub) => (
                   <button
                     key={sub.id}
@@ -3996,58 +4143,6 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   </button>
                 ))}
               </div>
-
-              <div className="border-t border-[#242424] pt-3">
-                <div className="px-2 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                  INTEGRATIONS
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigateStudioSection("sandbox")}
-                  className="w-full text-left px-2.5 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-[#101520] cursor-pointer flex items-center justify-between"
-                >
-                  <span>Data API</span>
-                  <ChevronRight className="size-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveSection("settings");
-                    setSettingsSubTab("vault");
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer flex items-center justify-between ${
-                    effectiveSettingsTab === "vault"
-                      ? "bg-[#262629] text-white font-medium"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
-                  }`}
-                >
-                  <span>Vault</span>
-                  <span className="px-1.5 py-0.2 rounded border border-amber-500/40 bg-amber-500/10 text-[9px] font-mono text-amber-300">
-                    BETA
-                  </span>
-                </button>
-              </div>
-
-              <div className="border-t border-[#242424] pt-3">
-                <div className="px-2 pb-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
-                  BILLING
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveSection("settings");
-                    setSettingsSubTab("billing");
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-md cursor-pointer flex items-center justify-between ${
-                    effectiveSettingsTab === "billing"
-                      ? "bg-[#262629] text-white font-medium"
-                      : "text-zinc-400 hover:text-zinc-200 hover:bg-[#101520]"
-                  }`}
-                >
-                  <span>Subscription &amp; Usage</span>
-                  <ChevronRight className="size-3" />
-                </button>
-              </div>
             </div>
           </aside>
         )}
@@ -4055,27 +4150,69 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
         {/* MAIN CONTENT WORKSPACE */}
         <main className="flex-1 flex flex-col min-h-0 bg-[#05060A] overflow-hidden">
           {/* =============================================================== */}
-          {/* VIEW: PROJECT OVERVIEW (SCREENSHOT 10 + 3)                      */}
+          {/* VIEW: PROJECT OVERVIEW (LIVE POSTGRESQL TELEMETRY)              */}
           {/* =============================================================== */}
           {activeSection === "overview" && (
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {!provisionedDb && (
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex flex-wrap items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="text-sm font-bold text-amber-200">
+                      Isolated PostgreSQL Database Not Provisioned Yet
+                    </div>
+                    <p className="text-xs text-zinc-300">
+                      Provision your dedicated PostgreSQL 16 database and least-privilege role on the cluster to run SQL queries, create tables, and take snapshots.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={provisioningDb}
+                    onClick={async () => {
+                      const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
+                      const created = await provisionIsolatedPgDatabase({
+                        tenantId: tid,
+                        userId: sessionUser.id,
+                        email: sessionUser.email,
+                        projectName: sessionUser.fullName,
+                        planId: selectedDbPlanId,
+                      });
+                      if (created) {
+                        await loadRealDatabasesAndHealth();
+                        await refreshLiveSchema(created.dbName);
+                        setStatusBanner({
+                          type: "success",
+                          message: `Provisioned dedicated PostgreSQL database ${created.dbName} (role: ${created.dbUser}).`,
+                        });
+                      }
+                    }}
+                    className="px-4 py-2 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-xs cursor-pointer disabled:opacity-50"
+                  >
+                    {provisioningDb ? "Provisioning PostgreSQL..." : "Provision PostgreSQL Database"}
+                  </button>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
-                    <h1 className="text-xl font-bold text-white tracking-tight">{activeProject.name}</h1>
+                    <h1 className="text-xl font-bold text-white tracking-tight">
+                      {provisionedDb ? provisionedDb.dbName : activeProject.name}
+                    </h1>
                     <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[10px] font-mono text-[#A3E635] font-semibold">
                       {activeProject.cfg.label}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-mono text-zinc-400">
-                    <span>{activeProject.id}.db.sparrowx.net</span>
+                    <span>
+                      {activeProject.host}:{activeProject.port} • role {activeProject.dbUser}
+                    </span>
                     <button
                       type="button"
-                      onClick={() => copyText("overview-url", `https://${activeProject.id}.db.sparrowx.net`)}
+                      onClick={() => copyText("overview-url", activeProject.directUri)}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-[#2E2E2E] bg-[#1A1A1A] hover:bg-[#242424] text-[11px] text-zinc-300 cursor-pointer"
                     >
                       {copiedKey === "overview-url" ? <Check className="size-3 text-[#A3E635]" /> : <Copy className="size-3" />}
-                      <span>Copy</span>
+                      <span>Copy URI</span>
                     </button>
                   </div>
                 </div>
@@ -4083,55 +4220,66 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => navigateStudioSection("sql")}
+                    className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#0C0F17] hover:bg-[#232323] text-xs font-medium text-zinc-200 cursor-pointer"
+                  >
+                    Open SQL Editor
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => navigateStudioSection("tables")}
                     className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#0C0F17] hover:bg-[#232323] text-xs font-medium text-zinc-200 cursor-pointer"
                   >
-                    Open Table Editor ({studioTables.length} tables)
+                    Table Editor ({studioTables.length})
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowConnectModal(true)}
                     className="px-3.5 py-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-semibold text-xs cursor-pointer"
                   >
-                    Connect SDK / psql
+                    Connect psql / SDK
                   </button>
                 </div>
               </div>
 
-              {/* Status 2x2 Cards (Live Measured Data Only) */}
+              {/* Status 2x2 Cards (100% Live PostgreSQL Cluster Data) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
                   {
                     icon: CheckCircle2,
-                    label: "STATUS",
-                    value: pingStatus.postgrest !== null ? "Connected" : "Checking...",
-                    sub:
-                      pingStatus.postgrest !== null
-                        ? `${pingStatus.postgrest}ms REST RTT`
-                        : "Probing PostgREST /rest/v1",
-                    accent: pingStatus.postgrest !== null ? "text-[#A3E635]" : "text-zinc-300",
+                    label: "CLUSTER STATUS",
+                    value: clusterHealth?.ok ? "Online" : clusterHealth ? "Offline" : "Probing...",
+                    sub: clusterHealth?.ok
+                      ? `${clusterHealth.latencyMs}ms PG latency`
+                      : clusterHealth?.error || "Checking /api/db/health",
+                    accent: clusterHealth?.ok ? "text-[#A3E635]" : "text-amber-300",
                   },
                   {
                     icon: Cpu,
                     label: "ENGINE",
-                    value: "PostgreSQL",
-                    sub: `PostgREST • ${studioTables.length} table(s)`,
+                    value: clusterHealth?.version || "PostgreSQL 16",
+                    sub: `${clusterHealth?.pgvectorAvailable ? "pgvector Ready" : "Standard PG"} • ${studioTables.length} table(s)`,
                     accent: "text-white",
                   },
                   {
-                    icon: GitBranch,
-                    label: "WORKSPACE",
-                    value: activeProject.cfg.branch,
-                    sub: activeProject.dbName,
+                    icon: HardDrive,
+                    label: "DATABASE SIZE",
+                    value: activeDbSummary?.sizePretty || provisionedDb?.sizePretty || "—",
+                    sub: activeDbSummary
+                      ? `${activeDbSummary.usagePct}% of ${activeDbSummary.storageLimitMb} MB quota`
+                      : provisionedDb?.dbName || "Not provisioned",
                     accent: "text-white",
                   },
                   {
-                    icon: Clock,
-                    label: "LIVE RECORDS",
-                    value: `${Object.values(tableCounts)
-                      .reduce((a, b) => a + b, 0)
-                      .toLocaleString()} rows`,
-                    sub: `Across ${studioTables.length} table(s)`,
+                    icon: Activity,
+                    label: "CONNECTIONS",
+                    value:
+                      activeDbSummary !== null
+                        ? `${activeDbSummary.activeConnections} / ${activeDbSummary.maxConnections}`
+                        : `0 / ${activeProject.maxPoolSize}`,
+                    sub: liveDbStats.cacheHitPct
+                      ? `Cache hit ${liveDbStats.cacheHitPct}`
+                      : "Isolated tenant role",
                     accent: "text-white",
                   },
                 ].map((stat) => {
@@ -4148,7 +4296,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                           {stat.label}
                         </div>
-                        <div className={`text-sm font-semibold mt-0.5 ${stat.accent}`}>{stat.value}</div>
+                        <div className={`text-sm font-semibold mt-0.5 truncate ${stat.accent}`}>{stat.value}</div>
                         <div className="text-[11px] text-zinc-500 truncate">{stat.sub}</div>
                       </div>
                     </div>
@@ -4156,21 +4304,19 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 })}
               </div>
 
-              {/* Primary Database Topology + Compute & Disk Telemetry */}
               <TopologyClusterPanel
-                region={projectRegion}
+                region={clusterHealth?.originRegion || projectRegion}
                 envLabel={activeProject.environment}
-                pingMs={pingStatus.postgrest}
+                pingMs={pingStatus.postgres}
                 tableCount={studioTables.length}
                 totalRows={Object.values(tableCounts).reduce((a, b) => a + b, 0)}
                 host={activeProject.host}
               />
 
-              {/* Quick Table Stats Summary Strip */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-medium text-zinc-400">Active Tables in public</div>
+                    <div className="text-xs font-medium text-zinc-400">Public Schema Tables</div>
                     <div className="text-lg font-bold text-white font-mono mt-1">{studioTables.length} Tables</div>
                   </div>
                   <button
@@ -4183,15 +4329,17 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
                 <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
                   <div>
-                    <div className="text-xs font-medium text-zinc-400">REST API Success Rate</div>
-                    <div className="text-lg font-bold text-[#A3E635] font-mono mt-1">100.0%</div>
+                    <div className="text-xs font-medium text-zinc-400">Recorded Snapshots</div>
+                    <div className="text-lg font-bold text-[#A3E635] font-mono mt-1">
+                      {activeDbSummary?.backupCount ?? dbSnapshots.length}
+                    </div>
                   </div>
                   <button
                     type="button"
-                    onClick={() => navigateStudioSection("sandbox")}
+                    onClick={() => navigateStudioSection("backups")}
                     className="px-2.5 py-1 rounded border border-[#2E2E2E] bg-[#101520] hover:text-[#A3E635] text-xs cursor-pointer"
                   >
-                    Test API →
+                    Backups →
                   </button>
                 </div>
                 <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
@@ -4271,13 +4419,21 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
 
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                  <span className="hidden lg:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2 py-1 text-[11px] font-mono text-zinc-300">
-                    <span className="size-4 rounded-full bg-[#2A2A2D] grid place-items-center text-[10px]">1</span>
-                    <span>RLS policy</span>
-                  </span>
                   <span className="hidden xl:inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2 py-1 text-[11px] font-mono text-zinc-300">
-                    Role postgres
+                    Role {activeProject.dbUser}
                   </span>
+
+                  {selectedTable && (
+                    <button
+                      type="button"
+                      onClick={() => void handleDropTable(selectedTable)}
+                      className="inline-flex items-center gap-1 rounded-md border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 px-2 py-1 text-xs text-red-400 cursor-pointer"
+                      title={`Drop table public.${selectedTable}`}
+                    >
+                      <Trash2 className="size-3" />
+                      <span>Drop</span>
+                    </button>
+                  )}
 
                   <button
                     type="button"
@@ -4300,12 +4456,13 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
                   <button
                     type="button"
+                    disabled={!selectedTable}
                     onClick={() => {
                       setEditingRow(null);
                       setJsonDraft(JSON.stringify(activeTableMeta.defaultRow, null, 2));
                       setShowInsertModal(true);
                     }}
-                    className="inline-flex items-center gap-1 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-3 py-1 text-xs font-bold shadow-sm cursor-pointer"
+                    className="inline-flex items-center gap-1 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-3 py-1 text-xs font-bold shadow-sm cursor-pointer disabled:opacity-40"
                   >
                     <Plus className="size-3.5" />
                     <span>Insert</span>
@@ -4482,26 +4639,36 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           )}
 
           {/* =============================================================== */}
-          {/* VIEW: SQL EDITOR (SCREENSHOT 7)                                 */}
+          {/* VIEW: SQL EDITOR (PURE MANUAL SUPABASE-STYLE POSTGRESQL RUNNER) */}
           {/* =============================================================== */}
           {activeSection === "sql" && (
             <div className="flex-1 flex flex-col min-h-0 bg-[#05060A] overflow-hidden">
               <div className="border-b border-[#2E2E2E] bg-[#080A10] px-4 py-2 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#222225] border border-[#2E2E2E] text-xs font-mono text-white">
-                    <Plus className="size-3 text-[#A3E635]" /> Query Scratchpad
+                    <Terminal className="size-3 text-[#A3E635]" /> SQL Query Editor
                   </span>
-                  <span className="rounded bg-lime-500/10 border border-lime-500/30 text-[#A3E635] px-2 py-0.5 text-[10px] font-mono">
-                    {activeProject.dbName}
-                  </span>
+                  {provisionedDb ? (
+                    <span className="rounded bg-lime-500/10 border border-lime-500/30 text-[#A3E635] px-2 py-0.5 text-[10px] font-mono">
+                      {provisionedDb.dbName} • {provisionedDb.dbUser}
+                    </span>
+                  ) : (
+                    <span className="rounded bg-amber-500/10 border border-amber-500/30 text-amber-300 px-2 py-0.5 text-[10px] font-mono">
+                      Not provisioned — Run will provision or click Provision DB
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
                   <select
                     aria-label="Select SQL Template"
+                    defaultValue=""
                     onChange={(e) => {
                       const t = SQL_TEMPLATES.find((x) => x.id === e.target.value);
-                      if (t) setActiveSql(t.sql);
+                      if (t) {
+                        setActiveSql(t.sql);
+                        setSqlError(null);
+                      }
                     }}
                     className="h-8 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2.5 text-xs text-zinc-300 font-mono outline-none focus:border-[#A3E635]"
                   >
@@ -4515,6 +4682,17 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
                   <button
                     type="button"
+                    onClick={() => {
+                      setActiveSql("");
+                      setSqlError(null);
+                    }}
+                    className="inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#1D1D20] hover:bg-[#27272B] text-zinc-300 px-2.5 py-1.5 text-xs font-medium cursor-pointer"
+                  >
+                    <span>Clear</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={handleSaveSqlQuery}
                     className="inline-flex items-center gap-1 rounded-md border border-[#2E2E2E] bg-[#1D1D20] hover:bg-[#27272B] text-zinc-200 px-3 py-1.5 text-xs font-medium cursor-pointer"
                   >
@@ -4524,7 +4702,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
                   <button
                     type="button"
-                    onClick={handleExecuteSql}
+                    onClick={() => void handleExecuteSql()}
                     disabled={executingSql}
                     className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-3.5 py-1.5 text-xs font-bold shadow cursor-pointer disabled:opacity-50"
                   >
@@ -4535,41 +4713,10 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
               </div>
 
               <div className="flex-1 flex flex-col min-h-0">
-                {/* SparrowX AI SQL & pgvector Neural Copilot Bar */}
-                <div className="border-b border-[#242424] bg-[#0B0F17] px-3 py-2 flex flex-wrap items-center gap-2 text-xs">
-                  <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-[#A3E635] shrink-0">
-                    <Sparkles className="size-3.5" /> SparrowX AI SQL Copilot
-                  </span>
-                  <input
-                    type="text"
-                    value={aiSqlPrompt}
-                    onChange={(e) => setAiSqlPrompt(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleGenerateAiSql();
-                      }
-                    }}
-                    placeholder="Ask SparrowX AI to generate PostgreSQL 16 DDL, pgvector HNSW indexes, or RLS policies..."
-                    className="h-7 flex-1 min-w-[200px] rounded border border-[#2E2E2E] bg-[#05060A] px-2.5 font-mono text-[11px] text-zinc-200 placeholder-zinc-500 outline-none focus:border-[#A3E635]"
-                  />
-                  <button
-                    type="button"
-                    disabled={aiSqlGenerating}
-                    onClick={() => void handleGenerateAiSql()}
-                    className="h-7 rounded bg-[#A3E635]/15 border border-[#A3E635]/40 hover:bg-[#A3E635]/25 px-2.5 text-[11px] font-semibold text-[#A3E635] cursor-pointer disabled:opacity-50"
-                  >
-                    {aiSqlGenerating ? "Synthesizing..." : "Synthesize SQL"}
-                  </button>
-                  {aiSqlNote && (
-                    <span className="text-[10px] font-mono text-emerald-400">{aiSqlNote}</span>
-                  )}
-                </div>
-
-                {/* Editor with Line Numbers */}
-                <div className="h-[48%] min-h-[180px] flex border-b border-[#2E2E2E] bg-[#07090E]">
+                {/* Manual SQL Editor with Line Numbers (Zero AI Copilot) */}
+                <div className="h-[50%] min-h-[200px] flex border-b border-[#2E2E2E] bg-[#07090E]">
                   <div className="w-10 py-3 bg-[#141417] border-r border-[#222226] text-right pr-2 font-mono text-[11px] text-zinc-600 select-none overflow-hidden">
-                    {activeSql.split("\n").map((_, idx) => (
+                    {(activeSql || " ").split("\n").map((_, idx) => (
                       <div key={idx} className="leading-relaxed">
                         {idx + 1}
                       </div>
@@ -4579,27 +4726,38 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     value={activeSql}
                     onChange={(e) => setActiveSql(e.target.value)}
                     onKeyDown={handleSqlKeyDown}
-                    placeholder="-- Hit Ctrl+Enter to run query or start typing PostgreSQL / pgvector SQL..."
+                    spellCheck={false}
+                    placeholder="-- Write PostgreSQL 16 / pgvector SQL and press Ctrl+Enter to execute directly against your database..."
                     className="flex-1 p-3 bg-transparent text-[#A3E635] font-mono text-xs outline-none resize-none leading-relaxed"
                   />
                 </div>
 
                 {/* History Strip */}
                 <div className="border-b border-[#242424] bg-[#151517] px-3 py-1.5 flex items-center justify-between text-[11px] text-zinc-500 font-mono">
-                  <span className="flex items-center gap-1.5">
+                  <span className="flex items-center gap-1.5 shrink-0">
                     <History className="size-3" /> Recent Runs:
                   </span>
-                  <div className="flex items-center gap-3 overflow-x-auto">
-                    {sqlHistory.slice(0, 3).map((h) => (
-                      <button
-                        key={h.id}
-                        type="button"
-                        onClick={() => setActiveSql(h.sql)}
-                        className="truncate max-w-[180px] hover:text-white text-zinc-400 cursor-pointer"
-                      >
-                        {h.sql.replace(/\s+/g, " ")}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-3 overflow-x-auto ml-3">
+                    {sqlHistory.length === 0 ? (
+                      <span className="text-zinc-600">No queries executed yet in this session.</span>
+                    ) : (
+                      sqlHistory.slice(0, 4).map((h) => (
+                        <button
+                          key={h.id}
+                          type="button"
+                          onClick={() => {
+                            setActiveSql(h.sql);
+                            setSqlError(null);
+                          }}
+                          className={`truncate max-w-[200px] hover:text-white cursor-pointer ${
+                            h.ok ? "text-zinc-400" : "text-red-400"
+                          }`}
+                        >
+                          {h.ok ? "✓ " : "✕ "}
+                          {h.sql.replace(/\s+/g, " ")}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
 
@@ -4627,65 +4785,155 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       ))}
                     </div>
 
-                    {sqlExecutionStats && (
-                      <span className="text-[#A3E635] text-[11px]">
-                        {sqlExecutionStats.rowCount} rows ({sqlExecutionStats.timeMs}ms)
+                    {sqlError ? (
+                      <span className="text-red-400 text-[11px] font-semibold">
+                        ERROR{sqlError.pgCode ? ` (${sqlError.pgCode})` : ""}
                       </span>
-                    )}
+                    ) : sqlExecutionStats ? (
+                      <span className="text-[#A3E635] text-[11px]">
+                        {sqlExecutionStats.command} • {sqlExecutionStats.rowCount} row(s) • {sqlExecutionStats.timeMs}ms
+                        {sqlExecutionStats.truncated ? " (truncated at 500)" : ""}
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="flex-1 overflow-auto p-3">
-                    {sqlResults === null ? (
-                      <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-xs font-mono">
-                        <span>Click Run to execute your query against {activeProject.dbName}</span>
+                    {sqlError ? (
+                      <div
+                        role="alert"
+                        className="rounded-lg border border-red-500/40 bg-red-950/30 p-4 font-mono text-xs space-y-2"
+                      >
+                        <div className="flex items-center gap-2 text-red-400 font-bold">
+                          <AlertCircle className="size-4 shrink-0" />
+                          <span>
+                            PostgreSQL Error{sqlError.pgCode ? ` [SQLSTATE ${sqlError.pgCode}]` : ""}
+                          </span>
+                        </div>
+                        <pre className="whitespace-pre-wrap text-red-200 leading-relaxed">{sqlError.message}</pre>
+                        {sqlError.detail && (
+                          <div className="text-zinc-300">
+                            <span className="text-zinc-500">DETAIL: </span>
+                            {sqlError.detail}
+                          </div>
+                        )}
+                        {sqlError.hint && (
+                          <div className="text-amber-300">
+                            <span className="text-zinc-500">HINT: </span>
+                            {sqlError.hint}
+                          </div>
+                        )}
+                        {sqlError.position && (
+                          <div className="text-zinc-400">
+                            <span className="text-zinc-500">POSITION: </span>
+                            character {sqlError.position}
+                          </div>
+                        )}
+                      </div>
+                    ) : sqlResults === null ? (
+                      <div className="h-full flex flex-col items-center justify-center text-zinc-500 text-xs font-mono gap-1.5">
+                        <span>
+                          Click <strong className="text-zinc-300">Run (Ctrl+Enter)</strong> to execute SQL directly against{" "}
+                          <span className="text-[#A3E635]">{provisionedDb?.dbName || "your PostgreSQL database"}</span>.
+                        </span>
+                        <span className="text-[11px] text-zinc-600">
+                          All statements execute live on PostgreSQL 16 via /api/db/query.
+                        </span>
                       </div>
                     ) : sqlResultViewMode === "grid" ? (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left font-mono text-xs border border-[#242428]">
-                          <thead className="bg-[#1B1B1F] border-b border-[#2E2E2E]">
-                            <tr>
-                              {sqlResults[0] &&
-                                Object.keys(sqlResults[0]).map((k) => (
+                      sqlResults.length === 0 ? (
+                        <div className="rounded-lg border border-[#A3E635]/30 bg-[#141A17] p-4 font-mono text-xs space-y-1">
+                          <div className="text-[#A3E635] font-semibold flex items-center gap-2">
+                            <CheckCircle2 className="size-4" />
+                            <span>
+                              Success. No rows returned ({sqlExecutionStats?.command || "OK"} •{" "}
+                              {sqlExecutionStats?.timeMs ?? 0}ms).
+                            </span>
+                          </div>
+                          {sqlResultFields.length > 0 && (
+                            <div className="text-zinc-400 text-[11px]">
+                              Columns: {sqlResultFields.join(", ")}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left font-mono text-xs border border-[#242428]">
+                            <thead className="bg-[#1B1B1F] border-b border-[#2E2E2E]">
+                              <tr>
+                                {(sqlResultFields.length > 0
+                                  ? sqlResultFields
+                                  : Object.keys(sqlResults[0] || {})
+                                ).map((k) => (
                                   <th key={k} className="p-2 border-r border-[#262626] text-zinc-300 font-semibold">
                                     {k}
                                   </th>
                                 ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#202024]">
-                            {sqlResults.map((r, idx) => (
-                              <tr key={idx} className="hover:bg-[#1A1A1E]">
-                                {Object.values(r).map((v, cIdx) => (
-                                  <td key={cIdx} className="p-2 border-r border-[#222226] text-zinc-300 truncate max-w-[220px]">
-                                    {String(v ?? "NULL")}
-                                  </td>
-                                ))}
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                            </thead>
+                            <tbody className="divide-y divide-[#202024]">
+                              {sqlResults.map((r, idx) => {
+                                const cols =
+                                  sqlResultFields.length > 0 ? sqlResultFields : Object.keys(r);
+                                return (
+                                  <tr key={idx} className="hover:bg-[#1A1A1E]">
+                                    {cols.map((colName) => {
+                                      const v = r[colName];
+                                      const formatted =
+                                        v === null || v === undefined
+                                          ? "NULL"
+                                          : typeof v === "object"
+                                            ? JSON.stringify(v)
+                                            : String(v);
+                                      return (
+                                        <td
+                                          key={colName}
+                                          title={formatted}
+                                          className={`p-2 border-r border-[#222226] truncate max-w-[260px] ${
+                                            v === null || v === undefined ? "text-zinc-600 italic" : "text-zinc-300"
+                                          }`}
+                                        >
+                                          {formatted}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
                     ) : sqlResultViewMode === "chart" ? (
                       <div className="p-4 rounded-lg border border-[#242428] bg-[#111114] space-y-3">
                         <div className="flex items-center gap-2 text-xs font-semibold text-white">
                           <BarChart3 className="size-4 text-[#A3E635]" />
-                          <span>Row Distribution Across Schema Tables</span>
+                          <span>Live Row Distribution Across Public Tables</span>
                         </div>
-                        <div className="space-y-2 font-mono text-[11px]">
-                          {studioTables.slice(0, 6).map((t) => {
-                            const count = tableCounts[t.name] ?? (LOCAL_SEED_TABLES[t.name] || []).length;
-                            const pct = Math.min(100, Math.max(8, count * 6));
-                            return (
-                              <div key={t.name} className="flex items-center gap-3">
-                                <span className="w-36 truncate text-zinc-300">{t.name}</span>
-                                <div className="flex-1 h-3 rounded bg-[#1B1B1F] overflow-hidden">
-                                  <div className="h-full bg-[#A3E635]/80 rounded" style={{ width: `${pct}%` }} />
+                        {studioTables.length === 0 ? (
+                          <p className="text-xs font-mono text-zinc-500">
+                            No tables in public schema yet. Run a CREATE TABLE statement to get started.
+                          </p>
+                        ) : (
+                          <div className="space-y-2 font-mono text-[11px]">
+                            {studioTables.slice(0, 10).map((t) => {
+                              const count = tableCounts[t.name] ?? t.estimatedRows;
+                              const maxCount = Math.max(
+                                1,
+                                ...studioTables.map((st) => tableCounts[st.name] ?? st.estimatedRows),
+                              );
+                              const pct = Math.min(100, Math.max(4, Math.round((count / maxCount) * 100)));
+                              return (
+                                <div key={t.name} className="flex items-center gap-3">
+                                  <span className="w-36 truncate text-zinc-300">{t.name}</span>
+                                  <div className="flex-1 h-3 rounded bg-[#1B1B1F] overflow-hidden">
+                                    <div className="h-full bg-[#A3E635]/80 rounded" style={{ width: `${pct}%` }} />
+                                  </div>
+                                  <span className="w-14 text-right text-[#A3E635]">{count}</span>
                                 </div>
-                                <span className="w-10 text-right text-[#A3E635]">{count}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <pre className="text-xs font-mono text-[#A3E635] bg-[#07090E] p-4 rounded-lg overflow-x-auto border border-[#242428]">
@@ -4749,24 +4997,49 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                   </div>
 
                   <div className="flex-1 overflow-auto p-6" style={DOT_GRID_STYLE}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 max-w-6xl mx-auto">
-                      {studioTables
-                        .filter(
-                          (t) =>
-                            !schemaFindTable.trim() ||
-                            t.name.toLowerCase().includes(schemaFindTable.toLowerCase())
-                        )
-                        .map((tbl) => {
-                          const cols = Object.keys(tbl.defaultRow || { id: "id" });
-                          return (
+                    {studioTables.length === 0 ? (
+                      <div className="max-w-md mx-auto mt-16 rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-6 text-center space-y-3">
+                        <Database className="size-8 text-[#A3E635] mx-auto" />
+                        <h3 className="text-sm font-bold text-white">No Tables in Public Schema</h3>
+                        <p className="text-xs text-zinc-400">
+                          {provisionedDb
+                            ? `Your PostgreSQL database ${provisionedDb.dbName} is live and empty. Create a table visually or via the SQL Editor.`
+                            : "Provision your isolated PostgreSQL database first to design and inspect tables."}
+                        </p>
+                        <div className="flex items-center justify-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowCreateTableModal(true)}
+                            className="px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
+                          >
+                            + New table
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigateStudioSection("sql")}
+                            className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#18181D] text-zinc-200 text-xs cursor-pointer"
+                          >
+                            Open SQL Editor
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 max-w-6xl mx-auto">
+                        {studioTables
+                          .filter(
+                            (t) =>
+                              !schemaFindTable.trim() ||
+                              t.name.toLowerCase().includes(schemaFindTable.toLowerCase())
+                          )
+                          .map((tbl) => (
                             <div
                               key={tbl.name}
                               className="rounded-lg border border-[#2E2E2E] bg-[#171719]/95 shadow-lg overflow-hidden font-mono text-xs"
                             >
                               <div className="px-3 py-2 bg-[#1D1D20] border-b border-[#2A2A2E] flex items-center justify-between">
-                                <div className="flex items-center gap-2 text-white font-semibold">
-                                  <Table2 className="size-3.5 text-[#A3E635]" />
-                                  <span>{tbl.name}</span>
+                                <div className="flex items-center gap-2 text-white font-semibold truncate">
+                                  <Table2 className="size-3.5 text-[#A3E635] shrink-0" />
+                                  <span className="truncate">{tbl.name}</span>
                                 </div>
                                 <button
                                   type="button"
@@ -4774,37 +5047,33 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                                     setSelectedTable(tbl.name);
                                     navigateStudioSection("tables");
                                   }}
-                                  className="text-[10px] text-zinc-400 hover:text-[#A3E635] cursor-pointer"
+                                  className="text-[10px] text-zinc-400 hover:text-[#A3E635] cursor-pointer shrink-0"
                                 >
                                   Open →
                                 </button>
                               </div>
                               <div className="divide-y divide-[#222226] max-h-56 overflow-y-auto">
-                                {cols.map((col) => {
-                                  const isPk = col === tbl.primaryKey;
-                                  const typ = inferColumnType(col, tbl.primaryKey, tbl.defaultRow?.[col]);
-                                  return (
-                                    <div
-                                      key={col}
-                                      className="px-3 py-1.5 flex items-center justify-between gap-2 text-[11px]"
-                                    >
-                                      <span className="flex items-center gap-1.5 text-zinc-300 truncate">
-                                        {isPk ? (
-                                          <KeyRound className="size-3 text-[#A3E635] shrink-0" />
-                                        ) : (
-                                          <span className="size-1.5 rounded-full bg-zinc-600 shrink-0 ml-1 mr-0.5" />
-                                        )}
-                                        <span className="truncate">{col}</span>
-                                      </span>
-                                      <span className="text-zinc-500 shrink-0">{typ}</span>
-                                    </div>
-                                  );
-                                })}
+                                {tbl.columns.map((col) => (
+                                  <div
+                                    key={col.name}
+                                    className="px-3 py-1.5 flex items-center justify-between gap-2 text-[11px]"
+                                  >
+                                    <span className="flex items-center gap-1.5 text-zinc-300 truncate">
+                                      {col.isPrimary ? (
+                                        <KeyRound className="size-3 text-[#A3E635] shrink-0" />
+                                      ) : (
+                                        <span className="size-1.5 rounded-full bg-zinc-600 shrink-0 ml-1 mr-0.5" />
+                                      )}
+                                      <span className="truncate">{col.name}</span>
+                                    </span>
+                                    <span className="text-zinc-500 shrink-0">{col.udtName || col.dataType}</span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
-                          );
-                        })}
-                    </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -4813,13 +5082,22 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 <div className="flex-1 p-6 overflow-y-auto space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold text-white">Public Schema Tables ({studioTables.length})</h2>
-                    <button
-                      type="button"
-                      onClick={() => setShowCreateTableModal(true)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
-                    >
-                      <Plus className="size-3.5" /> New table
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void refreshLiveSchema()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#18181D] text-zinc-200 text-xs cursor-pointer"
+                      >
+                        <RefreshCw className={`size-3.5 ${schemaLoading ? "animate-spin" : ""}`} /> Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateTableModal(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
+                      >
+                        <Plus className="size-3.5" /> New table
+                      </button>
+                    </div>
                   </div>
                   <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
                     <table className="w-full text-left text-xs font-mono">
@@ -4827,117 +5105,220 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <tr>
                           <th className="p-3">Table</th>
                           <th className="p-3">Primary Key</th>
+                          <th className="p-3">Columns</th>
                           <th className="p-3">Rows</th>
-                          <th className="p-3">Description</th>
-                          <th className="p-3 text-right">Action</th>
+                          <th className="p-3">Disk Size</th>
+                          <th className="p-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#232327]">
-                        {studioTables.map((t) => (
-                          <tr key={t.name} className="hover:bg-[#1E1E22]">
-                            <td className="p-3 text-white font-semibold">{t.name}</td>
-                            <td className="p-3 text-[#A3E635]">{t.primaryKey}</td>
-                            <td className="p-3 text-zinc-300">{tableCounts[t.name] ?? "-"}</td>
-                            <td className="p-3 text-zinc-400 truncate max-w-xs">{t.description}</td>
-                            <td className="p-3 text-right">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedTable(t.name);
-                                  navigateStudioSection("tables");
-                                }}
-                                className="text-[#A3E635] hover:underline cursor-pointer"
-                              >
-                                Inspect
-                              </button>
+                        {studioTables.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-8 text-center text-zinc-500">
+                              No public tables found in {activeProject.dbName}.
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          studioTables.map((t) => (
+                            <tr key={t.name} className="hover:bg-[#1E1E22]">
+                              <td className="p-3 text-white font-semibold">{t.name}</td>
+                              <td className="p-3 text-[#A3E635]">{t.primaryKey}</td>
+                              <td className="p-3 text-zinc-300">{t.columns.length}</td>
+                              <td className="p-3 text-zinc-300">{tableCounts[t.name] ?? t.estimatedRows}</td>
+                              <td className="p-3 text-zinc-400">{t.sizePretty}</td>
+                              <td className="p-3 text-right space-x-3">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTable(t.name);
+                                    navigateStudioSection("tables");
+                                  }}
+                                  className="text-[#A3E635] hover:underline cursor-pointer"
+                                >
+                                  Inspect
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDropTable(t.name)}
+                                  className="text-red-400 hover:underline cursor-pointer"
+                                >
+                                  Drop
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
 
-              {effectiveDatabaseTab === "extensions" && (
-                <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                  <h2 className="text-base font-bold text-white">PostgreSQL 16 Extensions</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {POSTGRES_EXTENSIONS.map((ext) => (
-                      <div key={ext.name} className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono font-bold text-sm text-white">{ext.name}</span>
-                          <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[10px] font-mono text-[#A3E635]">
-                            {ext.status} v{ext.version}
-                          </span>
-                        </div>
-                        <p className="text-xs text-zinc-400">{ext.description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(effectiveDatabaseTab === "functions" ||
+              {(effectiveDatabaseTab === "extensions" ||
+                effectiveDatabaseTab === "functions" ||
                 effectiveDatabaseTab === "triggers" ||
                 effectiveDatabaseTab === "indexes" ||
                 effectiveDatabaseTab === "policies" ||
                 effectiveDatabaseTab === "roles") && (
                 <div className="flex-1 p-6 overflow-y-auto space-y-4">
-                  <h2 className="text-base font-bold text-white capitalize">
-                    PostgreSQL {effectiveDatabaseTab} Manager
-                  </h2>
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3 text-xs font-mono">
-                    {effectiveDatabaseTab === "roles" ? (
-                      <div className="space-y-2">
-                        {[
-                          { role: "postgres", desc: "Superuser with direct cluster administration access" },
-                          { role: "service_role", desc: "Bypasses Row Level Security for trusted backend servers" },
-                          { role: "authenticated", desc: "Scoped JWT operator role subject to RLS policies" },
-                          { role: "anon", desc: "Restricted public read role with zero mutation writes" },
-                        ].map((r) => (
-                          <div key={r.role} className="flex items-center justify-between p-3 rounded bg-[#111114] border border-[#242428]">
-                            <span className="text-[#A3E635] font-bold">{r.role}</span>
-                            <span className="text-zinc-400">{r.desc}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-zinc-300">
-                          All {studioTables.length} public tables have strict Row Level Security, B-Tree primary key indexes, and IVFFlat/HNSW vector indexes synchronized.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleExportFullSchemaSql}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#A3E635] text-[#11181C] font-bold cursor-pointer"
-                        >
-                          <Download className="size-3.5" /> Export Full SQL Definition
-                        </button>
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-bold text-white capitalize">
+                        Live PostgreSQL {effectiveDatabaseTab}
+                      </h2>
+                      <p className="text-xs text-zinc-400 font-mono mt-0.5">
+                        Queried live from system catalogs on {activeProject.dbName}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={catalogLoading}
+                      onClick={() => void loadCatalogSubTab(effectiveDatabaseTab)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#18181D] hover:border-[#A3E635] text-zinc-200 text-xs font-mono cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`size-3.5 ${catalogLoading ? "animate-spin" : ""}`} />
+                      <span>Refresh</span>
+                    </button>
                   </div>
+
+                  {catalogError ? (
+                    <div className="rounded-xl border border-red-500/35 bg-red-950/25 p-4 text-xs font-mono text-red-300">
+                      {catalogError}
+                    </div>
+                  ) : catalogLoading ? (
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-8 text-center text-xs font-mono text-zinc-400">
+                      Querying PostgreSQL catalog...
+                    </div>
+                  ) : catalogRows.length === 0 ? (
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-8 text-center text-xs font-mono text-zinc-500 space-y-2">
+                      <div>No {effectiveDatabaseTab} defined in public schema yet.</div>
+                      <button
+                        type="button"
+                        onClick={() => navigateStudioSection("sql")}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-[#A3E635] text-[#11181C] font-bold cursor-pointer"
+                      >
+                        Open SQL Editor
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-x-auto">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E] text-zinc-400">
+                          <tr>
+                            {Object.keys(catalogRows[0] || {}).map((k) => (
+                              <th key={k} className="p-3 capitalize">
+                                {k.replace(/_/g, " ")}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#232327]">
+                          {catalogRows.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-[#1E1E22]">
+                              {Object.values(row).map((v, cIdx) => (
+                                <td key={cIdx} className="p-3 text-zinc-200 max-w-md truncate" title={String(v ?? "NULL")}>
+                                  {v === null || v === undefined ? (
+                                    <span className="text-zinc-600 italic">NULL</span>
+                                  ) : (
+                                    String(v)
+                                  )}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               )}
 
               {effectiveDatabaseTab === "backups" && (
                 <div className="flex-1 p-6 overflow-y-auto space-y-6">
-                  <div>
-                    <h2 className="text-base font-bold text-white flex items-center gap-2">
-                      <Archive className="size-4 text-[#A3E635]" />
-                      <span>Database Backups, DDL Dumps &amp; Disaster Recovery</span>
-                    </h2>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Export complete PostgreSQL 16 schemas, inspect nightly snapshots, and download full data archives.
-                    </p>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-bold text-white flex items-center gap-2">
+                        <Archive className="size-4 text-[#A3E635]" />
+                        <span>Live Database Snapshots &amp; DDL Exports</span>
+                      </h2>
+                      <p className="text-xs text-zinc-400 mt-1">
+                        Record real PostgreSQL snapshots with SHA-256 schema digests via /api/db/lifecycle and export live schemas or data.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={snapshotLabel}
+                        onChange={(e) => setSnapshotLabel(e.target.value)}
+                        placeholder="Snapshot label..."
+                        className="h-8 rounded-md border border-[#2E2E2E] bg-[#05060A] px-2.5 text-xs font-mono text-zinc-200 focus:border-[#A3E635] focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        disabled={creatingSnapshot || !provisionedDb}
+                        onClick={() => void handleCreateSnapshot()}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold px-3.5 py-1.5 text-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <Archive className="size-3.5" />
+                        <span>{creatingSnapshot ? "Recording..." : "Create Snapshot"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Live Recorded Snapshots Table */}
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-x-auto">
+                    <div className="px-4 py-2.5 border-b border-[#242428] flex items-center justify-between text-xs font-mono">
+                      <span className="text-white font-semibold">
+                        Recorded Snapshots for {activeProject.dbName} ({dbSnapshots.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void loadBackupsAndAudit()}
+                        className="text-zinc-400 hover:text-[#A3E635] cursor-pointer"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E] text-zinc-400">
+                        <tr>
+                          <th className="p-3">Snapshot ID</th>
+                          <th className="p-3">Label</th>
+                          <th className="p-3">Size</th>
+                          <th className="p-3">Tables</th>
+                          <th className="p-3">SHA-256</th>
+                          <th className="p-3">Created</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#232327]">
+                        {dbSnapshots.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-6 text-center text-zinc-500">
+                              No snapshots recorded yet. Click "Create Snapshot" to capture your database state.
+                            </td>
+                          </tr>
+                        ) : (
+                          dbSnapshots.map((s) => (
+                            <tr key={s.id} className="hover:bg-[#1E1E22]">
+                              <td className="p-3 text-[#A3E635] font-semibold">{s.id}</td>
+                              <td className="p-3 text-white">{s.label}</td>
+                              <td className="p-3 text-zinc-300">{s.sizePretty}</td>
+                              <td className="p-3 text-zinc-300">{s.tableCount}</td>
+                              <td className="p-3 text-zinc-500">{s.checksumSha256.slice(0, 14)}…</td>
+                              <td className="p-3 text-zinc-400">{s.createdAt.slice(0, 19).replace("T", " ")}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3">
                       <FileCode className="size-5 text-[#A3E635]" />
-                      <h3 className="font-bold text-white text-sm">Full Schema DDL (.sql)</h3>
+                      <h3 className="font-bold text-white text-sm">Live Schema DDL (.sql)</h3>
                       <p className="text-xs text-zinc-400">
-                        Exports all {studioTables.length} tables, pgvector indexes, and RLS policies.
+                        Exports CREATE TABLE definitions for all {studioTables.length} live public table(s).
                       </p>
                       <button
                         type="button"
@@ -4950,11 +5331,11 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
 
                     <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3">
                       <Database className="size-5 text-blue-400" />
-                      <h3 className="font-bold text-white text-sm">Full Data Snapshot (.json)</h3>
-                      <p className="text-xs text-zinc-400">Multi-table dump bundling all workspace records.</p>
+                      <h3 className="font-bold text-white text-sm">Live Data Dump (.json)</h3>
+                      <p className="text-xs text-zinc-400">Queries all live tables in {activeProject.dbName} and downloads JSON.</p>
                       <button
                         type="button"
-                        onClick={handleExportFullDatabaseJson}
+                        onClick={() => void handleExportFullDatabaseJson()}
                         className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#222225] hover:bg-[#2a2a2f] text-white font-semibold px-3 py-2 text-xs cursor-pointer"
                       >
                         <Download className="size-3.5" /> Export All Data (.json)
@@ -4965,14 +5346,15 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       <Table2 className="size-5 text-amber-400" />
                       <h3 className="font-bold text-white text-sm">Active Table CSV</h3>
                       <p className="text-xs text-zinc-400">
-                        Download spreadsheet-ready CSV of <span className="text-[#A3E635] font-mono">{selectedTable}</span>.
+                        Download spreadsheet-ready CSV of <span className="text-[#A3E635] font-mono">{selectedTable || "no table selected"}</span>.
                       </p>
                       <button
                         type="button"
+                        disabled={!selectedTable}
                         onClick={handleExportCsv}
-                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#222225] hover:bg-[#2a2a2f] text-white font-semibold px-3 py-2 text-xs cursor-pointer"
+                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#222225] hover:bg-[#2a2a2f] text-white font-semibold px-3 py-2 text-xs cursor-pointer disabled:opacity-40"
                       >
-                        <Download className="size-3.5" /> Download {selectedTable}.csv
+                        <Download className="size-3.5" /> Download {selectedTable || "table"}.csv
                       </button>
                     </div>
                   </div>
@@ -4982,58 +5364,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           )}
 
           {/* =============================================================== */}
-          {/* VIEW: AUTHENTICATION & ACCOUNT MANAGEMENT (SCREENSHOT 9)        */}
+          {/* VIEW: ACCOUNT, ISOLATED DB CREDENTIALS & AUDIT LOGS             */}
           {/* =============================================================== */}
           {activeSection === "auth" && (
             <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-6 space-y-6">
-              {(authSubTab === "users" || authSubTab === "account") && (
+              {(authSubTab === "account" || authSubTab === "users") && (
                 <>
-                  {/* Header + Filter Bar (Screenshot 9) */}
-                  <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h1 className="text-lg font-bold text-white">Users</h1>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => fetchTableRows("app_users")}
-                          className="p-1.5 rounded-md border border-[#2E2E2E] bg-[#0D111A] text-zinc-300 hover:text-white cursor-pointer"
-                          title="Refresh users"
-                          aria-label="Refresh users"
-                        >
-                          <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
-                        </button>
-                        <a
-                          href="#provision-user-panel"
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-xs"
-                        >
-                          <UserPlus className="size-3.5" /> Add user
-                        </a>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="px-2.5 py-1.5 rounded-md border border-[#2E2E2E] bg-[#171719] text-zinc-300 font-mono">
-                        Email address
-                      </span>
-                      <div className="relative flex-1 min-w-[200px] max-w-xs">
-                        <Search className="size-3.5 text-zinc-500 absolute left-2.5 top-2" />
-                        <input
-                          type="text"
-                          value={authUserSearch}
-                          onChange={(e) => setAuthUserSearch(e.target.value)}
-                          placeholder="Search by email"
-                          className="w-full h-8 rounded-md border border-[#2E2E2E] bg-[#121215] pl-8 pr-2 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#A3E635]"
-                        />
-                      </div>
-                      <span className="px-2.5 py-1.5 rounded-md border border-[#2E2E2E] bg-[#171719] text-zinc-400 font-mono">
-                        All columns
-                      </span>
-                      <span className="px-2.5 py-1.5 rounded-md border border-[#2E2E2E] bg-[#171719] text-zinc-400 font-mono">
-                        Sorted by user ID
-                      </span>
-                    </div>
-                  </div>
-
                   {/* Dedicated Isolated PostgreSQL Database Card */}
                   <div className="rounded-xl border border-[#A3E635]/30 bg-[#0A0D14] p-4 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262629] pb-2.5">
@@ -5059,35 +5395,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           <button
                             type="button"
                             disabled={creatingSnapshot}
-                            onClick={async () => {
-                              setCreatingSnapshot(true);
-                              try {
-                                const res = await fetch("/api/db/lifecycle", {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    action: "backup",
-                                    dbName: provisionedDb.dbName,
-                                    email: sessionUser.email,
-                                    label: "Manual Studio Snapshot",
-                                  }),
-                                });
-                                const data = await res.json();
-                                setStatusBanner({
-                                  type: data.ok ? "success" : "error",
-                                  message: data.ok
-                                    ? `Snapshot ${data.snapshot.id} created (${data.snapshot.sizePretty}, ${data.snapshot.tableCount} tables).`
-                                    : data.error || "Snapshot failed.",
-                                });
-                              } catch {
-                                setStatusBanner({
-                                  type: "error",
-                                  message: "Unable to reach snapshot lifecycle API (/api/db/lifecycle).",
-                                });
-                              } finally {
-                                setCreatingSnapshot(false);
-                              }
-                            }}
+                            onClick={() => void handleCreateSnapshot("Manual Studio Snapshot")}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#18181D] border border-[#2E2E34] hover:border-[#A3E635] text-zinc-200 font-bold text-[11px] font-mono cursor-pointer disabled:opacity-50"
                           >
                             <span>{creatingSnapshot ? "Snapshotting..." : "Snapshot"}</span>
@@ -5095,8 +5403,12 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         )}
                         <button
                           type="button"
-                          disabled={provisioningDb}
+                          disabled={provisioningDb || rotatingPassword}
                           onClick={async () => {
+                            if (provisionedDb) {
+                              await handleRotateDbPassword();
+                              return;
+                            }
                             const tid = sessionUser.tenantId || `TNT-${sessionUser.id}`;
                             const res = await provisionIsolatedPgDatabase({
                               tenantId: tid,
@@ -5105,22 +5417,26 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                               projectName: sessionUser.fullName,
                               planId: selectedDbPlanId,
                             });
-                            setStatusBanner({
-                              type: res ? "success" : "error",
-                              message: res
-                                ? `Provisioned dedicated PostgreSQL database ${res.dbName} (${res.planName || selectedDbPlanId}, role: ${res.dbUser}).`
-                                : "Unable to reach PostgreSQL provisioner (/api/db/provision).",
-                            });
+                            if (res) {
+                              await loadRealDatabasesAndHealth();
+                              await refreshLiveSchema(res.dbName);
+                              setStatusBanner({
+                                type: "success",
+                                message: `Provisioned dedicated PostgreSQL database ${res.dbName} (role: ${res.dbUser}).`,
+                              });
+                            }
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] font-bold text-[11px] font-mono cursor-pointer disabled:opacity-50"
                         >
-                          <RefreshCw className={`size-3 ${provisioningDb ? "animate-spin" : ""}`} />
+                          <RefreshCw className={`size-3 ${provisioningDb || rotatingPassword ? "animate-spin" : ""}`} />
                           <span>
                             {provisioningDb
                               ? "Provisioning..."
-                              : provisionedDb
-                                ? "Rotate DB Password"
-                                : "Provision Dedicated DB"}
+                              : rotatingPassword
+                                ? "Rotating..."
+                                : provisionedDb
+                                  ? "Rotate DB Password"
+                                  : "Provision Dedicated DB"}
                           </span>
                         </button>
                       </div>
@@ -5147,7 +5463,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                           <button
                             type="button"
                             onClick={() => {
-                              navigator.clipboard?.writeText(provisionedDb.connectionString);
+                              copyText("auth-uri", provisionedDb.connectionString);
                               setStatusBanner({
                                 type: "success",
                                 message: "Copied dedicated PostgreSQL connection URI to clipboard.",
@@ -5162,14 +5478,14 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       </div>
                     ) : (
                       <p className="text-xs text-zinc-400 font-mono">
-                        No dedicated database credentials cached for this browser session yet. Click{" "}
-                        <span className="text-[#A3E635]">Provision Dedicated DB</span> to create or rotate your isolated PostgreSQL database and role on the server.
+                        No dedicated database provisioned yet. Click{" "}
+                        <span className="text-[#A3E635]">Provision Dedicated DB</span> to create your isolated PostgreSQL database and role on the server.
                       </p>
                     )}
                   </div>
 
-                  {/* Account Management & Provisioning 2-Card Panel */}
-                  <div id="provision-user-panel" className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                  {/* Account Profile & Admin Provisioning Panel */}
+                  <div id="provision-user-panel" className={`grid grid-cols-1 ${isPlatformAdmin ? "xl:grid-cols-2" : ""} gap-4`}>
                     <form
                       onSubmit={handleUpdateOwnAccount}
                       className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3"
@@ -5178,7 +5494,7 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                         <div className="flex items-center gap-2">
                           <UserCheck className="size-4 text-[#A3E635]" />
                           <span className="text-xs font-bold text-white font-mono">
-                            My Database Account &amp; Session
+                            My Database Account &amp; Profile
                           </span>
                         </div>
                         <span className="px-2 py-0.5 rounded bg-lime-500/15 border border-lime-500/30 text-[#A3E635] font-mono text-[10px] font-bold">
@@ -5239,517 +5555,200 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       </div>
                     </form>
 
-                    <form
-                      onSubmit={handleProvisionDatabaseUser}
-                      className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262629] pb-2.5">
-                        <div className="flex items-center gap-2">
-                          <UserPlus className="size-4 text-[#A3E635]" />
-                          <span className="text-xs font-bold text-white font-mono">
-                            Provision New Database Account (app_users)
-                          </span>
+                    {isPlatformAdmin && (
+                      <form
+                        onSubmit={handleProvisionDatabaseUser}
+                        className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#262629] pb-2.5">
+                          <div className="flex items-center gap-2">
+                            <UserPlus className="size-4 text-[#A3E635]" />
+                            <span className="text-xs font-bold text-white font-mono">
+                              Provision New Developer Account + Isolated DB
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-zinc-400">ADMIN ONLY</span>
                         </div>
-                        <span className="text-[10px] font-mono text-zinc-400">EMAIL REGEX + HASHED</span>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs font-mono">
-                        <input
-                          type="text"
-                          name="newUserFullName"
-                          autoComplete="name"
-                          required
-                          value={newUserFullName}
-                          onChange={(e) => setNewUserFullName(e.target.value)}
-                          placeholder="Full Name"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
-                        />
-                        <input
-                          type="email"
-                          name="newUserEmail"
-                          autoComplete="email"
-                          spellCheck={false}
-                          required
-                          value={newUserEmail}
-                          onChange={(e) => setNewUserEmail(e.target.value)}
-                          placeholder="dev@company.com"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
-                        />
-                        <input
-                          type="password"
-                          name="newUserPassword"
-                          autoComplete="new-password"
-                          required
-                          minLength={6}
-                          value={newUserPassword}
-                          onChange={(e) => setNewUserPassword(e.target.value)}
-                          placeholder="Password (6+)"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
-                        />
-                        <select
-                          aria-label="New user role"
-                          value={newUserRole}
-                          onChange={(e) => setNewUserRole(e.target.value === "yes" ? "yes" : "no")}
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
-                        >
-                          <option value="no">Developer</option>
-                          <option value="yes">Admin</option>
-                        </select>
-                        <input
-                          type="text"
-                          value={newUserTenantId}
-                          onChange={(e) => setNewUserTenantId(e.target.value)}
-                          placeholder="Tenant ID"
-                          className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
-                        />
-                      </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs font-mono">
+                          <input
+                            type="text"
+                            name="newUserFullName"
+                            autoComplete="name"
+                            required
+                            value={newUserFullName}
+                            onChange={(e) => setNewUserFullName(e.target.value)}
+                            placeholder="Full Name"
+                            className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
+                          />
+                          <input
+                            type="email"
+                            name="newUserEmail"
+                            autoComplete="email"
+                            spellCheck={false}
+                            required
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            placeholder="dev@company.com"
+                            className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
+                          />
+                          <input
+                            type="password"
+                            name="newUserPassword"
+                            autoComplete="new-password"
+                            required
+                            minLength={6}
+                            value={newUserPassword}
+                            onChange={(e) => setNewUserPassword(e.target.value)}
+                            placeholder="Password (6+)"
+                            className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
+                          />
+                          <select
+                            aria-label="New user role"
+                            value={newUserRole}
+                            onChange={(e) => setNewUserRole(e.target.value === "yes" ? "yes" : "no")}
+                            className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
+                          >
+                            <option value="no">Developer</option>
+                            <option value="yes">Admin</option>
+                          </select>
+                          <input
+                            type="text"
+                            value={newUserTenantId}
+                            onChange={(e) => setNewUserTenantId(e.target.value)}
+                            placeholder="Tenant ID"
+                            className="px-2.5 py-1.5 rounded bg-[#101013] border border-[#2E2E2E] text-white focus:outline-none focus:border-[#A3E635]"
+                          />
+                        </div>
 
-                      <div className="flex items-center justify-end">
-                        <button
-                          type="submit"
-                          disabled={creatingAccount}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs cursor-pointer disabled:opacity-50"
-                        >
-                          <UserPlus className="size-3.5" />
-                          <span>{creatingAccount ? "Creating..." : "Create Database User"}</span>
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Auth Users Table (Screenshot 9 Columns) */}
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#161618] overflow-x-auto">
-                    <table className="w-full text-left text-xs font-mono min-w-[640px]">
-                      <thead className="bg-[#1B1B1F] border-b border-[#2E2E2E] text-zinc-400">
-                        <tr>
-                          <th className="p-3">UID</th>
-                          <th className="p-3">Display name</th>
-                          <th className="p-3">Email</th>
-                          <th className="p-3">Role</th>
-                          <th className="p-3">Providers</th>
-                          <th className="p-3">Tenant</th>
-                          <th className="p-3 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#222226]">
-                        {filteredAuthUsers.length === 0 ? (
-                          <tr>
-                            <td colSpan={7} className="p-10 text-center text-zinc-500">
-                              No matching users in your project.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredAuthUsers.map((u, idx) => {
-                            const emailStr = String(u.email ?? "");
-                            const fullNameStr = String(u.full_name ?? u.fullName ?? "-");
-                            const isSuper = String(u.admin ?? "no").toLowerCase() === "yes";
-                            return (
-                              <tr key={String(u.id ?? idx)} className="hover:bg-[#1E1E22]">
-                                <td className="p-3 text-zinc-300">{String(u.id ?? "-")}</td>
-                                <td className="p-3 text-white font-medium">{fullNameStr}</td>
-                                <td className="p-3 text-[#A3E635]">{emailStr}</td>
-                                <td className="p-3">
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-[10px] ${
-                                      isSuper
-                                        ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                                        : "bg-[#242428] text-zinc-300"
-                                    }`}
-                                  >
-                                    {isSuper ? "Superuser" : "Authenticated"}
-                                  </span>
-                                </td>
-                                <td className="p-3 text-zinc-400">Email + JWT</td>
-                                <td className="p-3 text-zinc-400">{String(u.tenant_id ?? u.tenantId ?? "-")}</td>
-                                <td className="p-3 text-right">
-                                  <div className="inline-flex items-center gap-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedTable("app_users");
-                                        setEditingRow(u);
-                                        setJsonDraft(JSON.stringify(u, null, 2));
-                                        setShowInsertModal(true);
-                                      }}
-                                      className="p-1 rounded hover:bg-zinc-700 text-zinc-300 cursor-pointer"
-                                      title="Edit user row"
-                                      aria-label="Edit user row"
-                                    >
-                                      <Edit3 className="size-3.5" />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedTable("app_users");
-                                        handleDeleteRow(u);
-                                      }}
-                                      className="p-1 rounded hover:bg-red-950 text-red-400 cursor-pointer"
-                                      title="Delete user"
-                                      aria-label="Delete user"
-                                    >
-                                      <Trash2 className="size-3.5" />
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                        <div className="flex items-center justify-end">
+                          <button
+                            type="submit"
+                            disabled={creatingAccount}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded bg-white hover:bg-zinc-200 text-black font-bold text-xs cursor-pointer disabled:opacity-50"
+                          >
+                            <UserPlus className="size-3.5" />
+                            <span>{creatingAccount ? "Creating..." : "Create User & DB"}</span>
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 </>
               )}
 
-              {authSubTab === "policies" && (
-                <div className="space-y-4 max-w-3xl">
-                  <h2 className="text-lg font-bold text-white">Auth Policies &amp; Security Guards</h2>
-                  <div className="space-y-3">
-                    {[
-                      { id: "emailVerification", title: "Strict Email Validation & Canonical Normalization", desc: "Reject malformed emails and enforce lowercase uniqueness in app_users." },
-                      { id: "blockDisposable", title: "Brute-Force & Disposable Domain Screening", desc: "Enforce minimum 6-character salted SHA-256 credentials." },
-                      { id: "rlsStrict", title: "Strict Row Level Security (RLS) Default", desc: "Block anonymous table mutations unless explicitly authorized by JWT policy." },
-                      { id: "passkeys", title: "Hardware Passkeys (WebAuthn)", desc: "Enable biometric hardware keys for Superuser sessions." },
-                    ].map((pol) => {
-                      const enabled = !!authPoliciesState[pol.id];
-                      return (
-                        <div
-                          key={pol.id}
-                          className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between gap-4"
-                        >
-                          <div>
-                            <div className="text-sm font-semibold text-white">{pol.title}</div>
-                            <div className="text-xs text-zinc-400 mt-0.5">{pol.desc}</div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAuthPoliciesState((prev) => ({ ...prev, [pol.id]: !enabled }))
-                            }
-                            className={`px-3 py-1 rounded-full text-xs font-mono font-bold border cursor-pointer ${
-                              enabled
-                                ? "bg-[#A3E635]/20 border-[#A3E635] text-[#A3E635]"
-                                : "bg-[#222226] border-[#333338] text-zinc-400"
-                            }`}
-                          >
-                            {enabled ? "ENABLED" : "DISABLED"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {authSubTab === "providers" && (
-                <div className="space-y-4 max-w-3xl">
-                  <h2 className="text-lg font-bold text-white">Sign In / Auth Providers</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    {[
-                      { name: "Email / Password", status: "Active", detail: "Salted SHA-256 + JWT issuance" },
-                      { name: "SparrowX API Key", status: "Active", detail: "Account-scoped Publishable & Secret keys" },
-                      { name: "GitHub OAuth", status: "Ready", detail: "Configure OAuth Client ID in Settings" },
-                      { name: "SAML 2.0 SSO", status: "Team Plan", detail: "Enterprise workspace federation" },
-                    ].map((prov) => (
-                      <div key={prov.name} className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex items-center justify-between">
-                        <div>
-                          <div className="font-semibold text-white text-sm">{prov.name}</div>
-                          <div className="text-zinc-400 mt-0.5">{prov.detail}</div>
-                        </div>
-                        <span className="px-2 py-0.5 rounded bg-[#A3E635]/15 text-[#A3E635] font-mono text-[10px]">
-                          {prov.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(authSubTab === "sessions" || authSubTab === "audit") && (
+              {authSubTab === "sessions" && (
                 <div className="space-y-4 max-w-4xl">
-                  <h2 className="text-lg font-bold text-white">
-                    {authSubTab === "sessions" ? "Active Cryptographic Session Claims" : "Authentication Audit Logs"}
-                  </h2>
+                  <h2 className="text-lg font-bold text-white">Active Session Claims</h2>
                   <pre className="rounded-xl border border-[#2E2E2E] bg-[#161618] p-4 font-mono text-xs text-[#A3E635] overflow-x-auto">
                     {JSON.stringify(
-                      authSubTab === "sessions"
-                        ? verifySessionToken() || { sub: sessionUser.id, email: sessionUser.email, role: sessionUser.admin }
-                        : (LOCAL_SEED_TABLES["audit_logs"] || []).slice(0, 8),
+                      verifySessionToken() || {
+                        sub: sessionUser.id,
+                        email: sessionUser.email,
+                        role: sessionUser.admin === "yes" ? "admin" : "client",
+                        tenantId: sessionUser.tenantId,
+                        database: provisionedDb?.dbName || null,
+                      },
                       null,
-                      2
+                      2,
                     )}
                   </pre>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* =============================================================== */}
-          {/* VIEW: STORAGE BUCKETS                                           */}
-          {/* =============================================================== */}
-          {activeSection === "storage" && (
-            <div className="flex-1 flex min-h-0 bg-[#05060A] overflow-hidden">
-              <div className="w-60 border-r border-[#2E2E2E] bg-[#080A10] p-3 flex flex-col shrink-0">
-                <div className="flex items-center justify-between pb-2 border-b border-[#2E2E2E]">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                    Storage Buckets ({storageBucketsList.length})
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewBucketModal(true)}
-                    className="p-1 rounded hover:bg-zinc-800 text-[#A3E635] cursor-pointer"
-                    title="New Bucket"
-                    aria-label="New Bucket"
-                  >
-                    <FolderPlus className="size-3.5" />
-                  </button>
-                </div>
-
-                <div className="mt-2 space-y-1">
-                  {storageBucketsList.map((b) => (
+              {authSubTab === "audit" && (
+                <div className="space-y-4 max-w-5xl">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-white">Live PostgreSQL Audit Logs ({dbAuditLogs.length})</h2>
                     <button
-                      key={b.id}
                       type="button"
-                      onClick={() => setSelectedBucket(b)}
-                      className={`w-full flex items-center justify-between p-2 rounded-lg text-left text-xs font-mono transition-colors cursor-pointer ${
-                        selectedBucket.id === b.id
-                          ? "bg-[#242426] text-[#A3E635] font-bold border border-[#A3E635]/30"
-                          : "text-zinc-300 hover:bg-[#101520]"
-                      }`}
+                      onClick={() => void loadBackupsAndAudit()}
+                      className="px-3 py-1.5 rounded border border-[#2E2E2E] bg-[#18181D] text-xs font-mono text-zinc-200 cursor-pointer"
                     >
-                      <div className="flex items-center gap-2 truncate">
-                        <HardDrive className="size-3.5 text-[#A3E635]" />
-                        <span className="truncate">{b.name}</span>
-                      </div>
-                      <span className="text-[10px] text-zinc-500">{b.fileCount}</span>
+                      Refresh
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex-1 p-6 overflow-y-auto space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-white flex items-center gap-2">
-                      <span>bucket: {selectedBucket.name}</span>
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded font-mono ${
-                          selectedBucket.isPublic
-                            ? "bg-lime-500/20 text-lime-400 border border-lime-500/30"
-                            : "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                        }`}
-                      >
-                        {selectedBucket.isPublic ? "Public Bucket" : "Private (Authenticated RLS)"}
-                      </span>
-                    </h2>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Allocation: {selectedBucket.totalSize} across {selectedBucket.fileCount} files on NVMe storage.
-                    </p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newFile = {
-                        name: `uploaded-asset-${Date.now().toString(36)}.bin`,
-                        size: "2.4 MB",
-                        type: "application/octet-stream",
-                        updated: "Just now",
-                      };
-                      setSelectedBucket((prev) => ({
-                        ...prev,
-                        fileCount: prev.fileCount + 1,
-                        files: [newFile, ...prev.files],
-                      }));
-                      setStatusBanner({
-                        type: "success",
-                        message: `File "${newFile.name}" uploaded to bucket "${selectedBucket.name}".`,
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
-                  >
-                    <Plus className="size-3.5" /> Upload Object
-                  </button>
-                </div>
-
-                <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E]">
-                      <tr>
-                        <th className="p-3 text-zinc-400">Object Name</th>
-                        <th className="p-3 text-zinc-400">MIME Type</th>
-                        <th className="p-3 text-zinc-400">Size</th>
-                        <th className="p-3 text-zinc-400">Last Modified</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#232327]">
-                      {selectedBucket.files.map((f) => (
-                        <tr key={f.name} className="hover:bg-[#1F1F23]">
-                          <td className="p-3 text-zinc-200 font-semibold flex items-center gap-2">
-                            <FileText className="size-3.5 text-zinc-400" />
-                            <span>{f.name}</span>
-                          </td>
-                          <td className="p-3 text-zinc-400">{f.type}</td>
-                          <td className="p-3 text-zinc-300">{f.size}</td>
-                          <td className="p-3 text-zinc-400">{f.updated}</td>
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E] text-zinc-400">
+                        <tr>
+                          <th className="p-3">Time</th>
+                          <th className="p-3">Action</th>
+                          <th className="p-3">Database</th>
+                          <th className="p-3">Actor</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Detail</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-[#232327]">
+                        {dbAuditLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-6 text-center text-zinc-500">
+                              No audit log entries recorded yet for {activeProject.dbName}.
+                            </td>
+                          </tr>
+                        ) : (
+                          dbAuditLogs.map((log) => (
+                            <tr key={log.id} className="hover:bg-[#1E1E22]">
+                              <td className="p-3 text-zinc-400 whitespace-nowrap">{log.createdAt.slice(0, 19).replace("T", " ")}</td>
+                              <td className="p-3 text-[#A3E635] font-semibold">{log.action}</td>
+                              <td className="p-3 text-zinc-300">{log.dbName}</td>
+                              <td className="p-3 text-zinc-300">{log.actor}</td>
+                              <td className="p-3 text-zinc-200">{log.status}</td>
+                              <td className="p-3 text-zinc-400 max-w-md truncate" title={log.detail}>{log.detail}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
           {/* =============================================================== */}
-          {/* VIEW: EDGE FUNCTIONS                                            */}
-          {/* =============================================================== */}
-          {activeSection === "functions" && (
-            <div className="flex-1 flex min-h-0 overflow-hidden">
-              <div className="w-60 border-r border-[#2E2E2E] bg-[#080A10] p-3 space-y-2 shrink-0">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 pb-2 border-b border-[#242424]">
-                  Edge Functions ({EDGE_FUNCTIONS_CATALOG.length})
-                </div>
-                {EDGE_FUNCTIONS_CATALOG.map((fn) => (
-                  <button
-                    key={fn.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedEdgeFnId(fn.id);
-                      setEdgeFnInvokeResult(null);
-                    }}
-                    className={`w-full text-left p-2.5 rounded-lg text-xs font-mono cursor-pointer transition-colors ${
-                      activeEdgeFn.id === fn.id
-                        ? "bg-[#242428] text-[#A3E635] border border-[#A3E635]/30 font-semibold"
-                        : "text-zinc-300 hover:bg-[#1E1E22]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Zap className="size-3.5 text-[#A3E635]" />
-                      <span>{fn.name}</span>
-                    </div>
-                    <div className="text-[10px] text-zinc-500 mt-1">{fn.avgLatencyMs} avg RTT</div>
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex-1 p-6 overflow-y-auto space-y-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="text-base font-bold text-white font-mono">{activeEdgeFn.name}</h2>
-                    <p className="text-xs text-zinc-400 font-mono">
-                      https://db.sparrowx.net{activeEdgeFn.route} • {activeEdgeFn.runtime}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={edgeFnInvoking}
-                    onClick={() => {
-                      setEdgeFnInvoking(true);
-                      setTimeout(() => {
-                        setEdgeFnInvoking(false);
-                        setEdgeFnInvokeResult(
-                          JSON.stringify(
-                            {
-                              status: 200,
-                              function: activeEdgeFn.name,
-                              executionTimeMs: 4.1,
-                              region: projectRegion,
-                              output: { verified: true, project: activeProject.name },
-                            },
-                            null,
-                            2
-                          )
-                        );
-                      }, 150);
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer"
-                  >
-                    <Play className="size-3.5" />
-                    <span>{edgeFnInvoking ? "Invoking..." : "Invoke Edge Function"}</span>
-                  </button>
-                </div>
-
-                <pre className="rounded-xl border border-[#2E2E2E] bg-[#07090E] p-4 font-mono text-xs text-zinc-200 overflow-x-auto leading-relaxed">
-                  {activeEdgeFn.code}
-                </pre>
-
-                {edgeFnInvokeResult && (
-                  <div className="rounded-xl border border-[#A3E635]/30 bg-[#141A17] p-4 space-y-2">
-                    <div className="text-xs font-mono text-[#A3E635] font-bold">HTTP 200 Invocation Response</div>
-                    <pre className="font-mono text-xs text-zinc-200 overflow-x-auto">{edgeFnInvokeResult}</pre>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* =============================================================== */}
-          {/* VIEW: REALTIME & POSTGREST SANDBOX                              */}
+          {/* VIEW: CONNECT & LIVE POSTGRESQL QUERY TEST                      */}
           {/* =============================================================== */}
           {activeSection === "sandbox" && (
             <div className="flex-1 flex flex-col min-h-0 bg-[#05060A] overflow-hidden">
-              <div className="border-b border-[#2E2E2E] bg-[#0C0F17] px-4 py-2.5 flex items-center justify-between">
+              <div className="border-b border-[#2E2E2E] bg-[#0C0F17] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Code2 className="size-4 text-[#A3E635]" />
-                  <span className="font-bold text-sm text-white">Interactive Data API &amp; Realtime Sandbox</span>
+                  <span className="font-bold text-sm text-white">Direct PostgreSQL Connection &amp; Live Query Probe</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-400">Target Table:</span>
                   <select
-                    aria-label="Target sandbox table"
+                    aria-label="Target query table"
                     value={sandboxSelectedTable}
                     onChange={(e) => setSandboxSelectedTable(e.target.value)}
                     className="h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-xs font-mono text-zinc-200"
                   >
+                    <option value="">(Database version &amp; role check)</option>
                     {studioTables.map((t) => (
                       <option key={t.name} value={t.name}>
-                        {t.name}
+                        public.{t.name}
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    onClick={() => void handleTestSandboxEndpoint()}
+                    disabled={sandboxLoading}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Send className="size-3" />
+                    <span>{sandboxLoading ? "Querying..." : "Run Live Query"}</span>
+                  </button>
                 </div>
               </div>
 
               <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 min-h-0">
-                <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-[#2E2E2E] bg-[#101014]">
-                  <div className="border-b border-[#222222] bg-[#16161C] px-4 py-2 flex items-center justify-between text-xs text-zinc-300 font-mono">
-                    <span className="font-semibold">SQL Schema &amp; Table DDL</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSandboxSql(
-                          `CREATE TABLE IF NOT EXISTS ${sandboxSelectedTable} (\n  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n  data JSONB DEFAULT '{}'::jsonb,\n  created_at TIMESTAMPTZ DEFAULT now()\n);`
-                        )
-                      }
-                      className="text-[11px] text-[#A3E635] hover:underline cursor-pointer"
-                    >
-                      Reset to {sandboxSelectedTable}
-                    </button>
-                  </div>
-                  <textarea
-                    value={sandboxSql}
-                    onChange={(e) => setSandboxSql(e.target.value)}
-                    className="flex-1 p-4 bg-[#0B0B0E] text-[#A3E635] font-mono text-xs outline-none resize-none leading-relaxed"
-                  />
-                  <div className="p-3 border-t border-[#222222] bg-[#141418] flex items-center justify-between text-xs text-zinc-400">
-                    <span className="text-[11px] font-mono">OpenAPI + PostgREST synced</span>
-                    <button
-                      type="button"
-                      onClick={handleTestSandboxEndpoint}
-                      disabled={sandboxLoading}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold px-3 py-1.5 text-xs cursor-pointer disabled:opacity-50"
-                    >
-                      <Send className="size-3" />
-                      <span>{sandboxLoading ? "Testing..." : "Test REST Endpoint"}</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex flex-col bg-[#121216] min-h-0">
+                <div className="flex flex-col border-b lg:border-b-0 lg:border-r border-[#2E2E2E] bg-[#101014] min-h-0">
                   <div className="border-b border-[#222222] bg-[#16161C] px-4 py-1.5 flex items-center justify-between">
                     <div className="flex items-center gap-1">
-                      {(["js", "curl", "python", "prisma"] as const).map((tab) => (
+                      {(["node", "psql", "python", "prisma"] as const).map((tab) => (
                         <button
                           key={tab}
                           type="button"
@@ -5773,25 +5772,37 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     </button>
                   </div>
 
-                  <div className="p-4 bg-[#0E0E12] border-b border-[#222222] overflow-x-auto max-h-52">
-                    <pre className="font-mono text-xs text-zinc-300">{sandboxSnippets[sandboxTab]}</pre>
+                  <div className="flex-1 p-4 bg-[#0B0B0E] overflow-auto">
+                    <pre className="font-mono text-xs text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                      {sandboxSnippets[sandboxTab]}
+                    </pre>
                   </div>
+                </div>
 
-                  <div className="flex-1 flex flex-col min-h-0 p-4 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-zinc-400 font-mono">
-                      <span className="text-white font-semibold">Live PostgREST Response</span>
-                      {sandboxLatency && (
-                        <span className="rounded bg-lime-500/10 border border-lime-500/30 text-[#A3E635] px-2 py-0.5 text-[10px]">
-                          HTTP 200 OK • {sandboxLatency}ms
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 rounded-xl border border-[#2E2E2E] bg-[#0B0B0D] p-3 overflow-auto">
-                      <pre className="font-mono text-xs text-[#A3E635] leading-relaxed">
-                        {sandboxResponse ||
-                          `// Click "Test REST Endpoint" to query ${activeProject.restBaseUrl}/${sandboxSelectedTable}`}
-                      </pre>
-                    </div>
+                <div className="flex flex-col bg-[#121216] min-h-0 p-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-zinc-400 font-mono">
+                    <span className="text-white font-semibold">Live PostgreSQL Response (/api/db/query)</span>
+                    {sandboxLatency !== null && (
+                      <span
+                        className={`rounded px-2 py-0.5 text-[10px] border ${
+                          sandboxStatusOk
+                            ? "bg-lime-500/10 border-lime-500/30 text-[#A3E635]"
+                            : "bg-red-500/10 border-red-500/30 text-red-400"
+                        }`}
+                      >
+                        {sandboxStatusOk ? "OK" : "ERROR"} • {sandboxLatency}ms
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 rounded-xl border border-[#2E2E2E] bg-[#0B0B0D] p-3 overflow-auto">
+                    <pre
+                      className={`font-mono text-xs leading-relaxed ${
+                        sandboxStatusOk === false ? "text-red-300" : "text-[#A3E635]"
+                      }`}
+                    >
+                      {sandboxResponse ||
+                        `// Click "Run Live Query" to execute a real SELECT against ${activeProject.dbName}`}
+                    </pre>
                   </div>
                 </div>
               </div>
@@ -5799,26 +5810,59 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
           )}
 
           {/* =============================================================== */}
-          {/* VIEW: OBSERVABILITY & PGBOUNCER                                 */}
+          {/* VIEW: LIVE POSTGRESQL OBSERVABILITY                             */}
           {/* =============================================================== */}
           {activeSection === "pooler" && (
             <div className="flex-1 p-6 overflow-y-auto space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Activity className="size-4 text-[#A3E635]" />
-                  <span>Observability, PgBouncer Pooler &amp; Compute Health</span>
-                </h2>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Real-time cluster compute, NVMe disk usage, and transaction pooler metrics on Port 6543.
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <Activity className="size-4 text-[#A3E635]" />
+                    <span>Live PostgreSQL Observability &amp; Activity</span>
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Measured directly from /api/db/health, /api/db/summary, pg_stat_database, and pg_stat_activity.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void loadRealDatabasesAndHealth();
+                    void loadLiveObservability();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#18181D] hover:border-[#A3E635] text-xs font-mono text-zinc-200 cursor-pointer"
+                >
+                  <RefreshCw className="size-3.5" />
+                  <span>Refresh Metrics</span>
+                </button>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: "Pooler Port", val: `Port ${activeProject.poolerPort}`, sub: "Transaction Mode" },
-                  { label: "Max Client Conns", val: "5,000 Conns", sub: "Pool size: 80 active" },
-                  { label: "Buffer Cache Hit", val: "99.6%", sub: "Shared buffers hot" },
-                  { label: "AI pgvector", val: "v0.7.0", sub: "Cosine & HNSW indexed" },
+                  {
+                    label: "Active / Max Conns",
+                    val: activeDbSummary
+                      ? `${activeDbSummary.activeConnections} / ${activeDbSummary.maxConnections}`
+                      : `0 / ${activeProject.maxPoolSize}`,
+                    sub: `Cluster total: ${clusterHealth?.activeConnections ?? "—"}`,
+                  },
+                  {
+                    label: "Database Disk Size",
+                    val: activeDbSummary?.sizePretty || "—",
+                    sub: activeDbSummary
+                      ? `${activeDbSummary.usagePct}% of ${activeDbSummary.storageLimitMb} MB`
+                      : "Provision DB to measure",
+                  },
+                  {
+                    label: "Buffer Cache Hit",
+                    val: liveDbStats.cacheHitPct || "—",
+                    sub: "Live pg_stat_database",
+                  },
+                  {
+                    label: "Cluster Latency",
+                    val: clusterHealth?.ok ? `${clusterHealth.latencyMs}ms` : "—",
+                    sub: clusterHealth?.pgvectorAvailable ? "pgvector enabled" : "PostgreSQL",
+                  },
                 ].map((m) => (
                   <div key={m.label} className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-1">
                     <div className="text-xs text-zinc-400">{m.label}</div>
@@ -5828,10 +5872,47 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 ))}
               </div>
 
+              {/* Live pg_stat_activity Table */}
+              <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-x-auto">
+                <div className="px-4 py-2.5 border-b border-[#242428] text-xs font-mono text-white font-semibold">
+                  Active Database Sessions (pg_stat_activity on {activeProject.dbName})
+                </div>
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E] text-zinc-400">
+                    <tr>
+                      <th className="p-3">PID</th>
+                      <th className="p-3">Role</th>
+                      <th className="p-3">State</th>
+                      <th className="p-3">Started</th>
+                      <th className="p-3">Query</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#232327]">
+                    {liveDbStats.activeQueries.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-zinc-500">
+                          No active sessions reported for {activeProject.dbName}.
+                        </td>
+                      </tr>
+                    ) : (
+                      liveDbStats.activeQueries.map((q, idx) => (
+                        <tr key={idx} className="hover:bg-[#1E1E22]">
+                          <td className="p-3 text-[#A3E635]">{String(q.pid ?? "-")}</td>
+                          <td className="p-3 text-white">{String(q.usename ?? "-")}</td>
+                          <td className="p-3 text-zinc-300">{String(q.state ?? "-")}</td>
+                          <td className="p-3 text-zinc-400">{String(q.started_at ?? "-").slice(0, 19)}</td>
+                          <td className="p-3 text-zinc-300 max-w-md truncate">{String(q.query ?? "")}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
               <TopologyClusterPanel
-                region={projectRegion}
+                region={clusterHealth?.originRegion || projectRegion}
                 envLabel={activeProject.environment}
-                pingMs={pingStatus.postgrest}
+                pingMs={pingStatus.postgres}
                 tableCount={studioTables.length}
                 totalRows={Object.values(tableCounts).reduce((a, b) => a + b, 0)}
                 host={activeProject.host}
@@ -5973,38 +6054,64 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     </div>
                   </div>
 
-                  {/* Custom Domains, Transfer & Delete Project (Screenshot 4) */}
+                  {/* Database Lifecycle Actions (Suspend / Resume / Delete / Sign Out) */}
                   <div className="space-y-4">
-                    <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-white">Custom domains</h3>
-                      <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
-                        <div className="space-y-0.5">
-                          <div className="text-xs font-semibold text-white">Vanity &amp; Custom Domains</div>
-                          <div className="text-[11px] text-zinc-400">
-                            Present your own domain (e.g. db.yourdomain.com) via Sovereign Reverse Proxy.
+                    {provisionedDb && (
+                      <div className="space-y-2">
+                        <h3 className="text-base font-semibold text-white">PostgreSQL Instance Lifecycle</h3>
+                        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
+                          <div className="space-y-0.5">
+                            <div className="text-xs font-semibold text-white font-mono">
+                              {provisionedDb.dbName} — Status: {activeDbSummary?.status || provisionedDb.status || "Active"}
+                            </div>
+                            <div className="text-[11px] text-zinc-400">
+                              Suspending revokes LOGIN on role {provisionedDb.dbUser} and terminates active sessions immediately.
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {(activeDbSummary?.status || provisionedDb.status) === "Suspended" ? (
+                              <button
+                                type="button"
+                                disabled={lifecycleBusy}
+                                onClick={() => void handleDbLifecycleAction("resume")}
+                                className="px-3 py-1.5 rounded-md bg-[#A3E635] text-[#11181C] font-bold text-xs cursor-pointer disabled:opacity-50"
+                              >
+                                Resume Database
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={lifecycleBusy}
+                                onClick={() => void handleDbLifecycleAction("suspend")}
+                                className="px-3 py-1.5 rounded-md border border-amber-500/40 bg-amber-500/15 text-amber-300 font-semibold text-xs cursor-pointer disabled:opacity-50"
+                              >
+                                Suspend Database
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              disabled={lifecycleBusy}
+                              onClick={() => void handleDbLifecycleAction("deprovision")}
+                              className="px-3 py-1.5 rounded-md border border-red-500/40 bg-red-500/15 hover:bg-red-500/25 text-red-300 font-semibold text-xs cursor-pointer disabled:opacity-50"
+                            >
+                              Drop Database
+                            </button>
                           </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setViewMode("landing")}
-                          className="px-3 py-1.5 rounded-md bg-[#65A30D] hover:bg-[#A3E635] hover:text-[#11181C] text-white font-semibold text-xs border border-[#A3E635]/40 cursor-pointer"
-                        >
-                          Upgrade to Pro
-                        </button>
                       </div>
-                    </div>
+                    )}
 
                     <div className="space-y-2">
-                      <h3 className="text-base font-semibold text-white">Delete / Reset workspace session</h3>
+                      <h3 className="text-base font-semibold text-white">Workspace Session</h3>
                       <div className="rounded-xl border border-red-500/35 bg-[#1B1314] p-4 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-start gap-3">
                           <ShieldAlert className="size-4 text-red-400 shrink-0 mt-0.5" />
                           <div className="space-y-0.5">
                             <div className="text-xs font-semibold text-white">
-                              Signing out or clearing workspace session locks Studio immediately
+                              Signing out locks Studio immediately
                             </div>
                             <div className="text-[11px] text-zinc-400">
-                              Export a schema DDL or JSON snapshot from Backups before resetting local workspace credentials.
+                              Your PostgreSQL database remains running on the cluster; sign back in anytime to resume.
                             </div>
                           </div>
                         </div>
@@ -6021,120 +6128,88 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                 </div>
               )}
 
-              {/* INFRASTRUCTURE TELEMETRY (SCREENSHOT 3) */}
+              {/* INFRASTRUCTURE TELEMETRY */}
               {effectiveSettingsTab === "infrastructure" && (
                 <div className="max-w-5xl space-y-5">
                   <div>
                     <h2 className="text-lg font-semibold text-white">Infrastructure</h2>
                     <p className="text-xs text-zinc-400">
-                      Cluster compute topology, CPU/memory balance, and NVMe WAL storage utilization.
+                      Live PostgreSQL cluster node info and measured health metrics.
                     </p>
                   </div>
                   <TopologyClusterPanel
-                    region={projectRegion}
+                    region={clusterHealth?.originRegion || projectRegion}
                     envLabel={activeProject.environment}
-                    pingMs={pingStatus.postgrest}
+                    pingMs={pingStatus.postgres}
+                    tableCount={studioTables.length}
+                    totalRows={Object.values(tableCounts).reduce((a, b) => a + b, 0)}
+                    host={activeProject.host}
                   />
                 </div>
               )}
 
-              {/* API KEYS & CONNECTION STRINGS (SCREENSHOT 2) */}
+              {/* CREDENTIALS & CONNECTION STRINGS */}
               {effectiveSettingsTab === "api_keys" && (
                 <div className="max-w-4xl space-y-7">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-lg font-semibold text-white">API Keys</h2>
+                      <h2 className="text-lg font-semibold text-white">Database Credentials &amp; Connection URI</h2>
                       <p className="text-xs text-zinc-400">
-                        Account-scoped Publishable and Secret keys protecting your PostgreSQL 16 + PostgREST cluster.
+                        Direct PostgreSQL role credentials for your isolated database <span className="font-mono text-[#A3E635]">{activeProject.dbName}</span>.
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={handleRotateStudioApiKey}
-                      className="inline-flex items-center gap-1.5 rounded-md border border-[#2E2E2E] bg-[#1E1E22] hover:bg-[#27272C] px-3 py-1.5 text-xs font-medium text-white cursor-pointer"
+                      disabled={rotatingPassword || !provisionedDb}
+                      onClick={() => void handleRotateDbPassword()}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-[#A3E635] hover:bg-[#84CC16] px-3 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer disabled:opacity-50"
                     >
-                      <Plus className="size-3.5 text-[#A3E635]" /> New publishable key
+                      <RefreshCw className={`size-3.5 ${rotatingPassword ? "animate-spin" : ""}`} />
+                      <span>{rotatingPassword ? "Rotating..." : "Rotate PostgreSQL Password"}</span>
                     </button>
                   </div>
 
-                  {/* Publishable Key Card */}
+                  {/* Role Password Card */}
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-white">Publishable key</h3>
+                    <h3 className="text-sm font-semibold text-white">PostgreSQL Role Password ({activeProject.dbUser})</h3>
                     <p className="text-xs text-zinc-400">
-                      Safe to use in a browser when Row Level Security (RLS) policies are active.
-                    </p>
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
-                      <table className="w-full text-left text-xs">
-                        <thead className="bg-[#1C1C1F] border-b border-[#262626] text-[10px] font-mono uppercase text-zinc-500">
-                          <tr>
-                            <th className="p-3">NAME</th>
-                            <th className="p-3">API KEY</th>
-                            <th className="p-3 text-right">COPY</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#242428]">
-                          {publishableKeys.map((pk) => (
-                            <tr key={pk.id}>
-                              <td className="p-3">
-                                <div className="font-semibold text-white">{pk.name}</div>
-                                <div className="text-[11px] text-zinc-500">{pk.description}</div>
-                              </td>
-                              <td className="p-3 font-mono text-zinc-200">
-                                <span className="px-2.5 py-1 rounded-md border border-[#2E2E2E] bg-[#05060A] inline-block max-w-xs truncate align-middle">
-                                  {pk.value}
-                                </span>
-                              </td>
-                              <td className="p-3 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => copyText(pk.id, pk.value)}
-                                  className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#A3E635] cursor-pointer"
-                                  title="Copy Publishable Key"
-                                  aria-label="Copy Publishable Key"
-                                >
-                                  {copiedKey === pk.id ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Secret Keys Card with Eye Toggle (Screenshot 2) */}
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-white">Secret keys</h3>
-                    <p className="text-xs text-zinc-400">
-                      Allows privileged bypass access to backend APIs. Never expose in client browsers.
+                      For security, passwords are only returned at provision or rotation time. Click Rotate to issue a fresh 256-bit password.
                     </p>
                     <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-xs text-white">default (service_role)</div>
-                        <div className="text-[11px] text-zinc-500">Backend &amp; Edge Functions secret key</div>
+                        <div className="font-semibold text-xs text-white font-mono">{activeProject.dbUser}</div>
+                        <div className="text-[11px] text-zinc-500">Least-privilege database owner role</div>
                       </div>
                       <div className="flex items-center gap-2 font-mono text-xs">
                         <span className="px-3 py-1.5 rounded-md border border-[#2E2E2E] bg-[#05060A] text-zinc-200">
-                          {showSecretKey ? activeProject.serviceRoleKey : "spx_secret_••••••••••••••••••••"}
+                          {activeProject.serviceRoleKey
+                            ? showSecretKey
+                              ? activeProject.serviceRoleKey
+                              : "••••••••••••••••••••••••"
+                            : "Rotate password to reveal"}
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowSecretKey((s) => !s)}
-                          className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-white cursor-pointer"
-                          title={showSecretKey ? "Hide secret key" : "Reveal secret key"}
-                          aria-label={showSecretKey ? "Hide secret key" : "Reveal secret key"}
-                        >
-                          {showSecretKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => copyText("secret-role", activeProject.serviceRoleKey)}
-                          className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#A3E635] cursor-pointer"
-                          title="Copy secret key"
-                          aria-label="Copy secret key"
-                        >
-                          {copiedKey === "secret-role" ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
-                        </button>
+                        {activeProject.serviceRoleKey && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setShowSecretKey((s) => !s)}
+                              className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-white cursor-pointer"
+                              title={showSecretKey ? "Hide password" : "Reveal password"}
+                              aria-label={showSecretKey ? "Hide password" : "Reveal password"}
+                            >
+                              {showSecretKey ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => copyText("secret-role", activeProject.serviceRoleKey)}
+                              className="p-1.5 rounded border border-[#2E2E2E] bg-[#1F1F23] hover:text-[#A3E635] cursor-pointer"
+                              title="Copy password"
+                              aria-label="Copy password"
+                            >
+                              {copiedKey === "secret-role" ? <Check className="size-3.5 text-[#A3E635]" /> : <Copy className="size-3.5" />}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -6144,16 +6219,16 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <h3 className="text-xs font-bold text-white font-mono">
-                          Environment Variables (.env) — {activeProject.environment}
+                          Environment Variables (.env) — {activeProject.dbName}
                         </h3>
-                        <p className="text-[11px] text-zinc-400">PostgreSQL 16 + PgBouncer + PostgREST URLs.</p>
+                        <p className="text-[11px] text-zinc-400">Direct PostgreSQL connection string for Prisma, Drizzle, pg, and psycopg.</p>
                       </div>
                       <button
                         type="button"
                         onClick={() =>
                           copyText(
                             "env-file",
-                            `DATABASE_URL="${activeProject.pooledUri}"\nDIRECT_URL="${activeProject.directUri}"\nSPARROWX_ANON_KEY="${activeProject.anonKey}"\nSPARROWX_SERVICE_ROLE_KEY="${activeProject.serviceRoleKey}"\nSPARROWX_REST_URL="${activeProject.restBaseUrl}"`
+                            `DATABASE_URL="${activeProject.directUri}"\nPGHOST="${activeProject.host}"\nPGPORT="${activeProject.port}"\nPGDATABASE="${activeProject.dbName}"\nPGUSER="${activeProject.dbUser}"`
                           )
                         }
                         className="inline-flex items-center gap-1.5 rounded bg-[#A3E635] px-3 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer"
@@ -6163,238 +6238,128 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
                       </button>
                     </div>
                     <pre className="rounded-md border border-[#262626] bg-[#05060A] p-3 font-mono text-[11px] text-[#A3E635] overflow-x-auto leading-relaxed">
-{`DATABASE_URL="${activeProject.pooledUri}"
-DIRECT_URL="${activeProject.directUri}"
-SPARROWX_ANON_KEY="${activeProject.anonKey}"
-SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
+{`DATABASE_URL="${activeProject.directUri}"
+PGHOST="${activeProject.host}"
+PGPORT="${activeProject.port}"
+PGDATABASE="${activeProject.dbName}"
+PGUSER="${activeProject.dbUser}"`}
                     </pre>
                   </div>
                 </div>
               )}
 
-              {/* JWT KEYS (SCREENSHOT 1) */}
-              {effectiveSettingsTab === "jwt_keys" && (
-                <div className="max-w-4xl space-y-6">
-                  <div className="space-y-1">
-                    <h2 className="text-lg font-semibold text-white">JWT Keys</h2>
-                    <p className="text-xs text-zinc-400">
-                      Control the cryptographic keys used to sign JSON Web Tokens for your project.
-                    </p>
-                  </div>
-
-                  <div className="border-b border-[#262626] flex items-center gap-6 text-xs font-medium">
+              {/* AUDIT TRAIL */}
+              {effectiveSettingsTab === "audit" && (
+                <div className="max-w-5xl space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-semibold text-white">PostgreSQL Provisioner Audit Trail</h2>
                     <button
                       type="button"
-                      onClick={() => setJwtTab("signing")}
-                      className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
-                        jwtTab === "signing" ? "border-white text-white" : "border-transparent text-zinc-400 hover:text-zinc-200"
-                      }`}
+                      onClick={() => void loadBackupsAndAudit()}
+                      className="px-3 py-1.5 rounded border border-[#2E2E2E] bg-[#18181D] text-xs font-mono text-zinc-200 cursor-pointer"
                     >
-                      JWT Signing Keys
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setJwtTab("legacy")}
-                      className={`pb-2.5 border-b-2 transition-colors cursor-pointer ${
-                        jwtTab === "legacy" ? "border-white text-white" : "border-transparent text-zinc-400 hover:text-zinc-200"
-                      }`}
-                    >
-                      Legacy JWT Secret
+                      Refresh
                     </button>
                   </div>
-
-                  {jwtTab === "signing" ? (
-                    <div className="space-y-6">
-                      <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 flex flex-wrap items-center justify-between gap-3">
-                        <div className="space-y-1 max-w-lg">
-                          <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                            CREATE STANDBY KEY
-                          </div>
-                          <p className="text-xs text-zinc-300">
-                            Set up a new standby signing key which you can promote once picked up by all application workers.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStandbyJwtKey({
-                              id: `6d4ee8ff-${Date.now().toString(16).slice(-4)}-a4ba-79bf7f7f6c4a`,
-                              alg: "ECC (P-256)",
-                              createdAt: "Just now",
-                            });
-                            setStatusBanner({
-                              type: "success",
-                              message: "Standby ECC (P-256) JWT signing key provisioned cleanly.",
-                            });
-                          }}
-                          className="px-3.5 py-2 rounded-md bg-[#65A30D] hover:bg-[#A3E635] hover:text-[#11181C] text-white font-semibold text-xs border border-[#A3E635]/40 cursor-pointer"
-                        >
-                          Create Standby Key
-                        </button>
-                      </div>
-
-                      {standbyJwtKey && (
-                        <div className="rounded-xl border border-[#A3E635]/40 bg-[#141A17] p-4 flex items-center justify-between text-xs font-mono">
-                          <div>
-                            <div className="text-white font-semibold">Standby Key (Ready)</div>
-                            <div className="text-[#A3E635] text-[11px]">{standbyJwtKey.id}</div>
-                          </div>
-                          <span className="text-zinc-300">{standbyJwtKey.alg}</span>
-                        </div>
-                      )}
-
-                      <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
-                        <table className="w-full text-left text-xs font-mono">
-                          <thead className="bg-[#1C1C1F] border-b border-[#262626] text-[10px] text-zinc-500 uppercase">
-                            <tr>
-                              <th className="p-3">KEY</th>
-                              <th className="p-3">TYPE</th>
-                              <th className="p-3 text-right">CREATED AT</th>
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="bg-[#1C1C1F] border-b border-[#2E2E2E] text-zinc-400">
+                        <tr>
+                          <th className="p-3">Time</th>
+                          <th className="p-3">Action</th>
+                          <th className="p-3">Actor</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3">Detail</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#232327]">
+                        {dbAuditLogs.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="p-6 text-center text-zinc-500">
+                              No audit events recorded yet.
+                            </td>
+                          </tr>
+                        ) : (
+                          dbAuditLogs.map((log) => (
+                            <tr key={log.id} className="hover:bg-[#1E1E22]">
+                              <td className="p-3 text-zinc-400 whitespace-nowrap">{log.createdAt.slice(0, 19).replace("T", " ")}</td>
+                              <td className="p-3 text-[#A3E635] font-semibold">{log.action}</td>
+                              <td className="p-3 text-zinc-300">{log.actor}</td>
+                              <td className="p-3 text-zinc-200">{log.status}</td>
+                              <td className="p-3 text-zinc-400">{log.detail}</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td className="p-3">
-                                <div className="text-white font-sans font-medium">Current</div>
-                                <div className="text-[11px] text-zinc-500">6d4ee8ff-1827-41c5-a4ba-79bf7f7f6c4a</div>
-                              </td>
-                              <td className="p-3 text-zinc-300">ECC (P-256)</td>
-                              <td className="p-3 text-right text-zinc-400">20 days ago</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-semibold text-white">Previously used keys</h3>
-                        <p className="text-xs text-zinc-400">
-                          These JWT signing keys still verify tokens issued prior to rotation until revoked.
-                        </p>
-                        <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] overflow-hidden">
-                          <table className="w-full text-left text-xs font-mono">
-                            <thead className="bg-[#1C1C1F] border-b border-[#262626] text-[10px] text-zinc-500 uppercase">
-                              <tr>
-                                <th className="p-3">KEY</th>
-                                <th className="p-3">TYPE</th>
-                                <th className="p-3 text-right">ACTION</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              <tr>
-                                <td className="p-3">
-                                  <div className="text-white font-sans font-medium">Previous</div>
-                                  <div className="text-[11px] text-zinc-500">a942eee5-a371-4796-835e-899ce2b1bf56</div>
-                                </td>
-                                <td className="p-3 text-zinc-300">HS256 (Shared Secret)</td>
-                                <td className="p-3 text-right">
-                                  {revokedPreviousJwt ? (
-                                    <span className="text-zinc-500">Revoked</span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setRevokedPreviousJwt(true);
-                                        setStatusBanner({
-                                          type: "info",
-                                          message: "Previous HS256 JWT verification key revoked.",
-                                        });
-                                      }}
-                                      className="px-2.5 py-1 rounded border border-red-500/35 bg-red-500/10 text-red-400 hover:bg-red-500/20 cursor-pointer"
-                                    >
-                                      Revoke
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-4 space-y-3 text-xs font-mono">
-                      <div className="text-white font-semibold">Legacy HS256 JWT Signing Secret</div>
-                      <div className="p-3 rounded bg-[#05060A] border border-[#262626] text-zinc-300 flex items-center justify-between">
-                        <span>{showSecretKey ? "spx_jwt_sovereign_hmac_sha256_secret_v1" : "••••••••••••••••••••••••••••••••••••"}</span>
-                        <button
-                          type="button"
-                          onClick={() => setShowSecretKey((s) => !s)}
-                          className="text-[#A3E635] hover:underline cursor-pointer"
-                        >
-                          {showSecretKey ? "Hide" : "Reveal"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
 
-              {(effectiveSettingsTab === "integrations" ||
-                effectiveSettingsTab === "log_drains" ||
-                effectiveSettingsTab === "addons" ||
-                effectiveSettingsTab === "vault" ||
-                effectiveSettingsTab === "billing") && (
+              {/* PLAN & REAL STORAGE QUOTA */}
+              {effectiveSettingsTab === "billing" && (
                 <div className="max-w-4xl space-y-4">
-                  <h2 className="text-lg font-semibold text-white capitalize">
-                    {effectiveSettingsTab.replace("_", " ")} Configuration
-                  </h2>
-                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-3 text-xs">
-                    {effectiveSettingsTab === "vault" ? (
-                      <p className="text-zinc-300">
-                        SparrowX Vault encrypts sensitive credentials at rest using authenticated AES-256 / SHA-256 verification before storage in PostgreSQL 16.
-                      </p>
-                    ) : effectiveSettingsTab === "billing" ? (
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div>
-                            <span className="text-zinc-300 font-medium">Selected Workspace Plan</span>
-                            <p className="text-[11px] text-zinc-500">
-                              Switch plans anytime — isolated PostgreSQL storage &amp; role remain intact.
-                            </p>
-                          </div>
-                          <span className="px-2.5 py-1 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[#A3E635] font-mono font-bold">
-                            {selectedPricingPlan.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                          {PRICING_PLANS.map((tier) => {
-                            const active = selectedPricingPlan === tier.id;
-                            return (
-                              <button
-                                key={tier.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedPricingPlan(tier.id);
-                                  emitEngineToast(
-                                    `Workspace plan updated to ${tier.name} (${tier.price}${tier.unit || ""})`,
-                                    "success",
-                                    "Plan Updated",
-                                  );
-                                }}
-                                className={`rounded-lg border p-3 text-left transition-colors cursor-pointer ${
-                                  active
-                                    ? "border-[#A3E635]/60 bg-[#A3E635]/10 text-white"
-                                    : "border-[#262626] bg-[#07090E] text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
-                                }`}
-                              >
-                                <div className="font-mono font-bold text-xs text-white">{tier.name}</div>
-                                <div className="text-[11px] text-[#A3E635] font-mono mt-0.5">
-                                  {tier.price}
-                                  {tier.unit}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        <p className="text-zinc-400">
-                          Database storage used: 25.9 MB • WAL: 80 MB • Unmetered internal REST queries.
+                  <h2 className="text-lg font-semibold text-white">Plan &amp; Live Storage Quota</h2>
+                  <div className="rounded-xl border border-[#2E2E2E] bg-[#0A0D14] p-5 space-y-4 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-zinc-300 font-medium">Active PostgreSQL Resource Tier</span>
+                        <p className="text-[11px] text-zinc-500">
+                          Applying a plan updates PostgreSQL CONNECTION LIMIT, statement_timeout, and work_mem immediately.
                         </p>
                       </div>
-                    ) : (
-                      <p className="text-zinc-300">
-                        Manage PostgreSQL log drains, pgvector memory add-ons, and external webhook destinations from this panel.
-                      </p>
-                    )}
+                      <span className="px-2.5 py-1 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 text-[#A3E635] font-mono font-bold">
+                        {activeDbSummary?.planName || provisionedDb?.planName || selectedDbPlanId}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {[
+                        { id: "db-free", name: "Sandbox", price: "₹0/mo", quota: "500 MB • 10 conns" },
+                        { id: "db-starter", name: "Starter", price: "₹399/mo", quota: "10 GB • 35 conns" },
+                        { id: "db-pro", name: "Pro Vector", price: "₹1,199/mo", quota: "50 GB • 100 conns" },
+                        { id: "db-enterprise", name: "Enterprise", price: "₹3,999/mo", quota: "250 GB • 300 conns" },
+                      ].map((tier) => {
+                        const active = (activeDbSummary?.planId || selectedDbPlanId) === tier.id;
+                        return (
+                          <button
+                            key={tier.id}
+                            type="button"
+                            disabled={lifecycleBusy}
+                            onClick={() => {
+                              setSelectedDbPlanId(tier.id);
+                              if (provisionedDb) {
+                                void handleDbLifecycleAction("upgrade_plan", tier.id);
+                              }
+                            }}
+                            className={`rounded-lg border p-3 text-left transition-colors cursor-pointer disabled:opacity-50 ${
+                              active
+                                ? "border-[#A3E635]/60 bg-[#A3E635]/10 text-white"
+                                : "border-[#262626] bg-[#07090E] text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                            }`}
+                          >
+                            <div className="font-mono font-bold text-xs text-white">{tier.name}</div>
+                            <div className="text-[11px] text-[#A3E635] font-mono mt-0.5">{tier.price}</div>
+                            <div className="text-[10px] text-zinc-500 font-mono mt-1">{tier.quota}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-[#242428] font-mono">
+                      <div className="flex items-center justify-between text-zinc-300">
+                        <span>Measured PostgreSQL Size: {activeDbSummary?.sizePretty || "—"}</span>
+                        <span>
+                          Quota: {activeDbSummary ? `${activeDbSummary.usagePct}% of ${activeDbSummary.storageLimitMb} MB` : "—"}
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded bg-[#18181D] overflow-hidden">
+                        <div
+                          className="h-full bg-[#A3E635] rounded"
+                          style={{ width: `${Math.min(100, Math.max(2, activeDbSummary?.usagePct ?? 0))}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -6527,10 +6492,11 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
             </button>
             <button
               type="button"
-              onClick={handleSaveRow}
-              className="rounded-md bg-[#A3E635] px-4 py-1.5 text-xs font-bold text-[#11181C] hover:opacity-95 cursor-pointer"
+              disabled={savingRow}
+              onClick={() => void handleSaveRow()}
+              className="rounded-md bg-[#A3E635] px-4 py-1.5 text-xs font-bold text-[#11181C] hover:opacity-95 cursor-pointer disabled:opacity-50"
             >
-              Save Row
+              {savingRow ? "Executing SQL..." : "Save Row"}
             </button>
           </div>
         </div>
@@ -6634,11 +6600,16 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
                   >
                     <option value="UUID">UUID</option>
                     <option value="TEXT">TEXT</option>
+                    <option value="VARCHAR(255)">VARCHAR(255)</option>
                     <option value="INTEGER">INTEGER</option>
                     <option value="BIGINT">BIGINT</option>
+                    <option value="NUMERIC(12,2)">NUMERIC(12,2)</option>
                     <option value="BOOLEAN">BOOLEAN</option>
                     <option value="TIMESTAMPTZ">TIMESTAMPTZ</option>
+                    <option value="DATE">DATE</option>
                     <option value="JSONB">JSONB</option>
+                    <option value="vector(3)">vector(3)</option>
+                    <option value="vector(384)">vector(384)</option>
                     <option value="vector(1536)">vector(1536)</option>
                   </select>
 
@@ -6717,93 +6688,13 @@ SPARROWX_REST_URL="${activeProject.restBaseUrl}"`}
               </button>
               <button
                 type="button"
-                onClick={handleCreateNewTable}
-                className="rounded-lg bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-4 py-2 text-xs font-bold cursor-pointer"
+                disabled={creatingTable}
+                onClick={() => void handleCreateNewTable()}
+                className="rounded-lg bg-[#A3E635] hover:bg-[#84CC16] text-[#11181C] px-4 py-2 text-xs font-bold cursor-pointer disabled:opacity-50"
               >
-                Create Table &amp; Publish API
+                {creatingTable ? "Creating in PostgreSQL..." : "Create Table"}
               </button>
             </div>
-          </div>
-        </div>
-      </NativeDialog>
-
-      {/* 4. CREATE STORAGE BUCKET MODAL */}
-      <NativeDialog
-        open={showNewBucketModal}
-        onClose={() => setShowNewBucketModal(false)}
-        titleId={bucketDialogTitleId}
-        maxWidthClass="max-w-md"
-      >
-        <div className="p-5 space-y-4 text-xs">
-          <div className="flex items-center justify-between border-b border-[#2E2E2E] pb-3">
-            <h2 id={bucketDialogTitleId} className="font-bold text-sm text-white flex items-center gap-2">
-              <FolderPlus className="size-4 text-[#A3E635]" />
-              <span>Create Storage Bucket</span>
-            </h2>
-            <button
-              type="button"
-              onClick={() => setShowNewBucketModal(false)}
-              className="text-zinc-400 hover:text-white cursor-pointer"
-              aria-label="Close Bucket Modal"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-
-          <div>
-            <label className="font-semibold text-zinc-300 block mb-1">Bucket Name</label>
-            <input
-              type="text"
-              placeholder="e.g. model-weights"
-              value={newBucketName}
-              onChange={(e) => setNewBucketName(e.target.value)}
-              className="w-full h-9 rounded-lg border border-[#2E2E2E] bg-[#05060A] px-3 font-mono text-zinc-100 outline-none focus:border-[#A3E635]"
-            />
-          </div>
-
-          <label className="flex items-center gap-2 text-zinc-300">
-            <input
-              type="checkbox"
-              checked={newBucketIsPublic}
-              onChange={(e) => setNewBucketIsPublic(e.target.checked)}
-            />
-            <span>Public Bucket (Anyone can download with URL)</span>
-          </label>
-
-          <div className="flex justify-end gap-2 border-t border-[#2E2E2E] pt-3">
-            <button
-              type="button"
-              onClick={() => setShowNewBucketModal(false)}
-              className="rounded-md border border-[#2E2E2E] bg-[#232323] px-3 py-1.5 text-xs text-zinc-300 cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!newBucketName.trim()) return;
-                const clean = newBucketName.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "-");
-                const newB: StorageBucket = {
-                  id: `bkt-${Date.now()}`,
-                  name: clean,
-                  isPublic: newBucketIsPublic,
-                  fileCount: 0,
-                  totalSize: "0 KB",
-                  files: [],
-                };
-                setStorageBucketsList((prev) => [...prev, newB]);
-                setSelectedBucket(newB);
-                setShowNewBucketModal(false);
-                setNewBucketName("");
-                setStatusBanner({
-                  type: "success",
-                  message: `Storage bucket "${clean}" initialized with NVMe storage.`,
-                });
-              }}
-              className="rounded-md bg-[#A3E635] px-4 py-1.5 text-xs font-bold text-[#11181C] cursor-pointer"
-            >
-              Create Bucket
-            </button>
           </div>
         </div>
       </NativeDialog>

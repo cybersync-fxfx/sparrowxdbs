@@ -123,15 +123,33 @@ export interface TenantQueryResult {
   rows: Record<string, unknown>[];
   truncated: boolean;
   durationMs: number;
+  statementCount?: number;
 }
 
 export class DbProvisionerError extends Error {
+  public pgCode?: string | undefined;
+  public detail?: string | undefined;
+  public hint?: string | undefined;
+  public position?: string | undefined;
+
   constructor(
     public statusCode: number,
     message: string,
+    pgMeta?: {
+      pgCode?: string | undefined;
+      detail?: string | undefined;
+      hint?: string | undefined;
+      position?: string | undefined;
+    },
   ) {
     super(message);
     this.name = "DbProvisionerError";
+    if (pgMeta) {
+      this.pgCode = pgMeta.pgCode;
+      this.detail = pgMeta.detail;
+      this.hint = pgMeta.hint;
+      this.position = pgMeta.position;
+    }
   }
 }
 
@@ -586,11 +604,12 @@ export async function rotateProvisionedDbPassword(
   dbName: string,
   actor: string,
   isAdmin = false,
+  actorTenantId?: string,
 ): Promise<{ dbName: string; dbUser: string; dbPassword: string; connectionString: string }> {
   const adminPool = await openAdminPool();
   try {
     await ensureProvisionRegistryTables(adminPool);
-    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin);
+    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin, actorTenantId);
     const dbUser = assertSafePgIdentifier(row.db_user);
     const newPassword = randomBytes(20).toString("base64url");
     await adminPool.query(
@@ -624,11 +643,12 @@ export async function createDatabaseSnapshot(
   actor: string,
   label = "Manual Snapshot",
   isAdmin = false,
+  actorTenantId?: string,
 ): Promise<DbSnapshotItem> {
   const adminPool = await openAdminPool();
   try {
     await ensureProvisionRegistryTables(adminPool);
-    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin);
+    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin, actorTenantId);
     const plan = resolveDbPlan(row.plan_id);
 
     const sizeRes = await adminPool.query<{ bytes: string; pretty: string }>(
@@ -717,11 +737,12 @@ export async function updateDatabasePlanOrStatus(
   updates: { planId?: string; status?: "Active" | "Suspended" },
   actor: string,
   isAdmin = false,
+  actorTenantId?: string,
 ) {
   const adminPool = await openAdminPool();
   try {
     await ensureProvisionRegistryTables(adminPool);
-    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin);
+    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin, actorTenantId);
     const dbUser = assertSafePgIdentifier(row.db_user);
     const nextPlan = resolveDbPlan(updates.planId || row.plan_id);
     const nextStatus = updates.status || (row.status as "Active" | "Suspended");
@@ -789,11 +810,12 @@ export async function deprovisionDatabase(
   dbName: string,
   actor: string,
   isAdmin = false,
+  actorTenantId?: string,
 ): Promise<{ dbName: string; deleted: boolean }> {
   const adminPool = await openAdminPool();
   try {
     await ensureProvisionRegistryTables(adminPool);
-    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin);
+    const row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin, actorTenantId);
     const safeDb = assertSafePgIdentifier(dbName);
     const safeUser = assertSafePgIdentifier(row.db_user);
 
@@ -827,13 +849,14 @@ export async function executeTenantSqlQuery(
   sql: string,
   actor: string,
   isAdmin = false,
+  actorTenantId?: string,
 ): Promise<TenantQueryResult> {
   const safeSql = validateTenantSqlSafety(sql);
   const adminPool = await openAdminPool();
   let row;
   try {
     await ensureProvisionRegistryTables(adminPool);
-    row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin);
+    row = await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin, actorTenantId);
     if (row.status === "Suspended") {
       throw new DbProvisionerError(403, `Database ${dbName} is currently suspended.`);
     }
@@ -851,24 +874,61 @@ export async function executeTenantSqlQuery(
     if (tenantRole && !isAdmin) {
       await client.query(`SET ROLE "${tenantRole}";`);
     }
-    const result = await client.query(safeSql);
+    const rawResult = (await client.query(safeSql)) as pg.QueryResult | pg.QueryResult[];
     const durationMs = Date.now() - started;
-    const allRows = Array.isArray(result.rows) ? result.rows : [];
+
+    const resultList = Array.isArray(rawResult) ? rawResult : [rawResult];
+    // For multi-statement scripts (e.g. CREATE TABLE ...; INSERT ...; SELECT ...;),
+    // prefer the last statement that produced a result set; otherwise use the last statement.
+    let selectedResult = resultList[resultList.length - 1];
+    for (let i = resultList.length - 1; i >= 0; i -= 1) {
+      const candidate = resultList[i];
+      if (candidate && Array.isArray(candidate.fields) && candidate.fields.length > 0) {
+        selectedResult = candidate;
+        break;
+      }
+    }
+
+    const allRows = selectedResult && Array.isArray(selectedResult.rows) ? selectedResult.rows : [];
     const truncated = allRows.length > 500;
     const rows = truncated ? allRows.slice(0, 500) : allRows;
-    const fields = Array.isArray(result.fields)
-      ? result.fields.map((f) => f.name)
-      : [];
+    const fields =
+      selectedResult && Array.isArray(selectedResult.fields)
+        ? selectedResult.fields.map((f) => f.name)
+        : [];
+    const commandsSummary =
+      resultList.length > 1
+        ? resultList
+            .map((r) => r?.command)
+            .filter(Boolean)
+            .join(" · ")
+        : selectedResult?.command || "QUERY";
 
     return {
       ok: true,
-      command: result.command || "QUERY",
-      rowCount: result.rowCount ?? rows.length,
+      command: commandsSummary || selectedResult?.command || "QUERY",
+      rowCount: selectedResult?.rowCount ?? rows.length,
       fields,
       rows,
       truncated,
       durationMs,
+      statementCount: resultList.length,
     };
+  } catch (err) {
+    if (err instanceof DbProvisionerError) throw err;
+    const pgErr = err as {
+      message?: string;
+      code?: string;
+      detail?: string;
+      hint?: string;
+      position?: string;
+    };
+    throw new DbProvisionerError(400, pgErr?.message || "PostgreSQL query execution failed", {
+      pgCode: pgErr?.code,
+      detail: pgErr?.detail,
+      hint: pgErr?.hint,
+      position: pgErr?.position,
+    });
   } finally {
     await client.query("RESET ROLE;").catch(() => {});
     client.release();
@@ -880,11 +940,12 @@ export async function listDatabaseSnapshots(
   dbName: string,
   actor: string,
   isAdmin = false,
+  actorTenantId?: string,
 ): Promise<DbSnapshotItem[]> {
   const adminPool = await openAdminPool();
   try {
     await ensureProvisionRegistryTables(adminPool);
-    await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin);
+    await assertDatabaseOwnership(adminPool, dbName, actor, isAdmin, actorTenantId);
     const res = await adminPool.query<{
       id: string;
       db_name: string;
