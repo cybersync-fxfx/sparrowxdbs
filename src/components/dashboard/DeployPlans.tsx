@@ -152,7 +152,7 @@ export function DeployPlans({
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
               <Sparkles className="size-3" aria-hidden="true" />
-              Smart 5-Tier Egg Sizing · {activeProfile.ramRangeLabel}
+              {activeProfile.themeLabel ?? activeProfile.label} · {activeProfile.ramRangeLabel}
             </span>
           </div>
           <h2 className="font-display text-lg font-semibold">

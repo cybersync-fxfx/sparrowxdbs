@@ -40,38 +40,81 @@ describe("Smart 5-Plan Egg Resource Profiler (all 321 eggs)", () => {
     expect(Object.keys(EGG_RESOURCE_PROFILES)).toHaveLength(9);
   });
 
-  it("assigns logical real-world RAM ranges to SA-MP, Minecraft, FiveM, Rust, Palworld, Bots, Redis, and Generic Runtimes", () => {
+  it("assigns logical real-world RAM ranges AND attractive themed plan names across Games, Applications & Generic Runtimes", () => {
     const samp = findEgg((e) => e.repoPath.includes("gta/samp/"));
-    expect(resolveEggResourceProfile(samp).ramRangeLabel).toBe("1GB – 8GB RAM");
+    const sampProfile = resolveEggResourceProfile(samp);
+    expect(sampProfile.ramRangeLabel).toBe("1GB – 8GB RAM");
+    expect(sampProfile.plans.map((p) => p.name)).toEqual([
+      "Grove Street",
+      "Idlewood Turf",
+      "Los Santos RP",
+      "San Fierro City",
+      "Las Venturas Max",
+    ]);
 
     const paper = findEgg((e) => e.repoPath.includes("minecraft/java/paper/"));
-    expect(resolveEggResourceProfile(paper).ramRangeLabel).toBe("3GB – 16GB RAM");
+    const paperProfile = resolveEggResourceProfile(paper);
+    expect(paperProfile.ramRangeLabel).toBe("3GB – 16GB RAM");
+    expect(paperProfile.plans.map((p) => p.name)).toEqual([
+      "Oak SMP",
+      "Iron Realm",
+      "Diamond Core",
+      "Netherite Pro",
+      "Ender Titan",
+    ]);
 
     const forge = findEgg((e) => e.repoPath.includes("minecraft/java/forge/"));
-    expect(resolveEggResourceProfile(forge).ramRangeLabel).toBe("4GB – 20GB RAM");
+    const forgeProfile = resolveEggResourceProfile(forge);
+    expect(forgeProfile.ramRangeLabel).toBe("4GB – 20GB RAM");
+    expect(forgeProfile.plans[2]!.name).toBe("Beacon Forge");
 
     const bedrock = findEgg((e) => e.repoPath.includes("minecraft/bedrock/bedrock/"));
-    expect(resolveEggResourceProfile(bedrock).ramRangeLabel).toBe("2GB – 10GB RAM");
+    const bedrockProfile = resolveEggResourceProfile(bedrock);
+    expect(bedrockProfile.ramRangeLabel).toBe("2GB – 10GB RAM");
+    expect(bedrockProfile.plans[2]!.name).toBe("Emerald Bedrock");
 
     const velocity = findEgg((e) => e.repoPath.includes("minecraft/proxy/java/velocity/"));
-    expect(resolveEggResourceProfile(velocity).ramRangeLabel).toBe("512MB – 4GB RAM");
+    const velocityProfile = resolveEggResourceProfile(velocity);
+    expect(velocityProfile.ramRangeLabel).toBe("512MB – 4GB RAM");
+    expect(velocityProfile.plans[1]!.name).toBe("Velocity Edge");
 
     const fivem = findEgg((e) => e.repoPath.includes("gta/fivem/"));
-    expect(resolveEggResourceProfile(fivem).ramRangeLabel).toBe("4GB – 16GB RAM");
+    const fivemProfile = resolveEggResourceProfile(fivem);
+    expect(fivemProfile.ramRangeLabel).toBe("4GB – 16GB RAM");
+    expect(fivemProfile.plans[2]!.name).toBe("Midnight City");
 
     const palworld = findEgg((e) => e.section === "games" && e.name.toLowerCase() === "palworld");
-    expect(resolveEggResourceProfile(palworld).ramRangeLabel).toBe("6GB – 24GB RAM");
+    const palProfile = resolveEggResourceProfile(palworld);
+    expect(palProfile.ramRangeLabel).toBe("6GB – 24GB RAM");
+    expect(palProfile.plans[2]!.name).toBe("Alpha Pal");
 
     const rustGame = findEgg((e) => e.section === "games" && e.repoPath.includes("rust/"));
-    expect(resolveEggResourceProfile(rustGame).ramRangeLabel).toBe("6GB – 24GB RAM");
+    const rustGameProfile = resolveEggResourceProfile(rustGame);
+    expect(rustGameProfile.ramRangeLabel).toBe("6GB – 24GB RAM");
+    expect(rustGameProfile.plans[2]!.name).toBe("Stone Compound");
 
     const rustGeneric = findEgg((e) => e.section === "generic" && e.name.toLowerCase().includes("rust"));
-    expect(resolveEggResourceProfile(rustGeneric).ramRangeLabel).toBe("1GB – 8GB RAM");
+    const rustGenProfile = resolveEggResourceProfile(rustGeneric);
+    expect(rustGenProfile.ramRangeLabel).toBe("1GB – 8GB RAM");
+    expect(rustGenProfile.plans[1]!.name).toBe("Tokio Core");
 
     const redis = findEgg((e) => e.section === "applications" && e.name.toLowerCase().includes("redis 7"));
-    expect(resolveEggResourceProfile(redis).ramRangeLabel).toBe("1GB – 8GB RAM");
+    const redisProfile = resolveEggResourceProfile(redis);
+    expect(redisProfile.ramRangeLabel).toBe("1GB – 8GB RAM");
+    expect(redisProfile.plans[0]!.name).toBe("Cache Micro");
+
+    const postgres = findEgg((e) => e.section === "applications" && e.name.toLowerCase().includes("postgres16"));
+    expect(resolveEggResourceProfile(postgres).plans[2]!.name).toBe("Primary Vault");
+
+    const uptimeKuma = findEgg((e) => e.section === "applications" && e.name.toLowerCase().includes("uptime kuma"));
+    expect(resolveEggResourceProfile(uptimeKuma).plans[0]!.name).toBe("Pulse Watch");
 
     const pythonGeneric = findEgg((e) => e.section === "generic" && e.name.toLowerCase().includes("python"));
-    expect(resolveEggResourceProfile(pythonGeneric).ramRangeLabel).toBe("512MB – 4GB RAM");
+    const pyProfile = resolveEggResourceProfile(pythonGeneric);
+    expect(pyProfile.ramRangeLabel).toBe("512MB – 4GB RAM");
+    expect(pyProfile.plans[1]!.name).toBe("FastAPI Core");
+
+    const nodeGeneric = findEgg((e) => e.section === "generic" && e.name.toLowerCase().includes("node"));
+    expect(resolveEggResourceProfile(nodeGeneric).plans[0]!.name).toBe("Event Loop");
   });
 });

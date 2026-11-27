@@ -21,6 +21,7 @@ export interface SmartPlanTier extends Plan {
 export interface EggResourceProfile {
   id: EggResourceProfileId;
   label: string;
+  themeLabel?: string;
   serviceId: ServiceId;
   ramRangeLabel: string;
   reasoning: string;
@@ -176,18 +177,316 @@ export function findSmartPlan(planId: string): { profile: EggResourceProfile; pl
   return SMART_PLAN_INDEX.get(planId) ?? null;
 }
 
-export function getDefaultProfileForService(service: ServiceId): EggResourceProfile {
-  if (service === "samp") return EGG_RESOURCE_PROFILES.samp;
-  if (service === "minecraft") return EGG_RESOURCE_PROFILES["mc-java"];
-  if (service === "fivem") return EGG_RESOURCE_PROFILES.rp;
-  return EGG_RESOURCE_PROFILES.bot;
+interface EggPlanTheme {
+  themeLabel: string;
+  names: [string, string, string, string, string];
+  hints?: [string, string, string, string, string];
 }
 
-/**
- * Intelligently profiles ANY of the 321 official Pterodactyl eggs (Games, Applications & Bots,
- * Generic Runtimes) into the best-fitting 5-tier hardware profile.
- */
-export function resolveEggResourceProfile(
+function cleanShortEggTitle(rawName: string): string {
+  return rawName
+    .replace(/\b(Generic|Dedicated|Server|Vanilla|Enhanced|Online|Public|Edition|Installer|Modupdate|Autowipe|Depotdownloader)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 18) || "Cloud";
+}
+
+function resolveEggPlanTheme(
+  egg: Pick<EggCatalogItem, "section" | "name" | "category" | "repoPath">,
+  baseProfileId: EggResourceProfileId,
+): EggPlanTheme {
+  const hay = `${egg.name} ${egg.category} ${egg.repoPath}`.toLowerCase();
+
+  // --- GENERIC RUNTIMES (12 eggs) ---
+  if (egg.section === "generic") {
+    if (/(nodejs|node js|nodemon|bun|deno)/i.test(hay)) {
+      return {
+        themeLabel: "JavaScript / TS Runtime",
+        names: ["Event Loop", "Express Core", "Async Prime", "Worker Pool", "Edge Cluster"],
+        hints: ["Dev scripts & APIs", "Active web services", "Production API / Bot", "Multi-worker apps", "High-throughput cluster"],
+      };
+    }
+    if (/python/i.test(hay)) {
+      return {
+        themeLabel: "Python Runtime",
+        names: ["PyScript", "FastAPI Core", "Async Worker", "Data Engine", "Compute Pro"],
+        hints: ["Automation & bots", "Web APIs & webhooks", "Production bots/apps", "Scrapers & pipelines", "Heavy Python workloads"],
+      };
+    }
+    if (/java/i.test(hay)) {
+      return {
+        themeLabel: "JVM Runtime",
+        names: ["JVM Micro", "Spring Core", "Bytecode Pro", "Heap Scale", "Enterprise JVM"],
+        hints: ["Small Java services", "REST APIs & tools", "Production JVM apps", "High-heap microservices", "Enterprise Java cluster"],
+      };
+    }
+    if (/golang/i.test(hay)) {
+      return {
+        themeLabel: "Go Runtime",
+        names: ["Goroutine Lite", "Go Micro", "Concurrent Pro", "Mesh Runner", "Cloud Binary"],
+        hints: ["Lightweight binaries", "Production APIs", "High-concurrency RPC", "Distributed workers", "Enterprise Go engine"],
+      };
+    }
+    if (/rust/i.test(hay)) {
+      return {
+        themeLabel: "Rust Runtime",
+        names: ["Cargo Dev", "Tokio Core", "Zero-Cost Pro", "Systems Scale", "Bare-Metal Rust"],
+        hints: ["Small Rust daemons", "Async Tokio APIs", "Production services", "Heavy compute nodes", "Max-throughput engine"],
+      };
+    }
+    const lang = cleanShortEggTitle(egg.name);
+    return {
+      themeLabel: `${lang} Runtime`,
+      names: [`${lang} Dev`, `${lang} Core`, `${lang} Prime`, `${lang} Scale`, `${lang} Cluster`],
+      hints: ["Dev & testing", "Small production", "Live apps & APIs", "Multi-service load", "High-concurrency node"],
+    };
+  }
+
+  // --- APPLICATIONS & BOTS (55 eggs) ---
+  if (egg.section === "applications") {
+    if (/(lavalink|jmusic|aoede|muse|sinusbot)/i.test(hay)) {
+      return {
+        themeLabel: "Audio & Music Streaming",
+        names: ["Lo-Fi Node", "Hi-Res Audio", "Bass Cluster", "Studio Stream", "Concert Mesh"],
+        hints: ["1–5 voice channels", "5–20 active guilds", "20–60 music queues", "100+ guild audio", "Multi-shard audio hub"],
+      };
+    }
+    if (/(bots\/|discord|twitch|phantom|soge|bastion|corp|dynamica|fragbot|parkertron|pixel|ree6|\bred\b|big brother)/i.test(hay)) {
+      return {
+        themeLabel: "24/7 Bot Hosting",
+        names: ["Spark Bot", "Guild Runner", "Shard Prime", "Hyper Bot", "Global Cluster"],
+        hints: ["1–3 small servers", "10–50 active guilds", "100+ guild commands", "Sharded bot fleet", "Verified mega-bot"],
+      };
+    }
+    if (/(postgres|mariadb|mysql|mongo|rethinkdb)/i.test(hay)) {
+      return {
+        themeLabel: "Managed Database Engine",
+        names: ["Dev Schema", "Index Starter", "Primary Vault", "High-IOPS DB", "Enterprise Core"],
+        hints: ["Dev & staging DB", "Small app backend", "Production queries", "High-write workloads", "Heavy analytics & cache"],
+      };
+    }
+    if (/(redis|meilisearch|elasticsearch|rabbitmq|\bnats\b)/i.test(hay)) {
+      return {
+        themeLabel: "In-Memory Cache & Queue",
+        names: ["Cache Micro", "Memory Fast", "Search Prime", "Cluster Cache", "Instant Index"],
+        hints: ["Session & key store", "Fast app caching", "Live queues & search", "High-throughput broker", "Enterprise memory grid"],
+      };
+    }
+    if (/(voice\/|teamspeak|ts3)/i.test(hay)) {
+      return {
+        themeLabel: "Low-Latency Voice Server",
+        names: ["Squad Voice", "Clan Comms", "Community TS", "Org Voice HQ", "Broadcast Hub"],
+        hints: ["Up to 32 slots", "Up to 64 slots", "Up to 128 slots", "Up to 256 slots", "512+ voice network"],
+      };
+    }
+    if (/(uptime|grafana|prometheus|loki)/i.test(hay)) {
+      return {
+        themeLabel: "Monitoring & Observability",
+        names: ["Pulse Watch", "Metric Stack", "Telemetry Pro", "Observability HQ", "NOC Command"],
+        hints: ["Up to 25 monitors", "Team dashboards", "Multi-node metrics", "Full log ingestion", "Enterprise telemetry"],
+      };
+    }
+    if (/(gitea|forgejo|code server|minio|owncast|reposilite|haste|rathole|yarr|sftp|languagetool|5e)/i.test(hay)) {
+      return {
+        themeLabel: "Self-Hosted Cloud App",
+        names: ["App Sandbox", "Dev Workspace", "Team Cloud", "Studio Stack", "Enterprise Node"],
+        hints: ["Personal instance", "Small team usage", "Production self-host", "Heavy media & repos", "Organization scale"],
+      };
+    }
+  }
+
+  // --- GAME SERVERS (254 eggs) ---
+  if (/(minecraft\/proxy|velocity|waterfall|travertine|waterdog|viaaas|limbo)/i.test(hay)) {
+    return {
+      themeLabel: "Minecraft Network Proxy",
+      names: ["Portal Link", "Velocity Edge", "Bungee Hub", "Network Mesh", "Hyper Proxy"],
+      hints: ["Up to 50 players", "Up to 150 players", "Up to 400 players", "Up to 800 players", "1,500+ proxy network"],
+    };
+  }
+  if (/(minecraft\/bedrock|pocketmine|nukkit|gomint|levilamina|liteloader)/i.test(hay)) {
+    return {
+      themeLabel: "Minecraft Bedrock Edition",
+      names: ["Cobble Pocket", "Copper Realm", "Emerald Bedrock", "Amethyst World", "Beacon Realm"],
+      hints: ["5–10 Bedrock players", "10–25 friends SMP", "25–50 active realm", "50–100 plugin world", "100+ mega realm"],
+    };
+  }
+  if (baseProfileId === "mc-mod") {
+    return {
+      themeLabel: "Modded Minecraft Forge / Fabric",
+      names: ["Redstone Pack", "Obsidian Mod", "Beacon Forge", "Withered Vault", "Overclocked Pack"],
+      hints: ["20–50 light mods", "50–120 modpack", "120–250 full pack", "250–400 kitchen sink", "400+ ultra modpack"],
+    };
+  }
+  if (baseProfileId === "mc-java") {
+    return {
+      themeLabel: "Minecraft Java 20.0 TPS",
+      names: ["Oak SMP", "Iron Realm", "Diamond Core", "Netherite Pro", "Ender Titan"],
+      hints: ["5–15 survival SMP", "15–35 plugin SMP", "35–75 active network", "75–150 heavy plugins", "150+ mega SMP"],
+    };
+  }
+  if (/(samp|s a m p|openmp|open m p|mtasa|multi theft auto|gtac)/i.test(hay)) {
+    return {
+      themeLabel: "San Andreas Multiplayer",
+      names: ["Grove Street", "Idlewood Turf", "Los Santos RP", "San Fierro City", "Las Venturas Max"],
+      hints: ["Up to 50 players", "Up to 150 players", "Up to 350 RP slots", "Up to 600 players", "1,000 max slots"],
+    };
+  }
+  if (/(fivem|five m|altv|alt v|ragemp|rage m p|ragecoop)/i.test(hay)) {
+    return {
+      themeLabel: "GTA V Roleplay City",
+      names: ["Vinewood Dev", "Vespucci RP", "Midnight City", "Syndicate RP", "Metropolis Ultra"],
+      hints: ["Dev / 32 slots", "48 slots + MLOs", "64 OneSync city", "128+ full QBCore", "256+ mega city"],
+    };
+  }
+  if (/(redm|red m)/i.test(hay)) {
+    return {
+      themeLabel: "RedM Wild West RP",
+      names: ["Valentine Camp", "Blackwater Trail", "Saint Denis RP", "Frontier Outlaw", "Wild West Legend"],
+      hints: ["Dev / 32 slots", "48 frontier slots", "64+ RP town", "128 county RP", "200+ territory RP"],
+    };
+  }
+  if (/\brust\b/i.test(hay)) {
+    return {
+      themeLabel: "Rust Wipe Performance",
+      names: ["Beach Naked", "Wood Base", "Stone Compound", "HQM Citadel", "Zerg Wipe"],
+      hints: ["3000 map / private", "3500 map · 50 pop", "4000 map · 120 pop", "4500+ · 200 pop", "Max entities / modded"],
+    };
+  }
+  if (/(\bark\b|pixark)/i.test(hay)) {
+    return {
+      themeLabel: "ARK Cluster Hosting",
+      names: ["Beach Bob", "Tribe Camp", "Rex Alpha", "Tek Base", "Ascended Titan"],
+      hints: ["Small private map", "Up to 20 survivors", "Active tribe + mods", "Multi-mod cluster", "Full alpha cluster"],
+    };
+  }
+  if (/palworld/i.test(hay)) {
+    return {
+      themeLabel: "Palworld Dedicated",
+      names: ["Palbox Starter", "Base Camp", "Alpha Pal", "Guild Fortress", "Legendary World"],
+      hints: ["4–8 co-op friends", "8–16 active players", "16–32 guild world", "32+ heavy bases", "Max guild capacity"],
+    };
+  }
+  if (/valheim/i.test(hay)) {
+    return {
+      themeLabel: "Valheim Viking Realm",
+      names: ["Meadows Hut", "Black Forest", "Iron Longhouse", "Plains Keep", "Valhalla Hall"],
+      hints: ["2–5 Vikings", "5–10 co-op clan", "10+ modded BepInEx", "Large builder world", "Mega Viking realm"],
+    };
+  }
+  if (/(counter strike|cs 1\.6|cs2|cs2d)/i.test(hay)) {
+    return {
+      themeLabel: "Counter-Strike Competitive",
+      names: ["Warmup 1v1", "Retake 5v5", "Matchmaking Pro", "128-Tick Scrim", "Major Arena"],
+      hints: ["Practice / 1v1", "10-slot scrims", "Public community", "Modded / surf / DM", "Tournament multi-slot"],
+    };
+  }
+  if (/(terraria|tshock|tmodloader)/i.test(hay)) {
+    return {
+      themeLabel: "Terraria World Engine",
+      names: ["Copper Pick", "Crimtane World", "Hallowed Realm", "Chlorophyte Pro", "Moon Lord"],
+      hints: ["Small world co-op", "Medium world · 8p", "Large world / TShock", "Calamity / Thorium", "Mega modded world"],
+    };
+  }
+  if (/(factorio|satisfactory|foundry)/i.test(hay)) {
+    return {
+      themeLabel: "Factory Automation Grid",
+      names: ["Belt Starter", "Steam Factory", "Rocket Megabase", "Nuclear Grid", "Hyper Logistics"],
+      hints: ["Early game co-op", "Mid-tier factories", "Large megabases", "Heavy mod trains", "Ultra UPS factory"],
+    };
+  }
+  if (/(dayz|7 days|zomboid|\bscum\b|forest|humanitz|night of the dead|no one survived|vein)/i.test(hay)) {
+    return {
+      themeLabel: "Zombie Survival Engine",
+      names: ["Campfire", "Safehouse", "Outpost Zero", "Stronghold", "Apocalypse Max"],
+      hints: ["Private squad", "10–20 survivors", "Modded survival", "50+ active server", "Full horde wipe"],
+    };
+  }
+  if (/(enshrouded|v rising|conan|soulmask|smalland|nightingale|moria)/i.test(hay)) {
+    return {
+      themeLabel: "Fantasy Survival World",
+      names: ["Flame Altar", "Crypt Lord", "Castle Keep", "Blood Citadel", "Immortal Realm"],
+      hints: ["2–6 co-op party", "6–16 clan world", "Active PvP/PvE", "40+ castle bases", "Full realm capacity"],
+    };
+  }
+  if (/(gmod|garry|team fortress|left4dead|half life|hlds|sven|black mesa|source)/i.test(hay)) {
+    return {
+      themeLabel: "Source / Valve Multiplayer",
+      names: ["Sandbox Lite", "DarkRP City", "Workshop Pro", "Source Community", "Tickrate Max"],
+      hints: ["Friends / 16 slots", "32-slot community", "Heavy Workshop pack", "64-slot RP/TTT", "100+ max tickrate"],
+    };
+  }
+  if (/(beamng|kissmp|assetto|automobilista|trackmania|truck simulator)/i.test(hay)) {
+    return {
+      themeLabel: "Racing & Driving Sim",
+      names: ["Pit Lane", "Drift Lobby", "Track Day Pro", "Grand Prix", "Apex Grid"],
+      hints: ["Private cruise", "12-car drift lobby", "Custom traffic / AI", "32+ racing league", "Full event grid"],
+    };
+  }
+  if (/(arma|squad|insurgency|post scriptum|ground branch|holdfast|mordhau|bannerlord|harsh doorstop)/i.test(hay)) {
+    return {
+      themeLabel: "Tactical MilSim Operations",
+      names: ["Fireteam", "Platoon Ops", "Battalion HQ", "Tactical Theater", "Command Ops"],
+      hints: ["Small squad ops", "32-slot missions", "64-slot MilSim", "100+ battle server", "Full warfare cluster"],
+    };
+  }
+  if (/(space engineers|empyrion|astroneer|avorion|starmade|stationeers)/i.test(hay)) {
+    return {
+      themeLabel: "Space Sandbox Simulation",
+      names: ["Escape Pod", "Orbital Station", "Cruiser Fleet", "Dreadnought", "Galactic Core"],
+      hints: ["2–4 astronauts", "Station + ships", "Multi-planet grids", "Heavy physics fleet", "Persistent galaxy"],
+    };
+  }
+
+  // Dynamic attractive game-specific fallback using the selected egg's name
+  const title = cleanShortEggTitle(egg.name);
+  return {
+    themeLabel: `${title} Server`,
+    names: [`${title} Starter`, `${title} Squad`, `${title} Prime`, `${title} Elite`, `${title} Titan`],
+  };
+}
+
+function applyThemeToProfile(base: EggResourceProfile, theme: EggPlanTheme): EggResourceProfile {
+  return {
+    ...base,
+    themeLabel: theme.themeLabel,
+    plans: base.plans.map((plan, idx) => ({
+      ...plan,
+      name: theme.names[idx] ?? plan.name,
+      capacityHint: theme.hints?.[idx] ?? plan.capacityHint,
+    })),
+  };
+}
+
+export function getDefaultProfileForService(service: ServiceId): EggResourceProfile {
+  if (service === "samp") {
+    return applyThemeToProfile(EGG_RESOURCE_PROFILES.samp, {
+      themeLabel: "San Andreas Multiplayer",
+      names: ["Grove Street", "Idlewood Turf", "Los Santos RP", "San Fierro City", "Las Venturas Max"],
+      hints: ["Up to 50 players", "Up to 150 players", "Up to 350 RP slots", "Up to 600 players", "1,000 max slots"],
+    });
+  }
+  if (service === "minecraft") {
+    return applyThemeToProfile(EGG_RESOURCE_PROFILES["mc-java"], {
+      themeLabel: "Minecraft Java 20.0 TPS",
+      names: ["Oak SMP", "Iron Realm", "Diamond Core", "Netherite Pro", "Ender Titan"],
+      hints: ["5–15 survival SMP", "15–35 plugin SMP", "35–75 active network", "75–150 heavy plugins", "150+ mega SMP"],
+    });
+  }
+  if (service === "fivem") {
+    return applyThemeToProfile(EGG_RESOURCE_PROFILES.rp, {
+      themeLabel: "GTA V Roleplay City",
+      names: ["Vinewood Dev", "Vespucci RP", "Midnight City", "Syndicate RP", "Metropolis Ultra"],
+      hints: ["Dev / 32 slots", "48 slots + MLOs", "64 OneSync city", "128+ full QBCore", "256+ mega city"],
+    });
+  }
+  return applyThemeToProfile(EGG_RESOURCE_PROFILES.bot, {
+    themeLabel: "24/7 Bot Hosting",
+    names: ["Spark Bot", "Guild Runner", "Shard Prime", "Hyper Bot", "Global Cluster"],
+    hints: ["1–3 small servers", "10–50 active guilds", "100+ guild commands", "Sharded bot fleet", "Verified mega-bot"],
+  });
+}
+
+function resolveBaseProfile(
   egg: Pick<EggCatalogItem, "section" | "name" | "category" | "repoPath" | "description">,
 ): EggResourceProfile {
   const hay = `${egg.name} ${egg.category} ${egg.repoPath}`.toLowerCase();
@@ -219,17 +518,12 @@ export function resolveEggResourceProfile(
   }
 
   // 3. Game Servers (254 eggs)
-  // 3a. Minecraft Proxies & Limbo -> Ultra-light (512MB - 4GB)
   if (/(minecraft\/proxy|velocity|waterfall|travertine|waterdog|viaaas|limbo|crewlink)/i.test(hay)) {
     return EGG_RESOURCE_PROFILES.bot;
   }
-
-  // 3b. Minecraft Bedrock & Modded Terraria -> 2GB - 10GB
   if (/(minecraft\/bedrock|pocketmine|nukkit|gomint|levilamina|liteloader|tmodloader)/i.test(hay)) {
     return EGG_RESOURCE_PROFILES["mc-bed"];
   }
-
-  // 3c. Minecraft Modded Java (Forge, Fabric, Modpacks) -> 4GB - 20GB
   if (
     /(forge|neoforge|fabric|quilt|curseforge|modrinth|ftb|mohist|magma|arclight|spongeforge|tekkit|hexxit|blightfall|attack of the b|1\.12\.2|1\.7\.10|the1 12|the1 7)/i.test(
       hay,
@@ -237,13 +531,9 @@ export function resolveEggResourceProfile(
   ) {
     return EGG_RESOURCE_PROFILES["mc-mod"];
   }
-
-  // 3d. Minecraft Java (Paper, Purpur, Spigot, Folia, Hytale) -> 3GB - 16GB
   if (/(minecraft\/java|minecraft\/crossplay|paper|purpur|spigot|folia|canvasmc|canvas mc|cuberite|glowstone|krypton|sponge|vanillacord|vanilla cord|hytale)/i.test(hay)) {
     return EGG_RESOURCE_PROFILES["mc-java"];
   }
-
-  // 3e. Heavy Open-World Giants (Rust, ARK, Palworld, Enshrouded, Satisfactory, Conan, SCUM, Space Engineers) -> 6GB - 24GB
   if (
     /(\brust\b|\bark\b|pixark|palworld|enshrouded|satisfactory|conan|\bscum\b|soulmask|icarus|myth of empires|the front|thefront|the isle|path of titans|space engineers|empyrion)/i.test(
       hay,
@@ -251,8 +541,6 @@ export function resolveEggResourceProfile(
   ) {
     return EGG_RESOURCE_PROFILES.heavy;
   }
-
-  // 3f. Classic Native / SA-MP / Source / 2D / Retro -> 1GB - 8GB
   if (
     /(samp|s a m p|openmp|open m p|mtasa|multi theft auto|gtac|grand theft auto connected|cs 1\.6|counter strike1|counter strike source|cs2d|c s2 d|hlds|half life|hl2|sven|team fortress|left4dead|quake|openarena|urban terror|urbanterror|wolfenstein|et legacy|e t legacy|xonotic|teeworlds|ddnet|d d net|ddrace|d d race|soldat|openttd|open t t d|openra|open r a|openrct2|cubeengine|assault cube|cube2|doom|zandronum|mindustry|classicube|classi cube|sonic robo|supertuxkart|super tux|clone hero|impostor|factorio|terraria|tshock|starbound|core keeper|necesse|minetest|dont starve|don t starve|subnautica|rimworld|trackmania|truck simulator|\bfof\b|black mesa|nazi zombies|open fortress|sourcecoop|source coop|nmrih|contagion|banana shooter|puck|tachyon|\bksp\b|k s p|risk of rain|tower unite|league sandbox|iw4x|\bcod\b|mohaa|losangelescrimes|l a c)/i.test(
       hay,
@@ -260,8 +548,6 @@ export function resolveEggResourceProfile(
   ) {
     return EGG_RESOURCE_PROFILES.samp;
   }
-
-  // 3g. GTA V RP, Tactical FPS & Modern High-Tick Multiplayer -> 4GB - 16GB
   if (
     /(fivem|five m|redm|red m|altv|alt v|ragemp|rage m p|ragecoop|rage c o o p|gmod|garry|counter strike2|\bcs2\b|assetto corsa|automobilista|beamng|beam m p|kissmp|unturned|scpsl|s c p s l|insurgency|squad|arma|bannerlord|mordhau|dayz|pavlov|killing floor|holdfast|ground branch|post scriptum|barotrauma|project zomboid|harsh doorstop|\br5\b|americas army|america s army|battalion|onset|just cause|j c3|tarkov)/i.test(
       hay,
@@ -269,12 +555,20 @@ export function resolveEggResourceProfile(
   ) {
     return EGG_RESOURCE_PROFILES.rp;
   }
-
-  // 3h. FoundryVTT (categorized in games repo) -> App/VTT 1GB - 8GB
   if (/foundryvtt/i.test(hay)) {
     return EGG_RESOURCE_PROFILES.app;
   }
-
-  // 3i. Default for all other modern 3D survival / sandbox games -> 4GB - 16GB
   return EGG_RESOURCE_PROFILES.surv;
+}
+
+/**
+ * Intelligently profiles ANY of the 321 official Pterodactyl eggs (Games, Applications & Bots,
+ * Generic Runtimes) into the best-fitting 5-tier hardware profile WITH attractive egg-themed plan names.
+ */
+export function resolveEggResourceProfile(
+  egg: Pick<EggCatalogItem, "section" | "name" | "category" | "repoPath" | "description">,
+): EggResourceProfile {
+  const base = resolveBaseProfile(egg);
+  const theme = resolveEggPlanTheme(egg, base.id);
+  return applyThemeToProfile(base, theme);
 }
