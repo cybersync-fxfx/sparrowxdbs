@@ -1559,9 +1559,15 @@ ensure_netsec_dashboard_running() {
   pg_host_port="${pg_host_port:-5432}"
 
   local pg_host="127.0.0.1" pg_port="${pg_host_port}"
-  if [ "${docker_ok}" = "yes" ] && docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
-    pg_host="sparrowx-postgres"
-    pg_port="5432"
+  if [ "${docker_ok}" = "yes" ]; then
+    if docker ps -a --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-postgres"; then
+      docker start sparrowx-postgres >/dev/null 2>&1 || true
+      pg_host="sparrowx-postgres"
+      pg_port="5432"
+    else
+      pg_host="host.docker.internal"
+      pg_port="${pg_host_port}"
+    fi
   fi
   local pg_url="postgresql://${pg_user}:${pg_pass}@${pg_host}:${pg_port}/${pg_db}"
 
@@ -1611,14 +1617,19 @@ ensure_netsec_dashboard_running() {
 
   local netsec_started="no"
   if [ "${docker_ok}" = "yes" ]; then
+    if [ "${pg_host}" = "sparrowx-postgres" ]; then
+      docker network connect "${edge_net}" sparrowx-postgres >/dev/null 2>&1 || true
+    fi
     if [ "${need_build}" != "yes" ] && \
        docker ps --filter status=running --format '{{.Names}}' 2>/dev/null | grep -Fxq "sparrowx-netsec" && \
        docker inspect -f '{{json .NetworkSettings.Networks}}' sparrowx-netsec 2>/dev/null | grep -q "\"${edge_net}\"" && \
-       docker exec sparrowx-netsec env 2>/dev/null | grep -q "POSTGRES_HOST=" && \
-       docker exec sparrowx-netsec env 2>/dev/null | grep -q "SPARROWX_MASTER_SSO_SECRET=" && \
+       docker exec sparrowx-netsec env 2>/dev/null | grep -Fxq "POSTGRES_HOST=${pg_host}" && \
+       docker exec sparrowx-netsec env 2>/dev/null | grep -Fxq "DATABASE_URL=${pg_url}" && \
+       docker exec sparrowx-netsec env 2>/dev/null | grep -Fxq "SPARROWX_MASTER_SSO_SECRET=${ns_sso_secret}" && \
+       docker exec sparrowx-netsec node -e "const s=require('net').connect(${pg_port},'${pg_host}');s.setTimeout(2000);s.on('connect',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));s.on('timeout',()=>process.exit(1))" 2>/dev/null && \
        curl -fsS -o /dev/null --max-time 3 "http://127.0.0.1:${netsec_p}/api/health" 2>/dev/null; then
       netsec_started="yes"
-      log_ok "Network DDoS Dashboard (${netsec_domain}) container sparrowx-netsec already healthy on :${netsec_p}"
+      log_ok "Network DDoS Dashboard (${netsec_domain}) container sparrowx-netsec already healthy on :${netsec_p} (DB: ${pg_host}:${pg_port})"
     else
       docker network create "${edge_net}" >/dev/null 2>&1 || true
       docker rm -f sparrowx-netsec >/dev/null 2>&1 || true
@@ -1645,6 +1656,9 @@ ensure_netsec_dashboard_running() {
   fi
 
   if [ "${netsec_started}" != "yes" ]; then
+    upsert_env_kv_file "${netsec_env}" "POSTGRES_HOST" "127.0.0.1"
+    upsert_env_kv_file "${netsec_env}" "POSTGRES_PORT" "${pg_host_port}"
+    upsert_env_kv_file "${netsec_env}" "DATABASE_URL" "postgresql://${pg_user}:${pg_pass}@127.0.0.1:${pg_host_port}/${pg_db}"
     if [ "${ns_url}" = "http://host.docker.internal:8000" ]; then
       upsert_env_kv_file "${netsec_env}" "SUPABASE_URL" "http://127.0.0.1:8000"
     fi
