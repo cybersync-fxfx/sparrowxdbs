@@ -11,7 +11,9 @@ import {
   Search,
   Server,
   ShieldCheck,
+  ShieldOff,
   Sliders,
+  UserPlus,
   Users,
   X,
 } from "lucide-react";
@@ -20,6 +22,7 @@ import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import {
   adminAdjustCoins,
   adminAssignSubscription,
+  adminSetUserAdminRole,
   adminUpdateSubscription,
   getAdminOverview,
 } from "@/lib/portal.functions";
@@ -226,6 +229,23 @@ export function AdminControlPanel() {
     onError: (e) => toast.error(errorText(e)),
   });
 
+  const adminRoleMutation = useMutation({
+    mutationFn: (payload: { clientId: string; makeAdmin: boolean }) =>
+      adminSetUserAdminRole({ data: payload }),
+    onSuccess: async (res) => {
+      await invalidateAdmin();
+      toast.success(
+        res.isAdmin ? `Appointed ${res.email} as Admin` : `Revoked Admin access for ${res.email}`,
+        {
+          description: res.isAdmin
+            ? "They can now access the Admin Control Panel and manage users."
+            : "Account reverted to standard client permissions.",
+        },
+      );
+    },
+    onError: (e) => toast.error(errorText(e)),
+  });
+
   const filteredClients = useMemo(() => {
     const list = data?.clients ?? [];
     const q = userSearch.trim().toLowerCase();
@@ -415,7 +435,20 @@ export function AdminControlPanel() {
                 filteredClients.map((client) => (
                   <tr key={client.id} className="hover:bg-white/[0.02]">
                     <th scope="row" className="px-4 py-3 font-normal">
-                      <div className="font-semibold text-foreground">{client.email ?? client.username}</div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-foreground">{client.email ?? client.username}</span>
+                        {client.isPrimaryAdmin ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/45 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-200">
+                            <ShieldCheck className="size-3" aria-hidden="true" />
+                            Primary Admin
+                          </span>
+                        ) : client.isAdmin ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-sky-400/45 bg-sky-500/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-sky-200">
+                            <ShieldCheck className="size-3" aria-hidden="true" />
+                            Admin
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-[11px] text-muted-foreground">{client.username}</div>
                     </th>
                     <td data-label="Panel" className="px-4 py-3 font-mono text-xs text-secondary-foreground">
@@ -432,6 +465,38 @@ export function AdminControlPanel() {
                     </td>
                     <td data-label="Actions" className="px-4 py-3">
                       <div className="flex flex-wrap items-center justify-end gap-1.5">
+                        {!client.isPrimaryAdmin && client.email ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={adminRoleMutation.isPending}
+                            className={cn(
+                              "h-8 rounded-lg px-2.5 text-xs border",
+                              client.isAdmin
+                                ? "border-rose-500/35 text-rose-200 hover:bg-rose-500/15"
+                                : "border-amber-500/35 text-amber-200 hover:bg-amber-500/15",
+                            )}
+                            onClick={() =>
+                              adminRoleMutation.mutate({
+                                clientId: client.id,
+                                makeAdmin: !client.isAdmin,
+                              })
+                            }
+                          >
+                            {client.isAdmin ? (
+                              <>
+                                <ShieldOff className="size-3.5" aria-hidden="true" />
+                                <span>Revoke Admin</span>
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus className="size-3.5" aria-hidden="true" />
+                                <span>Make Admin</span>
+                              </>
+                            )}
+                          </Button>
+                        ) : null}
                         <Button
                           type="button"
                           size="sm"

@@ -132,6 +132,8 @@ export type AdminClientSummary = {
   createdAt: string;
   subscriptionCount: number;
   activeSubscriptions: number;
+  isAdmin?: boolean;
+  isPrimaryAdmin?: boolean;
 };
 
 export type AdminSubscriptionSummary = {

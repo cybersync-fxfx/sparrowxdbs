@@ -181,7 +181,7 @@ export const getPanelLaunchContext = createServerFn({ method: "GET" }).handler(a
   run(async () => (await import("./server/portal.server")).getPanelLaunchInfo()),
 );
 
-// ---------------- Game Client Area Admin Functions (atchukris@gmail.com) ----------------
+// ---------------- Game Client Area Admin Functions (atchukriz@gmail.com + appointed admins) ----------------
 
 export const getAdminOverview = createServerFn({ method: "GET" }).handler(async () =>
   run(async () => (await import("./server/portal.server")).adminGetOverview()),
@@ -240,6 +240,19 @@ export const adminAssignSubscription = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) =>
     run(async () => (await import("./server/portal.server")).adminGrantSubscription(data)),
+  );
+
+export const adminSetUserAdminRole = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z
+      .object({
+        clientId: z.string().min(1).max(80),
+        makeAdmin: z.boolean(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).adminSetClientAdminRole(data)),
   );
 
 export const logout = createServerFn({ method: "POST" }).handler(async () => {

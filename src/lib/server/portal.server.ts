@@ -4,9 +4,12 @@ import { decryptText, encryptText, generatePassword, sanitizeUsername } from "./
 import * as db from "./db.server";
 import * as ptero from "./ptero.server";
 import {
+  BOOTSTRAP_PRIMARY_ADMIN_EMAIL,
   MASTER_SSO_COOKIE_NAME,
   UNIFIED_CLIENT_SESSION_COOKIE_NAME,
   extractCookieValue,
+  listAppointedAdminEmailsInDb,
+  setUserAdminRoleInDb,
   verifyMasterSsoToken,
   type MasterSsoClaims,
 } from "./master-sso.server";
@@ -20,7 +23,12 @@ import type {
   TxType,
 } from "../portal-types";
 
-const DEFAULT_GAME_ADMIN_EMAILS = ["atchukris@gmail.com"];
+const DEFAULT_GAME_ADMIN_EMAILS = [BOOTSTRAP_PRIMARY_ADMIN_EMAIL];
+
+export function isPrimaryBootstrapAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return email.trim().toLowerCase() === BOOTSTRAP_PRIMARY_ADMIN_EMAIL;
+}
 
 export function isGameAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
@@ -30,6 +38,14 @@ export function isGameAdminEmail(email: string | null | undefined): boolean {
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
   return DEFAULT_GAME_ADMIN_EMAILS.includes(clean) || extra.includes(clean);
+}
+
+export async function isEffectiveGameAdmin(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  if (isGameAdminEmail(email)) return true;
+  const clean = email.trim().toLowerCase();
+  const appointed = await listAppointedAdminEmailsInDb().catch(() => []);
+  return appointed.includes(clean);
 }
 
 type DirectPteroCacheEntry = {
@@ -310,7 +326,7 @@ export async function dashboard(): Promise<DashboardData> {
 
   return {
     mode: "live",
-    isAdmin: isGameAdminEmail(claims.email),
+    isAdmin: await isEffectiveGameAdmin(claims.email),
     user: {
       id: claims.sub,
       email: claims.email,
@@ -824,11 +840,11 @@ export async function powerAction(identifier: string, signal: "start" | "stop" |
   }
 }
 
-// ---------------- Game Client Area Admin Operations (atchukris@gmail.com) ----------------
+// ---------------- Game Client Area Admin Operations (atchukriz@gmail.com + appointed admins) ----------------
 
 async function requireGameAdmin(): Promise<MasterSsoClaims> {
   const claims = await requireGoogleUser();
-  if (!isGameAdminEmail(claims.email)) {
+  if (!(await isEffectiveGameAdmin(claims.email))) {
     throw new PortalError("FORBIDDEN", "Admin privileges required.");
   }
   return claims;
@@ -840,11 +856,14 @@ export async function adminGetOverview(): Promise<AdminOverviewData> {
     throw new PortalError("UNAVAILABLE", "Database connection is required for admin management.");
   }
 
-  const [clients, subscriptions, transactions] = await Promise.all([
+  const [clients, subscriptions, transactions, appointedEmails] = await Promise.all([
     db.listAllClients(250),
     db.listAllSubscriptions(400),
     db.listRecentTransactions(60),
+    listAppointedAdminEmailsInDb().catch(() => [BOOTSTRAP_PRIMARY_ADMIN_EMAIL]),
   ]);
+
+  const appointedSet = new Set(appointedEmails.map((e) => e.trim().toLowerCase()));
 
   const clientById = new Map(clients.map((c) => [c.id, c]));
   const subCounts = new Map<string, { total: number; active: number }>();
@@ -879,6 +898,12 @@ export async function adminGetOverview(): Promise<AdminOverviewData> {
     },
     clients: clients.map((c) => {
       const counts = subCounts.get(c.id) ?? { total: 0, active: 0 };
+      const cleanEmail = (c.email ?? "").trim().toLowerCase();
+      const isPrimaryAdmin = isPrimaryBootstrapAdminEmail(cleanEmail);
+      const isAdmin =
+        isPrimaryAdmin ||
+        isGameAdminEmail(cleanEmail) ||
+        (cleanEmail.length > 0 && appointedSet.has(cleanEmail));
       return {
         id: c.id,
         email: c.email,
@@ -889,6 +914,8 @@ export async function adminGetOverview(): Promise<AdminOverviewData> {
         createdAt: c.created_at,
         subscriptionCount: counts.total,
         activeSubscriptions: counts.active,
+        isAdmin,
+        isPrimaryAdmin,
       };
     }),
     subscriptions: subscriptions.map((s) => {
@@ -1110,6 +1137,44 @@ export async function adminGrantSubscription(input: {
   });
 
   return { ok: true, subscription: created };
+}
+
+export async function adminSetClientAdminRole(input: {
+  clientId: string;
+  makeAdmin: boolean;
+}) {
+  const actingAdmin = await requireGameAdmin();
+  if (!integrations().database) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required.");
+  }
+
+  const client = await db.getClient(input.clientId);
+  if (!client) throw new PortalError("NOT_FOUND", "Client account not found.");
+  const targetEmail = (client.email ?? "").trim().toLowerCase();
+  if (!targetEmail) {
+    throw new PortalError("BAD_REQUEST", "This user account has no verified email address to grant admin access.");
+  }
+
+  if (!input.makeAdmin && isPrimaryBootstrapAdminEmail(targetEmail)) {
+    throw new PortalError("BAD_REQUEST", `Primary admin (${BOOTSTRAP_PRIMARY_ADMIN_EMAIL}) cannot be revoked.`);
+  }
+  if (!input.makeAdmin && targetEmail === actingAdmin.email.trim().toLowerCase()) {
+    throw new PortalError("BAD_REQUEST", "You cannot revoke your own active admin access.");
+  }
+
+  const updated = await setUserAdminRoleInDb({
+    email: targetEmail,
+    fullName: client.discord_username,
+    makeAdmin: input.makeAdmin,
+  });
+
+  return {
+    ok: true,
+    clientId: client.id,
+    email: updated.email,
+    isAdmin: updated.isAdmin,
+    appointedBy: actingAdmin.email,
+  };
 }
 
 export type { ServiceId };

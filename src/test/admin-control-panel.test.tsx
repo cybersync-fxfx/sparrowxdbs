@@ -9,12 +9,14 @@ const mockGetAdminOverview = vi.fn();
 const mockAdminAdjustCoins = vi.fn();
 const mockAdminUpdateSubscription = vi.fn();
 const mockAdminAssignSubscription = vi.fn();
+const mockAdminSetUserAdminRole = vi.fn();
 
 vi.mock("@/lib/portal.functions", () => ({
   getAdminOverview: (...args: unknown[]) => mockGetAdminOverview(...args),
   adminAdjustCoins: (...args: unknown[]) => mockAdminAdjustCoins(...args),
   adminUpdateSubscription: (...args: unknown[]) => mockAdminUpdateSubscription(...args),
   adminAssignSubscription: (...args: unknown[]) => mockAdminAssignSubscription(...args),
+  adminSetUserAdminRole: (...args: unknown[]) => mockAdminSetUserAdminRole(...args),
   getDashboard: vi.fn(),
   getServers: vi.fn(),
   getSubscriptions: vi.fn(),
@@ -24,7 +26,7 @@ vi.mock("@/lib/portal.functions", () => ({
 import { AdminControlPanel } from "@/components/dashboard/AdminControlPanel";
 
 const MOCK_OVERVIEW: AdminOverviewData = {
-  adminEmail: "atchukris@gmail.com",
+  adminEmail: "atchukriz@gmail.com",
   stats: {
     totalClients: 2,
     totalCoins: 1750,
@@ -43,17 +45,21 @@ const MOCK_OVERVIEW: AdminOverviewData = {
       createdAt: "2026-11-01T10:00:00Z",
       subscriptionCount: 1,
       activeSubscriptions: 1,
+      isAdmin: false,
+      isPrimaryAdmin: false,
     },
     {
       id: "cli-2",
-      email: "atchukris@gmail.com",
-      username: "Atchu",
+      email: "atchukriz@gmail.com",
+      username: "Atchu Kriz",
       pteroUserId: 1,
-      pteroUsername: "atchukris",
+      pteroUsername: "atchukriz_ac24",
       coins: 1500,
       createdAt: "2026-10-01T10:00:00Z",
       subscriptionCount: 0,
       activeSubscriptions: 0,
+      isAdmin: true,
+      isPrimaryAdmin: true,
     },
   ],
   subscriptions: [
@@ -84,7 +90,7 @@ const MOCK_OVERVIEW: AdminOverviewData = {
   ],
 };
 
-describe("Client Area Admin Access & Control Panel (atchukris@gmail.com)", () => {
+describe("Client Area Admin Access & Control Panel (atchukriz@gmail.com)", () => {
   beforeEach(() => {
     HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
       this.setAttribute("open", "");
@@ -108,6 +114,13 @@ describe("Client Area Admin Access & Control Panel (atchukris@gmail.com)", () =>
       panelSyncedStatus: true,
       panelWarning: null,
     });
+    mockAdminSetUserAdminRole.mockResolvedValue({
+      ok: true,
+      clientId: "cli-1",
+      email: "player@example.com",
+      isAdmin: true,
+      appointedBy: "atchukriz@gmail.com",
+    });
   });
 
   afterEach(() => {
@@ -115,15 +128,15 @@ describe("Client Area Admin Access & Control Panel (atchukris@gmail.com)", () =>
     vi.clearAllMocks();
   });
 
-  it("strictly authorizes atchukris@gmail.com (case-insensitive) and rejects non-admin emails", () => {
-    expect(isGameAdminEmail("atchukris@gmail.com")).toBe(true);
-    expect(isGameAdminEmail("  ATCHUKRIS@GMAIL.COM ")).toBe(true);
+  it("strictly authorizes atchukriz@gmail.com (case-insensitive) and rejects non-admin emails", () => {
+    expect(isGameAdminEmail("atchukriz@gmail.com")).toBe(true);
+    expect(isGameAdminEmail("  ATCHUKRIZ@GMAIL.COM ")).toBe(true);
     expect(isGameAdminEmail("other@gmail.com")).toBe(false);
-    expect(isGameAdminEmail("atchukris@gmail.com.evil.net")).toBe(false);
+    expect(isGameAdminEmail("atchukriz@gmail.com.evil.net")).toBe(false);
     expect(isGameAdminEmail(null)).toBe(false);
   });
 
-  it("lets atchukris@gmail.com adjust user coins and edit/extend subscriptions with live Panel sync", async () => {
+  it("lets atchukriz@gmail.com appoint a new admin from the user list, adjust coins, and edit subscriptions", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={qc}>
@@ -132,7 +145,21 @@ describe("Client Area Admin Access & Control Panel (atchukris@gmail.com)", () =>
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Super Admin · atchukris@gmail.com/i)).toBeDefined();
+      expect(screen.getByText(/Super Admin · atchukriz@gmail.com/i)).toBeDefined();
+    });
+
+    // Primary Admin badge shown on atchukriz@gmail.com, Make Admin shown only on non-primary client
+    expect(screen.getByText("Primary Admin")).toBeDefined();
+    const makeAdminBtn = screen.getByRole("button", { name: /Make Admin/i });
+    fireEvent.click(makeAdminBtn);
+
+    await waitFor(() => {
+      expect(mockAdminSetUserAdminRole).toHaveBeenCalledWith({
+        data: {
+          clientId: "cli-1",
+          makeAdmin: true,
+        },
+      });
     });
 
     // Manage coins for player@example.com

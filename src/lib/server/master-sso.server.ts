@@ -13,6 +13,11 @@ const { Pool } = pg;
 
 export const MASTER_SSO_COOKIE_NAME = "spx_master_sso";
 export const MASTER_SSO_TTL_SECONDS = 60 * 60 * 24 * 7;
+export const BOOTSTRAP_PRIMARY_ADMIN_EMAIL = "atchukriz@gmail.com";
+
+// In-memory mirror of appointed admin emails (synced with PostgreSQL `public.app_users.admin`)
+const runtimeAppointedAdmins = new Set<string>([BOOTSTRAP_PRIMARY_ADMIN_EMAIL]);
+const runtimeRevokedAdmins = new Set<string>();
 
 export interface MasterSsoUser {
   id: string;
@@ -665,27 +670,32 @@ export async function upsertGoogleSsoUserInDb(profile: {
           LIMIT 1`,
         [emailClean],
       );
+      const isBootstrapAdmin = emailClean === BOOTSTRAP_PRIMARY_ADMIN_EMAIL;
       const row = existing.rows[0];
       if (row) {
+        const effectiveAdmin =
+          isBootstrapAdmin || String(row.admin || "no").toLowerCase() === "yes";
         await pool
           .query(
             `UPDATE public.app_users
                 SET email_verified = TRUE,
                     email_verified_at = COALESCE(email_verified_at, NOW()),
+                    admin = CASE WHEN $3 THEN 'yes' ELSE admin END,
                     full_name = CASE WHEN COALESCE(full_name, '') = '' THEN $2 ELSE full_name END
               WHERE id = $1`,
-            [row.id, fallbackName],
+            [row.id, fallbackName, isBootstrapAdmin],
           )
           .catch(() => {});
         return {
           id: row.id,
           email: row.email.trim().toLowerCase(),
           fullName: row.full_name || fallbackName,
-          role: String(row.admin || "no").toLowerCase() === "yes" ? "admin" : "client",
+          role: effectiveAdmin ? "admin" : "client",
           tenantId: row.tenant_id || generatedTenantId,
         };
       }
 
+      const initialAdminFlag = isBootstrapAdmin ? "yes" : "no";
       const inserted = await pool.query<{
         id: string;
         email: string;
@@ -694,10 +704,12 @@ export async function upsertGoogleSsoUserInDb(profile: {
         tenant_id: string | null;
       }>(
         `INSERT INTO public.app_users (id, email, password, full_name, admin, tenant_id)
-         VALUES ($1, $2, $3, $4, 'no', $5)
-         ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name
+         VALUES ($1, $2, $3, $4, $6, $5)
+         ON CONFLICT (email) DO UPDATE SET
+           full_name = EXCLUDED.full_name,
+           admin = CASE WHEN EXCLUDED.admin = 'yes' THEN 'yes' ELSE public.app_users.admin END
          RETURNING id, email, full_name, admin, tenant_id`,
-        [generatedId, emailClean, googlePlaceholderDigest, fallbackName, generatedTenantId],
+        [generatedId, emailClean, googlePlaceholderDigest, fallbackName, generatedTenantId, initialAdminFlag],
       );
       const created = inserted.rows[0];
       if (created) {
@@ -780,7 +792,155 @@ export async function upsertGoogleSsoUserInDb(profile: {
     id: generatedId,
     email: emailClean,
     fullName: fallbackName,
-    role: "client",
+    role: emailClean === BOOTSTRAP_PRIMARY_ADMIN_EMAIL ? "admin" : "client",
     tenantId: generatedTenantId,
   };
+}
+
+/**
+ * Lists all emails currently granted admin privileges in PostgreSQL `public.app_users`
+ * (always including the bootstrap primary admin `atchukriz@gmail.com`).
+ */
+export async function listAppointedAdminEmailsInDb(): Promise<string[]> {
+  const admins = new Set<string>([BOOTSTRAP_PRIMARY_ADMIN_EMAIL]);
+  for (const em of runtimeAppointedAdmins) admins.add(em);
+
+  try {
+    const pool = await openMasterAuthPool();
+    try {
+      await ensureAppUsersTable(pool);
+      const res = await pool.query<{ email: string }>(
+        `SELECT LOWER(email) AS email FROM public.app_users WHERE LOWER(admin) = 'yes'`,
+      );
+      for (const r of res.rows) {
+        const clean = String(r.email || "").trim().toLowerCase();
+        if (clean) {
+          admins.add(clean);
+          runtimeAppointedAdmins.add(clean);
+          runtimeRevokedAdmins.delete(clean);
+        }
+      }
+    } finally {
+      await pool.end().catch(() => {});
+    }
+  } catch {
+    // Fallback to JSON store if PG pool is unavailable locally
+    try {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const dataPath = path.resolve(
+        process.env.SPARROWX_DATA_DIR || path.resolve(process.cwd(), "data"),
+        "sparrowx-ovh-db.json",
+      );
+      const raw = await fs.readFile(dataPath, "utf-8");
+      const store = JSON.parse(raw) as { app_users?: Array<{ email?: string; admin?: string }> };
+      for (const u of store.app_users ?? []) {
+        if (String(u.admin || "no").toLowerCase() === "yes" && u.email) {
+          admins.add(u.email.trim().toLowerCase());
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  for (const rev of runtimeRevokedAdmins) {
+    if (rev !== BOOTSTRAP_PRIMARY_ADMIN_EMAIL) admins.delete(rev);
+  }
+  return Array.from(admins);
+}
+
+/**
+ * Persists an admin appointment or revocation for a user email in PostgreSQL `public.app_users`.
+ * Protects the bootstrap primary admin (`atchukriz@gmail.com`) from accidental demotion.
+ */
+export async function setUserAdminRoleInDb(input: {
+  email: string;
+  fullName?: string | null;
+  makeAdmin: boolean;
+}): Promise<{ email: string; isAdmin: boolean }> {
+  const emailClean = input.email.trim().toLowerCase();
+  if (!emailClean || !emailClean.includes("@")) {
+    throw new Error("A valid email address is required to update admin privileges.");
+  }
+  if (!input.makeAdmin && emailClean === BOOTSTRAP_PRIMARY_ADMIN_EMAIL) {
+    throw new Error(`Primary bootstrap admin (${BOOTSTRAP_PRIMARY_ADMIN_EMAIL}) cannot be demoted.`);
+  }
+
+  const nextFlag = input.makeAdmin ? "yes" : "no";
+  const fallbackName = (input.fullName || emailClean.split("@")[0] || "SparrowX Admin").trim();
+  const slug = emailClean.replace(/[^a-z0-9]/gi, "").slice(0, 8).toUpperCase() || "USER";
+  const generatedId = `USR-A-${Date.now().toString(36).toUpperCase()}`;
+
+  if (input.makeAdmin) {
+    runtimeAppointedAdmins.add(emailClean);
+    runtimeRevokedAdmins.delete(emailClean);
+  } else {
+    runtimeAppointedAdmins.delete(emailClean);
+    runtimeRevokedAdmins.add(emailClean);
+  }
+
+  try {
+    const pool = await openMasterAuthPool();
+    try {
+      await ensureAppUsersTable(pool);
+      const upd = await pool.query(
+        `UPDATE public.app_users SET admin = $2 WHERE LOWER(email) = $1`,
+        [emailClean, nextFlag],
+      );
+      if ((upd.rowCount ?? 0) === 0 && input.makeAdmin) {
+        await pool.query(
+          `INSERT INTO public.app_users (id, email, password, full_name, admin, tenant_id)
+           VALUES ($1, $2, '', $3, 'yes', $4)
+           ON CONFLICT (email) DO UPDATE SET admin = 'yes'`,
+          [generatedId, emailClean, fallbackName, `TNT-${slug}`],
+        );
+      }
+    } finally {
+      await pool.end().catch(() => {});
+    }
+  } catch {
+    // Also mirror into local JSON fallback if present
+    try {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const dataPath = path.resolve(
+        process.env.SPARROWX_DATA_DIR || path.resolve(process.cwd(), "data"),
+        "sparrowx-ovh-db.json",
+      );
+      const raw = await fs.readFile(dataPath, "utf-8");
+      const store = JSON.parse(raw) as {
+        app_users?: Array<{
+          id: string;
+          email: string;
+          password?: string;
+          full_name?: string;
+          admin?: string;
+          tenant_id?: string | null;
+          created_at?: string;
+        }>;
+      };
+      const users = Array.isArray(store.app_users) ? store.app_users : [];
+      const existing = users.find((u) => String(u.email || "").trim().toLowerCase() === emailClean);
+      if (existing) {
+        existing.admin = nextFlag;
+      } else if (input.makeAdmin) {
+        users.push({
+          id: generatedId,
+          email: emailClean,
+          password: "",
+          full_name: fallbackName,
+          admin: "yes",
+          tenant_id: `TNT-${slug}`,
+          created_at: new Date().toISOString(),
+        });
+      }
+      store.app_users = users;
+      await fs.writeFile(dataPath, JSON.stringify(store, null, 2) + "\n", "utf-8").catch(() => {});
+    } catch {
+      // ignore
+    }
+  }
+
+  return { email: emailClean, isAdmin: input.makeAdmin };
 }
