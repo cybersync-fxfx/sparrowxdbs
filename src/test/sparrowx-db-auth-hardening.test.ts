@@ -94,15 +94,25 @@ describe("SparrowX DB Auth, Provisioner SQL Policy, Summary IDOR & Master SSO Ha
   });
 
   describe("extractClientIp trusted header precedence", () => {
-    it("prefers cf-connecting-ip, then x-real-ip, and uses last hop in x-forwarded-for", () => {
-      const withCf = new Request("https://db.sparrowx.net/api/db/query", {
-        headers: {
-          "cf-connecting-ip": "198.51.100.10",
-          "x-real-ip": "203.0.113.20",
-          "x-forwarded-for": "10.0.0.1, 192.0.2.30",
-        },
-      });
-      expect(dbAuth.extractClientIp(withCf)).toBe("198.51.100.10");
+    it("prefers x-real-ip by default, trusts cf-connecting-ip when explicitly enabled, and uses last hop in x-forwarded-for", () => {
+      const prevTrustCf = process.env.SPARROWX_TRUST_CLOUDFLARE;
+      delete process.env.SPARROWX_TRUST_CLOUDFLARE;
+      try {
+        const withCf = new Request("https://db.sparrowx.net/api/db/query", {
+          headers: {
+            "cf-connecting-ip": "198.51.100.10",
+            "x-real-ip": "203.0.113.20",
+            "x-forwarded-for": "10.0.0.1, 192.0.2.30",
+          },
+        });
+        expect(dbAuth.extractClientIp(withCf)).toBe("203.0.113.20");
+
+        process.env.SPARROWX_TRUST_CLOUDFLARE = "true";
+        expect(dbAuth.extractClientIp(withCf)).toBe("198.51.100.10");
+      } finally {
+        if (prevTrustCf === undefined) delete process.env.SPARROWX_TRUST_CLOUDFLARE;
+        else process.env.SPARROWX_TRUST_CLOUDFLARE = prevTrustCf;
+      }
 
       const withRealIp = new Request("https://db.sparrowx.net/api/db/query", {
         headers: {

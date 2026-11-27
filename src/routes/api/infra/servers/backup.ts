@@ -9,12 +9,18 @@ async function resolveBackupServerForRequest(request: Request, rawServerId: stri
   const serverId = sanitizeServerId(rawServerId);
   const { readMasterSsoFromRequest } = await import("@/lib/server/master-sso.server");
   const { hasValidAdminKey } = await import("@/lib/server/db-auth.server");
-  const isAuthed = hasValidAdminKey(request) || Boolean(await readMasterSsoFromRequest(request));
+  const isAdminKey = hasValidAdminKey(request);
+  const claims = isAdminKey ? null : await readMasterSsoFromRequest(request);
+  const isAdmin = isAdminKey || claims?.role === "admin";
+  const callerEmail = claims?.email?.trim().toLowerCase() || "";
 
-  if (isAuthed) {
+  if (isAdmin || callerEmail) {
     const { listManagedInfraServers } = await import("@/lib/server/proxmox.server");
     const list = await listManagedInfraServers();
-    const matched = list.servers.find((s) => s.id === serverId) || list.servers[0];
+    const scoped = isAdmin
+      ? list.servers
+      : list.servers.filter((s) => (s.ownerEmail || "").toLowerCase() === callerEmail);
+    const matched = scoped.find((s) => s.id === serverId) || scoped[0];
     if (matched) return matched;
   }
 

@@ -96,9 +96,13 @@ export const Route = createFileRoute("/api/db/provision")({
             ip,
             fields: { Email: email, TenantId: tenantId, Plan: planId || "free" },
           });
+          const clientMessage =
+            status < 500 && err instanceof Error
+              ? err.message
+              : "Database provisioning temporarily unavailable.";
           return Response.json(
-            { ok: false, error: message },
-            { status },
+            { ok: false, error: clientMessage },
+            { status, headers: { "Cache-Control": "no-store" } },
           );
         }
       },

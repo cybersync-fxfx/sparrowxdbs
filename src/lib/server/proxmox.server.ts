@@ -4,6 +4,7 @@ export type ManagedServerStatus = "running" | "stopped" | "rebooting" | "provisi
 
 export interface ManagedInfraServer {
   id: string;
+  ownerEmail?: string | undefined;
   vmid: number;
   node: string;
   name: string;
@@ -48,9 +49,16 @@ export interface ProxmoxConfigStatus {
 }
 
 const serverStore = new Map<string, ManagedInfraServer>();
+const redeemedOrderIds = new Set<string>();
+
+export function isInfraOrderProvisioned(orderId: string): boolean {
+  const clean = orderId.trim().toUpperCase();
+  return Boolean(clean && redeemedOrderIds.has(clean));
+}
 
 export function clearInfraServerStoreForTests(): void {
   serverStore.clear();
+  redeemedOrderIds.clear();
 }
 
 export function getProxmoxConfigStatus(): ProxmoxConfigStatus {
@@ -224,6 +232,7 @@ export async function setupProxmoxVmNetworkAndBridge(
 
 export function provisionServerFromPaidOrder(input: {
   orderId: string;
+  ownerEmail?: string | undefined;
   planId: string;
   planName: string;
   category: "bare-metal" | "dedicated" | "vds" | "vps";
@@ -235,12 +244,14 @@ export function provisionServerFromPaidOrder(input: {
   ramTotalGb?: number;
   diskTotalGb?: number;
 }): ManagedInfraServer {
+  const cleanOrderId = input.orderId.trim().toUpperCase();
   const nextVmid = 400 + serverStore.size + 1;
   const octet = 120 + (serverStore.size % 120);
-  const id = `srv-${input.orderId.toLowerCase().replace(/[^a-z0-9-]/g, "")}`;
+  const id = `srv-${cleanOrderId.toLowerCase().replace(/[^a-z0-9-]/g, "")}`;
   const cleanHost = input.hostname.trim() || `${input.planId}-${nextVmid}.sparrowx.net`;
   const created: ManagedInfraServer = {
     id,
+    ...(input.ownerEmail ? { ownerEmail: input.ownerEmail.trim().toLowerCase() } : {}),
     vmid: nextVmid,
     node: process.env.PVE_NODE || "pve-in-01",
     name: `${input.planName} (${nextVmid})`,
@@ -277,6 +288,7 @@ export function provisionServerFromPaidOrder(input: {
   };
 
   serverStore.set(id, created);
+  if (cleanOrderId) redeemedOrderIds.add(cleanOrderId);
 
   // Trigger real Proxmox Cloud-Init clone and bridge configuration asynchronously when live PVE credentials exist
   if (getProxmoxConfigStatus().configured && process.env.PVE_TEMPLATE_VMID) {
@@ -296,36 +308,51 @@ export function provisionServerFromPaidOrder(input: {
   return created;
 }
 
-export async function executeServerAction(input: {
-  serverId: string;
-  action:
-    | "start"
-    | "stop"
-    | "shutdown"
-    | "reboot"
-    | "rebuild"
-    | "snapshot"
-    | "delete-snapshot"
-    | "add-ssh-key"
-    | "set-rdns"
-    | "toggle-wireguard"
-    | "reset-password";
-  os?: string;
-  snapshotName?: string;
-  snapshotId?: string;
-  sshKeyLabel?: string;
-  sshPublicKey?: string;
-  rdns?: string;
-}): Promise<{
+export async function executeServerAction(
+  input: {
+    serverId: string;
+    action:
+      | "start"
+      | "stop"
+      | "shutdown"
+      | "reboot"
+      | "rebuild"
+      | "snapshot"
+      | "delete-snapshot"
+      | "add-ssh-key"
+      | "set-rdns"
+      | "toggle-wireguard"
+      | "reset-password";
+    os?: string;
+    snapshotName?: string;
+    snapshotId?: string;
+    sshKeyLabel?: string;
+    sshPublicKey?: string;
+    rdns?: string;
+  },
+  actor?: { email?: string | undefined; isAdmin?: boolean },
+): Promise<{
   ok: boolean;
   message: string;
+  statusCode?: number;
   server?: ManagedInfraServer;
   generatedPassword?: string;
   proxmoxTask?: string;
 }> {
   const server = serverStore.get(input.serverId);
   if (!server) {
-    return { ok: false, message: "Server instance not found." };
+    return { ok: false, statusCode: 404, message: "Server instance not found." };
+  }
+  if (actor && !actor.isAdmin) {
+    const actorEmail = (actor.email || "").trim().toLowerCase();
+    const ownerEmail = (server.ownerEmail || "").trim().toLowerCase();
+    if (!actorEmail || !ownerEmail || ownerEmail !== actorEmail) {
+      return {
+        ok: false,
+        statusCode: 403,
+        message: "Forbidden: server belongs to another account.",
+      };
+    }
   }
 
   const node = encodeURIComponent(server.node);
@@ -473,8 +500,12 @@ export async function executeServerAction(input: {
   return { ok: false, message: "Unsupported server action." };
 }
 
-export async function createServerConsoleSession(serverId: string): Promise<{
+export async function createServerConsoleSession(
+  serverId: string,
+  actor?: { email?: string | undefined; isAdmin?: boolean },
+): Promise<{
   ok: boolean;
+  statusCode?: number;
   sshCommand?: string;
   proxmoxTicket?: string;
   consolePort?: number;
@@ -483,7 +514,19 @@ export async function createServerConsoleSession(serverId: string): Promise<{
 }> {
   const server = serverStore.get(serverId);
   if (!server) {
-    return { ok: false, mode: "unconfigured", error: "Server instance not found." };
+    return { ok: false, statusCode: 404, mode: "unconfigured", error: "Server instance not found." };
+  }
+  if (actor && !actor.isAdmin) {
+    const actorEmail = (actor.email || "").trim().toLowerCase();
+    const ownerEmail = (server.ownerEmail || "").trim().toLowerCase();
+    if (!actorEmail || !ownerEmail || ownerEmail !== actorEmail) {
+      return {
+        ok: false,
+        statusCode: 403,
+        mode: "unconfigured",
+        error: "Forbidden: server belongs to another account.",
+      };
+    }
   }
   const cfg = getProxmoxConfigStatus();
   const sshCommand = `ssh ${server.sshUser}@${server.ipv4}${server.sshPort !== 22 ? ` -p ${server.sshPort}` : ""}`;

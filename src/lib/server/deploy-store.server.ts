@@ -1069,8 +1069,37 @@ export async function attachDomainForActor(projectId: string, domain: string, ac
   const access = await assertProjectAccess(projectId, actor);
   if (!access) throw new Error("Project not found.");
   const { db, project } = access;
-  const hostDomain = getDeployHostDomain();
-  const cleanDomain = domain.trim().toLowerCase();
+  const hostDomain = getDeployHostDomain().toLowerCase();
+  const cleanDomain = domain.trim().toLowerCase().replace(/\.$/, "");
+
+  if (
+    cleanDomain === "localhost" ||
+    cleanDomain.endsWith(".local") ||
+    cleanDomain.endsWith(".internal") ||
+    cleanDomain.endsWith(".localhost") ||
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(cleanDomain)
+  ) {
+    throw new Error("Private or internal hostnames cannot be attached as custom domains.");
+  }
+
+  if (
+    actor.role !== "admin" &&
+    (cleanDomain === hostDomain ||
+      cleanDomain.endsWith(`.${hostDomain}`) ||
+      cleanDomain === "sparrowx.net" ||
+      cleanDomain.endsWith(".sparrowx.net"))
+  ) {
+    throw new Error("Reserved SparrowX platform domains cannot be attached as custom domains.");
+  }
+
+  const existing = await db
+    .select({ id: deployDomains.id, projectId: deployDomains.projectId })
+    .from(deployDomains)
+    .where(eq(deployDomains.domain, cleanDomain))
+    .limit(1);
+  if (existing[0]) {
+    throw new Error(`Domain ${cleanDomain} is already registered to a project.`);
+  }
 
   const [created] = await db
     .insert(deployDomains)

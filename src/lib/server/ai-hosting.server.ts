@@ -439,7 +439,10 @@ function ensureSeededControlPlane() {
   appendAudit("billing@sparrowx.net", "upi.autopay_captured", "SPX-AI-2026-1104 (₹2,712)", "103.174.10.24", "ok");
 }
 
-export function listAiWorkspaceState(ownerEmail?: string): {
+export function listAiWorkspaceState(
+  ownerEmail?: string,
+  options?: { isAdmin?: boolean },
+): {
   instances: AiInstanceRecord[];
   auditLogs: AiAuditLogRecord[];
   invoices: AiInvoiceRecord[];
@@ -447,15 +450,26 @@ export function listAiWorkspaceState(ownerEmail?: string): {
   plans: typeof AI_COMPUTE_PLANS;
 } {
   ensureSeededControlPlane();
+  const isAdmin = Boolean(options?.isAdmin);
+  const cleanOwner = ownerEmail?.trim().toLowerCase();
   const all = Array.from(instanceStore.values()).map((entry) => entry.record);
-  const filtered = ownerEmail
-    ? all.filter((inst) => inst.ownerEmail === ownerEmail || inst.ownerEmail === "developer@sparrowx.net")
-    : all;
+  const filtered = isAdmin
+    ? cleanOwner
+      ? all.filter((inst) => inst.ownerEmail.toLowerCase() === cleanOwner)
+      : all
+    : cleanOwner
+      ? all.filter((inst) => inst.ownerEmail.toLowerCase() === cleanOwner)
+      : [];
+  const filteredAudit = isAdmin
+    ? auditLogStore.slice(0, 30)
+    : cleanOwner
+      ? auditLogStore.filter((entry) => entry.actor.toLowerCase() === cleanOwner).slice(0, 30)
+      : [];
   return {
     instances: filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    auditLogs: auditLogStore.slice(0, 30),
-    invoices: invoiceStore,
-    walletBalanceInr: 3450,
+    auditLogs: filteredAudit,
+    invoices: isAdmin ? invoiceStore : [],
+    walletBalanceInr: isAdmin ? 3450 : 0,
     plans: AI_COMPUTE_PLANS,
   };
 }
@@ -634,6 +648,7 @@ export function performAiInstanceAction(
   input: InstanceActionInput,
   actorEmail = "developer@sparrowx.net",
   actorIp = "103.174.10.24",
+  options?: { isAdmin?: boolean },
 ): {
   instance: AiInstanceRecord;
   revealedSecret?: { key: string; value: string };
@@ -645,6 +660,10 @@ export function performAiInstanceAction(
     throw new Error("Instance not found");
   }
   const inst = entry.record;
+  const isAdmin = Boolean(options?.isAdmin);
+  if (!isAdmin && inst.ownerEmail.toLowerCase() !== actorEmail.trim().toLowerCase()) {
+    throw new Error("Forbidden: instance belongs to another account.");
+  }
   const nowIso = new Date().toISOString();
 
   const pushLog = (level: InstanceLogLine["level"], source: InstanceLogLine["source"], message: string) => {
@@ -757,8 +776,19 @@ export function performAiInstanceAction(
     }
 
     case "add_domain": {
-      if (inst.domains.some((d) => d.hostname === input.hostname)) {
-        throw new Error(`Domain ${input.hostname} is already attached.`);
+      const normalizedHost = input.hostname.trim().toLowerCase().replace(/\.$/, "");
+      if (
+        !isAdmin &&
+        (normalizedHost === "sparrowx.net" ||
+          normalizedHost.endsWith(".sparrowx.net") ||
+          normalizedHost === "localhost" ||
+          normalizedHost.endsWith(".local") ||
+          normalizedHost.endsWith(".internal"))
+      ) {
+        throw new Error("Forbidden: platform or internal domains cannot be attached as custom domains.");
+      }
+      if (inst.domains.some((d) => d.hostname.toLowerCase() === normalizedHost)) {
+        throw new Error(`Domain ${normalizedHost} is already attached.`);
       }
       inst.domains.push({
         id: `dom-${Date.now().toString(36)}`,
@@ -875,10 +905,17 @@ function executeSafeContainerCommand(inst: AiInstanceRecord, rawCmd: string): st
   }
 }
 
-export function deleteAiInstance(instanceId: string, actorEmail = "developer@sparrowx.net"): boolean {
+export function deleteAiInstance(
+  instanceId: string,
+  actorEmail = "developer@sparrowx.net",
+  options?: { isAdmin?: boolean },
+): boolean {
   ensureSeededControlPlane();
   const entry = instanceStore.get(instanceId);
   if (!entry) return false;
+  if (!options?.isAdmin && entry.record.ownerEmail.toLowerCase() !== actorEmail.trim().toLowerCase()) {
+    throw new Error("Forbidden: cannot delete another account's instance.");
+  }
   instanceStore.delete(instanceId);
   appendAudit(actorEmail, "instance.deleted", entry.record.subdomain, "103.174.10.24", "warning");
   return true;

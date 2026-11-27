@@ -30,7 +30,7 @@ DOMAIN_NETSEC="${DOMAIN_NETSEC:-netsec.${SPARROWX_DOMAIN}}"
 HTTP_PORT="${HTTP_PORT:-80}"
 HTTPS_PORT="${HTTPS_PORT:-443}"
 PTERO_PORT="${PTERO_PORT:-8090}"
-DISCORD_WEBHOOK="${DISCORD_ALERT_WEBHOOK:-https://discord.com/api/webhooks/1571155240747536484/SRH2ShHvjM0n9NVXf0oqqWeI7_3R-jR-1-eOE3Z600-XlHOgFopyVkKsdUTxa1pttlWh}"
+DISCORD_WEBHOOK="${DISCORD_ALERT_WEBHOOK:-${SPARROWX_DISCORD_WEBHOOK_URL:-}}"
 
 log_msg() {
   local level="$1"; shift
@@ -46,9 +46,11 @@ notify_discord() {
   local color="${3:-15158332}" # red default
   [ -z "${DISCORD_WEBHOOK}" ] && return 0
   command -v curl >/dev/null 2>&1 || return 0
-  local payload
+  local safe_title safe_desc payload
+  safe_title="$(printf '%s' "${title}" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\r\n' ' ')"
+  safe_desc="$(printf '%s' "${desc}" | sed 's/\\/\\\\/g; s/"/\\"/g' | tr '\r\n' ' ')"
   payload=$(cat <<JSON
-{"username":"SparrowX Maintainer","embeds":[{"title":"${title}","description":"${desc}","color":${color},"footer":{"text":"OVH Self-Healer • ${SPARROWX_DOMAIN}"}}]}
+{"username":"SparrowX Maintainer","embeds":[{"title":"${safe_title}","description":"${safe_desc}","color":${color},"footer":{"text":"OVH Self-Healer • ${SPARROWX_DOMAIN}"}}]}
 JSON
 )
   curl -fsS -m 6 -H "Content-Type: application/json" -d "${payload}" "${DISCORD_WEBHOOK}" >/dev/null 2>&1 || true

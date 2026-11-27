@@ -27,13 +27,17 @@ export const Route = createFileRoute("/api/infra/servers/console")({
             );
           }
 
+          const isAdmin = isAdminKey || claims?.role === "admin";
           const body = (await request.json()) as { serverId?: string };
           const { createServerConsoleSession } = await import(
             "@/lib/server/proxmox.server"
           );
-          const result = await createServerConsoleSession(String(body.serverId || ""));
+          const result = await createServerConsoleSession(String(body.serverId || ""), {
+            email: claims?.email,
+            isAdmin,
+          });
           return Response.json(result, {
-            status: result.ok ? 200 : 404,
+            status: result.ok ? 200 : result.statusCode || 404,
             headers: { "Cache-Control": "no-store" },
           });
         } catch {

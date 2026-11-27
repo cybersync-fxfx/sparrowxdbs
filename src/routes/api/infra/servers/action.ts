@@ -27,13 +27,17 @@ export const Route = createFileRoute("/api/infra/servers/action")({
             );
           }
 
+          const isAdmin = isAdminKey || claims?.role === "admin";
           const body = await request.json();
           const { executeServerAction } = await import(
             "@/lib/server/proxmox.server"
           );
-          const result = await executeServerAction(body);
+          const result = await executeServerAction(body, {
+            email: claims?.email,
+            isAdmin,
+          });
           return Response.json(result, {
-            status: result.ok ? 200 : 400,
+            status: result.ok ? 200 : result.statusCode || 400,
             headers: { "Cache-Control": "no-store" },
           });
         } catch {

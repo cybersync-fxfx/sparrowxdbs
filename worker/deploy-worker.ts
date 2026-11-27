@@ -581,16 +581,30 @@ export async function processDeployJob(payload: DeployJobPayload): Promise<void>
           });
         } else {
           // Synthesize deterministic zero-config BuildKit Dockerfile for Node/Python/Static
+          // Defense-in-depth: strictly validate commands & port before writing Dockerfile
+          const SAFE_CMD_RE = /^[a-zA-Z0-9._:/@\-=+\s]*$/;
+          const safePort = Number.isInteger(project.port) && project.port >= 80 && project.port <= 65535 ? project.port : 3000;
+          const rawBuild = (project.buildCommand || "").trim();
+          const rawStart = (project.startCommand || "").trim();
+          if ((rawBuild && !SAFE_CMD_RE.test(rawBuild)) || (rawStart && !SAFE_CMD_RE.test(rawStart))) {
+            throw new Error("Build or start command failed security validation.");
+          }
           const autoDockerfile = path.join(buildDir, ".Dockerfile.sparrowx");
           const isPython =
             project.framework === "python" ||
             fs.existsSync(path.join(buildDir, "requirements.txt"));
           const isStatic = project.framework === "static";
+          const pythonCmd = rawStart
+            ? JSON.stringify(["sh", "-c", rawStart])
+            : JSON.stringify(["uvicorn", "main:app", "--host", "0.0.0.0", "--port", String(safePort)]);
+          const nodeCmd = rawStart
+            ? JSON.stringify(["sh", "-c", rawStart])
+            : JSON.stringify(["npm", "run", "start"]);
           const dockerfileBody = isStatic
-            ? `FROM nginx:1.27-alpine\nCOPY . /usr/share/nginx/html\nEXPOSE ${project.port}\n`
+            ? `FROM nginx:1.27-alpine\nCOPY . /usr/share/nginx/html\nEXPOSE ${safePort}\n`
             : isPython
-              ? `FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi\nEXPOSE ${project.port}\nCMD ${project.startCommand ? `["sh","-c","${project.startCommand}"]` : `["uvicorn","main:app","--host","0.0.0.0","--port","${project.port}"]`}\n`
-              : `FROM node:22-slim\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install --no-audit --no-fund\nCOPY . .\n${project.buildCommand ? `RUN ${project.buildCommand}\n` : ""}EXPOSE ${project.port}\nCMD ${project.startCommand ? `["sh","-c","${project.startCommand}"]` : `["npm","run","start"]`}\n`;
+              ? `FROM python:3.12-slim\nWORKDIR /app\nCOPY . .\nRUN if [ -f requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; fi\nEXPOSE ${safePort}\nCMD ${pythonCmd}\n`
+              : `FROM node:22-slim\nWORKDIR /app\nCOPY package*.json ./\nRUN npm install --no-audit --no-fund\nCOPY . .\n${rawBuild ? `RUN ${rawBuild}\n` : ""}EXPOSE ${safePort}\nCMD ${nodeCmd}\n`;
           fs.writeFileSync(autoDockerfile, dockerfileBody, "utf8");
           await runStreamingCommand(
             "docker",

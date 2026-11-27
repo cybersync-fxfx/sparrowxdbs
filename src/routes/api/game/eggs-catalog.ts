@@ -68,7 +68,7 @@ export const Route = createFileRoute("/api/game/eggs-catalog")({
           return Response.json(
             {
               ok: false,
-              error: "Egg catalog not synced yet. Run 'sudo sparrowx-eggs sync' on your server.",
+              error: "Game egg catalog is currently syncing. Please check back shortly.",
               sections: [],
               eggs: [],
               totalEggs: 0,

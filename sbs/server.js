@@ -3580,8 +3580,8 @@ app.post('/api/internal/security-fix', authMiddleware, adminMiddleware, (req, re
       exec('systemctl restart nftables haproxy &');
     }
     res.json({ success: true, message: 'Automated repair sequence triggered.' });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
+  } catch {
+    res.status(500).json({ error: 'Automated repair sequence failed to start.' });
   }
 });
 
@@ -3589,29 +3589,30 @@ app.post('/api/internal/security-fix', authMiddleware, adminMiddleware, (req, re
 
 app.post('/api/guard/command', authMiddleware, adminMiddleware, (req, res) => {
   const { command } = req.body;
-  if (!command) return res.status(400).json({ error: 'Missing command' });
+  if (!command || typeof command !== 'string') return res.status(400).json({ error: 'Missing command' });
 
-  // Only allow specific safe inspection commands for now to prevent RCE
-  const allowed = [
-    'nft list ruleset',
-    'nft list tables',
-    'systemctl status nftables --no-pager',
-    'systemctl restart nftables',
-    'tail -n 40 /var/log/sbs/attacks.log',
-    'ip addr',
-    'ss -ant',
-    'uname -a'
-  ];
+  // Strict binary+argv dispatch (zero shell invocation) to eliminate command injection surface
+  const allowedCommands = {
+    'nft list ruleset': ['nft', ['list', 'ruleset']],
+    'nft list tables': ['nft', ['list', 'tables']],
+    'systemctl status nftables --no-pager': ['systemctl', ['status', 'nftables', '--no-pager']],
+    'systemctl restart nftables': ['systemctl', ['restart', 'nftables']],
+    'tail -n 40 /var/log/sbs/attacks.log': ['tail', ['-n', '40', '/var/log/sbs/attacks.log']],
+    'ip addr': ['ip', ['addr']],
+    'ss -ant': ['ss', ['-ant']],
+    'uname -a': ['uname', ['-a']],
+  };
 
-  if (!allowed.includes(command)) {
+  const spec = allowedCommands[command];
+  if (!spec) {
     return res.status(403).json({ error: 'This command is not authorized for guard execution.' });
   }
 
   try {
-    const output = execSync(command, { timeout: 5000 }).toString();
+    const output = require('child_process').execFileSync(spec[0], spec[1], { timeout: 5000 }).toString();
     res.json({ success: true, output });
-  } catch (err) {
-    res.status(500).json({ error: err.message, output: err.stdout?.toString() });
+  } catch {
+    res.status(500).json({ error: 'Guard command execution failed.' });
   }
 });
 

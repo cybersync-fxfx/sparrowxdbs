@@ -299,6 +299,7 @@ async function finalizePaidOrder(
     try {
       const server = provisionServerFromPaidOrder({
         orderId: order.orderId,
+        ownerEmail: order.customerEmail,
         planId: order.planId,
         planName: order.planName,
         category: order.metadata?.category ?? "vps",

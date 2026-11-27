@@ -615,7 +615,11 @@ heal_pterodactyl_host_nginx() {
     fi
   done
   if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -qi "Status: active"; then
-    ufw allow 3306/tcp >/dev/null 2>&1 || true
+    # Restrict MariaDB port 3306 strictly to loopback + Docker private bridges (never expose 3306 to 0.0.0.0/0 internet)
+    ufw delete allow 3306/tcp >/dev/null 2>&1 || true
+    ufw allow from 127.0.0.1 to any port 3306 proto tcp >/dev/null 2>&1 || true
+    ufw allow from 172.16.0.0/12 to any port 3306 proto tcp >/dev/null 2>&1 || true
+    ufw allow from 10.0.0.0/8 to any port 3306 proto tcp >/dev/null 2>&1 || true
   fi
 
   if [ -n "${db_cli}" ] && [ -n "${db_pass}" ]; then
@@ -2103,17 +2107,17 @@ fi
 PTERO_PORT="${PTERO_PORT:-8090}"
 POSTGRES_USER="${POSTGRES_USER:-sparrowx}"
 if [ -z "${POSTGRES_PASSWORD:-}" ] || [ "${#POSTGRES_PASSWORD}" -lt 12 ] || [ "${POSTGRES_PASSWORD}" = "sparrowx_ovh_secret_2026" ] || [ "${POSTGRES_PASSWORD}" = "SparrowxMasterSecretPass2026!" ]; then
-  POSTGRES_PASSWORD="SpxPg_$(openssl rand -hex 16 2>/dev/null || echo '9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c')"
+  POSTGRES_PASSWORD="SpxPg_$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 fi
 POSTGRES_DB="${POSTGRES_DB:-sparrowx_db}"
 if [ -z "${SPARROWX_JWT_SECRET:-}" ] || [ "${#SPARROWX_JWT_SECRET}" -lt 24 ] || [ "${SPARROWX_JWT_SECRET}" = "sparrowx_jwt_secret_key_32_characters_2026" ]; then
-  SPARROWX_JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || echo 'a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90')"
+  SPARROWX_JWT_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 fi
 if [ -z "${SPARROWX_MASTER_SSO_SECRET:-}" ] || [ "${#SPARROWX_MASTER_SSO_SECRET}" -lt 24 ]; then
-  SPARROWX_MASTER_SSO_SECRET="$(openssl rand -hex 32 2>/dev/null || echo "${SPARROWX_JWT_SECRET}")"
+  SPARROWX_MASTER_SSO_SECRET="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 fi
-SPARROWX_REDIS_SECRET="${SPARROWX_REDIS_SECRET:-$(openssl rand -hex 16 2>/dev/null || echo 'sparrowx_redis_secret_2026')}"
-PTERO_SSO_SECRET="${PTERO_SSO_SECRET:-$(openssl rand -hex 32 2>/dev/null || echo 'sparrowx_ptero_sso_hmac_secret_2026_32c')}"
+SPARROWX_REDIS_SECRET="${SPARROWX_REDIS_SECRET:-$(openssl rand -hex 16 2>/dev/null || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
+PTERO_SSO_SECRET="${PTERO_SSO_SECRET:-$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
 PTERO_URL="https://${DOMAIN_GAME}"
 
 EXISTING_PTERO_DB=""
@@ -2641,6 +2645,12 @@ gzip_comp_level 5;
 gzip_min_length 256;
 gzip_types text/plain text/css text/xml text/javascript application/javascript application/json application/xml image/svg+xml;
 
+map \$http_origin \$spx_cors_origin {
+    default "";
+    ~^https://([a-z0-9-]+\.)*sparrowx\.net$ \$http_origin;
+    ~^http://(localhost|127\.0\.0\.1)(:[0-9]+)?$ \$http_origin;
+}
+
 limit_req_zone \$binary_remote_addr zone=spx_edge_req:20m rate=250r/s;
 limit_req_zone \$binary_remote_addr zone=spx_api_req:10m rate=120r/s;
 limit_conn_zone \$binary_remote_addr zone=spx_conn_limit:10m;
@@ -2692,7 +2702,8 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_intercept_errors on;
         error_page 502 503 504 = @sparrowx_host_fallback;
-        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Origin \$spx_cors_origin always;
+        add_header Vary "Origin" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
         if (\$request_method = OPTIONS) { return 204; }
@@ -2772,7 +2783,8 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_intercept_errors on;
         error_page 502 503 504 = @sparrowx_host_fallback;
-        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Origin \$spx_cors_origin always;
+        add_header Vary "Origin" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
         if (\$request_method = OPTIONS) { return 204; }
@@ -2854,7 +2866,8 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_intercept_errors on;
         error_page 502 503 504 = @sparrowx_host_fallback;
-        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Allow-Origin \$spx_cors_origin always;
+        add_header Vary "Origin" always;
         add_header Access-Control-Allow-Methods "GET, POST, PATCH, PUT, DELETE, OPTIONS" always;
         add_header Access-Control-Allow-Headers "Content-Type, Authorization, apikey, Prefer, x-sparrowx-key" always;
         if (\$request_method = OPTIONS) { return 204; }

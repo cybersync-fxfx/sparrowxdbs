@@ -21,6 +21,12 @@ export const Route = createFileRoute("/api/infra/servers/")({
           );
           const data = await listManagedInfraServers();
           const isAdmin = isAdminKey || claims?.role === "admin";
+          const callerEmail = claims?.email?.trim().toLowerCase() || "";
+          const visibleServers = isAdmin
+            ? data.servers
+            : data.servers.filter(
+                (s) => Boolean(callerEmail) && (s.ownerEmail || "").toLowerCase() === callerEmail,
+              );
           return Response.json(
             {
               ok: true,
@@ -33,7 +39,7 @@ export const Route = createFileRoute("/api/infra/servers/")({
                     node: data.proxmox.configured ? "managed-cluster" : "unconfigured",
                     tokenIdMasked: data.proxmox.configured ? "Configured" : "Not configured",
                   },
-              servers: data.servers,
+              servers: visibleServers,
             },
             { headers: { "Cache-Control": "no-store" } },
           );

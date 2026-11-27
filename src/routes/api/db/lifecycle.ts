@@ -175,8 +175,14 @@ export const Route = createFileRoute("/api/db/lifecycle")({
             err instanceof Error && "statusCode" in err
               ? Number((err as { statusCode: number }).statusCode)
               : 503;
-          const message = err instanceof Error ? err.message : "Lifecycle operation failed";
-          return Response.json({ ok: false, error: message }, { status });
+          const message =
+            status < 500 && err instanceof Error
+              ? err.message
+              : "Database lifecycle service temporarily unavailable.";
+          return Response.json(
+            { ok: false, error: message },
+            { status, headers: { "Cache-Control": "no-store" } },
+          );
         }
       },
     },

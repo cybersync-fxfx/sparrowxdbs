@@ -13,6 +13,9 @@ networks:
   sparrowx_control:
     name: sparrowx_control
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
   sparrowx_apps:
     name: sparrowx_apps
     driver: bridge
@@ -84,7 +87,7 @@ services:
       GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      CADDY_ADMIN_URL: http://caddy:2019
+      CADDY_ADMIN_URL: http://172.28.0.10:2019
     networks:
       - sparrowx_control
       - sparrowx_apps
@@ -110,7 +113,7 @@ services:
       SPARROWX_APPS_NETWORK: sparrowx_apps
       SPARROWX_ENCRYPTION_KEY: ${SPARROWX_ENCRYPTION_KEY:?SPARROWX_ENCRYPTION_KEY is required}
       SPARROWX_WORKER_CONCURRENCY: ${SPARROWX_WORKER_CONCURRENCY:-2}
-      CADDY_ADMIN_URL: http://caddy:2019
+      CADDY_ADMIN_URL: http://172.28.0.10:2019
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -131,8 +134,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     networks:
-      - sparrowx_control
-      - sparrowx_apps
+      sparrowx_control:
+        ipv4_address: 172.28.0.10
+      sparrowx_apps: {}
 
 volumes:
   deploy_pgdata:

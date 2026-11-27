@@ -26,9 +26,9 @@ export const Route = createFileRoute("/api/client-protect/heartbeat")({
             },
             { headers: { "Cache-Control": "no-store" } },
           );
-        } catch (err) {
+        } catch {
           return Response.json(
-            { ok: false, error: err instanceof Error ? err.message : "Failed to load client registry" },
+            { ok: false, error: "Failed to load client registry." },
             { status: 500, headers: { "Cache-Control": "no-store" } },
           );
         }
@@ -85,9 +85,9 @@ export const Route = createFileRoute("/api/client-protect/heartbeat")({
             status: updated.status,
             lastSeen: updated.lastSeen,
           });
-        } catch (err) {
+        } catch {
           return Response.json(
-            { ok: false, error: err instanceof Error ? err.message : "Heartbeat update failed" },
+            { ok: false, error: "Heartbeat update failed." },
             { status: 500, headers: { "Cache-Control": "no-store" } },
           );
         }

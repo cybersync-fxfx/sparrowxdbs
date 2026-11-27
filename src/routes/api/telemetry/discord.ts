@@ -46,20 +46,44 @@ export const Route = createFileRoute("/api/telemetry/discord")({
         // Enforce same-origin browser check unless caller presents an authenticated session/admin key
         const isAdminKey = hasValidAdminKey(request);
         const claims = await readMasterSsoFromRequest(request);
-        const originHeader = request.headers.get("origin") || "";
-        if (!isAdminKey && !claims && originHeader) {
+        if (!isAdminKey && !claims) {
+          const strictRate = checkDbRateLimit(`discord-telemetry-anon:${ip}`, 6, 60_000);
+          if (!strictRate.allowed) {
+            return Response.json(
+              { ok: false, error: `Rate limit exceeded. Retry in ${strictRate.retryAfterSec}s.` },
+              {
+                status: 429,
+                headers: { "Retry-After": String(strictRate.retryAfterSec), "Cache-Control": "no-store" },
+              },
+            );
+          }
+          const originOrReferer =
+            (request.headers.get("origin") || request.headers.get("referer") || "").trim();
+          if (!originOrReferer) {
+            return Response.json(
+              { ok: false, error: "Authentication or trusted origin required." },
+              { status: 403, headers: { "Cache-Control": "no-store" } },
+            );
+          }
           try {
-            const oHost = new URL(originHeader).hostname.toLowerCase();
+            const parsedOrigin = new URL(originOrReferer);
+            const oHost = parsedOrigin.hostname.toLowerCase();
+            const isProd = process.env.NODE_ENV === "production";
             const trustedOrigin =
-              oHost === "sparrowx.net" ||
-              oHost.endsWith(".sparrowx.net") ||
-              oHost === "localhost" ||
-              oHost === "127.0.0.1";
+              (parsedOrigin.protocol === "https:" &&
+                (oHost === "sparrowx.net" || oHost.endsWith(".sparrowx.net"))) ||
+              (!isProd && (oHost === "localhost" || oHost === "127.0.0.1"));
             if (!trustedOrigin) {
-              return Response.json({ ok: false, error: "Forbidden origin" }, { status: 403 });
+              return Response.json(
+                { ok: false, error: "Forbidden origin" },
+                { status: 403, headers: { "Cache-Control": "no-store" } },
+              );
             }
           } catch {
-            return Response.json({ ok: false, error: "Invalid origin" }, { status: 403 });
+            return Response.json(
+              { ok: false, error: "Invalid origin" },
+              { status: 403, headers: { "Cache-Control": "no-store" } },
+            );
           }
         }
 
@@ -98,7 +122,7 @@ export const Route = createFileRoute("/api/telemetry/discord")({
         const severity: DiscordTelemetrySeverity =
           !isTrustedCaller && requestedSeverity === "critical" ? "medium" : requestedSeverity;
 
-        const title = String(body.title || "").trim();
+        const title = String(body.title || "").trim().slice(0, 160);
         if (!title) {
           return Response.json({ ok: false, error: "title is required" }, { status: 400 });
         }
@@ -107,9 +131,9 @@ export const Route = createFileRoute("/api/telemetry/discord")({
           category,
           severity,
           title,
-          ...(body.description ? { description: String(body.description) } : {}),
-          ...(body.service ? { service: String(body.service) } : {}),
-          ...(body.url ? { url: String(body.url) } : {}),
+          ...(body.description ? { description: String(body.description).slice(0, 800) } : {}),
+          ...(body.service ? { service: String(body.service).slice(0, 80) } : {}),
+          ...(body.url ? { url: String(body.url).slice(0, 240) } : {}),
           ...(body.fields && typeof body.fields === "object" ? { fields: body.fields } : {}),
           ip,
           userAgent: request.headers.get("user-agent") || undefined,

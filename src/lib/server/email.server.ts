@@ -322,6 +322,15 @@ export async function sendSmtpEmail(input: SendMailInput): Promise<SendMailResul
   }
 }
 
+function escapeHtml(input: string): string {
+  return String(input || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function buildVerificationEmailTemplate(params: {
   fullName: string;
   code: string;
@@ -329,20 +338,28 @@ export function buildVerificationEmailTemplate(params: {
   serviceName: string;
   domain: string;
 }): { subject: string; text: string; html: string } {
-  const safeName = params.fullName || "Developer";
+  const safeName = (params.fullName || "Developer").slice(0, 80);
+  const safeService = (params.serviceName || "SparrowX Sovereign Cloud").slice(0, 80);
+  const safeDomain = (params.domain || "sparrowx.net").slice(0, 120);
+  const safeUrl = /^https?:\/\//i.test(params.verifyUrl) ? params.verifyUrl : `https://${safeDomain}`;
+  const htmlName = escapeHtml(safeName);
+  const htmlService = escapeHtml(safeService);
+  const htmlUrl = escapeHtml(safeUrl);
+  const htmlDomain = escapeHtml(safeDomain);
+  const htmlCode = escapeHtml(params.code);
   const subject = `${params.code} is your SparrowX verification code`;
   const text = [
     `Hello ${safeName},`,
     ``,
-    `Welcome to ${params.serviceName} on SparrowX.`,
+    `Welcome to ${safeService} on SparrowX.`,
     `Use this 6-digit verification code to verify your email address across all SparrowX services:`,
     ``,
     `  Verification Code: ${params.code}`,
     ``,
     `Or click the 1-click verification link (valid for 15 minutes):`,
-    `  ${params.verifyUrl}`,
+    `  ${safeUrl}`,
     ``,
-    `If you did not create this account on ${params.domain}, you can safely ignore this email.`,
+    `If you did not create this account on ${safeDomain}, you can safely ignore this email.`,
     ``,
     `— SparrowX Autonomous Security & Sovereign Cloud`,
   ].join("\n");
@@ -360,26 +377,26 @@ export function buildVerificationEmailTemplate(params: {
     <tr>
       <td style="padding:24px 28px;">
         <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#cbd5e1;">
-          Hi <strong style="color:#ffffff;">${safeName.replace(/[<>&"]/g, "")}</strong>,<br/>
-          Enter this verification code to activate your unified SparrowX account for <strong>${params.serviceName.replace(/[<>&"]/g, "")}</strong> and all linked services.
+          Hi <strong style="color:#ffffff;">${htmlName}</strong>,<br/>
+          Enter this verification code to activate your unified SparrowX account for <strong>${htmlService}</strong> and all linked services.
         </p>
         <div style="margin:20px 0;padding:18px;background:#07090f;border:1px solid #334155;border-radius:10px;text-align:center;">
           <div style="font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">6-Digit Verification Code</div>
-          <div style="font-family:'JetBrains Mono',Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#ffffff;">${params.code}</div>
+          <div style="font-family:'JetBrains Mono',Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#ffffff;">${htmlCode}</div>
           <div style="font-size:11px;color:#64748b;margin-top:8px;">Expires in 15 minutes</div>
         </div>
         <div style="text-align:center;margin:22px 0;">
-          <a href="${params.verifyUrl}" style="display:inline-block;padding:12px 24px;background:#ffffff;color:#07090f;font-size:14px;font-weight:700;text-decoration:none;border-radius:8px;">Verify Email Instantly</a>
+          <a href="${htmlUrl}" style="display:inline-block;padding:12px 24px;background:#ffffff;color:#07090f;font-size:14px;font-weight:700;text-decoration:none;border-radius:8px;">Verify Email Instantly</a>
         </div>
         <p style="margin:18px 0 0;font-size:12px;line-height:1.5;color:#64748b;">
           If the button doesn't work, copy this link into your browser:<br/>
-          <span style="color:#94a3b8;word-break:break-all;">${params.verifyUrl}</span>
+          <span style="color:#94a3b8;word-break:break-all;">${htmlUrl}</span>
         </p>
       </td>
     </tr>
     <tr>
       <td style="padding:16px 28px;background:#090c14;border-top:1px solid #1e293b;font-size:11px;color:#64748b;">
-        Sent directly by SparrowX Sovereign SMTP (${params.domain}) · If you did not request this, ignore this email.
+        Sent directly by SparrowX Sovereign SMTP (${htmlDomain}) · If you did not request this, ignore this email.
       </td>
     </tr>
   </table>

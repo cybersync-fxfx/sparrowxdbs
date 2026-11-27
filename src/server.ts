@@ -255,15 +255,54 @@ async function handleSovereignRestApi(request: Request, url: URL): Promise<Respo
     });
   }
 
-  // Prevent privilege escalation on app_users by non-admin callers
-  if (tableName === "app_users" && auth && !auth.isAdmin) {
-    return new Response(
-      JSON.stringify({ error: "Forbidden: account mutations must use /api/auth/master-sso." }),
-      {
-        status: 403,
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
-      },
-    );
+  // Enforce strict RBAC & tenant isolation on ALL write operations (POST / PATCH / DELETE)
+  const ADMIN_ONLY_WRITE_TABLES = new Set([
+    "app_users",
+    "client_tenants",
+    "provisioned_databases",
+    "provisioned_db_backups",
+    "provisioned_db_audit_logs",
+    "email_verification_codes",
+  ]);
+
+  if (auth && !auth.isAdmin) {
+    if (ADMIN_ONLY_WRITE_TABLES.has(tableName)) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden: direct mutations on protected tables require admin privileges." }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+        },
+      );
+    }
+    const actorTenant = auth.tenantId || "";
+    const actorEmail = (auth.actorEmail || "").toLowerCase();
+    if (tableName === "incidents" || tableName === "tenant_ips") {
+      if (!actorTenant) {
+        return new Response(JSON.stringify({ error: "Forbidden: tenant scope required." }), {
+          status: 403,
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+        });
+      }
+      if (request.method === "PATCH" || request.method === "DELETE") {
+        const reqTenantFilter = url.searchParams.get("tenant_id") || url.searchParams.get("tenantId");
+        if (reqTenantFilter && reqTenantFilter !== `eq.${actorTenant}`) {
+          return new Response(JSON.stringify({ error: "Forbidden: cross-tenant mutation blocked." }), {
+            status: 403,
+            headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+          });
+        }
+        url.searchParams.set("tenant_id", `eq.${actorTenant}`);
+      }
+    } else if (tableName === "contact_inquiries" && (request.method === "PATCH" || request.method === "DELETE")) {
+      if (!actorEmail) {
+        return new Response(JSON.stringify({ error: "Forbidden: account scope required." }), {
+          status: 403,
+          headers: { "Content-Type": "application/json", "Cache-Control": "no-store", ...corsHeaders },
+        });
+      }
+      url.searchParams.set("email", `eq.${actorEmail}`);
+    }
   }
 
   // Forward write operations (POST / PATCH / DELETE) to PostgREST in background/parallel while updating memory store

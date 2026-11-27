@@ -95,25 +95,34 @@ describe("SparrowX AI Hosting Control Plane (ai.sparrowx.net)", () => {
     expect(created.smtpOutboundBlocked).toBe(true);
     expect(created.envSecrets.some((e) => e.key === "DATABASE_URL")).toBe(true);
 
-    const revealed = performAiInstanceAction({
-      action: "reveal_env",
-      instanceId: created.id,
-      key: "MCP_AUTH_TOKEN",
-    });
+    const revealed = performAiInstanceAction(
+      {
+        action: "reveal_env",
+        instanceId: created.id,
+        key: "MCP_AUTH_TOKEN",
+      },
+      "founder@startup.in",
+    );
     expect(revealed.revealedSecret?.value).toBe("spx_live_secret_4412");
 
-    const term = performAiInstanceAction({
-      action: "terminal_exec",
-      instanceId: created.id,
-      command: "nc smtp.gmail.com 25",
-    });
+    const term = performAiInstanceAction(
+      {
+        action: "terminal_exec",
+        instanceId: created.id,
+        command: "nc smtp.gmail.com 25",
+      },
+      "founder@startup.in",
+    );
     expect(term.terminalOutput).toContain("TCP port 25 (SMTP) is blocked");
 
-    const snap = performAiInstanceAction({
-      action: "snapshot",
-      instanceId: created.id,
-      label: "pre-release-v2",
-    });
+    const snap = performAiInstanceAction(
+      {
+        action: "snapshot",
+        instanceId: created.id,
+        label: "pre-release-v2",
+      },
+      "founder@startup.in",
+    );
     expect(snap.instance.snapshots[0]?.label).toBe("pre-release-v2");
 
     const enforcement = buildProvisioningEnforcementSpec({

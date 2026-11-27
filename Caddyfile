@@ -49,8 +49,13 @@ https://sec.sparrowx.net {
 # 3. REST API Gateway: api.sparrowx.net
 # ------------------------------------------------------------------------------
 https://api.sparrowx.net {
+    @trusted_origin header_regexp origin Origin ^https://([a-z0-9-]+\.)*sparrowx\.net$
+    header @trusted_origin {
+        Access-Control-Allow-Origin "{http.request.header.Origin}"
+        Access-Control-Allow-Credentials "true"
+        Vary "Origin"
+    }
     header {
-        Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
         Access-Control-Allow-Headers "Authorization, apikey, Content-Type, Prefer"
         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"

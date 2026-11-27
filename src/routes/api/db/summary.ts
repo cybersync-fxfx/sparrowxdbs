@@ -79,18 +79,17 @@ export const Route = createFileRoute("/api/db/summary")({
             ...(effectiveTenant ? { tenantId: effectiveTenant } : {}),
           });
           return Response.json({ ok: true, ...summary });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : "Unable to inspect databases";
+        } catch {
           return Response.json(
             {
               ok: false,
-              error: message,
+              error: "Unable to inspect databases right now.",
               totalUsers: 0,
               totalProvisionedDbs: 0,
               totalStorageBytes: 0,
               databases: [],
             },
-            { status: 503 },
+            { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
       },

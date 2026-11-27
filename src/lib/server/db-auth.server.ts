@@ -32,11 +32,14 @@ function isLoopbackRequest(request: Request): boolean {
 }
 
 export function extractClientIp(request: Request): string {
+  // Only trust CF-Connecting-IP when explicitly configured behind Cloudflare proxy;
+  // otherwise prefer X-Real-IP set authoritatively by Nginx $remote_addr to prevent rate-limit spoofing.
+  const trustCf = env("SPARROWX_TRUST_CLOUDFLARE") === "true";
   const cfIp = request.headers.get("cf-connecting-ip");
-  if (cfIp?.trim()) return cfIp.trim();
-  // Prefer X-Real-IP (set authoritatively by Nginx $remote_addr) before X-Forwarded-For.
+  if (trustCf && cfIp?.trim()) return cfIp.trim();
   const realIp = request.headers.get("x-real-ip");
   if (realIp?.trim()) return realIp.trim();
+  if (cfIp?.trim()) return cfIp.trim();
   const xff = request.headers.get("x-forwarded-for");
   if (xff) {
     const hops = xff
@@ -204,11 +207,11 @@ export async function authorizeDbRequest(
     };
   }
 
-  // Fail closed in production or on non-loopback hosts unless explicitly disabled for local testing.
+  // Fail closed in production (never allow env override to disable auth in production).
   const strictFlag = env("SPARROWX_STRICT_DB_AUTH");
   const isLocalDevOverride =
-    strictFlag === "false" ||
-    (strictFlag !== "true" && process.env.NODE_ENV !== "production" && isLoopbackRequest(request));
+    process.env.NODE_ENV !== "production" &&
+    (strictFlag === "false" || (strictFlag !== "true" && isLoopbackRequest(request)));
 
   if (!isLocalDevOverride) {
     return {

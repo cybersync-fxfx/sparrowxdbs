@@ -1,5 +1,7 @@
 {
-  admin 0.0.0.0:2019
+  # Bind Admin API strictly to the isolated sparrowx_control interface IP so untrusted
+  # tenant containers on sparrowx_apps cannot reach port 2019 or tamper with routing.
+  admin 172.28.0.10:2019
   on_demand_tls {
     ask http://control-plane:3000/api/deploy/internal/ask
   }

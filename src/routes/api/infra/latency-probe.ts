@@ -5,21 +5,59 @@ import {
   type ClientGeoLocation,
 } from "@/lib/latency-probe";
 
+function buildProbeCorsHeaders(request: Request): Record<string, string> {
+  const origin = (request.headers.get("origin") || "").trim();
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-store, no-cache, must-revalidate",
+    Vary: "Origin",
+  };
+  if (origin) {
+    try {
+      const parsed = new URL(origin);
+      const h = parsed.hostname.toLowerCase();
+      if (
+        (parsed.protocol === "https:" && (h === "sparrowx.net" || h.endsWith(".sparrowx.net"))) ||
+        (parsed.protocol === "http:" && (h === "localhost" || h === "127.0.0.1"))
+      ) {
+        headers["Access-Control-Allow-Origin"] = origin;
+      }
+    } catch {
+      // ignore invalid origin
+    }
+  }
+  return headers;
+}
+
 export const Route = createFileRoute("/api/infra/latency-probe")({
   server: {
     handlers: {
-      HEAD: async () => {
+      HEAD: async ({ request }) => {
         return new Response(null, {
           status: 200,
           headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate",
-            "Access-Control-Allow-Origin": "*",
+            ...buildProbeCorsHeaders(request),
             "X-SparrowX-Probe": "ready",
           },
         });
       },
       GET: async ({ request }) => {
         try {
+          const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
+          const ip = extractClientIp(request);
+          const rate = checkDbRateLimit(`latency-probe:${ip}`, 60, 60_000);
+          if (!rate.allowed) {
+            return Response.json(
+              { ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
+              {
+                status: 429,
+                headers: {
+                  ...buildProbeCorsHeaders(request),
+                  "Retry-After": String(rate.retryAfterSec),
+                },
+              },
+            );
+          }
+
           const url = new URL(request.url);
           const reqRegion = url.searchParams.get("region") || "sg-sin";
           const queryTz = url.searchParams.get("tz") || "";
@@ -124,16 +162,14 @@ export const Route = createFileRoute("/api/infra/latency-probe")({
             },
             {
               status: 200,
-              headers: {
-                "Cache-Control": "no-store, no-cache, must-revalidate",
-                "Access-Control-Allow-Origin": "*",
-              },
+              headers: buildProbeCorsHeaders(request),
             },
           );
-        } catch (err) {
-          const message =
-            err instanceof Error ? err.message : "Latency probe failed";
-          return Response.json({ ok: false, error: message }, { status: 500 });
+        } catch {
+          return Response.json(
+            { ok: false, error: "Latency probe unavailable" },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
+          );
         }
       },
     },

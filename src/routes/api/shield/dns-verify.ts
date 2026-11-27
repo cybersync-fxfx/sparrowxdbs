@@ -23,7 +23,7 @@ async function queryDoh(name: string, type: "A" | "CNAME" | "TXT"): Promise<stri
   try {
     const res = await fetch(
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=${type}`,
-      { headers: { Accept: "application/dns-json" } },
+      { headers: { Accept: "application/dns-json" }, signal: AbortSignal.timeout(6000) },
     );
     if (!res.ok) return [];
     const data = (await res.json()) as { Answer?: DohAnswer[] };
@@ -33,23 +33,50 @@ async function queryDoh(name: string, type: "A" | "CNAME" | "TXT"): Promise<stri
   }
 }
 
+function isSafePublicDomain(domain: string): boolean {
+  if (!domain || domain.length > 253) return false;
+  if (
+    domain === "localhost" ||
+    domain.endsWith(".local") ||
+    domain.endsWith(".internal") ||
+    domain.endsWith(".localhost") ||
+    /^\d{1,3}(?:\.\d{1,3}){3}$/.test(domain)
+  ) {
+    return false;
+  }
+  return VALID_DOMAIN_RE.test(domain);
+}
+
 export const Route = createFileRoute("/api/shield/dns-verify")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
+          const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
+          const ip = extractClientIp(request);
+          const rate = checkDbRateLimit(`shield-dns-verify:${ip}`, 20, 60_000);
+          if (!rate.allowed) {
+            return Response.json(
+              { ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
+              {
+                status: 429,
+                headers: { "Retry-After": String(rate.retryAfterSec), "Cache-Control": "no-store" },
+              },
+            );
+          }
+
           const payload = (await request.json().catch(() => null)) as {
             domain?: string;
             verifyToken?: string;
           } | null;
 
           const domain = normalizeDomain(String(payload?.domain || ""));
-          const verifyToken = String(payload?.verifyToken || "").trim();
+          const verifyToken = String(payload?.verifyToken || "").trim().slice(0, 96);
 
-          if (!domain || !VALID_DOMAIN_RE.test(domain)) {
+          if (!isSafePublicDomain(domain)) {
             return Response.json(
-              { ok: false, error: "Invalid domain name." },
-              { status: 400 },
+              { ok: false, error: "Invalid public domain name." },
+              { status: 400, headers: { "Cache-Control": "no-store" } },
             );
           }
 
@@ -118,11 +145,11 @@ export const Route = createFileRoute("/api/shield/dns-verify")({
               headers: { "Cache-Control": "no-store" },
             },
           );
-        } catch (err) {
+        } catch {
           return Response.json(
             {
               ok: false,
-              error: err instanceof Error ? err.message : "Live DNS lookup failed.",
+              error: "Live DNS lookup failed. Please retry shortly.",
             },
             { status: 500, headers: { "Cache-Control": "no-store" } },
           );

@@ -31,12 +31,27 @@ export const Route = createFileRoute("/api/infra/servers/provision")({
           const body = await request.json();
           const orderId = String(body.orderId || "").trim().toUpperCase();
 
-          // Non-admin callers MUST present a verified PAID payment order owned by their account
+          const { isInfraOrderProvisioned, provisionServerFromPaidOrder } = await import(
+            "@/lib/server/proxmox.server"
+          );
+
+          let boundPlanId = String(body.planId || "vps-starter");
+          let boundPlanName = String(body.planName || "VPS-Builder NVMe");
+          let boundPriceInr = Number(body.monthlyPriceInr || 849);
+          let boundOwnerEmail = claims?.email?.trim().toLowerCase();
+
+          // Non-admin callers MUST present a verified, unredeemed PAID infra payment order owned by their account
           if (!isAdmin) {
             if (!orderId) {
               return Response.json(
                 { ok: false, error: "A verified paid orderId is required to provision a server." },
                 { status: 402, headers: { "Cache-Control": "no-store" } },
+              );
+            }
+            if (isInfraOrderProvisioned(orderId)) {
+              return Response.json(
+                { ok: false, error: "Order has already been provisioned." },
+                { status: 409, headers: { "Cache-Control": "no-store" } },
               );
             }
             const { getSparrowxPayOrder } = await import("@/lib/server/sparrowx-pay.server");
@@ -50,6 +65,12 @@ export const Route = createFileRoute("/api/infra/servers/provision")({
                 { status: 402, headers: { "Cache-Control": "no-store" } },
               );
             }
+            if (verifiedOrder.service !== "infra") {
+              return Response.json(
+                { ok: false, error: "Order is not valid for infrastructure provisioning." },
+                { status: 403, headers: { "Cache-Control": "no-store" } },
+              );
+            }
             if (
               claims &&
               verifiedOrder.customerEmail.toLowerCase() !== claims.email.toLowerCase()
@@ -59,20 +80,23 @@ export const Route = createFileRoute("/api/infra/servers/provision")({
                 { status: 403, headers: { "Cache-Control": "no-store" } },
               );
             }
+            // Bind server specs strictly to the verified PAID order (prevent price/plan tampering)
+            boundPlanId = verifiedOrder.planId;
+            boundPlanName = verifiedOrder.planName;
+            boundPriceInr = verifiedOrder.amountInr;
+            boundOwnerEmail = verifiedOrder.customerEmail.toLowerCase();
           }
 
-          const { provisionServerFromPaidOrder } = await import(
-            "@/lib/server/proxmox.server"
-          );
           const server = provisionServerFromPaidOrder({
             orderId: orderId || `SPX-${Date.now().toString(36).toUpperCase()}`,
-            planId: String(body.planId || "vps-starter"),
-            planName: String(body.planName || "VPS-Builder NVMe"),
+            ownerEmail: boundOwnerEmail,
+            planId: boundPlanId,
+            planName: boundPlanName,
             category: body.category || "vps",
             hostname: String(body.hostname || "node-01.sparrowx.net"),
             region: String(body.region || "Mumbai IN-1"),
             os: String(body.os || "Ubuntu 24.04 LTS (Hardened)"),
-            monthlyPriceInr: Number(body.monthlyPriceInr || 849),
+            monthlyPriceInr: boundPriceInr,
           });
           void import("@/lib/server/discord-webhook.server")
             .then(({ sendDiscordTelemetry }) =>

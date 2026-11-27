@@ -1,5 +1,5 @@
 import { createServer, request as httpRequest } from "node:http";
-import { randomBytes, timingSafeEqual as cryptoTimingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual as cryptoTimingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { readFile, stat, writeFile, mkdir, unlink } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
@@ -35,7 +35,43 @@ const STORAGE_DIR = resolve(process.cwd(), "data/storage");
 const STORAGE_INDEX_FILE = resolve(STORAGE_DIR, "index.json");
 const SAFE_STORAGE_ID_RE = /^[a-zA-Z0-9_-]{3,96}$/;
 const MAX_EPHEMERAL_DROPS = 500;
+const MAX_EPHEMERAL_TOTAL_BYTES = 256 * 1024 * 1024; // 256 MB total RAM budget against OOM DoS
+const MAX_EPHEMERAL_ITEM_BYTES = 25 * 1024 * 1024; // 25 MB per ephemeral RAM drop
 const MAX_STORAGE_FILE_BYTES = 100 * 1024 * 1024;
+const edgeRateBuckets = new Map();
+
+function checkEdgeRateLimit(key, maxRequests, windowMs) {
+  const now = Date.now();
+  if (edgeRateBuckets.size > 4000) {
+    for (const [k, v] of edgeRateBuckets.entries()) {
+      if (v.resetAt <= now) edgeRateBuckets.delete(k);
+    }
+  }
+  const existing = edgeRateBuckets.get(key);
+  if (!existing || existing.resetAt <= now) {
+    edgeRateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, retryAfterSec: 0 };
+  }
+  if (existing.count >= maxRequests) {
+    return { allowed: false, retryAfterSec: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)) };
+  }
+  existing.count += 1;
+  return { allowed: true, retryAfterSec: 0 };
+}
+
+function getEdgeClientIp(req) {
+  const trustCf = process.env.SPARROWX_TRUST_CLOUDFLARE === "true";
+  const cfIp = String(req.headers["cf-connecting-ip"] || "").trim();
+  if (trustCf && cfIp) return cfIp;
+  const realIp = String(req.headers["x-real-ip"] || "").trim();
+  if (realIp) return realIp;
+  const xff = String(req.headers["x-forwarded-for"] || "");
+  if (xff) {
+    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1];
+  }
+  return req.socket?.remoteAddress || "127.0.0.1";
+}
 
 let storageIndexQueue = Promise.resolve();
 function withStorageLock(fn) {
@@ -190,9 +226,85 @@ function hasValidAdminHeader(req) {
   return safeEqualStrings(headerKey, configured) || safeEqualStrings(bearer, configured);
 }
 
-function hasMasterSsoCookie(req) {
-  const cookie = String(req.headers.cookie || "");
-  return /(?:^|;\s*)spx_master_sso=[^;\s]+/.test(cookie);
+function getMasterSsoSecret() {
+  return (
+    process.env.SPARROWX_MASTER_SSO_SECRET ||
+    process.env.SPARROWX_JWT_SECRET ||
+    process.env.JWT_SECRET ||
+    process.env.SESSION_SECRET ||
+    ""
+  ).trim();
+}
+
+function decodeBase64UrlJson(segment) {
+  try {
+    const norm = segment.replace(/-/g, "+").replace(/_/g, "/");
+    const pad = norm.length % 4 === 0 ? "" : "=".repeat(4 - (norm.length % 4));
+    return JSON.parse(Buffer.from(norm + pad, "base64").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
+function verifyMasterSsoCookie(req) {
+  const secret = getMasterSsoSecret();
+  if (!secret) return null;
+  const cookieHeader = String(req.headers.cookie || "");
+  let rawToken = "";
+  for (const part of cookieHeader.split(";")) {
+    const eqIdx = part.indexOf("=");
+    if (eqIdx === -1) continue;
+    if (part.slice(0, eqIdx).trim() === "spx_master_sso") {
+      rawToken = part.slice(eqIdx + 1).trim();
+      try {
+        rawToken = decodeURIComponent(rawToken);
+      } catch {
+        // keep raw
+      }
+      break;
+    }
+  }
+  if (!rawToken) return null;
+  const parts = rawToken.split(".");
+  if (parts.length !== 2) return null;
+  const [payloadB64, sigHex] = parts;
+  if (!payloadB64 || !sigHex || !/^[0-9a-f]{64}$/i.test(sigHex)) return null;
+  const expectedHex = createHmac("sha256", secret).update(payloadB64, "utf8").digest("hex");
+  if (!safeEqualStrings(sigHex.toLowerCase(), expectedHex.toLowerCase())) return null;
+  const claims = decodeBase64UrlJson(payloadB64);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!claims || !claims.sub || !claims.email || typeof claims.exp !== "number" || claims.exp <= nowSec) {
+    return null;
+  }
+  return {
+    sub: String(claims.sub),
+    email: String(claims.email).trim().toLowerCase(),
+    role: claims.role === "admin" ? "admin" : "client",
+  };
+}
+
+function verifyHs256Jwt(token) {
+  const secret = (process.env.SPARROWX_JWT_SECRET || process.env.JWT_SECRET || "").trim();
+  if (!secret || !token) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const [headerB64, payloadB64, sigB64] = parts;
+  if (!headerB64 || !payloadB64 || !sigB64) return false;
+  const header = decodeBase64UrlJson(headerB64);
+  if (!header || header.alg !== "HS256") return false;
+  const expectedSig = createHmac("sha256", secret)
+    .update(`${headerB64}.${payloadB64}`, "utf8")
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  if (!safeEqualStrings(sigB64, expectedSig)) return false;
+  const payload = decodeBase64UrlJson(payloadB64);
+  if (!payload || typeof payload !== "object") return false;
+  if (typeof payload.exp === "number" && payload.exp <= Math.floor(Date.now() / 1000)) {
+    return false;
+  }
+  return true;
 }
 
 const MAX_BODY_BYTES = 25 * 1024 * 1024; // 25 MB hard cap against memory exhaustion
@@ -339,14 +451,25 @@ const server = createServer(async (req, res) => {
     // 1. Post encrypted payload into RAM: POST /api/drop/payload/:id or POST /api/drop/payload
     const dropUploadMatch = pathname.match(/^\/api\/drop\/payload(?:\/([a-zA-Z0-9_-]+))?$/);
     if (dropUploadMatch && req.method === "POST") {
+      const clientIp = getEdgeClientIp(req);
+      const dropRate = checkEdgeRateLimit(`drop-upload:${clientIp}`, 12, 60_000);
+      if (!dropRate.allowed) {
+        res.writeHead(429, {
+          "Content-Type": "application/json",
+          "Retry-After": String(dropRate.retryAfterSec),
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify({ error: `Rate limit exceeded. Retry in ${dropRate.retryAfterSec}s.` }));
+        return;
+      }
       const chunks = [];
       let totalBytes = 0;
       for await (const chunk of req) {
         const buf = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
         totalBytes += buf.byteLength;
-        if (totalBytes > 100 * 1024 * 1024) {
+        if (totalBytes > MAX_EPHEMERAL_ITEM_BYTES) {
           res.writeHead(413, { "Content-Type": "application/json", ...SECURITY_HEADERS });
-          res.end(JSON.stringify({ error: "Payload exceeds 100MB RAM limit" }));
+          res.end(JSON.stringify({ error: "Payload exceeds 25MB ephemeral RAM limit" }));
           return;
         }
         chunks.push(buf);
@@ -359,21 +482,47 @@ const server = createServer(async (req, res) => {
         const dropId = SAFE_STORAGE_ID_RE.test(String(rawDropId))
           ? String(rawDropId)
           : generatedDropId;
-        if (parsed.ciphertext) {
+        if (ephemeralDropStore.has(dropId)) {
+          res.writeHead(409, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+          res.end(JSON.stringify({ error: "Drop ID already exists" }));
+          return;
+        }
+        let ramInUse = 0;
+        for (const v of ephemeralDropStore.values()) {
+          ramInUse += typeof v.ciphertext === "string" ? Buffer.byteLength(v.ciphertext) : 0;
+        }
+        const incomingCipherLen =
+          typeof parsed.ciphertext === "string" ? Buffer.byteLength(parsed.ciphertext) : 0;
+        if (ramInUse + incomingCipherLen > MAX_EPHEMERAL_TOTAL_BYTES) {
+          res.writeHead(507, { "Content-Type": "application/json", ...SECURITY_HEADERS });
+          res.end(JSON.stringify({ error: "Ephemeral relay memory pool is temporarily full" }));
+          return;
+        }
+        if (parsed.ciphertext && typeof parsed.ciphertext === "string") {
+          const deleteToken = randomBytes(16).toString("hex");
           storeEphemeralDrop(dropId, {
             id: dropId,
             ciphertext: parsed.ciphertext,
-            filename: parsed.filename || "file",
-            type: parsed.type || "application/octet-stream",
-            size: parsed.size || 0,
+            filename: String(parsed.filename || "file").slice(0, 240),
+            type: String(parsed.type || "application/octet-stream").slice(0, 120),
+            size: Number(parsed.size) || 0,
+            deleteToken,
           });
 
           res.writeHead(201, {
             "Content-Type": "application/json",
+            "Cache-Control": "no-store",
             ...corsHeaders,
             ...SECURITY_HEADERS,
           });
-          res.end(JSON.stringify({ success: true, dropId, expiresAt: Date.now() + 15 * 60 * 1000 }));
+          res.end(
+            JSON.stringify({
+              success: true,
+              dropId,
+              deleteToken,
+              expiresAt: Date.now() + 15 * 60 * 1000,
+            }),
+          );
           return;
         }
       } catch {
@@ -419,10 +568,20 @@ const server = createServer(async (req, res) => {
     if (dropDeleteMatch && req.method === "DELETE") {
       const dropId = dropDeleteMatch[1];
       const drop = ephemeralDropStore.get(dropId);
-      if (drop && drop.timer) clearTimeout(drop.timer);
-      ephemeralDropStore.delete(dropId);
+      if (drop) {
+        const providedToken = String(req.headers["x-drop-delete-token"] || "").trim();
+        const isAuthed = hasValidAdminHeader(req) || Boolean(verifyMasterSsoCookie(req));
+        if (!isAuthed && (!drop.deleteToken || !safeEqualStrings(providedToken, drop.deleteToken))) {
+          res.writeHead(403, { "Content-Type": "application/json", "Cache-Control": "no-store", ...SECURITY_HEADERS });
+          res.end(JSON.stringify({ error: "Forbidden: valid delete token or session required" }));
+          return;
+        }
+        if (drop.timer) clearTimeout(drop.timer);
+        ephemeralDropStore.delete(dropId);
+      }
       res.writeHead(200, {
         "Content-Type": "application/json",
+        "Cache-Control": "no-store",
         ...corsHeaders,
         ...SECURITY_HEADERS,
       });
@@ -504,9 +663,11 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // 3. List all stored files: GET /api/storage/files (authenticated only)
+    // 3. List all stored files: GET /api/storage/files (cryptographically verified auth + tenant scoping)
     if (pathname === "/api/storage/files" && req.method === "GET") {
-      if (!hasValidAdminHeader(req) && !hasMasterSsoCookie(req)) {
+      const isAdmin = hasValidAdminHeader(req);
+      const claims = isAdmin ? null : verifyMasterSsoCookie(req);
+      if (!isAdmin && !claims) {
         res.writeHead(401, {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
@@ -517,18 +678,47 @@ const server = createServer(async (req, res) => {
         return;
       }
       const files = await getStoredFiles();
+      const visible =
+        isAdmin || claims?.role === "admin"
+          ? files
+          : files.filter(
+              (f) => f.ownerEmail && String(f.ownerEmail).toLowerCase() === claims.email,
+            );
       res.writeHead(200, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
         ...corsHeaders,
         ...SECURITY_HEADERS,
       });
-      res.end(JSON.stringify(files));
+      res.end(JSON.stringify(visible));
       return;
     }
 
-    // 3b. Upload file to persistent disk: POST /api/storage/upload (CSPRNG fileId)
+    // 3b. Upload file to persistent disk: POST /api/storage/upload (verified auth + rate limit + CSPRNG fileId)
     if (pathname === "/api/storage/upload" && req.method === "POST") {
+      const clientIp = getEdgeClientIp(req);
+      const uploadRate = checkEdgeRateLimit(`storage-upload:${clientIp}`, 10, 60_000);
+      if (!uploadRate.allowed) {
+        res.writeHead(429, {
+          "Content-Type": "application/json",
+          "Retry-After": String(uploadRate.retryAfterSec),
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify({ error: `Rate limit exceeded. Retry in ${uploadRate.retryAfterSec}s.` }));
+        return;
+      }
+      const isAdmin = hasValidAdminHeader(req);
+      const claims = isAdmin ? null : verifyMasterSsoCookie(req);
+      if (!isAdmin && !claims) {
+        res.writeHead(401, {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+          ...corsHeaders,
+          ...SECURITY_HEADERS,
+        });
+        res.end(JSON.stringify({ error: "Authentication required to upload persistent files" }));
+        return;
+      }
       const chunks = [];
       let totalBytes = 0;
       for await (const chunk of req) {
@@ -562,6 +752,7 @@ const server = createServer(async (req, res) => {
           const fileDomain = host.includes("file.") ? host : "file.sparrowx.net";
           const record = {
             id: fileId,
+            ownerEmail: claims ? claims.email : "admin@sparrowx.net",
             name: String(parsed.filename).slice(0, 240),
             size: buffer.byteLength,
             type: String(parsed.type || "application/octet-stream").slice(0, 120),
@@ -578,6 +769,7 @@ const server = createServer(async (req, res) => {
 
           res.writeHead(201, {
             "Content-Type": "application/json",
+            "Cache-Control": "no-store",
             ...corsHeaders,
             ...SECURITY_HEADERS,
           });
@@ -593,9 +785,11 @@ const server = createServer(async (req, res) => {
       return;
     }
 
-    // 4. Delete file from persistent disk: DELETE /api/storage/files/:id (authenticated only)
+    // 4. Delete file from persistent disk: DELETE /api/storage/files/:id (verified auth + ownership)
     if ((pathname.startsWith("/api/storage/files/") || pathname === "/api/storage/files") && req.method === "DELETE") {
-      if (!hasValidAdminHeader(req) && !hasMasterSsoCookie(req)) {
+      const isAdmin = hasValidAdminHeader(req);
+      const claims = isAdmin ? null : verifyMasterSsoCookie(req);
+      if (!isAdmin && !claims) {
         res.writeHead(401, {
           "Content-Type": "application/json",
           "Cache-Control": "no-store",
@@ -610,14 +804,35 @@ const server = createServer(async (req, res) => {
       const fileId = rawFileId ? rawFileId.trim() : "";
       const safePath = fileId ? resolveSafeStoragePath(fileId) : null;
       if (fileId && safePath) {
+        let forbidden = false;
+        let existed = false;
         await withStorageLock(async () => {
           const files = await getStoredFiles();
+          const target = files.find((f) => f.id === fileId);
+          if (!target) return;
+          existed = true;
+          const isOwner =
+            isAdmin ||
+            claims?.role === "admin" ||
+            (target.ownerEmail && String(target.ownerEmail).toLowerCase() === claims?.email);
+          if (!isOwner) {
+            forbidden = true;
+            return;
+          }
           const updated = files.filter((f) => f.id !== fileId);
           await saveStoredFiles(updated);
         });
-        await unlink(safePath).catch(() => {});
+        if (forbidden) {
+          res.writeHead(403, { "Content-Type": "application/json", "Cache-Control": "no-store", ...SECURITY_HEADERS });
+          res.end(JSON.stringify({ error: "Forbidden: cannot delete another user's file" }));
+          return;
+        }
+        if (existed) {
+          await unlink(safePath).catch(() => {});
+        }
         res.writeHead(200, {
           "Content-Type": "application/json",
+          "Cache-Control": "no-store",
           ...corsHeaders,
           ...SECURITY_HEADERS,
         });
@@ -873,7 +1088,8 @@ const server = createServer(async (req, res) => {
 
     // Unified SSR / TanStack Start renderer
     const handleViaAppEngine = async () => {
-      const protocol = req.headers["x-forwarded-proto"] || "http";
+      const rawProtoHdr = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim().toLowerCase();
+      const protocol = rawProtoHdr === "https" ? "https" : "http";
       const fullUrl = `${protocol}://${rawHost}${reqUrl}`;
 
       const chunks = [];
@@ -1024,9 +1240,9 @@ const server = createServer(async (req, res) => {
       ).trim();
       const isAuthorizedGateway =
         hasValidAdminHeader(req) ||
-        hasMasterSsoCookie(req) ||
+        Boolean(verifyMasterSsoCookie(req)) ||
         (configuredServiceKey && safeEqualStrings(apiKey, configuredServiceKey)) ||
-        (apiKey.split(".").length === 3 && apiKey.length >= 64);
+        verifyHs256Jwt(apiKey);
 
       if (req.method !== "HEAD" && !isAuthorizedGateway) {
         res.writeHead(401, { "Content-Type": "application/json", ...SECURITY_HEADERS });

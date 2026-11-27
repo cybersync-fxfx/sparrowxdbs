@@ -141,8 +141,7 @@ export async function handleContactRequest(request: Request, deps: ContactDeps):
 
   try {
     await persist(record);
-  } catch (err) {
-    console.error("[contact] persist failed", err);
+  } catch {
     return json(
       503,
       { error: "Could not save your message. Please email founder@sparrowx.net." },

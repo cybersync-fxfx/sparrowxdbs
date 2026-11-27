@@ -5,16 +5,29 @@ export const Route = createFileRoute("/api/public/razorpay/webhook")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const { checkDbRateLimit, extractClientIp } = await import("@/lib/server/db-auth.server");
+        const ip = extractClientIp(request);
+        const rate = checkDbRateLimit(`razorpay-webhook:${ip}`, 60, 60_000);
+        if (!rate.allowed) {
+          return new Response("rate limit exceeded", {
+            status: 429,
+            headers: { "Retry-After": String(rate.retryAfterSec) },
+          });
+        }
         const raw = await request.text();
         const { verifyWebhook } = await import("@/lib/server/razorpay.server");
         const { sendDiscordTelemetry } = await import("@/lib/server/discord-webhook.server");
         if (!(await verifyWebhook(raw, request.headers.get("x-razorpay-signature")))) {
-          void sendDiscordTelemetry({
-            category: "security",
-            severity: "high",
-            service: "Razorpay Billing Webhook",
-            title: "Invalid Razorpay Webhook Signature Rejected",
-          });
+          const alertRate = checkDbRateLimit(`razorpay-webhook-bad-sig:${ip}`, 3, 60_000);
+          if (alertRate.allowed) {
+            void sendDiscordTelemetry({
+              category: "security",
+              severity: "high",
+              service: "Razorpay Billing Webhook",
+              title: "Invalid Razorpay Webhook Signature Rejected",
+              ip,
+            });
+          }
           return new Response("invalid signature", { status: 401 });
         }
         let evt: { event?: string; payload?: { payment?: { entity?: { id?: string; amount?: number; status?: string; notes?: { client_id?: string } } } } };
@@ -51,8 +64,8 @@ export const Route = createFileRoute("/api/public/razorpay/webhook")({
             fields: { ClientId: clientId, PaymentId: p.id, AmountPaise: p.amount },
           });
           return Response.json(
-            { ok: false, error: message },
-            { status: 500 },
+            { ok: false, error: "Failed to apply payment topup." },
+            { status: 500, headers: { "Cache-Control": "no-store" } },
           );
         }
       },

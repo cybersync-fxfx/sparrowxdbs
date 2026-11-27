@@ -89,7 +89,7 @@ export async function verifyEdgeTargetResolvable(
   try {
     const res = await fetchFn(
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(edgeHost)}&type=A`,
-      { headers: { Accept: "application/dns-json" } },
+      { headers: { Accept: "application/dns-json" }, signal: AbortSignal.timeout(6000) },
     );
     if (!res.ok) {
       return {
@@ -129,6 +129,7 @@ async function cfRequest<T>(
 ): Promise<CloudflareApiResponse<T>> {
   const res = await fetch(`${CF_API_BASE}${path}`, {
     ...init,
+    signal: AbortSignal.timeout(8000),
     headers: {
       Authorization: `Bearer ${apiToken}`,
       "Content-Type": "application/json",
@@ -258,7 +259,7 @@ async function upsertDnsRecord(params: {
         type: rec.type,
         name: rec.name,
         content: rec.content,
-        proxied: rec.proxied,
+        proxied: Boolean(rec.proxied),
       });
       await cfRequest<{ id: string }>(
         apiToken,
@@ -309,6 +310,32 @@ export const Route = createFileRoute("/api/shield/cloudflare-autoconfig")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          const { checkDbRateLimit, extractClientIp, hasValidAdminKey } = await import(
+            "@/lib/server/db-auth.server"
+          );
+          const { readMasterSsoFromRequest } = await import("@/lib/server/master-sso.server");
+
+          const ip = extractClientIp(request);
+          const rate = checkDbRateLimit(`cf-autoconfig:${ip}`, 10, 60_000);
+          if (!rate.allowed) {
+            return Response.json(
+              { ok: false, error: `Rate limit exceeded. Retry in ${rate.retryAfterSec}s.` },
+              {
+                status: 429,
+                headers: { "Retry-After": String(rate.retryAfterSec), "Cache-Control": "no-store" },
+              },
+            );
+          }
+
+          const isAdminKey = hasValidAdminKey(request);
+          const claims = isAdminKey ? null : await readMasterSsoFromRequest(request);
+          if (!isAdminKey && !claims) {
+            return Response.json(
+              { ok: false, error: "Authentication required to configure Cloudflare DNS." },
+              { status: 401, headers: { "Cache-Control": "no-store" } },
+            );
+          }
+
           const payload = (await request.json().catch(() => null)) as {
             mode?: "configure" | "rollback";
             apiToken?: string;
