@@ -83,13 +83,16 @@ export const getEggConfigDetails = createServerFn({ method: "GET" })
   .validator((d) =>
     z
       .object({
-        nestId: z.number().int().positive(),
-        eggId: z.number().int().positive(),
+        nestId: z.number().int().positive().optional(),
+        eggId: z.number().int().positive().optional(),
+        service: z.enum(["fivem", "samp", "minecraft", "discord"]).optional(),
       })
       .parse(d),
   )
   .handler(async ({ data }) =>
-    run(async () => (await import("./server/portal.server")).getEggDetails(data.nestId, data.eggId)),
+    run(async () =>
+      (await import("./server/portal.server")).getEggDetails(data.nestId, data.eggId, data.service),
+    ),
   );
 
 export const getLiveServerConfig = createServerFn({ method: "GET" })

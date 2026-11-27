@@ -164,11 +164,19 @@ export async function unsuspendServer(serverId: number): Promise<void> {
 }
 
 /** Egg per service, from env "PTERO_EGG_FIVEM" etc. formatted as "nestId:eggId". */
-function eggFor(service: ServiceId): { nest: number; egg: number } {
+export function resolveDefaultEggForService(service: ServiceId): { nest: number; egg: number } | null {
   const raw = env(`PTERO_EGG_${service.toUpperCase()}`);
   const m = raw?.match(/^(\d+):(\d+)$/);
-  if (!m) throw new Error(`Game panel egg for ${service} is not configured (PTERO_EGG_${service.toUpperCase()}="nest:egg")`);
+  if (!m) return null;
   return { nest: Number(m[1]), egg: Number(m[2]) };
+}
+
+function eggFor(service: ServiceId): { nest: number; egg: number } {
+  const resolved = resolveDefaultEggForService(service);
+  if (!resolved) {
+    throw new Error(`Game panel egg for ${service} is not configured (PTERO_EGG_${service.toUpperCase()}="nest:egg")`);
+  }
+  return resolved;
 }
 
 type EggVarAttr = {

@@ -490,13 +490,26 @@ async function requireOwnedServer(serverId: number): Promise<{ pteroUserId: numb
   return { pteroUserId, server };
 }
 
-export async function getEggDetails(nestId: number, eggId: number) {
+export async function getEggDetails(nestId?: number, eggId?: number, service?: ServiceId) {
   await requireGoogleUser();
   if (!integrations().pterodactyl) {
     throw new PortalError("UNAVAILABLE", "Game panel API is not configured on this server.");
   }
+  let targetNest = nestId;
+  let targetEgg = eggId;
+  if ((!targetNest || !targetEgg) && service) {
+    const def = ptero.resolveDefaultEggForService(service);
+    if (!def) {
+      throw new PortalError("NOT_FOUND", `Default panel egg for ${service} is not configured yet.`);
+    }
+    targetNest = def.nest;
+    targetEgg = def.egg;
+  }
+  if (!targetNest || !targetEgg) {
+    throw new PortalError("BAD_REQUEST", "Provide nestId & eggId or service.");
+  }
   try {
-    const details = await ptero.getEggDetails(nestId, eggId);
+    const details = await ptero.getEggDetails(targetNest, targetEgg);
     return {
       ...details,
       variables: details.variables.filter((v) => v.userViewable),
