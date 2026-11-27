@@ -1578,6 +1578,7 @@ if [ -d "/usr/local/bin" ]; then
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-fix 2>/dev/null || true
   ln -sf "${INSTALL_DIR}/fix.sh" /usr/local/bin/sparrowx-doctor 2>/dev/null || true
   [ -f "${INSTALL_DIR}/mirror.sh" ] && ln -sf "${INSTALL_DIR}/mirror.sh" /usr/local/bin/sparrowx-mirror 2>/dev/null || true
+  [ -f "${INSTALL_DIR}/deploy/ptero-egg-packager.sh" ] && chmod +x "${INSTALL_DIR}/deploy/ptero-egg-packager.sh" 2>/dev/null && ln -sf "${INSTALL_DIR}/deploy/ptero-egg-packager.sh" /usr/local/bin/sparrowx-eggs 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/ddos-setup.sh" ] && ln -sf "${INSTALL_DIR}/deploy/ddos-setup.sh" /usr/local/bin/sparrowx-ddos 2>/dev/null || true
   [ -f "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" ] && ln -sf "${INSTALL_DIR}/deploy/xdp/attach-xdp.sh" /usr/local/bin/sparrowx-xdp 2>/dev/null || true
   if [ -f "${INSTALL_DIR}/deploy/sparrowx-noc.py" ]; then

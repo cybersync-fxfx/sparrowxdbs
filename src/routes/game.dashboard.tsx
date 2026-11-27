@@ -13,6 +13,7 @@ import { fetchMasterSsoUser } from "@/lib/developer-connection";
 import { PanelCredentials } from "@/components/dashboard/PanelCredentials";
 import { TopUpDialog } from "@/components/dashboard/TopUpDialog";
 import { DeployPlans } from "@/components/dashboard/DeployPlans";
+import { EggCatalogSection } from "@/components/dashboard/EggCatalogSection";
 import { ServerList } from "@/components/dashboard/ServerList";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { Transactions } from "@/components/dashboard/Transactions";
@@ -252,6 +253,11 @@ function GameDashboard() {
             />
           </div>
         )}
+        <EggCatalogSection
+          onSelectDeployPlans={() =>
+            document.getElementById("game-deploy-plans")?.scrollIntoView({ behavior: "smooth" })
+          }
+        />
         <Transactions />
 
         <section

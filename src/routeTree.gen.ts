@@ -25,6 +25,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as RefundRouteImport } from './routes/refund'
 import { Route as SecurityRouteImport } from './routes/security'
 import { Route as ShieldRouteImport } from './routes/shield'
+import { Route as ShieldCheckRouteImport } from './routes/shield-check'
 import { Route as StoryRouteImport } from './routes/story'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as UsageRouteImport } from './routes/usage'
@@ -57,6 +58,7 @@ import { Route as ApiDeployDomainsRouteImport } from './routes/api/deploy/domain
 import { Route as ApiDeployProjectsRouteImport } from './routes/api/deploy/projects'
 import { Route as ApiDeploySiteRouteImport } from './routes/api/deploy/site'
 import { Route as ApiDeployUsageRouteImport } from './routes/api/deploy/usage'
+import { Route as ApiGameEggsCatalogRouteImport } from './routes/api/game/eggs-catalog'
 import { Route as ApiGamePanelSsoRouteImport } from './routes/api/game/panel-sso'
 import { Route as ApiInfraLatencyProbeRouteImport } from './routes/api/infra/latency-probe'
 import { Route as ApiPayOrderRouteImport } from './routes/api/pay/order'
@@ -160,6 +162,11 @@ const SecurityRoute = SecurityRouteImport.update({
 const ShieldRoute = ShieldRouteImport.update({
   id: '/shield',
   path: '/shield',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShieldCheckRoute = ShieldCheckRouteImport.update({
+  id: '/shield-check',
+  path: '/shield-check',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StoryRoute = StoryRouteImport.update({
@@ -324,6 +331,11 @@ const ApiDeployUsageRoute = ApiDeployUsageRouteImport.update({
   path: '/api/deploy/usage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGameEggsCatalogRoute = ApiGameEggsCatalogRouteImport.update({
+  id: '/api/game/eggs-catalog',
+  path: '/api/game/eggs-catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGamePanelSsoRoute = ApiGamePanelSsoRouteImport.update({
   id: '/api/game/panel-sso',
   path: '/api/game/panel-sso',
@@ -466,6 +478,7 @@ export interface FileRoutesByFullPath {
   '/refund': typeof RefundRoute
   '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
+  '/shield-check': typeof ShieldCheckRoute
   '/story': typeof StoryRoute
   '/terms': typeof TermsRoute
   '/usage': typeof UsageRoute
@@ -498,6 +511,7 @@ export interface FileRoutesByFullPath {
   '/api/deploy/projects': typeof ApiDeployProjectsRouteWithChildren
   '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/deploy/usage': typeof ApiDeployUsageRoute
+  '/api/game/eggs-catalog': typeof ApiGameEggsCatalogRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/pay/order': typeof ApiPayOrderRoute
@@ -540,6 +554,7 @@ export interface FileRoutesByTo {
   '/refund': typeof RefundRoute
   '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
+  '/shield-check': typeof ShieldCheckRoute
   '/story': typeof StoryRoute
   '/terms': typeof TermsRoute
   '/usage': typeof UsageRoute
@@ -572,6 +587,7 @@ export interface FileRoutesByTo {
   '/api/deploy/projects': typeof ApiDeployProjectsRouteWithChildren
   '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/deploy/usage': typeof ApiDeployUsageRoute
+  '/api/game/eggs-catalog': typeof ApiGameEggsCatalogRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/pay/order': typeof ApiPayOrderRoute
@@ -615,6 +631,7 @@ export interface FileRoutesById {
   '/refund': typeof RefundRoute
   '/security': typeof SecurityRoute
   '/shield': typeof ShieldRoute
+  '/shield-check': typeof ShieldCheckRoute
   '/story': typeof StoryRoute
   '/terms': typeof TermsRoute
   '/usage': typeof UsageRoute
@@ -647,6 +664,7 @@ export interface FileRoutesById {
   '/api/deploy/projects': typeof ApiDeployProjectsRouteWithChildren
   '/api/deploy/site': typeof ApiDeploySiteRoute
   '/api/deploy/usage': typeof ApiDeployUsageRoute
+  '/api/game/eggs-catalog': typeof ApiGameEggsCatalogRoute
   '/api/game/panel-sso': typeof ApiGamePanelSsoRoute
   '/api/infra/latency-probe': typeof ApiInfraLatencyProbeRoute
   '/api/pay/order': typeof ApiPayOrderRoute
@@ -691,6 +709,7 @@ export interface FileRouteTypes {
     | '/refund'
     | '/security'
     | '/shield'
+    | '/shield-check'
     | '/story'
     | '/terms'
     | '/usage'
@@ -723,6 +742,7 @@ export interface FileRouteTypes {
     | '/api/deploy/projects'
     | '/api/deploy/site'
     | '/api/deploy/usage'
+    | '/api/game/eggs-catalog'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/pay/order'
@@ -765,6 +785,7 @@ export interface FileRouteTypes {
     | '/refund'
     | '/security'
     | '/shield'
+    | '/shield-check'
     | '/story'
     | '/terms'
     | '/usage'
@@ -797,6 +818,7 @@ export interface FileRouteTypes {
     | '/api/deploy/projects'
     | '/api/deploy/site'
     | '/api/deploy/usage'
+    | '/api/game/eggs-catalog'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/pay/order'
@@ -839,6 +861,7 @@ export interface FileRouteTypes {
     | '/refund'
     | '/security'
     | '/shield'
+    | '/shield-check'
     | '/story'
     | '/terms'
     | '/usage'
@@ -871,6 +894,7 @@ export interface FileRouteTypes {
     | '/api/deploy/projects'
     | '/api/deploy/site'
     | '/api/deploy/usage'
+    | '/api/game/eggs-catalog'
     | '/api/game/panel-sso'
     | '/api/infra/latency-probe'
     | '/api/pay/order'
@@ -914,6 +938,7 @@ export interface RootRouteChildren {
   RefundRoute: typeof RefundRoute
   SecurityRoute: typeof SecurityRoute
   ShieldRoute: typeof ShieldRoute
+  ShieldCheckRoute: typeof ShieldCheckRoute
   StoryRoute: typeof StoryRoute
   TermsRoute: typeof TermsRoute
   UsageRoute: typeof UsageRoute
@@ -945,6 +970,7 @@ export interface RootRouteChildren {
   ApiDeployProjectsRoute: typeof ApiDeployProjectsRouteWithChildren
   ApiDeploySiteRoute: typeof ApiDeploySiteRoute
   ApiDeployUsageRoute: typeof ApiDeployUsageRoute
+  ApiGameEggsCatalogRoute: typeof ApiGameEggsCatalogRoute
   ApiGamePanelSsoRoute: typeof ApiGamePanelSsoRoute
   ApiInfraLatencyProbeRoute: typeof ApiInfraLatencyProbeRoute
   ApiPayOrderRoute: typeof ApiPayOrderRoute
@@ -1081,6 +1107,13 @@ declare module '@tanstack/react-router' {
       path: '/shield'
       fullPath: '/shield'
       preLoaderRoute: typeof ShieldRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shield-check': {
+      id: '/shield-check'
+      path: '/shield-check'
+      fullPath: '/shield-check'
+      preLoaderRoute: typeof ShieldCheckRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/story': {
@@ -1307,6 +1340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDeployUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/game/eggs-catalog': {
+      id: '/api/game/eggs-catalog'
+      path: '/api/game/eggs-catalog'
+      fullPath: '/api/game/eggs-catalog'
+      preLoaderRoute: typeof ApiGameEggsCatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/game/panel-sso': {
       id: '/api/game/panel-sso'
       path: '/api/game/panel-sso'
@@ -1528,6 +1568,7 @@ const rootRouteChildren: RootRouteChildren = {
   RefundRoute: RefundRoute,
   SecurityRoute: SecurityRoute,
   ShieldRoute: ShieldRoute,
+  ShieldCheckRoute: ShieldCheckRoute,
   StoryRoute: StoryRoute,
   TermsRoute: TermsRoute,
   UsageRoute: UsageRoute,
@@ -1559,6 +1600,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDeployProjectsRoute: ApiDeployProjectsRouteWithChildren,
   ApiDeploySiteRoute: ApiDeploySiteRoute,
   ApiDeployUsageRoute: ApiDeployUsageRoute,
+  ApiGameEggsCatalogRoute: ApiGameEggsCatalogRoute,
   ApiGamePanelSsoRoute: ApiGamePanelSsoRoute,
   ApiInfraLatencyProbeRoute: ApiInfraLatencyProbeRoute,
   ApiPayOrderRoute: ApiPayOrderRoute,
