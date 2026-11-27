@@ -2,6 +2,7 @@ import fivemImg from "@/assets/hero-fivem.jpg";
 import sampImg from "@/assets/hero-samp.jpg";
 import minecraftImg from "@/assets/hero-minecraft.jpg";
 import discordImg from "@/assets/hero-discord.jpg";
+import { findSmartPlan } from "./egg-smart-plans";
 
 function resolveAssetUrl(asset: unknown): string {
   if (typeof asset === "string") return asset;
@@ -106,6 +107,10 @@ export function findPlan(planId: string): { service: Service; plan: Plan } | nul
   for (const service of SERVICE_LIST) {
     const plan = service.plans.find((p) => p.id === planId);
     if (plan) return { service, plan };
+  }
+  const smart = findSmartPlan(planId);
+  if (smart) {
+    return { service: SERVICES[smart.profile.serviceId], plan: smart.plan };
   }
   return null;
 }

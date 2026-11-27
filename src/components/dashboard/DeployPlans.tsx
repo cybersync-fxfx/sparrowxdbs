@@ -4,11 +4,14 @@ import { toast } from "sonner";
 import {
   CheckCircle2,
   Coins,
+  Cpu,
+  HardDrive,
   Layers,
   Loader2,
   MessageCircle,
   Rocket,
   Sliders,
+  Sparkles,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,23 +27,16 @@ import { Input } from "@/components/ui/input";
 import { ServiceSwitcher } from "@/components/site/ServiceSwitcher";
 import { deployPlan, getEggConfigDetails } from "@/lib/portal.functions";
 import { findPlan, formatRam, planCostCoins, SERVICES, type Plan, type ServiceId } from "@/lib/services";
+import {
+  getDefaultProfileForService,
+  resolveEggResourceProfile,
+  type SmartPlanTier,
+} from "@/lib/egg-smart-plans";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import type { EggCatalogItem } from "@/routes/api/game/eggs-catalog";
 import { cn } from "@/lib/utils";
 import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { errorText, useRefreshAll } from "./hooks";
-
-function inferServiceForEgg(egg: EggCatalogItem): ServiceId {
-  const haystack = `${egg.name} ${egg.category} ${egg.repoPath}`.toLowerCase();
-  if (egg.section === "applications" || egg.section === "generic") return "discord";
-  if (haystack.includes("fivem") || haystack.includes("redm") || haystack.includes("altv") || haystack.includes("gta")) {
-    return "fivem";
-  }
-  if (haystack.includes("samp") || haystack.includes("open.mp") || haystack.includes("san andreas")) {
-    return "samp";
-  }
-  return "minecraft";
-}
 
 export function DeployPlans({
   coins,
@@ -69,10 +65,15 @@ export function DeployPlans({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Automatically focus the matching hardware tier whenever the user picks an egg from the 3-repo catalog
+  // Resolve the intelligent 5-plan hardware profile from the selected egg (or active service tab)
+  const activeProfile = useMemo(
+    () => (selectedEgg ? resolveEggResourceProfile(selectedEgg) : getDefaultProfileForService(service)),
+    [selectedEgg, service],
+  );
+
   useEffect(() => {
     if (!selectedEgg) return;
-    setService(inferServiceForEgg(selectedEgg));
+    setService(resolveEggResourceProfile(selectedEgg).serviceId);
   }, [selectedEgg]);
 
   const canLoadEggVars = Boolean(
@@ -138,9 +139,9 @@ export function DeployPlans({
     onError: (e) => toast.error(errorText(e)),
   });
 
-  const open = (p: Plan) => {
+  const open = (p: SmartPlanTier) => {
     setSelected(p);
-    setName(selectedEgg ? `${selectedEgg.name} (${p.name})` : `${p.name} Server`);
+    setName(selectedEgg ? `${selectedEgg.name} — ${p.name}` : `${SERVICES[service].name} ${p.name}`);
   };
   const short = selected ? Math.max(0, planCostCoins(selected) - coins) : 0;
 
@@ -148,39 +149,54 @@ export function DeployPlans({
     <section data-service={service} className="surface-3d rounded-3xl p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="font-display text-lg font-semibold">Deploy &amp; Pre-Configure a New Server</h2>
-          <p className="text-sm text-muted-foreground">
-            Pick your hardware tier — customize Docker image &amp; Panel startup variables before first boot.
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-emerald-300">
+              <Sparkles className="size-3" aria-hidden="true" />
+              Smart 5-Tier Egg Sizing · {activeProfile.ramRangeLabel}
+            </span>
+          </div>
+          <h2 className="font-display text-lg font-semibold">
+            {selectedEgg ? `Smart Plans for ${selectedEgg.name}` : "Deploy & Pre-Configure a New Server"}
+          </h2>
+          <p className="text-xs text-muted-foreground max-w-2xl mt-0.5">
+            {activeProfile.reasoning}
           </p>
         </div>
-        <ServiceSwitcher value={service} onChange={setService} layoutId="dash-pill" />
+        <ServiceSwitcher
+          value={service}
+          onChange={(nextSvc) => {
+            onClearEgg?.();
+            setService(nextSvc);
+          }}
+          layoutId="dash-pill"
+        />
       </div>
 
-      {/* Active Egg Selected from the 3-Repo Egg Library */}
+      {/* Active Egg Selected Banner (Green Highlighted State) */}
       {selectedEgg && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-500/40 bg-sky-500/10 px-4 py-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-400/60 bg-emerald-500/10 px-4 py-3 text-xs shadow-[0_0_24px_-8px_rgba(16,185,129,0.45)]">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-sky-400/40 bg-[#05060a] text-sky-300">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-emerald-400/50 bg-[#05060a] text-emerald-300">
               <Layers className="size-4" aria-hidden="true" />
             </span>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold text-white">Pre-Selected Egg: {selectedEgg.name}</span>
-                <span className="rounded-full border border-border bg-[#05060a] px-2 py-0.5 font-mono text-[10px] text-sky-300">
-                  {selectedEgg.nestName}
+                <span className="font-semibold text-white">Selected Egg: {selectedEgg.name}</span>
+                <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-200">
+                  {activeProfile.label} ({activeProfile.ramRangeLabel})
                 </span>
                 {selectedEgg.installed ? (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
                     <CheckCircle2 className="size-2.5" aria-hidden="true" /> Panel Live
                   </span>
                 ) : (
                   <span className="rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] text-amber-300">
-                    Sync on VPS via sudo sparrowx-eggs sync
+                    Run sudo sparrowx-eggs sync on VPS
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground truncate">
-                Choose any RAM / vCPU plan below to configure startup variables and provision directly into Pterodactyl.
+              <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                Nest: {selectedEgg.nestName} · Pick any of the 5 tailored plans below to pre-configure startup variables &amp; deploy.
               </p>
             </div>
           </div>
@@ -190,37 +206,75 @@ export function DeployPlans({
               onClick={onClearEgg}
               className="inline-flex items-center gap-1 rounded-lg border border-border bg-[#05060a] px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:text-white shrink-0"
             >
-              <X className="size-3.5" aria-hidden="true" /> Reset Egg
+              <X className="size-3.5" aria-hidden="true" /> Clear Egg
             </button>
           )}
         </div>
       )}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {SERVICES[service].plans.map((p) => {
+      {/* Smart 5-Plan Grid tailored specifically to the active egg's logical RAM/CPU range */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {activeProfile.plans.map((p) => {
           const cost = planCostCoins(p);
           return (
             <div
               key={p.id}
               className={cn(
-                "relative rounded-2xl border border-border bg-[#05060a]/80 p-5 transition-colors hover:border-sky-400/50",
-                p.popular && "border-sky-500/50",
+                "relative flex flex-col justify-between rounded-2xl border bg-[#05060a]/85 p-4 transition-all hover:border-emerald-400/60",
+                p.popular
+                  ? "border-emerald-400/70 bg-emerald-500/[0.06] ring-1 ring-emerald-400/35"
+                  : "border-border",
               )}
             >
-              {p.popular && (
-                <span className="absolute right-4 top-4 rounded-full bg-sky-500/15 px-2.5 py-0.5 text-[10px] font-semibold text-sky-300">
-                  Most Popular
-                </span>
-              )}
-              <h3 className="font-display text-sm font-semibold">{p.name}</h3>
-              <p className="mt-2 flex items-center gap-1.5 font-display text-2xl font-bold">
-                <Coins className="size-5 text-sheen" /> {cost}
-              </p>
-              <p className="mt-2 font-mono text-xs text-muted-foreground">
-                {formatRam(p.ramMb)} · {p.vcpu} vCPU · {p.diskGb}GB NVMe{p.slots ? ` · ${p.slots} slots` : ""}
-              </p>
-              <Button variant="discord" className="mt-4 w-full rounded-xl" onClick={() => open(p)}>
-                <Rocket /> {selectedEgg ? `Deploy ${selectedEgg.name}` : "Configure & Deploy"}
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {p.tierLabel}
+                  </span>
+                  {p.popular && (
+                    <span className="rounded-full border border-emerald-400/40 bg-emerald-500/20 px-2 py-0.5 font-mono text-[9px] font-semibold text-emerald-200">
+                      Recommended
+                    </span>
+                  )}
+                </div>
+
+                <h3 className="mt-1.5 font-display text-sm font-bold text-foreground">{p.name}</h3>
+                <p className="text-[11px] text-muted-foreground">{p.capacityHint}</p>
+
+                <p className="mt-3 flex items-baseline gap-1 font-display text-2xl font-bold text-foreground">
+                  <Coins className="size-4 text-emerald-400 self-center shrink-0" aria-hidden="true" />
+                  <span>{cost}</span>
+                  <span className="font-mono text-[10px] font-normal text-muted-foreground">/30d</span>
+                </p>
+
+                <ul className="mt-3 space-y-1.5 border-t border-border/70 pt-3 font-mono text-[11px] text-secondary-foreground">
+                  <li className="flex items-center justify-between">
+                    <span className="text-muted-foreground">RAM</span>
+                    <span className="font-semibold text-white">{formatRam(p.ramMb)}</span>
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <Cpu className="size-3" aria-hidden="true" /> vCPU
+                    </span>
+                    <span>{p.vcpu} Cores</span>
+                  </li>
+                  <li className="flex items-center justify-between">
+                    <span className="inline-flex items-center gap-1 text-muted-foreground">
+                      <HardDrive className="size-3" aria-hidden="true" /> NVMe
+                    </span>
+                    <span>{p.diskGb} GB</span>
+                  </li>
+                </ul>
+              </div>
+
+              <Button
+                variant={p.popular ? "ivory" : "discord"}
+                size="sm"
+                className="mt-4 w-full rounded-xl text-xs"
+                onClick={() => open(p)}
+              >
+                <Rocket className="size-3.5" />
+                <span>{selectedEgg ? "Deploy Egg" : "Deploy Plan"}</span>
               </Button>
             </div>
           );
@@ -257,9 +311,9 @@ export function DeployPlans({
 
                 {/* Live Pre-Deploy Egg Startup Configuration (Synced directly from Pterodactyl Panel!) */}
                 {selectedEgg && (
-                  <div className="rounded-2xl border border-border bg-[#05060a] p-4 space-y-3">
+                  <div className="rounded-2xl border border-emerald-500/35 bg-[#05060a] p-4 space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-sky-300">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-300">
                         <Sliders className="size-3.5" aria-hidden="true" />
                         Panel Pre-Configuration ({selectedEgg.name})
                       </span>

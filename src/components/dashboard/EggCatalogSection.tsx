@@ -12,6 +12,7 @@ import {
   Terminal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { resolveEggResourceProfile } from "@/lib/egg-smart-plans";
 import type { EggCatalogItem, EggSectionSummary } from "@/routes/api/game/eggs-catalog";
 
 interface CatalogApiResponse {
@@ -301,56 +302,90 @@ export function EggCatalogSection({
       ) : (
         <div className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleEggs.map((egg) => (
-              <article
-                key={egg.id}
-                className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-background/45 p-4 hover:border-primary/45 transition-colors"
-              >
-                <div className="space-y-1.5">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-xs font-semibold text-foreground leading-snug">
-                      {egg.name}
-                    </h3>
-                    {egg.installed ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-300 shrink-0">
-                        <CheckCircle2 className="size-2.5" aria-hidden="true" />
-                        <span>Panel Live</span>
+            {visibleEggs.map((egg) => {
+              const isSelected = selectedEggId === egg.id;
+              const smartProfile = resolveEggResourceProfile(egg);
+              return (
+                <article
+                  key={egg.id}
+                  data-selected={isSelected ? "true" : "false"}
+                  onClick={() => {
+                    if (onSelectEgg) onSelectEgg(egg);
+                  }}
+                  className={`relative overflow-hidden flex flex-col justify-between gap-3 rounded-2xl border p-4 transition-all ${
+                    onSelectEgg ? "cursor-pointer" : ""
+                  } ${
+                    isSelected
+                      ? "border-emerald-400 bg-emerald-500/12 ring-2 ring-emerald-400/50 shadow-[0_0_28px_-6px_rgba(16,185,129,0.5)]"
+                      : "border-border bg-background/45 hover:border-primary/45"
+                  }`}
+                >
+                  {isSelected && (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-400/15 via-emerald-500/5 to-transparent"
+                    />
+                  )}
+                  <div className="relative space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="text-xs font-semibold text-foreground leading-snug">
+                        {egg.name}
+                      </h3>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isSelected && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/70 bg-emerald-500/25 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-200">
+                            <CheckCircle2 className="size-2.5" aria-hidden="true" />
+                            <span>Selected</span>
+                          </span>
+                        )}
+                        {egg.installed ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-2 py-0.5 font-mono text-[10px] text-emerald-300">
+                            <CheckCircle2 className="size-2.5" aria-hidden="true" />
+                            <span>Panel Live</span>
+                          </span>
+                        ) : (
+                          <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                            {egg.category}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                      {egg.description || `Official Pterodactyl ${egg.category} package (${egg.repoPath}).`}
+                    </p>
+                  </div>
+
+                  <div className="relative flex items-center justify-between gap-2 border-t border-border/70 pt-2.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="rounded-md border border-border bg-[#05060a]/80 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300/90 shrink-0">
+                        {smartProfile.ramRangeLabel}
                       </span>
-                    ) : (
-                      <span className="rounded-full border border-border bg-background/70 px-2 py-0.5 font-mono text-[10px] text-muted-foreground shrink-0">
-                        {egg.category}
+                      <span className="font-mono text-[10px] text-muted-foreground truncate">
+                        {egg.dockerImage || egg.category}
                       </span>
+                    </div>
+                    {(onSelectEgg || onSelectDeployPlans) && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onSelectEgg) {
+                            onSelectEgg(egg);
+                          } else {
+                            onSelectDeployPlans?.();
+                          }
+                        }}
+                        className={`text-[11px] font-semibold hover:underline shrink-0 cursor-pointer ${
+                          isSelected ? "text-emerald-300" : "text-sheen"
+                        }`}
+                      >
+                        {isSelected ? "Selected ✓" : "Configure & Deploy →"}
+                      </button>
                     )}
                   </div>
-                  <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
-                    {egg.description || `Official Pterodactyl ${egg.category} package (${egg.repoPath}).`}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between gap-2 border-t border-border/70 pt-2.5">
-                  <span className="font-mono text-[10px] text-muted-foreground truncate">
-                    {egg.dockerImage || egg.category}
-                  </span>
-                  {(onSelectEgg || onSelectDeployPlans) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onSelectEgg) {
-                          onSelectEgg(egg);
-                        } else {
-                          onSelectDeployPlans?.();
-                        }
-                      }}
-                      className={`text-[11px] font-semibold hover:underline shrink-0 cursor-pointer ${
-                        selectedEggId === egg.id ? "text-emerald-300" : "text-sheen"
-                      }`}
-                    >
-                      {selectedEggId === egg.id ? "Selected ✓" : "Configure & Deploy →"}
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
+                </article>
+              );
+            })}
           </div>
 
           {filteredEggs.length > visibleCount && (

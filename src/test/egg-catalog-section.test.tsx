@@ -107,12 +107,16 @@ describe("EggCatalogSection", () => {
     );
 
     const onDeploy = vi.fn();
-    renderWithQuery(<EggCatalogSection onSelectDeployPlans={onDeploy} />);
+    renderWithQuery(<EggCatalogSection selectedEggId="games:paper-1" onSelectDeployPlans={onDeploy} />);
 
-    // Default section: Game Servers
+    // Default section: Game Servers + green selected overlay on active egg
     await waitFor(() => {
       expect(screen.getByText("Paper")).toBeDefined();
     });
+    const selectedArticle = screen.getByText("Paper").closest("article");
+    expect(selectedArticle?.getAttribute("data-selected")).toBe("true");
+    expect(selectedArticle?.className).toContain("border-emerald-400");
+    expect(screen.getByText("3GB – 16GB RAM")).toBeDefined();
     expect(screen.getByText(/sudo sparrowx-eggs sync/i)).toBeDefined();
     expect(screen.getByText("Panel Live")).toBeDefined();
     expect(screen.queryByText("Uptime Kuma")).toBeNull();
