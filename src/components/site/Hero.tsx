@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SERVICES, type Service, type ServiceId } from "@/lib/services";
@@ -57,27 +56,18 @@ const HERO_SCENES: HeroScene[] = [
 
 export function Hero({
   service,
-  onService,
 }: {
   service: Service;
-  onService: (s: ServiceId) => void;
+  onService?: (s: ServiceId) => void;
 }) {
   const { data: me } = useSessionSummary();
-  const [sceneId, setSceneId] = useState<string>(
-    HERO_SCENES.find((s) => s.serviceId === service.id)?.id ?? "minecraft",
-  );
-
-  const activeScene = HERO_SCENES.find((s) => s.id === sceneId) ?? HERO_SCENES[0]!;
+  const activeScene =
+    HERO_SCENES.find((s) => s.serviceId === service.id) ?? HERO_SCENES[0]!;
   const targetDashboard = `/game/dashboard?egg=${encodeURIComponent(activeScene.eggQuery)}&section=${activeScene.section}`;
   const primaryHref = me ? targetDashboard : `/login?next=${encodeURIComponent(targetDashboard)}`;
 
-  const handleSelectScene = (scene: HeroScene) => {
-    setSceneId(scene.id);
-    if (scene.serviceId) onService(scene.serviceId);
-  };
-
   return (
-    <section className="relative isolate flex min-h-[92svh] flex-col justify-between overflow-hidden bg-[#05060a] pt-28 pb-10">
+    <section className="relative isolate flex min-h-[86svh] flex-col justify-center overflow-hidden bg-[#05060a] pt-28 pb-16">
       {/* Full-bleed atmospheric backdrop bleeding seamlessly behind navbar (y = 0) */}
       <img
         key={activeScene.id}
@@ -113,39 +103,6 @@ export function Hero({
               <ArrowRight className="size-4" aria-hidden="true" />
             </a>
           </Button>
-        </div>
-      </div>
-
-      {/* Interactive world backdrop switcher anchored cleanly along the lower horizon */}
-      <div className="mx-auto mt-12 w-full max-w-3xl px-5">
-        <div
-          role="radiogroup"
-          aria-label="Preview featured server worlds"
-          className="flex items-center justify-center gap-1 rounded-2xl border border-white/10 bg-[#080a10]/85 p-1.5 backdrop-blur-md overflow-x-auto"
-        >
-          {HERO_SCENES.map((scene) => {
-            const active = scene.id === activeScene.id;
-            return (
-              <label
-                key={scene.id}
-                className={`relative shrink-0 cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200 ${
-                  active
-                    ? "bg-white text-zinc-950 font-semibold"
-                    : "text-slate-300 hover:text-white"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="hero-scene"
-                  value={scene.id}
-                  checked={active}
-                  onChange={() => handleSelectScene(scene)}
-                  className="sr-only"
-                />
-                <span>{scene.label}</span>
-              </label>
-            );
-          })}
         </div>
       </div>
     </section>
