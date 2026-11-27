@@ -917,8 +917,11 @@ const server = createServer(async (req, res) => {
     }
 
     // Subdomain-Aware Wrong-Path & Typoed-Subdomain Auto-Correction (HTML browser GET only)
+    // Bypass auto-correction for WAF attack probes / traversal payloads so the live Edge WAF inspects & blocks them
+    const looksLikeWafProbe = /(\.\.|%2e%2e|etc\/passwd|win\.ini|spx_waf_test|<script|%3cscript|union(?:\+|%20|\s)+select|\/\.env|wp-login|xmlrpc)/i.test(reqUrl);
     if (
       (req.method === "GET" || req.method === "HEAD") &&
+      !looksLikeWafProbe &&
       !pathname.startsWith("/api/") &&
       !pathname.startsWith("/rest/v1") &&
       !pathname.startsWith("/_serverFn") &&

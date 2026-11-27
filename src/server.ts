@@ -28,6 +28,7 @@ import {
   buildHostSitemapXml,
   resolveCanonicalSubdomainRedirect,
 } from "./lib/seo-profiles";
+import { handleLiveEdgeWaf } from "./lib/server/edge-waf.server";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -1162,10 +1163,28 @@ export default {
         return apiResponse;
       }
 
+      // 1b. Live SparrowX Shield Edge WAF inspection, browser verification gate & SOC telemetry
+      const wafResult = await handleLiveEdgeWaf(request);
+      if (wafResult.response) {
+        return wafResult.response;
+      }
+
       // 2. Otherwise delegate to TanStack Start SSR handler
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+      if (wafResult.edgeStatus !== "BYPASS") {
+        const headers = new Headers(normalized.headers);
+        headers.set("X-SparrowX-WAF", `ACTIVE (${wafResult.wafMode.toUpperCase()})`);
+        headers.set("X-SparrowX-Edge-Status", wafResult.edgeStatus);
+        headers.set("X-SparrowX-Ray", wafResult.rayId);
+        return new Response(normalized.body, {
+          status: normalized.status,
+          statusText: normalized.statusText,
+          headers,
+        });
+      }
+      return normalized;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

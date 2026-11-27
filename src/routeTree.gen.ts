@@ -66,6 +66,8 @@ import { Route as ApiPayUpiIngestRouteImport } from './routes/api/pay/upi-ingest
 import { Route as ApiPayVerifyRouteImport } from './routes/api/pay/verify'
 import { Route as ApiShieldCloudflareAutoconfigRouteImport } from './routes/api/shield/cloudflare-autoconfig'
 import { Route as ApiShieldDnsVerifyRouteImport } from './routes/api/shield/dns-verify'
+import { Route as ApiShieldEdgeVerifyRouteImport } from './routes/api/shield/edge-verify'
+import { Route as ApiShieldTelemetryRouteImport } from './routes/api/shield/telemetry'
 import { Route as ApiSystemBackboneRouteImport } from './routes/api/system/backbone'
 import { Route as ApiTelemetryDiscordRouteImport } from './routes/api/telemetry/discord'
 import { Route as ApiWebhooksGithubRouteImport } from './routes/api/webhooks/github'
@@ -372,6 +374,16 @@ const ApiShieldDnsVerifyRoute = ApiShieldDnsVerifyRouteImport.update({
   path: '/api/shield/dns-verify',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiShieldEdgeVerifyRoute = ApiShieldEdgeVerifyRouteImport.update({
+  id: '/api/shield/edge-verify',
+  path: '/api/shield/edge-verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiShieldTelemetryRoute = ApiShieldTelemetryRouteImport.update({
+  id: '/api/shield/telemetry',
+  path: '/api/shield/telemetry',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSystemBackboneRoute = ApiSystemBackboneRouteImport.update({
   id: '/api/system/backbone',
   path: '/api/system/backbone',
@@ -519,6 +531,8 @@ export interface FileRoutesByFullPath {
   '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/shield/cloudflare-autoconfig': typeof ApiShieldCloudflareAutoconfigRoute
   '/api/shield/dns-verify': typeof ApiShieldDnsVerifyRoute
+  '/api/shield/edge-verify': typeof ApiShieldEdgeVerifyRoute
+  '/api/shield/telemetry': typeof ApiShieldTelemetryRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/webhooks/github': typeof ApiWebhooksGithubRoute
@@ -595,6 +609,8 @@ export interface FileRoutesByTo {
   '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/shield/cloudflare-autoconfig': typeof ApiShieldCloudflareAutoconfigRoute
   '/api/shield/dns-verify': typeof ApiShieldDnsVerifyRoute
+  '/api/shield/edge-verify': typeof ApiShieldEdgeVerifyRoute
+  '/api/shield/telemetry': typeof ApiShieldTelemetryRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/webhooks/github': typeof ApiWebhooksGithubRoute
@@ -672,6 +688,8 @@ export interface FileRoutesById {
   '/api/pay/verify': typeof ApiPayVerifyRoute
   '/api/shield/cloudflare-autoconfig': typeof ApiShieldCloudflareAutoconfigRoute
   '/api/shield/dns-verify': typeof ApiShieldDnsVerifyRoute
+  '/api/shield/edge-verify': typeof ApiShieldEdgeVerifyRoute
+  '/api/shield/telemetry': typeof ApiShieldTelemetryRoute
   '/api/system/backbone': typeof ApiSystemBackboneRoute
   '/api/telemetry/discord': typeof ApiTelemetryDiscordRoute
   '/api/webhooks/github': typeof ApiWebhooksGithubRoute
@@ -750,6 +768,8 @@ export interface FileRouteTypes {
     | '/api/pay/verify'
     | '/api/shield/cloudflare-autoconfig'
     | '/api/shield/dns-verify'
+    | '/api/shield/edge-verify'
+    | '/api/shield/telemetry'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/webhooks/github'
@@ -826,6 +846,8 @@ export interface FileRouteTypes {
     | '/api/pay/verify'
     | '/api/shield/cloudflare-autoconfig'
     | '/api/shield/dns-verify'
+    | '/api/shield/edge-verify'
+    | '/api/shield/telemetry'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/webhooks/github'
@@ -902,6 +924,8 @@ export interface FileRouteTypes {
     | '/api/pay/verify'
     | '/api/shield/cloudflare-autoconfig'
     | '/api/shield/dns-verify'
+    | '/api/shield/edge-verify'
+    | '/api/shield/telemetry'
     | '/api/system/backbone'
     | '/api/telemetry/discord'
     | '/api/webhooks/github'
@@ -978,6 +1002,8 @@ export interface RootRouteChildren {
   ApiPayVerifyRoute: typeof ApiPayVerifyRoute
   ApiShieldCloudflareAutoconfigRoute: typeof ApiShieldCloudflareAutoconfigRoute
   ApiShieldDnsVerifyRoute: typeof ApiShieldDnsVerifyRoute
+  ApiShieldEdgeVerifyRoute: typeof ApiShieldEdgeVerifyRoute
+  ApiShieldTelemetryRoute: typeof ApiShieldTelemetryRoute
   ApiSystemBackboneRoute: typeof ApiSystemBackboneRoute
   ApiTelemetryDiscordRoute: typeof ApiTelemetryDiscordRoute
   ApiWebhooksGithubRoute: typeof ApiWebhooksGithubRoute
@@ -1396,6 +1422,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiShieldDnsVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/shield/edge-verify': {
+      id: '/api/shield/edge-verify'
+      path: '/api/shield/edge-verify'
+      fullPath: '/api/shield/edge-verify'
+      preLoaderRoute: typeof ApiShieldEdgeVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/shield/telemetry': {
+      id: '/api/shield/telemetry'
+      path: '/api/shield/telemetry'
+      fullPath: '/api/shield/telemetry'
+      preLoaderRoute: typeof ApiShieldTelemetryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/system/backbone': {
       id: '/api/system/backbone'
       path: '/api/system/backbone'
@@ -1608,6 +1648,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPayVerifyRoute: ApiPayVerifyRoute,
   ApiShieldCloudflareAutoconfigRoute: ApiShieldCloudflareAutoconfigRoute,
   ApiShieldDnsVerifyRoute: ApiShieldDnsVerifyRoute,
+  ApiShieldEdgeVerifyRoute: ApiShieldEdgeVerifyRoute,
+  ApiShieldTelemetryRoute: ApiShieldTelemetryRoute,
   ApiSystemBackboneRoute: ApiSystemBackboneRoute,
   ApiTelemetryDiscordRoute: ApiTelemetryDiscordRoute,
   ApiWebhooksGithubRoute: ApiWebhooksGithubRoute,

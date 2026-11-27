@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
@@ -7,12 +8,14 @@ import {
   ChevronDown,
   Copy,
   Download,
+  ExternalLink,
   Eye,
   EyeOff,
   FileCode2,
   Gamepad2,
   Globe,
   Plus,
+  Radio,
   RefreshCw,
   Server,
   Shield,
@@ -22,6 +25,7 @@ import {
   Trash2,
   User,
   Webhook,
+  Zap,
 } from "lucide-react";
 import { SparrowxSentraSocWorkbench, type SocViewMode } from "@/components/SparrowxSentraSocWorkbench";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
@@ -144,6 +148,192 @@ export function ShieldSocDashboardView({
   const [auditing, setAuditing] = useState(false);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [liveAudit, setLiveAudit] = useState<LiveDomainAuditResult | null>(null);
+
+  // Live Edge WAF & Real-Time Request Telemetry (100% live from /api/shield/telemetry)
+  type LiveEdgeWafMode = "balanced" | "strict" | "monitor";
+  type LiveEdgeEventRow = {
+    id: string;
+    rayId: string;
+    timestamp: string;
+    domain: string;
+    ip: string;
+    method: string;
+    path: string;
+    action: "ALLOW" | "CHALLENGE" | "VERIFIED" | "BLOCKED" | "MONITOR";
+    rule: string;
+    statusCode: number;
+    userAgent: string;
+    severity: "Critical" | "High" | "Medium" | "Low" | "Info";
+  };
+  type LiveEdgeTelemetryData = {
+    ok: true;
+    domain: string;
+    domainProtected: boolean;
+    policy: {
+      domain: string;
+      wafMode: LiveEdgeWafMode;
+      edgeCheckEnabled: boolean;
+      hasSensorKey: boolean;
+      updatedAt: string;
+    };
+    connectedDomains: Array<{
+      domain: string;
+      wafMode: LiveEdgeWafMode;
+      edgeCheckEnabled: boolean;
+      hasSensorKey: boolean;
+      updatedAt: string;
+    }>;
+    uptimeSec: number;
+    totalInspected: number;
+    requestsPerMin: number;
+    blockedCount: number;
+    challengesIssued: number;
+    challengesPassed: number;
+    uniqueIps: number;
+    lastEventAt: string | null;
+    recentEvents: LiveEdgeEventRow[];
+  };
+
+  const [edgeTelemetry, setEdgeTelemetry] = useState<LiveEdgeTelemetryData | null>(null);
+  const [edgeLoading, setEdgeLoading] = useState(false);
+  const [edgeUpdating, setEdgeUpdating] = useState(false);
+  const [edgeTestRunning, setEdgeTestRunning] = useState(false);
+
+  const fetchLiveEdgeTelemetry = async (silent = false) => {
+    if (!silent) setEdgeLoading(true);
+    try {
+      const q = activeHost ? `?domain=${encodeURIComponent(activeHost)}` : "";
+      const res = await fetch(`/api/shield/telemetry${q}`, {
+        credentials: "include",
+        cache: "no-store",
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as LiveEdgeTelemetryData;
+      if (data?.ok) setEdgeTelemetry(data);
+    } catch {
+      // Keep last known snapshot on transient network hiccup
+    } finally {
+      if (!silent) setEdgeLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchLiveEdgeTelemetry(false);
+    const timer = window.setInterval(() => {
+      void fetchLiveEdgeTelemetry(true);
+    }, 5000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeHost]);
+
+  const handleUpdateEdgePolicy = async (patch: {
+    wafMode?: LiveEdgeWafMode;
+    edgeCheckEnabled?: boolean;
+    register?: boolean;
+  }) => {
+    const dom = activeHost || edgeTelemetry?.domain || "sparrowx.net";
+    setEdgeUpdating(true);
+    try {
+      const res = await fetch("/api/shield/telemetry", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: patch.register ? "register_domain" : "update_policy",
+          domain: dom,
+          wafMode: patch.wafMode ?? edgeTelemetry?.policy.wafMode ?? "balanced",
+          edgeCheckEnabled:
+            typeof patch.edgeCheckEnabled === "boolean"
+              ? patch.edgeCheckEnabled
+              : (edgeTelemetry?.policy.edgeCheckEnabled ?? true),
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; error?: string; telemetry?: LiveEdgeTelemetryData }
+        | null;
+      if (!res.ok || !data?.ok) {
+        emitEngineToast(
+          data?.error || "Sign in with your SparrowX account to modify live WAF policy.",
+          "error",
+          "Policy Update Denied",
+        );
+        return;
+      }
+      if (data.telemetry) setEdgeTelemetry(data.telemetry);
+      emitEngineToast(
+        `${dom} live Edge WAF updated (${(patch.wafMode ?? data.telemetry?.policy.wafMode ?? "balanced").toUpperCase()} · Checking Page ${(patch.edgeCheckEnabled ?? data.telemetry?.policy.edgeCheckEnabled) ? "ON" : "OFF"}).`,
+        "success",
+        "Edge WAF Policy Live",
+      );
+    } finally {
+      setEdgeUpdating(false);
+    }
+  };
+
+  const handleRunLiveWafTest = async () => {
+    const dom = activeHost || edgeTelemetry?.domain || "sparrowx.net";
+    setEdgeTestRunning(true);
+    try {
+      const res = await fetch("/api/shield/telemetry", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "test_waf_block",
+          domain: dom,
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            probe?: {
+              rayId: string;
+              incidentId: string;
+              persisted: boolean;
+              event: LiveEdgeEventRow;
+            };
+            telemetry?: LiveEdgeTelemetryData;
+          }
+        | null;
+      if (!res.ok || !data?.ok || !data.probe) {
+        emitEngineToast(
+          data?.error || "Unable to run live WAF probe — ensure you are signed in.",
+          "error",
+          "Live WAF Probe Failed",
+        );
+        return;
+      }
+      if (data.telemetry) setEdgeTelemetry(data.telemetry);
+
+      const nowTime = new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
+      const liveInc: Incident = {
+        id: data.probe.incidentId,
+        title: "SQL Injection Payload Blocked at Edge WAF (Live Probe)",
+        source: `${dom} · Edge WAF (${data.probe.event.ip})`,
+        time: nowTime,
+        severity: "Critical",
+        status: data.probe.event.action === "BLOCKED" ? "Open" : "Investigating",
+        assignee: "SparrowX Edge WAF",
+        summary: `[${data.probe.event.action}] Rule ${data.probe.event.rule} blocked live probe on https://${dom}${data.probe.event.path} (Ray ID: ${data.probe.rayId}).`,
+        playbook: "Edge WAF OWASP-SQLI-942 Containment & IP Block",
+        affectedAssets: 1,
+      };
+      onIncidentsUpdated([liveInc, ...incidents.filter((i) => i.id !== liveInc.id)]);
+      emitEngineToast(
+        `Blocked OWASP-SQLI-942 probe on ${dom} (Ray ${data.probe.rayId}) and streamed incident ${liveInc.id} to SOC.`,
+        "success",
+        "Live Edge WAF Verified",
+      );
+    } finally {
+      setEdgeTestRunning(false);
+    }
+  };
 
   useEffect(() => {
     if (activeHost) {
@@ -750,12 +940,264 @@ server {
               <span>Autonomous Defense</span>
               <Shield className="size-3.5 text-[#F4F6FA]" />
             </div>
-            <div className="mt-2 text-2xl font-bold text-[#F4F6FA]">
-              {tenants.length > 0 ? "ARMED" : "STANDBY"}
+            <div className="mt-2 text-2xl font-bold text-[#F4F6FA] flex items-center gap-2">
+              <span>{edgeTelemetry?.domainProtected || tenants.length > 0 ? "ARMED" : "STANDBY"}</span>
+              {edgeTelemetry?.domainProtected ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/35 px-2 py-0.5 text-[10px] font-mono text-emerald-400">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  LIVE
+                </span>
+              ) : null}
             </div>
             <p className="mt-1 text-[11px] text-[#9EA7B8]">
-              Edge WAF · AI Prompt Guardrails · Origin Audit
+              {edgeTelemetry
+                ? `${edgeTelemetry.requestsPerMin} req/min · WAF ${edgeTelemetry.policy.wafMode.toUpperCase()} · Check ${edgeTelemetry.policy.edgeCheckEnabled ? "ON" : "OFF"}`
+                : "Edge WAF · AI Prompt Guardrails · Origin Audit"}
             </p>
+          </div>
+        </section>
+
+        {/* Live Edge WAF Enforcement & Real-Time Request Telemetry Stream */}
+        <section className="rounded-2xl border border-[#C0C7D6]/18 bg-gradient-to-b from-[#0E1320] to-[#080B12] p-5 space-y-5 shadow-[0_18px_45px_rgba(0,0,0,0.5)]">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-mono uppercase tracking-wider text-emerald-400">
+                  <Radio className="size-3 animate-pulse" aria-hidden="true" />
+                  <span>
+                    {edgeTelemetry?.domainProtected
+                      ? `Edge WAF Live · ${edgeTelemetry.requestsPerMin} req/min`
+                      : "Edge Sensor Syncing"}
+                  </span>
+                </span>
+                <span className="text-[11px] font-mono text-[#9EA7B8]">
+                  Target: <strong className="text-[#F4F6FA]">{activeHost || edgeTelemetry?.domain || "sparrowx.net"}</strong>
+                </span>
+                {edgeTelemetry?.lastEventAt ? (
+                  <span className="text-[11px] font-mono text-[#71717A]">
+                    Last hit: {new Date(edgeTelemetry.lastEventAt).toLocaleTimeString([], { hour12: false })}
+                  </span>
+                ) : null}
+              </div>
+              <h2 className="text-base sm:text-lg font-semibold text-[#F4F6FA] flex items-center gap-2">
+                <Activity className="size-4 text-emerald-400" aria-hidden="true" />
+                <span>Live Edge WAF &amp; Real-Time HTTP Telemetry</span>
+              </h2>
+              <p className="text-xs text-[#9EA7B8] max-w-2xl">
+                Every incoming request to your connected domain is inspected at the SparrowX Edge before reaching origin — enforcing L7 OWASP rules (SQLi, XSS, LFI, scanner bots, rate floods) and the signed browser verification gate in real time.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {edgeTelemetry && !edgeTelemetry.domainProtected && activeHost ? (
+                <button
+                  type="button"
+                  disabled={edgeUpdating}
+                  onClick={() => void handleUpdateEdgePolicy({ register: true, edgeCheckEnabled: true, wafMode: "balanced" })}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#05060A] px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <ShieldCheck className="size-3.5" aria-hidden="true" />
+                  <span>Arm Edge WAF on {activeHost}</span>
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={edgeTestRunning}
+                onClick={() => void handleRunLiveWafTest()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#F9103A] hover:bg-[#F9103A]/90 text-white px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <Zap className="size-3.5" aria-hidden="true" />
+                <span>{edgeTestRunning ? "Sending Live Probe..." : "Run Live WAF Block Test"}</span>
+              </button>
+
+              {activeHost ? (
+                <a
+                  href={`https://${activeHost}/?spx_waf_test=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.04] hover:bg-white/[0.08] px-3 py-1.5 text-xs font-mono text-[#E2E7F0] transition-colors"
+                >
+                  <span>Open Live 403 Test</span>
+                  <ExternalLink className="size-3" aria-hidden="true" />
+                </a>
+              ) : null}
+
+              <button
+                type="button"
+                disabled={edgeLoading}
+                onClick={() => void fetchLiveEdgeTelemetry(false)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/12 bg-white/[0.03] hover:bg-white/[0.08] px-2.5 py-1.5 text-xs font-mono text-[#9EA7B8] hover:text-[#F4F6FA] transition-colors cursor-pointer"
+                title="Refresh live edge stream"
+              >
+                <RefreshCw className={`size-3.5 ${edgeLoading ? "animate-spin" : ""}`} aria-hidden="true" />
+                <span>Sync</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Live Counters + Instant Enforcement Controls */}
+          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+            <div className="rounded-xl border border-white/10 bg-[#060910] p-3.5">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9EA7B8]">Inspected Reqs</div>
+              <div className="mt-1.5 text-xl font-bold font-mono text-[#F4F6FA]">
+                {edgeTelemetry?.totalInspected ?? 0}
+              </div>
+              <div className="mt-0.5 text-[10px] text-[#71717A] font-mono">
+                {edgeTelemetry?.requestsPerMin ?? 0}/min active
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-[#060910] p-3.5">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9EA7B8]">Threats Blocked</div>
+              <div className="mt-1.5 text-xl font-bold font-mono text-[#FF6B84]">
+                {edgeTelemetry?.blockedCount ?? 0}
+              </div>
+              <div className="mt-0.5 text-[10px] text-[#71717A] font-mono">OWASP L7 + Flood</div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-[#060910] p-3.5">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9EA7B8]">Edge Checks</div>
+              <div className="mt-1.5 text-xl font-bold font-mono text-emerald-400">
+                {edgeTelemetry?.challengesPassed ?? 0}
+                <span className="text-xs font-normal text-[#71717A]">
+                  {" "}/ {edgeTelemetry?.challengesIssued ?? 0}
+                </span>
+              </div>
+              <div className="mt-0.5 text-[10px] text-[#71717A] font-mono">Verified / Issued</div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-[#060910] p-3.5">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9EA7B8]">Unique IPs</div>
+              <div className="mt-1.5 text-xl font-bold font-mono text-[#38BDF8]">
+                {edgeTelemetry?.uniqueIps ?? 0}
+              </div>
+              <div className="mt-0.5 text-[10px] text-[#71717A] font-mono">Real visitors</div>
+            </div>
+
+            {/* Live Edge Checking Page ON/OFF Switch */}
+            <div className="rounded-xl border border-white/10 bg-[#060910] p-3.5 flex flex-col justify-between">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9EA7B8]">Checking Page Gate</div>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span
+                  className={`text-xs font-mono font-semibold ${
+                    edgeTelemetry?.policy.edgeCheckEnabled ? "text-emerald-400" : "text-amber-400"
+                  }`}
+                >
+                  {edgeTelemetry?.policy.edgeCheckEnabled ? "ENABLED" : "OFF"}
+                </span>
+                <button
+                  type="button"
+                  disabled={edgeUpdating}
+                  onClick={() =>
+                    void handleUpdateEdgePolicy({
+                      edgeCheckEnabled: !(edgeTelemetry?.policy.edgeCheckEnabled ?? true),
+                    })
+                  }
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-mono font-semibold border transition-colors disabled:opacity-50 cursor-pointer ${
+                    edgeTelemetry?.policy.edgeCheckEnabled
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                      : "border-white/15 bg-white/[0.05] text-[#D4D4D8] hover:bg-white/[0.1]"
+                  }`}
+                >
+                  {edgeTelemetry?.policy.edgeCheckEnabled ? "Turn OFF" : "Turn ON"}
+                </button>
+              </div>
+            </div>
+
+            {/* Live WAF Mode Switcher */}
+            <div className="rounded-xl border border-white/10 bg-[#060910] p-3.5 flex flex-col justify-between">
+              <div className="text-[10px] font-mono uppercase tracking-wider text-[#9EA7B8]">WAF Mode</div>
+              <div className="mt-2 grid grid-cols-3 gap-1">
+                {(["balanced", "strict", "monitor"] as const).map((mode) => {
+                  const active = (edgeTelemetry?.policy.wafMode ?? "balanced") === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      disabled={edgeUpdating}
+                      onClick={() => void handleUpdateEdgePolicy({ wafMode: mode })}
+                      className={`rounded px-1.5 py-1 text-[10px] font-mono uppercase transition-colors disabled:opacity-50 cursor-pointer ${
+                        active
+                          ? "bg-[#F9103A] text-white font-semibold"
+                          : "bg-white/[0.04] text-[#9EA7B8] hover:text-white hover:bg-white/[0.08]"
+                      }`}
+                    >
+                      {mode.slice(0, 3)}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Real-Time Edge Request & WAF Inspection Stream */}
+          <div className="rounded-xl border border-white/10 bg-[#05070C] overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/8 bg-[#090D16]">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-[#C0C7D6]">
+                Live Edge WAF Inspection Stream (Auto-polls every 5s)
+              </span>
+              <span className="text-[11px] font-mono text-[#71717A]">
+                {edgeTelemetry?.recentEvents.length ?? 0} recent real events
+              </span>
+            </div>
+
+            {edgeTelemetry && edgeTelemetry.recentEvents.length > 0 ? (
+              <div className="max-h-64 overflow-y-auto divide-y divide-white/[0.05] font-mono text-[11px]">
+                {edgeTelemetry.recentEvents.map((ev) => {
+                  const badgeCls =
+                    ev.action === "BLOCKED"
+                      ? "bg-[#F9103A]/15 border-[#F9103A]/40 text-[#FF6B84]"
+                      : ev.action === "CHALLENGE"
+                        ? "bg-amber-500/15 border-amber-500/35 text-amber-300"
+                        : ev.action === "VERIFIED"
+                          ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-300"
+                          : ev.action === "MONITOR"
+                            ? "bg-sky-500/15 border-sky-500/35 text-sky-300"
+                            : "bg-white/[0.06] border-white/12 text-[#D4D4D8]";
+                  return (
+                    <div
+                      key={ev.id}
+                      className="grid grid-cols-12 items-center gap-2 px-4 py-2 hover:bg-white/[0.02]"
+                    >
+                      <span className="col-span-2 sm:col-span-1 text-[#71717A] truncate">
+                        {new Date(ev.timestamp).toLocaleTimeString([], { hour12: false })}
+                      </span>
+                      <span className="col-span-3 sm:col-span-2">
+                        <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold ${badgeCls}`}>
+                          {ev.action}
+                        </span>
+                      </span>
+                      <span className="col-span-3 sm:col-span-2 text-[#A1A1AA] truncate" title={ev.ip}>
+                        {ev.ip}
+                      </span>
+                      <span className="col-span-4 sm:col-span-4 text-[#F4F6FA] truncate" title={`${ev.method} ${ev.domain}${ev.path}`}>
+                        <span className="text-[#71717A] mr-1">{ev.method}</span>
+                        {ev.domain}{ev.path}
+                      </span>
+                      <span className="hidden sm:block sm:col-span-2 text-[#9EA7B8] truncate" title={ev.rule}>
+                        {ev.rule}
+                      </span>
+                      <span className="hidden sm:block sm:col-span-1 text-right text-[#71717A] truncate" title={ev.rayId}>
+                        {ev.rayId.slice(-6)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-6 text-center space-y-2">
+                <p className="text-xs text-[#9EA7B8]">
+                  Live Edge WAF sensor is armed and listening on{" "}
+                  <strong className="font-mono text-[#F4F6FA]">{activeHost || "sparrowx.net"}</strong>.
+                  Zero requests inspected since last container boot.
+                </p>
+                <p className="text-[11px] font-mono text-[#71717A]">
+                  Visit <span className="text-[#E2E7F0]">https://{activeHost || "sparrowx.net"}</span> in a new tab (or click{" "}
+                  <strong className="text-[#FF6B84]">Run Live WAF Block Test</strong> above) to watch live traffic &amp; blocks stream in.
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

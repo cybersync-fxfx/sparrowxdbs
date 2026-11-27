@@ -403,6 +403,17 @@ export function ShieldWafOnboardingView({
         persistClientTenantToBackend(newTenant),
         persistProtectedServiceToBackend(newService),
         persistAssetToBackend(newAsset),
+        fetch("/api/shield/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "register_domain",
+            domain: cleanHost,
+            wafMode,
+            edgeCheckEnabled: true,
+            sensorKey: apiKey,
+          }),
+        }).catch(() => {}),
       ]).catch(() => {});
 
       setProvisionedTenant(newTenant);
