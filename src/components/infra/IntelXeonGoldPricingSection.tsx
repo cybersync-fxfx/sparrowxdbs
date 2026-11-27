@@ -324,118 +324,117 @@ export function IntelXeonGoldPricingSection({
             return (
               <article
                 key={plan.id}
-                className={`group relative flex flex-col justify-between rounded-2xl border bg-[#08101C]/90 p-6 backdrop-blur-xl transition-all duration-200 overflow-visible ${
+                className={`group relative flex flex-col justify-between rounded-2xl border bg-gradient-to-b from-[#0A111D]/95 via-[#060A12]/95 to-[#030509] p-5 sm:p-6 backdrop-blur-xl transition-all duration-200 ${
                   isHighlighted
-                    ? "border-[#0284C7]/70 shadow-[0_0_40px_rgba(2,132,199,0.22)]"
-                    : "border-white/10 hover:border-[#38BDF8]/45 hover:shadow-[0_12px_36px_rgba(56,189,248,0.14)]"
+                    ? "border-sky-400/60 shadow-[0_14px_45px_-12px_rgba(2,132,199,0.38)]"
+                    : "border-white/[0.09] hover:border-sky-400/45 hover:shadow-[0_14px_40px_-14px_rgba(56,189,248,0.22)]"
                 }`}
               >
-                {/* Background LGA Circuit & Pin Matrix Watermark */}
+                {/* Clean metallic specular rim & subtle sapphire hardware glow */}
                 <HardwarePinGridWatermark accent="blue" />
 
-                {/* Pinned Upper-Edge "In Stock" Sticker (outside card body) */}
-                <div className="absolute -top-3 left-4 z-20 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-[#050C12] px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 shadow-md">
-                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>In Stock</span>
-                </div>
-
-                {/* Highlight Ribbon */}
-                {plan.highlight && (
-                  <div className="absolute -top-3 right-4 inline-flex items-center gap-1 rounded-full bg-[#0071C5] px-3 py-0.5 text-[11px] font-bold tracking-wide text-white shadow-lg shadow-sky-600/30 z-20">
-                    <Sparkles className="size-3" aria-hidden="true" />
-                    <span>{plan.highlight}</span>
-                  </div>
-                )}
-
-                <div className="relative z-10 pt-1">
-                  {/* Plan Header */}
+                <div className="relative z-10 flex flex-col">
+                  {/* Aligned Status & Architecture Strip */}
                   <div className="mb-4 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-md border border-[#38BDF8]/25 bg-[#38BDF8]/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-[#38BDF8]">
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-sky-400/25 bg-sky-400/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-sky-300">
                       Dual Xeon Gold
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
-                      <Database className="size-3" aria-hidden="true" />
-                      1 Free Backup
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {plan.highlight && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#0071C5] px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-white shadow-sm shadow-sky-600/30">
+                          <Sparkles className="size-2.5" aria-hidden="true" />
+                          <span>{plan.highlight}</span>
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>In Stock</span>
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Intel Chip Pin Icon & Title */}
-                  <div className="flex items-center gap-3.5 mb-4">
-                    <div className="relative size-12 rounded-xl bg-gradient-to-br from-sky-950/70 via-[#071324] to-[#08101C] border border-[#38BDF8]/35 flex items-center justify-center text-sky-400 shrink-0 shadow-[0_0_18px_rgba(56,189,248,0.2)] group-hover:border-[#38BDF8]/70 group-hover:shadow-[0_0_24px_rgba(56,189,248,0.4)] transition-all">
-                      <IntelXeonChipPinIcon className="size-10" />
-                    </div>
+                  {/* Real Intel Xeon Processor Hardware Photo & Plan Identity */}
+                  <div className="flex items-center gap-3.5">
+                    <IntelXeonChipPinIcon className="size-14" />
                     <div className="min-w-0">
-                      <h3 className="text-xl font-bold tracking-tight text-[#F4F6FA]">
+                      <h3 className="text-xl font-extrabold tracking-tight text-white group-hover:text-sky-300 transition-colors">
                         {plan.name}
                       </h3>
-                      <p className="mt-0.5 text-xs text-[#38BDF8]/80 font-mono">
+                      <p className="mt-0.5 font-mono text-[11px] text-sky-300/80 truncate">
                         {plan.tier === "vds"
                           ? "Dedicated Cores · Dual Socket"
                           : "KVM Shared vCPU · Dual Socket"}
                       </p>
+                      <span className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] font-semibold text-emerald-300">
+                        <Database className="size-2.5" aria-hidden="true" />
+                        1 Free Backup
+                      </span>
                     </div>
                   </div>
 
-                  {/* Price */}
-                  <div className="mt-5 flex items-baseline gap-1 border-b border-white/10 pb-5 tabular-nums">
-                    <span className="text-3xl font-extrabold tracking-tight text-[#F4F6FA]">
-                      {priceLabel}
-                    </span>
-                    <span className="text-xs font-medium text-[#F4F6FA]/55">
-                      /mo
+                  {/* Pricing Band */}
+                  <div className="mt-5 flex items-baseline justify-between gap-2 pb-4 border-b border-white/[0.08] tabular-nums">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-extrabold tracking-tight text-white">
+                        {priceLabel}
+                      </span>
+                      <span className="text-xs font-medium text-zinc-400">/mo</span>
+                    </div>
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                      Static IPv4 Incl.
                     </span>
                   </div>
 
-                  {/* Specs List */}
-                  <ul className="mt-5 space-y-3 text-sm">
-                    <li className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-xs text-[#F4F6FA]/60">
-                        <Cpu className="size-3.5 text-[#38BDF8]" aria-hidden="true" />
+                  {/* Precision 2x2 Hardware Spec Matrix */}
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 text-xs">
+                    <div className="rounded-xl border border-white/[0.06] bg-[#04070D]/90 px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                        <Cpu className="size-3 text-sky-400" aria-hidden="true" />
                         <span>CPU</span>
                       </span>
-                      <span className="font-mono text-xs font-semibold text-[#F4F6FA]">
+                      <span className="mt-1 block font-mono text-xs font-semibold text-white">
                         {plan.cpuSpec}
                       </span>
-                    </li>
-                    <li className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-xs text-[#F4F6FA]/60">
-                        <Server className="size-3.5 text-[#38BDF8]" aria-hidden="true" />
+                    </div>
+                    <div className="rounded-xl border border-white/[0.06] bg-[#04070D]/90 px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                        <Server className="size-3 text-sky-400" aria-hidden="true" />
                         <span>RAM</span>
                       </span>
-                      <span className="font-mono text-xs font-semibold text-[#F4F6FA]">
+                      <span className="mt-1 block font-mono text-xs font-semibold text-white">
                         {plan.ramSpec}
                       </span>
-                    </li>
-                    <li className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-xs text-[#F4F6FA]/60">
-                        <HardDrive className="size-3.5 text-[#38BDF8]" aria-hidden="true" />
+                    </div>
+                    <div className="rounded-xl border border-white/[0.06] bg-[#04070D]/90 px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                        <HardDrive className="size-3 text-sky-400" aria-hidden="true" />
                         <span>Storage</span>
                       </span>
-                      <span className="font-mono text-xs font-semibold text-[#F4F6FA]">
+                      <span className="mt-1 block font-mono text-xs font-semibold text-white">
                         {plan.storageSpec}
                       </span>
-                    </li>
-                    <li className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-2 text-xs text-[#F4F6FA]/60">
-                        <Network className="size-3.5 text-[#38BDF8]" aria-hidden="true" />
+                    </div>
+                    <div className="rounded-xl border border-white/[0.06] bg-[#04070D]/90 px-3 py-2.5">
+                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+                        <Network className="size-3 text-sky-400" aria-hidden="true" />
                         <span>Bandwidth</span>
                       </span>
-                      <span className="font-mono text-xs font-semibold text-[#F4F6FA]">
+                      <span className="mt-1 block font-mono text-xs font-semibold text-white">
                         {plan.bandwidthSpec}
                       </span>
-                    </li>
-                  </ul>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Actions */}
-                <div className="mt-6 space-y-2">
+                <div className="relative z-10 mt-5 space-y-2">
                   <button
                     type="button"
                     onClick={() => onConfigurePlan?.(toInfraServerPlan(plan))}
-                    className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-150 ${
+                    className={`inline-flex w-full min-h-[42px] cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-150 ${
                       isHighlighted
-                        ? "bg-[#0071C5] text-white hover:bg-[#0284C7] shadow-[0_6px_22px_rgba(0,113,197,0.4)]"
-                        : "border border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#F4F6FA] hover:bg-[#38BDF8] hover:text-[#05060A]"
+                        ? "bg-gradient-to-r from-[#0071C5] to-[#0284C7] text-white hover:from-[#0284C7] hover:to-[#0EA5E9] shadow-[0_6px_22px_rgba(0,113,197,0.4)]"
+                        : "border border-sky-400/35 bg-sky-400/12 text-white hover:bg-sky-400 hover:text-black"
                     }`}
                   >
                     <span>Deploy {plan.name}</span>
@@ -445,7 +444,7 @@ export function IntelXeonGoldPricingSection({
                     href={whatsappHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-[#F4F6FA]/75 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300"
+                    className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.02] px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300"
                   >
                     <MessageCircle className="size-3.5" aria-hidden="true" />
                     <span>Order on WhatsApp</span>

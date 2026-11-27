@@ -155,74 +155,95 @@ export function InfraPriceCard({
   const formattedMonthlyPrice = price.formattedMonthly;
 
   return (
-    <article className="group relative rounded-2xl border border-white/10 bg-[#0C1017] p-6 hover:border-red-500/50 hover:shadow-[0_12px_40px_rgba(237,28,36,0.22)] transition-all duration-200 flex flex-col justify-between overflow-visible">
-      {/* Background AM5 Circuit & Pin Watermark */}
+    <article className="group relative flex flex-col justify-between rounded-2xl border border-white/[0.09] bg-gradient-to-b from-[#130A0D]/95 via-[#09070B]/95 to-[#030408] p-5 sm:p-6 hover:border-red-500/50 hover:shadow-[0_14px_45px_-12px_rgba(237,28,36,0.3)] transition-all duration-200">
+      {/* Clean metallic specular rim & subtle crimson hardware glow */}
       <HardwarePinGridWatermark accent="red" />
 
-      {/* Pinned Upper-Edge "In Stock" Sticker (outside card body) */}
-      <div className="absolute -top-3 right-4 z-20 inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-[#071014] px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400 shadow-md">
-        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        <span>In Stock</span>
-      </div>
-
-      <div className="relative z-10 pt-1">
-        {/* Top Processor Badge (matches Dual Xeon Gold style) */}
+      <div className="relative z-10 flex flex-col">
+        {/* Aligned Status & Architecture Strip */}
         <div className="mb-4 flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-red-400">
-            Ryzen 9
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300/80">
-            AM5 · Zen 5
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex items-center rounded-md border border-red-500/30 bg-red-500/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-red-400">
+              Ryzen 9
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-amber-300/80">
+              AM5 · Zen 5
+            </span>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
+            <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>In Stock</span>
           </span>
         </div>
 
-        {/* Ryzen Chip with Pins Icon & Plan Title */}
-        <div className="flex items-center gap-3.5 mb-5">
-          <div className="relative size-12 rounded-xl bg-gradient-to-br from-red-950/70 via-[#120508] to-[#0A0D14] border border-red-500/40 flex items-center justify-center text-red-400 shrink-0 shadow-[0_0_18px_rgba(237,28,36,0.25)] group-hover:border-red-500/70 group-hover:shadow-[0_0_24px_rgba(237,28,36,0.45)] transition-all">
-            <RyzenChipPinIcon className="size-10" />
-          </div>
+        {/* Real AMD Ryzen 9 9950X Hardware Photo & Plan Identity */}
+        <div className="flex items-center gap-3.5">
+          <RyzenChipPinIcon className="size-14" />
           <div className="min-w-0">
-            <h3 className="text-base font-bold text-white tracking-tight group-hover:text-red-400 transition-colors">
+            <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight group-hover:text-red-400 transition-colors">
               {plan.name}
             </h3>
-            <p className="text-xs text-zinc-400 font-mono mt-0.5">
+            <p className="font-mono text-[11px] text-zinc-400 mt-0.5">
               5.7 GHz Boost · DDR5 ECC
             </p>
           </div>
         </div>
 
-        {/* Price Row */}
-        <div className="mb-5 pb-4 border-b border-white/10 tabular-nums flex items-baseline gap-1">
-          <span className="text-3xl font-extrabold text-white tracking-tight">
-            {formattedMonthlyPrice}
-          </span>
-          <span className="text-xs text-zinc-400 ml-1 font-normal">/month</span>
-        </div>
-
-        {/* Spacious Specs Grid */}
-        <div className="grid grid-cols-2 gap-3 mb-5 text-xs">
-          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
-            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">
-              {plan.category === "vds" ? "Dedicated" : "Compute"}
+        {/* Pricing Band */}
+        <div className="mt-5 pb-4 border-b border-white/[0.08] tabular-nums flex items-baseline justify-between gap-2">
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-extrabold text-white tracking-tight">
+              {formattedMonthlyPrice}
             </span>
-            <span className="text-white font-semibold block mt-0.5">{plan.coresThreads}</span>
+            <span className="text-xs text-zinc-400 font-medium">/month</span>
           </div>
-          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
-            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Memory</span>
-            <span className="text-white font-semibold block mt-0.5">{plan.ram}</span>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+            {plan.category === "vds" ? "Dedicated" : "KVM NVMe"}
+          </span>
+        </div>
+
+        {/* Precision 2x2 Hardware Spec Matrix */}
+        <div className="mt-4 grid grid-cols-2 gap-2.5 mb-4 text-xs">
+          <div className="rounded-xl border border-white/[0.06] bg-[#04050A]/90 px-3 py-2.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+              <Cpu className="size-3 text-red-400" aria-hidden="true" />
+              <span>{plan.category === "vds" ? "Dedicated" : "Compute"}</span>
+            </span>
+            <span className="mt-1 block font-mono text-xs font-semibold text-white">
+              {plan.coresThreads}
+            </span>
           </div>
-          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
-            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Storage</span>
-            <span className="text-white font-semibold block mt-0.5">{plan.storage}</span>
+          <div className="rounded-xl border border-white/[0.06] bg-[#04050A]/90 px-3 py-2.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+              <Server className="size-3 text-red-400" aria-hidden="true" />
+              <span>Memory</span>
+            </span>
+            <span className="mt-1 block font-mono text-xs font-semibold text-white">
+              {plan.ram}
+            </span>
           </div>
-          <div className="bg-white/[0.03] p-2.5 rounded-xl border border-white/5">
-            <span className="text-zinc-500 block text-[10px] uppercase tracking-wider font-mono">Network</span>
-            <span className="text-white font-semibold block mt-0.5">{plan.network.split("·")[0]?.trim() || "10 Gbps"}</span>
+          <div className="rounded-xl border border-white/[0.06] bg-[#04050A]/90 px-3 py-2.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+              <HardDrive className="size-3 text-red-400" aria-hidden="true" />
+              <span>Storage</span>
+            </span>
+            <span className="mt-1 block font-mono text-xs font-semibold text-white">
+              {plan.storage}
+            </span>
+          </div>
+          <div className="rounded-xl border border-white/[0.06] bg-[#04050A]/90 px-3 py-2.5">
+            <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-zinc-500">
+              <Network className="size-3 text-red-400" aria-hidden="true" />
+              <span>Network</span>
+            </span>
+            <span className="mt-1 block font-mono text-xs font-semibold text-white">
+              {plan.network.split("·")[0]?.trim() || "10 Gbps"}
+            </span>
           </div>
         </div>
 
-        {/* AMD Ryzen Included Guarantees (DDoS, 24/7 Support, 99.9% SLA, 1 Static IP) */}
-        <ul className="space-y-2 text-xs text-zinc-300 mb-6">
+        {/* AMD Ryzen Included Guarantees */}
+        <ul className="space-y-1.5 text-xs text-zinc-300 mb-5">
           <li className="flex items-center gap-2">
             <Check className="size-3.5 text-red-400 shrink-0" />
             <span>DDoS Protection</span>
@@ -238,11 +259,11 @@ export function InfraPriceCard({
         </ul>
       </div>
 
-      {/* Button */}
+      {/* Primary Action */}
       <button
         type="button"
         onClick={() => onConfigure(plan)}
-        className="relative z-10 w-full min-h-[44px] inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ED1C24] to-[#B91C1C] hover:from-red-600 hover:to-red-700 text-white font-bold py-3 px-4 text-sm transition-all duration-150 shadow-[0_4px_18px_rgba(237,28,36,0.3)] hover:shadow-[0_6px_28px_rgba(237,28,36,0.5)] cursor-pointer"
+        className="relative z-10 w-full min-h-[42px] inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#ED1C24] to-[#B91C1C] hover:from-red-500 hover:to-red-700 text-white font-bold py-2.5 px-4 text-sm transition-all duration-150 shadow-[0_6px_22px_rgba(237,28,36,0.3)] hover:shadow-[0_8px_28px_rgba(237,28,36,0.5)] cursor-pointer"
       >
         <span>Configure &amp; Order</span>
         <ArrowRight className="size-4" />
