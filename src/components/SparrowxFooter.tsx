@@ -1,6 +1,7 @@
 import React from "react";
 import { buildMasterHref } from "@/lib/routing";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
+import { DotGridMiniIcon } from "@/components/landing/DotMatrixArt";
 
 export type SparrowxServiceKey =
   | "db"
@@ -163,45 +164,45 @@ export function SparrowxFooter({
   };
 
   return (
-    <footer className="font-soc relative z-10 mt-auto border-t border-white/10 bg-[#06080E] text-[#F4F6FA]">
+    <footer className="font-soc relative z-10 mt-auto border-t border-white/[0.08] bg-[#06070A] text-[#F4F6FA]">
       <div
         aria-hidden="true"
-        className="pointer-events-none h-px w-full bg-gradient-to-r from-transparent via-white/20 to-transparent"
+        className="pointer-events-none h-px w-full bg-gradient-to-r from-transparent via-[#5B87FF]/30 to-transparent"
       />
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-14">
+      <div className="mx-auto max-w-[1280px] border-x border-white/[0.08] px-4 sm:px-8 py-12 sm:py-16">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-12">
           {/* Brand Summary & Status Column */}
           <div className="md:col-span-4 space-y-4 min-w-0">
             <a
               href={masterHomeHref}
-              className="min-h-6 inline-flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F96246] rounded-sm"
+              className="min-h-6 inline-flex items-center gap-2.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#5B87FF] rounded-sm"
             >
               <img
                 src="/sparrowx-logo.png"
                 alt="SparrowX Autonomous Security and Sovereign Cloud Platform"
-                width={34}
-                height={34}
+                width={30}
+                height={30}
                 loading="lazy"
-                className="size-8.5 object-contain shrink-0 drop-shadow-[0_4px_10px_rgba(255,255,255,0.2)]"
+                className="size-7.5 object-contain shrink-0"
               />
-              <span className="text-base font-medium tracking-tight text-[#F4F6FA]">
-                SparrowX Technologies
+              <span className="font-display text-sm font-bold tracking-[0.14em] uppercase text-[#F4F6FA]">
+                SPARROWX
               </span>
             </a>
 
-            <p className="text-sm text-[#CBD5E1]/85 leading-relaxed max-w-[38ch]">
-              Independent cloud infrastructure for developers and teams.
-              Predictable PostgreSQL databases, L7 DDoS defense, encrypted file
-              transfer, and client-side key tooling.
+            <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-[36ch]">
+              Independent sovereign cloud infrastructure for developers and teams.
+              Managed PostgreSQL, L7 DDoS defense, bare-metal compute, encrypted file
+              drops, and offline cryptographic tooling.
             </p>
 
             <div>
               <a
                 href={statusHref}
-                className="min-h-9 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3.5 py-1.5 text-xs font-medium text-emerald-200 hover:bg-emerald-500/15 hover:border-emerald-400/40 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 cursor-pointer"
+                className="min-h-9 inline-flex items-center gap-2 rounded-md border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-mono text-emerald-200 hover:bg-emerald-500/15 hover:border-emerald-400/40 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400 cursor-pointer"
               >
                 <span
-                  className="size-2 rounded-full bg-[#10B981] shrink-0"
+                  className="size-1.5 rounded-full bg-[#10B981] shrink-0"
                   aria-hidden="true"
                 />
                 <span>All systems operational</span>
@@ -216,7 +217,10 @@ export function SparrowxFooter({
           >
             {/* Column 1: Products */}
             <div className="space-y-3 min-w-0">
-              <h3 className="text-sm font-medium text-[#F4F6FA]">Products</h3>
+              <h3 className="text-sm font-semibold text-[#F4F6FA] inline-flex items-center gap-2">
+                <DotGridMiniIcon tone="blue" className="size-2.5" />
+                <span>Products</span>
+              </h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 {PRODUCT_LINKS.map((item) => (
                   <li key={`${item.label}-${item.href}`} className="min-w-0">
@@ -239,8 +243,9 @@ export function SparrowxFooter({
 
             {/* Column 2: Infrastructure */}
             <div className="space-y-3 min-w-0">
-              <h3 className="text-sm font-medium text-[#F4F6FA]">
-                Infrastructure
+              <h3 className="text-sm font-semibold text-[#F4F6FA] inline-flex items-center gap-2">
+                <DotGridMiniIcon tone="emerald" className="size-2.5" />
+                <span>Infrastructure</span>
               </h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 <li className="min-w-0">
@@ -276,7 +281,10 @@ export function SparrowxFooter({
 
             {/* Column 3: Company */}
             <div className="space-y-3 min-w-0">
-              <h3 className="text-sm font-medium text-[#F4F6FA]">Company</h3>
+              <h3 className="text-sm font-semibold text-[#F4F6FA] inline-flex items-center gap-2">
+                <DotGridMiniIcon tone="amber" className="size-2.5" />
+                <span>Company</span>
+              </h3>
               <ul role="list" className="list-none space-y-2 p-0 m-0">
                 <li className="min-w-0">
                   <a href={buildMasterHref("/story")} className={LINK_CLASSES}>
