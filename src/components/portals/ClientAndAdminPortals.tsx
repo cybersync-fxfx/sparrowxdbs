@@ -1,4 +1,5 @@
 import { emitEngineActivity, emitEngineToast } from "@/components/BackgroundEngineToaster";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { useState, useEffect } from "react";
 import {
   Activity,
@@ -603,7 +604,7 @@ export function ClientPortalView({
               type="button"
               title="View SparrowX Coins wallet & plans"
             >
-              <Coins className="size-3.5 text-amber-400" />
+              <SparrowxCoinIcon className="size-4" />
               <span>SparrowX Coins: {creditBalance.toLocaleString()}</span>
             </button>
             <Button
@@ -628,7 +629,7 @@ export function ClientPortalView({
             { label: "Subscriptions & Due Dates", icon: Activity },
             {
               label: "Billing & SparrowX Coins",
-              icon: Coins,
+              icon: SparrowxCoinIcon,
               targetNav: "Billing & Credits",
             },
             { label: "Profile Management", icon: Users },
@@ -1096,8 +1097,8 @@ export function ClientPortalView({
               </div>
               <div className="border border-border bg-card p-4">
                 <span className="text-xs text-muted-foreground">SparrowX Central Wallet</span>
-                <div className="mt-2 font-display text-2xl font-semibold flex items-center gap-1.5 text-amber-400">
-                  <Coins className="size-5" />
+                <div className="mt-2 font-display text-2xl font-semibold flex items-center gap-2 text-[#C7D2FE]">
+                  <SparrowxCoinIcon className="size-6" />
                   {creditBalance.toLocaleString()} Coins
                 </div>
                 <span className="mt-1 block text-[11px] text-muted-foreground">
@@ -1182,48 +1183,68 @@ export function ClientPortalView({
           return (
             <section className="space-y-6">
               {/* 1. Hero SparrowX Coins Central Wallet HUD */}
-              <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-card via-primary/[0.04] to-card p-6 shadow-xl">
-                <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-primary/10 blur-3xl" />
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-primary">
-                      <Coins className="size-4 text-amber-400" />
+              <div className="relative overflow-hidden rounded-2xl border border-[#8FA4FF]/30 bg-gradient-to-br from-[#080B16] via-[#0C1224] to-[#060811] p-6 shadow-xl">
+                <div className="pointer-events-none absolute -right-20 -top-20 size-64 rounded-full bg-[#8B9CFF]/15 blur-3xl" />
+                <div className="relative grid grid-cols-1 lg:grid-cols-12 items-center gap-6">
+                  <div className="lg:col-span-7">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C7D2FE]">
+                      <SparrowxCoinIcon className="size-5" />
                       <span>SparrowX Central Wallet</span>
                       <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-400">
                         <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         Universal Auto-Debit Active
                       </span>
-                      <span className="rounded-md bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 text-[10px] font-bold text-amber-400">
+                      <span className="rounded-md bg-[#8B9CFF]/20 border border-[#A5B4FC]/40 px-2.5 py-0.5 text-[10px] font-bold text-[#E0E7FF]">
                         1 Coin = ₹1.00 INR
                       </span>
                     </div>
-                    <div className="mt-3 flex items-baseline gap-3">
-                      <span className="font-display text-4xl font-extrabold tracking-tight text-foreground">
-                        {creditBalance.toLocaleString()}
-                      </span>
-                      <span className="font-mono text-lg font-bold text-primary">
-                        SparrowX Coins
-                      </span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        (≈ ₹{creditBalance.toLocaleString()} INR)
-                      </span>
+                    <div className="mt-3 flex items-center gap-3">
+                      <SparrowxCoinIcon className="size-10" size={40} />
+                      <div className="flex flex-wrap items-baseline gap-2.5">
+                        <span className="font-display text-4xl font-extrabold tracking-tight text-white tabular-nums">
+                          {creditBalance.toLocaleString()}
+                        </span>
+                        <span className="font-mono text-lg font-bold text-[#A5B4FC]">
+                          SparrowX Coins
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          (≈ ₹{creditBalance.toLocaleString()} INR)
+                        </span>
+                      </div>
                     </div>
-                    <p className="mt-2 text-xs text-muted-foreground max-w-xl leading-relaxed">
-                      Unified platform currency powering all <strong>SparrowX departments</strong>: Autonomous Shield Defense, Sovereign PostgreSQL Databases, Cloud NVMe VPS/VDS, and Game Hosting.
+                    <p className="mt-2.5 text-xs text-zinc-300 max-w-xl leading-relaxed">
+                      Unified platform currency powering all <strong>SparrowX departments</strong>: Autonomous Shield Defense, Sovereign PostgreSQL Databases, Cloud NVMe VPS/VDS, AI Agents, Deploy PaaS, and Game Hosting.
                     </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <Button
+                        onClick={() => {
+                          setNeededCreditsForService(undefined);
+                          setShowPaymentModal(true);
+                        }}
+                        size="lg"
+                        className="border border-white/40 bg-gradient-to-b from-[#F3F6FA] to-[#CFD6E2] font-bold text-[#05060A] hover:from-white hover:to-[#E2E8F0] shadow-lg shadow-[#8B9CFF]/20 cursor-pointer"
+                      >
+                        <SparrowxCoinIcon className="size-4 mr-1.5" /> Top-Up SparrowX Coins
+                      </Button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                    <Button
-                      onClick={() => {
-                        setNeededCreditsForService(undefined);
-                        setShowPaymentModal(true);
-                      }}
-                      size="lg"
-                      className="bg-primary font-bold text-black hover:opacity-95 shadow-lg shadow-primary/25 cursor-pointer"
-                    >
-                      <Plus className="size-4 mr-2" /> Top-Up Coins
-                    </Button>
+                  {/* Official 3D SparrowX Coins Stack Marketing Visual */}
+                  <div className="lg:col-span-5 flex justify-center lg:justify-end">
+                    <div className="group relative w-full max-w-[320px] overflow-hidden rounded-2xl border border-[#A5B4FC]/25 bg-[#060914] shadow-[0_16px_45px_rgba(0,0,0,0.65)]">
+                      <picture>
+                        <source type="image/webp" srcSet="/images/sparrowx-coins-stack.webp" />
+                        <img
+                          src="/images/sparrowx-coins-stack.jpg"
+                          alt="SparrowX 3D metallic coins stack"
+                          width={960}
+                          height={746}
+                          loading="lazy"
+                          decoding="async"
+                          className="block w-full h-auto object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
+                      </picture>
+                    </div>
                   </div>
                 </div>
 
@@ -1257,7 +1278,7 @@ export function ClientPortalView({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                   <div>
                     <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                      <Coins className="size-4 text-primary" />
+                      <SparrowxCoinIcon className="size-5" />
                       <span>Purchase SparrowX Coins</span>
                     </h3>
                     <p className="text-xs text-muted-foreground">
@@ -1331,11 +1352,12 @@ export function ClientPortalView({
                           </span>
                         </div>
 
-                        <div className="flex items-baseline gap-1.5 mt-2">
-                          <span className="font-display text-3xl font-extrabold text-foreground">
+                        <div className="flex items-center gap-2 mt-2">
+                          <SparrowxCoinIcon className="size-7" size={28} />
+                          <span className="font-display text-3xl font-extrabold text-foreground tabular-nums">
                             {pkg.coins.toLocaleString()}
                           </span>
-                          <span className="text-xs font-semibold text-primary font-mono">
+                          <span className="text-xs font-semibold text-[#A5B4FC] font-mono">
                             Coins
                           </span>
                         </div>
@@ -1359,7 +1381,7 @@ export function ClientPortalView({
                           size="sm"
                           className="w-full bg-primary font-bold text-black hover:opacity-95 shadow-md shadow-primary/20 cursor-pointer"
                         >
-                          <Coins className="size-3.5 mr-1.5" />
+                          <SparrowxCoinIcon className="size-4 mr-1.5" />
                           Buy {pkg.coins.toLocaleString()} Coins
                         </Button>
                       </div>

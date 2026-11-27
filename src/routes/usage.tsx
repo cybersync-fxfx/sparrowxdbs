@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Activity, Cpu, HardDrive, Network } from "lucide-react";
 import { DeployAppShell } from "@/components/deploy/DeployAppShell";
 import { StatusBadge, useDeploySession } from "@/components/deploy/deploy-ui";
+import { SparrowxCoinsMarketingBanner } from "@/components/SparrowxCoinVisuals";
 
 export const Route = createFileRoute("/usage")({
   head: () => ({
@@ -203,6 +204,13 @@ function UsageAndQuotasPage() {
                 </div>
               ))}
             </div>
+
+            {/* Unified SparrowX Coins Ecosystem Banner */}
+            <SparrowxCoinsMarketingBanner
+              variant="compact"
+              ctaLabel="Open SparrowX Coins Wallet"
+              ctaHref="https://sparrowx.net/"
+            />
           </>
         )}
       </div>

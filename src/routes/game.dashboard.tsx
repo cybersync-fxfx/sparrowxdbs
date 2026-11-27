@@ -1,7 +1,8 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Coins, Database, ExternalLink, Gift, Loader2, LogOut, Plus, ShieldCheck, Sparkles } from "lucide-react";
+import { Database, ExternalLink, Gift, Loader2, LogOut, Plus, ShieldCheck } from "lucide-react";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,8 +207,8 @@ function GameDashboard() {
                 <ShieldCheck className="size-4 text-emerald-400" /> Panel Auto-Login <ExternalLink className="size-3.5" />
               </a>
             </Button>
-            <div className="flex items-center gap-1 rounded-full border border-border bg-card p-1 pl-3 glow-discord">
-              <Coins className="size-4 text-sheen" />
+            <div className="flex items-center gap-1.5 rounded-full border border-[#A5B4FC]/30 bg-card p-1 pl-2.5 glow-discord">
+              <SparrowxCoinIcon className="size-5" />
               <span className="font-mono text-sm font-semibold">{data ? data.coins.toLocaleString("en-IN") : "—"}</span>
               <span className="hidden text-[10px] text-muted-foreground sm:inline">· 1 Coin = ₹1</span>
               <Button size="sm" variant="discord" className="ml-1 h-7 rounded-full px-3" onClick={() => setTopUp(true)}>
@@ -249,19 +250,22 @@ function GameDashboard() {
                     </div>
                   </div>
                   <Button type="button" variant="ivory" className="rounded-xl" onClick={() => setTopUp(true)}>
-                    <Sparkles className="size-4" /> Add SparrowCoins
+                    <SparrowxCoinIcon className="size-4" /> Add SparrowCoins
                   </Button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    { label: "Active servers", value: servers?.length ?? "—" },
-                    { label: "Online nodes", value: servers ? onlineCount : "—" },
-                    { label: "SparrowCoins", value: data.coins.toLocaleString("en-IN") },
-                    { label: "INR Value", value: `₹${data.coins.toLocaleString("en-IN")}` },
+                    { label: "Active servers", value: servers?.length ?? "—", coin: false },
+                    { label: "Online nodes", value: servers ? onlineCount : "—", coin: false },
+                    { label: "SparrowCoins", value: data.coins.toLocaleString("en-IN"), coin: true },
+                    { label: "INR Value", value: `₹${data.coins.toLocaleString("en-IN")}`, coin: false },
                   ].map((s) => (
                     <div key={s.label} className="rounded-2xl border border-border bg-background/45 p-3">
-                      <p className="font-display text-xl font-bold">{s.value}</p>
+                      <p className="flex items-center gap-1.5 font-display text-xl font-bold">
+                        {s.coin && <SparrowxCoinIcon className="size-5" />}
+                        <span>{s.value}</span>
+                      </p>
                       <p className="text-[11px] text-muted-foreground">{s.label}</p>
                     </div>
                   ))}

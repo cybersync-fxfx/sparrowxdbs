@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { ContactSection } from "./landing/ContactSection";
 import { SparrowxPoweredByTech } from "@/components/SparrowxPoweredByTech";
+import { SparrowxCoinsMarketingBanner } from "@/components/SparrowxCoinVisuals";
 import {
   Dialog,
   DialogContent,
@@ -1334,6 +1335,21 @@ export function SparrowxMasterLanding({
             </a>
           ))}
         </div>
+      </section>
+
+      {/* SECTION 4: SPARROWX COINS — UNIVERSAL ECOSYSTEM CURRENCY MARKETING SPOTLIGHT */}
+      <section id="coins" className="spx-defer-section scroll-mt-24 px-4 sm:px-6 pb-16 max-w-7xl mx-auto w-full relative z-10">
+        <SparrowxCoinsMarketingBanner
+          variant="hero"
+          ctaLabel={sessionUser ? "Open SparrowX Coins Wallet" : "Create Account & Claim Coin Wallet"}
+          onCtaClick={() => {
+            if (sessionUser) {
+              onOpenLogin();
+            } else {
+              setOperatorModalOpen(true);
+            }
+          }}
+        />
       </section>
 
       {/* SECTION 5: SHORT EMOTIONAL STORY TEASER -> FULL /story PAGE */}

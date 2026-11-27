@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
-  Coins,
   Cpu,
   HardDrive,
   Layers,
@@ -9,6 +8,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { Button } from "@/components/ui/button";
 import { ServiceSwitcher } from "@/components/site/ServiceSwitcher";
 import { findPlan, formatRam, planCostCoins, type ServiceId } from "@/lib/services";
@@ -156,8 +156,8 @@ export function DeployPlans({
                 <h3 className="mt-1.5 font-display text-sm font-bold text-foreground">{p.name}</h3>
                 <p className="text-[11px] text-muted-foreground">{p.capacityHint}</p>
 
-                <p className="mt-3 flex items-baseline gap-1 font-display text-2xl font-bold text-foreground">
-                  <Coins className="size-4 text-emerald-400 self-center shrink-0" aria-hidden="true" />
+                <p className="mt-3 flex items-baseline gap-1.5 font-display text-2xl font-bold text-foreground">
+                  <SparrowxCoinIcon className="size-5 self-center shrink-0" />
                   <span>{cost}</span>
                   <span className="font-mono text-[10px] font-normal text-muted-foreground">/30d</span>
                 </p>

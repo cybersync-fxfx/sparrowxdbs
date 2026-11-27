@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Coins,
   Cpu,
   Dices,
   ExternalLink,
@@ -30,6 +29,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { deployPlan, getEggConfigDetails } from "@/lib/portal.functions";
 import { formatRam, planCostCoins, SERVICES, type ServiceId } from "@/lib/services";
 import type { EggResourceProfile, SmartPlanTier } from "@/lib/egg-smart-plans";
@@ -988,8 +988,8 @@ export function ServerDeployWizard({
             <div className="rounded-2xl border border-border bg-[#05060a] p-4 text-sm space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Plan Cost (30 days)</span>
-                <span className="font-mono font-semibold flex items-center gap-1">
-                  <Coins className="size-3.5 text-emerald-400" /> {cost} SparrowCoins
+                <span className="font-mono font-semibold flex items-center gap-1.5">
+                  <SparrowxCoinIcon className="size-4" /> {cost} SparrowCoins
                 </span>
               </div>
               <div className="flex justify-between">
@@ -1080,7 +1080,7 @@ export function ServerDeployWizard({
                   onNeedCoins();
                 }}
               >
-                <Coins className="size-3.5" />
+                <SparrowxCoinIcon className="size-4" />
                 <span>Top Up {short} Coins to Create</span>
               </Button>
             ) : (

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Coins, Gift, Loader2, MessageCircle, Plus, Smartphone } from "lucide-react";
+import { Gift, Loader2, MessageCircle, Plus, Smartphone } from "lucide-react";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -80,11 +81,31 @@ export function TopUpDialog({ open, onOpenChange, demo, razorpay }: { open: bool
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="theme-dashboard surface-3d max-w-md rounded-3xl border-border text-foreground">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 font-display">
-            <Coins className="size-5 text-sheen" /> Top Up SparrowCoins
+          <DialogTitle className="flex items-center gap-2.5 font-display">
+            <SparrowxCoinIcon className="size-6" size={24} lowPriority /> Top Up SparrowCoins
           </DialogTitle>
-          <DialogDescription>1 Coin = ₹1. Coins never expire and pay for any plan.</DialogDescription>
+          <DialogDescription>1 Coin = ₹1. Coins never expire and pay for any SparrowX plan.</DialogDescription>
         </DialogHeader>
+        <div className="relative overflow-hidden rounded-2xl border border-[#A5B4FC]/25 bg-[#060914] flex items-center gap-3 p-3">
+          <picture className="shrink-0">
+            <source type="image/webp" srcSet="/images/sparrowx-coins-stack.webp" />
+            <img
+              src="/images/sparrowx-coins-stack.jpg"
+              alt="SparrowX Coins bundle"
+              width={112}
+              height={87}
+              fetchPriority="low"
+              decoding="async"
+              className="h-16 w-20 rounded-xl object-cover border border-white/10"
+            />
+          </picture>
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-xs font-semibold text-white">Universal SparrowX Ecosystem Wallet</p>
+            <p className="text-[11px] text-zinc-400 leading-snug">
+              Instant UPI / Card top-up. Spend seamlessly across Game Hosting, VPS, DB &amp; AI.
+            </p>
+          </div>
+        </div>
         <Tabs defaultValue="upi">
           <TabsList className="grid w-full grid-cols-2 bg-background/50">
             <TabsTrigger value="upi"><Smartphone className="mr-1.5 size-4" /> UPI / Card</TabsTrigger>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Coins } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -24,7 +25,7 @@ export function Transactions() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-            <Coins className="size-5 text-sheen" /> SparrowCoins Ledger
+            <SparrowxCoinIcon className="size-5" /> SparrowCoins Ledger
           </h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1 text-emerald-300">

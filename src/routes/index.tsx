@@ -118,6 +118,7 @@ const lazyEngineFallback = (
 import { hasVerifiedPaidSubscription } from "@/lib/sparrowx-plans";
 import { Suspense, lazy, useEffect, useMemo, useState, useRef } from "react";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import {
   Activity,
   AlertCircle,
@@ -2688,7 +2689,7 @@ function Dashboard() {
                     size="sm"
                     variant={activeNav === "Billing & Credits" ? "secondary" : "ghost"}
                   >
-                    <Coins className="size-3.5 text-primary" /> Billing &amp; SparrowX Coins
+                    <SparrowxCoinIcon className="size-4" /> Billing &amp; SparrowX Coins
                   </Button>
                   <Button
                     className="w-full justify-start text-xs font-medium"
@@ -2724,7 +2725,7 @@ function Dashboard() {
                     size="sm"
                     variant={activeNav === "Billing & Credits" ? "secondary" : "ghost"}
                   >
-                    <Coins className="size-3.5 text-primary" /> Billing & Credits
+                    <SparrowxCoinIcon className="size-4" /> Billing &amp; Credits
                   </Button>
                   <Button
                     className="w-full justify-start text-xs font-medium"
@@ -5535,7 +5536,7 @@ function AppSidebar({
   const socManagementItems: Array<{
     label: string;
     navKey: string;
-    icon: typeof Activity;
+    icon: React.ComponentType<{ className?: string }>;
     count?: string | undefined;
   }> = [
     {
@@ -5557,7 +5558,7 @@ function AppSidebar({
       count: "Active",
     },
     { label: "Subscriptions & Due Dates", navKey: "Subscriptions & Due Dates", icon: CreditCard },
-    { label: "Billing & Credits", navKey: "Billing & Credits", icon: Coins },
+    { label: "Billing & Credits", navKey: "Billing & Credits", icon: SparrowxCoinIcon },
     { label: "Reports & Compliance", navKey: "Reports", icon: FileText },
     { label: "SOC Analysts & Access", navKey: "Team & access", icon: Users },
     { label: "Defense Updates & Threat Intel", navKey: "Defense Updates", icon: Globe2, count: "LIVE" },
@@ -5571,7 +5572,7 @@ function AppSidebar({
   // Client Area Hub Navigation (clean account hub for managing created services, subscriptions & coins)
   const clientAreaNavItems: Array<{
     label: string;
-    icon: typeof Activity;
+    icon: React.ComponentType<{ className?: string }>;
     count?: string | undefined;
   }> = [
     {
@@ -5580,7 +5581,7 @@ function AppSidebar({
       count: tenantCount > 0 ? String(tenantCount) : undefined,
     },
     { label: "Subscriptions & Due Dates", icon: CreditCard },
-    { label: "Billing & Credits", icon: Coins, count: "COINS" },
+    { label: "Billing & Credits", icon: SparrowxCoinIcon, count: "COINS" },
     { label: "Profile Management", icon: Users },
     { label: "Activity History", icon: Clock3 },
     { label: "System Status", icon: Activity },

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/site/Navbar";
 import { Hero } from "@/components/site/Hero";
 import { GameHostingShowcase } from "@/components/site/GameHostingShowcase";
 import { PlatformFeatures } from "@/components/site/PlatformFeatures";
+import { SparrowxCoinsMarketingBanner } from "@/components/SparrowxCoinVisuals";
 import { Footer } from "@/components/site/Footer";
 import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/services";
 import { buildRouteHeadFromProfile, SEO_PROFILES } from "@/lib/seo-profiles";
@@ -64,6 +65,13 @@ function GameIndex() {
       <main>
         <Hero service={service} onService={setService} />
         <GameHostingShowcase />
+        <div className="mx-auto max-w-7xl px-5 py-12">
+          <SparrowxCoinsMarketingBanner
+            variant="hero"
+            ctaLabel="Top Up & Deploy with SparrowX Coins"
+            ctaHref="/game/dashboard"
+          />
+        </div>
         <PlatformFeatures />
         <div className="spx-defer-section border-t border-white/[0.06]">
           <Suspense fallback={<div id="performance" className="mx-auto max-w-7xl px-5 py-24 min-h-[540px]" />}>

@@ -22,6 +22,7 @@ import type {
   FounderAdminTelemetry,
 } from "@/lib/ai/contracts";
 import { AI_COMPUTE_PLANS } from "@/lib/ai/contracts";
+import { SparrowxCoinIcon, SparrowxCoinsMarketingBanner } from "@/components/SparrowxCoinVisuals";
 
 interface AiBillingCenterProps {
   walletBalanceInr: number;
@@ -90,11 +91,18 @@ export function AiBillingCenter({
         </button>
       </div>
 
+      <SparrowxCoinsMarketingBanner
+        variant="compact"
+        balanceCoins={walletBalanceInr}
+        ctaLabel="Top Up Wallet via UPI"
+        onCtaClick={() => onTriggerUpiCheckout(AI_COMPUTE_PLANS[1]!)}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="rounded-xl border border-white/[0.08] bg-[#090B11] p-5">
           <div className="flex items-center justify-between text-xs font-mono text-zinc-500">
-            <span>INR WALLET BALANCE</span>
-            <IndianRupee className="size-4 text-[#10B981]" aria-hidden="true" />
+            <span>SPARROWX COIN WALLET</span>
+            <SparrowxCoinIcon className="size-5" />
           </div>
           <div className="mt-2 text-3xl font-mono font-semibold text-white">
             ₹{walletBalanceInr.toLocaleString("en-IN")}

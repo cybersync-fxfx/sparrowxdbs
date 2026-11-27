@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   CalendarPlus,
-  Coins,
   CreditCard,
   History,
   Loader2,
@@ -17,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import {
   adminAdjustCoins,
   adminAssignSubscription,
@@ -320,7 +320,7 @@ export function AdminControlPanel() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: "Total Clients", value: data.stats.totalClients.toLocaleString("en-IN"), icon: Users, accent: "text-sky-300" },
-          { label: "Wallet Coins Supply", value: `${data.stats.totalCoins.toLocaleString("en-IN")} coins`, icon: Coins, accent: "text-emerald-300" },
+          { label: "Wallet Coins Supply", value: `${data.stats.totalCoins.toLocaleString("en-IN")} coins`, icon: SparrowxCoinIcon, accent: "text-[#C7D2FE]" },
           { label: "Active Subscriptions", value: `${data.stats.activeSubscriptions} active / ${data.stats.expiredSubscriptions} inactive`, icon: Server, accent: "text-amber-300" },
           { label: "Active Plan Volume", value: `₹${data.stats.monthlyCoinVolume.toLocaleString("en-IN")}/mo`, icon: CreditCard, accent: "text-white" },
         ].map((kpi) => {
@@ -444,7 +444,7 @@ export function AdminControlPanel() {
                             setCoinNote("");
                           }}
                         >
-                          <Coins className="size-3.5" aria-hidden="true" />
+                          <SparrowxCoinIcon className="size-4" />
                           <span>Coins</span>
                         </Button>
                         <Button
@@ -757,7 +757,7 @@ export function AdminControlPanel() {
                   Cancel
                 </Button>
                 <Button type="submit" size="sm" variant="ivory" className="rounded-xl" disabled={coinsMutation.isPending}>
-                  {coinsMutation.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Coins className="size-3.5" />}
+                  {coinsMutation.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <SparrowxCoinIcon className="size-4" />}
                   <span>Apply Coin Update</span>
                 </Button>
               </div>

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { buildWhatsAppSupportUrl, WHATSAPP_SUPPORT_DISPLAY } from "@/lib/whatsapp-support";
 import { WhatsAppLogo } from "@/components/WhatsAppPlansToaster";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 
 export type CheckoutPayMethod = "upi" | "binance_usdt_trc20" | "binance_usdt_bep20";
 
@@ -276,15 +277,15 @@ export function UpiAutoPayModal({
     >
       <div className="flex items-center justify-between gap-4 border-b border-white/10 bg-[#0E131D] px-6 py-5">
         <div className="flex items-center gap-3.5 min-w-0">
-          <div className="size-10 rounded-xl bg-emerald-500/15 border border-emerald-500/35 grid place-items-center text-emerald-400 shrink-0">
-            <QrCode className="size-5" aria-hidden="true" />
+          <div className="size-11 rounded-xl bg-[#8B9CFF]/15 border border-[#A5B4FC]/35 grid place-items-center shrink-0">
+            <SparrowxCoinIcon className="size-7" size={28} lowPriority />
           </div>
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-bold text-white tracking-tight truncate">
-              SparrowX Pay
+              SparrowX Pay · Coins &amp; Checkout
             </h2>
             <p className="text-xs text-zinc-400 truncate">
-              Direct UPI &amp; Binance USDT · Self-verified · 0% gateway fee
+              Direct UPI &amp; Binance USDT · 1 Coin = ₹1 · 0% gateway fee
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CalendarClock, Coins, CreditCard, Loader2, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
+import { CalendarClock, CreditCard, Loader2, MessageCircle, RefreshCw, Sparkles } from "lucide-react";
+import { SparrowxCoinIcon } from "@/components/SparrowxCoinVisuals";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { renewSubscription } from "@/lib/portal.functions";
@@ -152,7 +153,7 @@ export function SubscriptionManager({
                       className="rounded-xl"
                       onClick={onOpenCoinStore}
                     >
-                      <Coins className="size-3.5 text-sheen" /> Add Coins
+                      <SparrowxCoinIcon className="size-4" /> Add Coins
                     </Button>
                   )}
                 </div>
@@ -167,13 +168,32 @@ export function SubscriptionManager({
         <div>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5">
-              <span className="grid size-9 place-items-center rounded-xl bg-amber-500/20 text-amber-300">
-                <Coins className="size-4" />
+              <span className="grid size-10 place-items-center rounded-xl border border-[#A5B4FC]/30 bg-[#8B9CFF]/15">
+                <SparrowxCoinIcon className="size-6" size={24} />
               </span>
               <div>
                 <h2 className="font-display text-lg font-semibold">SparrowCoins Store</h2>
                 <p className="text-xs text-muted-foreground">1 SparrowCoin = ₹1 · Instant UPI / Card credit</p>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-4 relative overflow-hidden rounded-2xl border border-[#A5B4FC]/20 bg-[#060914]">
+            <picture>
+              <source type="image/webp" srcSet="/images/sparrowx-coins-stack.webp" />
+              <img
+                src="/images/sparrowx-coins-stack.jpg"
+                alt="Stacks of official 3D SparrowX Coins"
+                width={960}
+                height={746}
+                loading="lazy"
+                decoding="async"
+                className="h-32 w-full object-cover object-center"
+              />
+            </picture>
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#060914] via-[#060914]/70 to-transparent px-3 pb-2 pt-6 flex items-center justify-between text-[10px] font-mono text-[#C7D2FE]">
+              <span>UNIVERSAL ECOSYSTEM COINS</span>
+              <span className="text-emerald-300 font-semibold">ZERO EXPIRY</span>
             </div>
           </div>
 
@@ -185,8 +205,9 @@ export function SubscriptionManager({
                 onClick={onOpenCoinStore}
                 className="group rounded-2xl border border-border bg-background/45 p-3.5 text-left transition-all hover:border-sheen/60 hover:bg-background/70"
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-display text-base font-bold text-foreground">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="inline-flex items-center gap-1.5 font-display text-base font-bold text-foreground">
+                    <SparrowxCoinIcon className="size-4" />
                     {pack.coins.toLocaleString("en-IN")}
                   </span>
                   <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-sheen">
