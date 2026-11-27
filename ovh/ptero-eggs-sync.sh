@@ -115,10 +115,25 @@ if command -v php >/dev/null 2>&1 && [ -f "${PTERO_DIR}/artisan" ]; then
     $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
     $kernel->bootstrap();
 
-    $nest = Pterodactyl\Models\Nest::firstOrCreate(
-      ["name" => "SparrowX Curated"],
-      ["author" => "ops@sparrowx.net", "description" => "Curated FiveM, SA-MP/open.mp, Minecraft, and Discord Bot eggs"]
-    );
+    $nest = Pterodactyl\Models\Nest::where("name", "SparrowX Curated")->first();
+    if (!$nest) {
+      if (class_exists(Pterodactyl\Services\Nests\NestCreationService::class)) {
+        $nest = $app->make(Pterodactyl\Services\Nests\NestCreationService::class)->handle(
+          [
+            "name" => "SparrowX Curated",
+            "description" => "Curated FiveM, SA-MP/open.mp, Minecraft, and Discord Bot eggs",
+          ],
+          "ops@sparrowx.net"
+        );
+      } else {
+        $nest = new Pterodactyl\Models\Nest();
+        $nest->uuid = Ramsey\Uuid\Uuid::uuid4()->toString();
+        $nest->author = "ops@sparrowx.net";
+        $nest->name = "SparrowX Curated";
+        $nest->description = "Curated FiveM, SA-MP/open.mp, Minecraft, and Discord Bot eggs";
+        $nest->save();
+      }
+    }
     $importer = $app->make(Pterodactyl\Services\Eggs\Sharing\EggImporterService::class);
 
     foreach (glob($argv[2] . "/egg-*.json") as $file) {
