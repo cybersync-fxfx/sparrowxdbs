@@ -31,8 +31,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Local persistent data directory
-data/
+# Local persistent data directory (root only; allow public/data/ bundled catalogs)
+/data/
 backups/
 *.tar.gz
 *.tar.zst
