@@ -5,7 +5,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/site/Navbar";
 import { Hero } from "@/components/site/Hero";
 import { GameHostingShowcase } from "@/components/site/GameHostingShowcase";
+import { GameSpatialExperience } from "@/components/site/GameSpatialExperience";
 import { PlatformFeatures } from "@/components/site/PlatformFeatures";
+import { SmoothScroll } from "@/components/shared/SmoothScroll";
 import { SparrowxCoinsMarketingBanner } from "@/components/SparrowxCoinVisuals";
 import { Footer } from "@/components/site/Footer";
 import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/services";
@@ -60,27 +62,30 @@ function GameIndex() {
   }, [search.auth_error, navigate]);
 
   return (
-    <div data-service={service.id} className="theme-game min-h-screen bg-[#05060a] text-foreground">
-      <Navbar service={service.id} onService={setService} />
-      <main>
-        <Hero service={service} onService={setService} />
-        <GameHostingShowcase />
-        <div className="mx-auto max-w-7xl px-5 py-12">
-          <SparrowxCoinsMarketingBanner
-            variant="hero"
-            ctaLabel="Top Up & Deploy with SparrowX Coins"
-            ctaHref="/game/dashboard"
-          />
-        </div>
-        <PlatformFeatures />
-        <div className="spx-defer-section border-t border-white/[0.06]">
-          <Suspense fallback={<div id="performance" className="mx-auto max-w-7xl px-5 py-24 min-h-[540px]" />}>
-            <Performance service={service} />
-          </Suspense>
-        </div>
-      </main>
-      <Footer />
-      <Toaster theme="dark" position="bottom-right" />
-    </div>
+    <SmoothScroll>
+      <div data-service={service.id} className="theme-game min-h-screen bg-[#030407] text-foreground">
+        <Navbar service={service.id} onService={setService} />
+        <main>
+          <Hero service={service} onService={setService} />
+          <GameSpatialExperience />
+          <GameHostingShowcase />
+          <div className="mx-auto max-w-7xl px-5 py-12">
+            <SparrowxCoinsMarketingBanner
+              variant="hero"
+              ctaLabel="Top Up & Deploy with SparrowX Coins"
+              ctaHref="/game/dashboard"
+            />
+          </div>
+          <PlatformFeatures />
+          <div className="spx-defer-section border-t border-white/[0.06]">
+            <Suspense fallback={<div id="performance" className="mx-auto max-w-7xl px-5 py-24 min-h-[540px]" />}>
+              <Performance service={service} />
+            </Suspense>
+          </div>
+        </main>
+        <Footer />
+        <Toaster theme="dark" position="bottom-right" />
+      </div>
+    </SmoothScroll>
   );
 }

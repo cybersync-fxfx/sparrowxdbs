@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DeployAppShell } from "@/components/deploy/DeployAppShell";
+import { DeployLandingView } from "@/components/deploy/DeployLandingView";
 import {
   formatRelativeTime,
   FrameworkIcon,
@@ -70,7 +71,7 @@ interface GithubRepoItem {
 }
 
 export function SparrowxDeployDashboard() {
-  const { user, checking, networkError } = useDeploySession(true);
+  const { user, checking } = useDeploySession(false);
   const [projects, setProjects] = useState<DeployProjectSummary[]>([]);
   const [workspace, setWorkspace] = useState<WorkspaceInfo | null>(null);
   const [hostDomain, setHostDomain] = useState("sparrowx.net");
@@ -173,15 +174,19 @@ export function SparrowxDeployDashboard() {
     return githubRepos.filter((r) => r.fullName.toLowerCase().includes(q)).slice(0, 6);
   }, [githubRepos, repoSearch]);
 
-  if (checking || !user) {
+  if (checking) {
     return (
-      <div className="min-h-screen bg-[#05060A] flex items-center justify-center">
+      <div className="min-h-screen bg-[#030407] flex items-center justify-center">
         <div className="flex items-center gap-3 text-xs spx-mono text-zinc-400">
-          <span className="size-2 rounded-full bg-zinc-300 animate-pulse" />
-          <span>{networkError || "Verifying SparrowX session..."}</span>
+          <span className="size-2 rounded-full bg-[#8F9CFF] animate-pulse" />
+          <span>Loading SparrowX Deploy…</span>
         </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return <DeployLandingView />;
   }
 
   const liveCount = projects.filter(

@@ -2,18 +2,10 @@ import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { SparrowxDeployDashboard } from "@/components/SparrowxDeployDashboard";
 import { BackgroundEngineToaster } from "@/components/BackgroundEngineToaster";
+import { buildRouteHeadFromProfile, SEO_PROFILES } from "@/lib/seo-profiles";
 
 export const Route = createFileRoute("/deploy")({
-  head: () => ({
-    meta: [
-      { title: "SparrowX Deploy — Cloud PaaS & Web App Deployment" },
-      {
-        name: "description",
-        content:
-          "Deploy Next.js, Vite, React, Node.js, Python, and Docker web apps with instant *.deploy.sparrowx.net HTTPS subdomains and live build logs.",
-      },
-    ],
-  }),
+  head: () => buildRouteHeadFromProfile(SEO_PROFILES.deploy),
   component: SparrowxDeployRoute,
 });
 

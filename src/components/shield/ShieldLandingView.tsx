@@ -1,20 +1,20 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import {
   Activity,
   ArrowRight,
   Check,
-  CheckCircle2,
-  Cpu,
   Download,
   Flame,
   Gamepad2,
   Globe,
   Lock,
+  Pause,
+  Play,
   RefreshCw,
-  Server,
   Shield,
+  ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Terminal,
   Zap,
 } from "lucide-react";
@@ -28,8 +28,13 @@ import {
 } from "@/components/GrowthAndMonetizationHub";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
-import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
 import { UnderAttackModal } from "@/components/shield/UnderAttackModal";
+import { SmoothScroll } from "@/components/shared/SmoothScroll";
+import { ParticleField } from "@/components/shared/ParticleField";
+import { GridCanvas } from "@/components/shared/GridCanvas";
+import { ThreeModelViewer } from "@/components/shared/ThreeModelViewer";
+import { InteractiveCard } from "@/components/shared/InteractiveCard";
+import { BentoCard, BentoGrid } from "@/components/shared/BentoGrid";
 
 export const GAMESEC_URL = "https://gamesec.sparrowx.net";
 
@@ -40,6 +45,24 @@ export interface ShieldLandingViewProps {
   onEnterDashboard: () => void;
   onSignOut: () => void;
 }
+
+interface SimPacket {
+  id: number;
+  kind: "legit" | "ddos" | "sqli" | "prompt";
+  label: string;
+  source: string;
+  action: "PASSED" | "DROPPED";
+  latencyMs: number;
+}
+
+const PACKET_TEMPLATES: Omit<SimPacket, "id">[] = [
+  { kind: "legit", label: "GET /api/v1/products · TLS 1.3", source: "Mumbai IN", action: "PASSED", latencyMs: 11 },
+  { kind: "ddos", label: "L7 HTTP/2 Flood · 48k RPS burst", source: "Botnet AS4134", action: "DROPPED", latencyMs: 0 },
+  { kind: "sqli", label: "POST /login · ' OR 1=1-- SQLi", source: "Scanner Proxy", action: "DROPPED", latencyMs: 0 },
+  { kind: "legit", label: "POST /api/checkout · Verified", source: "Bengaluru IN", action: "PASSED", latencyMs: 14 },
+  { kind: "prompt", label: "LLM Jailbreak · System Override", source: "AI Abuse Bot", action: "DROPPED", latencyMs: 0 },
+  { kind: "legit", label: "GET /assets/app.js · Edge Cache", source: "Chennai IN", action: "PASSED", latencyMs: 6 },
+];
 
 export function ShieldLandingView({
   activeUser,
@@ -55,6 +78,36 @@ export function ShieldLandingView({
   const [currency, setCurrency] = useState<"INR" | "USD" | "EUR">("INR");
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [underAttackOpen, setUnderAttackOpen] = useState(false);
+  const [simPaused, setSimPaused] = useState(false);
+  const [burstMode, setBurstMode] = useState(false);
+  const [packets, setPackets] = useState<SimPacket[]>(() =>
+    PACKET_TEMPLATES.slice(0, 4).map((p, i) => ({ ...p, id: i + 1 })),
+  );
+  const [droppedCount, setDroppedCount] = useState(1420);
+  const [passedCount, setPassedCount] = useState(8940);
+
+  useEffect(() => {
+    if (simPaused) return;
+    let seq = 10;
+    const interval = window.setInterval(
+      () => {
+        seq += 1;
+        const pool = burstMode
+          ? PACKET_TEMPLATES.filter((p) => p.action === "DROPPED")
+          : PACKET_TEMPLATES;
+        const nextTpl = pool[seq % pool.length]!;
+        const pkt: SimPacket = { ...nextTpl, id: seq };
+        setPackets((prev) => [pkt, ...prev].slice(0, 6));
+        if (pkt.action === "DROPPED") {
+          setDroppedCount((c) => c + (burstMode ? 48 : 7));
+        } else {
+          setPassedCount((c) => c + 19);
+        }
+      },
+      burstMode ? 650 : 1400,
+    );
+    return () => window.clearInterval(interval);
+  }, [simPaused, burstMode]);
 
   const runLandingScan = async (overrideDomain?: string) => {
     const raw = (overrideDomain ?? scanInput).trim();
@@ -88,211 +141,322 @@ export function ShieldLandingView({
   };
 
   return (
-    <div className="font-soc min-h-screen bg-[#090B11] text-[#F4F6FA] flex flex-col selection:bg-[#F9103A] selection:text-[#F4F6FA]">
-      {/* Sticky Top Header */}
-      <header className="sticky top-0 z-40 border-b border-[#F4F6FA]/[0.08] bg-[#090B11]/92 backdrop-blur-xl px-4 sm:px-6 py-3">
-        <div className="max-w-[1380px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logos/sparrowx-shield.png"
-              alt="SparrowX Shield"
-              width={36}
-              height={36}
-              className="size-9 object-contain shrink-0 drop-shadow-[0_4px_14px_rgba(249,16,58,0.28)]"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-semibold tracking-tight text-[#F4F6FA]">SparrowX Shield</span>
-                <span className="hidden sm:inline-flex items-center rounded-full border border-[#F9103A]/35 bg-[#F9103A]/10 px-2 py-0.5 font-mono text-[10px] text-[#F96246]">
-                  sec.sparrowx.net
-                </span>
+    <SmoothScroll>
+      <div className="font-soc min-h-screen bg-[#030407] text-[#F4F6FA] flex flex-col selection:bg-[#06B6D4] selection:text-[#030407]">
+        {/* Sticky Obsidian Header */}
+        <header className="sticky top-0 z-40 border-b border-[#141A29] bg-[#030407]/90 backdrop-blur-xl px-4 sm:px-6 py-3">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logos/sparrowx-shield.png"
+                alt="SparrowX Shield"
+                width={34}
+                height={34}
+                className="size-8.5 object-contain shrink-0"
+              />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm sm:text-base font-extrabold tracking-tight text-white">
+                    SparrowX Shield
+                  </span>
+                  <span className="hidden sm:inline-flex items-center rounded-full border border-[#06B6D4]/35 bg-[#06B6D4]/10 px-2 py-0.5 font-mono text-[10px] text-[#06B6D4]">
+                    sec.sparrowx.net
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-400 hidden sm:block">
+                  Edge WAF · L3/L4/L7 DDoS · AI Prompt Guardrails
+                </p>
               </div>
-              <p className="text-[11px] text-[#F4F6FA]/45 hidden sm:block">Edge WAF · Origin Cloaking · Autonomous SOC</p>
             </div>
-          </div>
 
-          <nav aria-label="SparrowX Shield Navigation" className="hidden md:flex items-center gap-6 text-xs text-[#F4F6FA]/70">
-            <a href="#shield-features" className="hover:text-[#F4F6FA] transition-colors">Capabilities</a>
-            <a href="#shield-scanner" className="hover:text-[#F4F6FA] transition-colors">Live Audit</a>
-            <a href="#shield-game-ddos" className="text-[#F96246] hover:text-[#F9103A] font-medium transition-colors flex items-center gap-1.5">
-              <Gamepad2 className="size-3.5" /> Game DDoS Defense
-            </a>
-            <a href="#shield-agent-plans" className="hover:text-[#F4F6FA] transition-colors">Plans</a>
-          </nav>
+            <nav aria-label="SparrowX Shield Navigation" className="hidden md:flex items-center gap-6 text-xs text-zinc-400">
+              <a href="#shield-traffic-sim" className="hover:text-white transition-colors">Live WAF Sim</a>
+              <a href="#shield-features" className="hover:text-white transition-colors">Capabilities</a>
+              <a href="#shield-scanner" className="hover:text-white transition-colors">Live Audit</a>
+              <a href="#shield-game-ddos" className="text-amber-400 hover:text-amber-300 font-medium flex items-center gap-1.5">
+                <Gamepad2 className="size-3.5" /> Game DDoS Defense
+              </a>
+              <a href="#shield-agent-plans" className="hover:text-white transition-colors">Plans</a>
+            </nav>
 
-          <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setUnderAttackOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-red-500/60 bg-red-600/20 hover:bg-red-600/35 px-3 py-2 text-xs font-bold text-red-200 hover:text-white transition-all cursor-pointer shadow-[0_0_20px_rgba(239,68,68,0.28)]"
-            >
-              <span className="size-2 rounded-full bg-red-500 animate-ping" aria-hidden="true" />
-              <span>Under Attack?</span>
-            </button>
-            {activeUser ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onEnterClientArea}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#F9103A] px-3.5 py-2 text-xs font-medium text-white hover:bg-[#F9103A]/90 transition-colors cursor-pointer shadow-[0_6px_20px_rgba(249,16,58,0.28)]"
-                >
-                  <span>Client Area</span>
-                  <ArrowRight className="size-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={onEnterDashboard}
-                  className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-[#10B981]/35 bg-[#10B981]/10 px-3 py-2 text-xs font-medium text-[#10B981] hover:bg-[#10B981]/20 transition-colors cursor-pointer"
-                >
-                  <ShieldCheck className="size-3.5" />
-                  <span>SOC Dashboard</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={onSignOut}
-                  className="rounded-lg border border-[#F4F6FA]/12 bg-[#121620] px-3 py-2 text-xs text-[#F4F6FA]/75 hover:text-[#F4F6FA] cursor-pointer"
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onOpenAuthModal("register")}
-                  className="hidden sm:inline-flex items-center rounded-lg border border-[#F4F6FA]/12 bg-[#121620] px-3.5 py-2 text-xs font-medium text-[#F4F6FA]/85 hover:border-[#F4F6FA]/25 cursor-pointer"
-                >
-                  Create Account
-                </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setUnderAttackOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/45 bg-rose-500/15 px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/25 cursor-pointer"
+              >
+                <Flame className="size-3.5" />
+                <span>Under Attack?</span>
+              </button>
+
+              {activeUser ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={onEnterClientArea}
+                    className="rounded-xl border border-[#06B6D4]/40 bg-[#06B6D4]/15 px-3 py-1.5 text-xs font-semibold text-[#06B6D4] hover:bg-[#06B6D4]/25 cursor-pointer"
+                  >
+                    Client Area
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onSignOut}
+                    className="rounded-xl border border-[#141A29] bg-[#080B12] px-3 py-1.5 text-xs text-zinc-300 hover:text-white cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   onClick={() => onOpenAuthModal("signin")}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#F9103A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#F9103A]/90 transition-colors cursor-pointer shadow-[0_6px_20px_rgba(249,16,58,0.32)]"
+                  className="rounded-xl bg-white px-4 py-1.5 text-xs font-bold text-[#030407] hover:bg-zinc-200 cursor-pointer"
                 >
-                  <Lock className="size-3.5" />
-                  <span>Client Login</span>
+                  Sign In
                 </button>
-              </>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="flex-1">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden border-b border-[#F4F6FA]/[0.07]">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-36 left-1/2 -translate-x-1/2 h-[460px] w-[780px] rounded-full bg-[radial-gradient(circle,rgba(249,16,58,0.16),rgba(249,98,70,0.06)_45%,transparent_72%)] blur-2xl"
-          />
-          <div className="max-w-[1380px] mx-auto px-4 sm:px-6 py-14 sm:py-20 grid gap-10 lg:grid-cols-[1.15fr_0.95fr] items-center relative">
-            <div className="space-y-6 min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-[#F9103A]/35 bg-[#F9103A]/10 px-3.5 py-1 text-[11px] font-medium text-[#F96246]">
-                <span className="size-1.5 rounded-full bg-[#10B981]" />
-                <span>SPARROWX SHIELD · EDGE WAF &amp; AUTONOMOUS SOC</span>
-              </div>
+        <main className="flex-1">
+          {/* SPATIAL HERO WITH 3D HOLOGRAPHIC SHIELD NODE */}
+          <GridCanvas accent="cyan" variant="blueprint" className="border-b border-[#141A29]">
+            <ParticleField accentColor="6, 182, 212" secondaryColor="244, 63, 94" density={46} />
 
-              <h1 className="text-3xl sm:text-5xl font-semibold tracking-[-0.03em] leading-[1.08] text-[#F4F6FA]">
-                Stop L7 floods, prompt exploits, and origin leaks before packets hit your app.
-              </h1>
+            <section className="relative mx-auto max-w-7xl px-4 sm:px-6 pt-12 pb-16 sm:pt-18 sm:pb-22">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+                <motion.div
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                  className="lg:col-span-7 space-y-6"
+                >
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#06B6D4]/35 bg-[#080B12]/90 px-3.5 py-1.5 font-mono text-[11px] text-[#06B6D4]">
+                    <ShieldCheck className="size-3.5 text-[#10B981]" />
+                    <span>SPARROWX SEC · L3/L4/L7 EDGE WAF &amp; THREAT INTERCEPTION</span>
+                  </div>
 
-              <p className="max-w-2xl text-sm sm:text-base text-[#F4F6FA]/65 leading-relaxed">
-                Deploy SparrowX Shield in front of websites, APIs, and LLM agents. Sign in to provision your Client Area key, inspect live origin headers, export Cloudflare &amp; NGINX blocklists, and operate a clean autonomous SOC workbench.
-              </p>
+                  <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-extrabold tracking-tight leading-[1.06]">
+                    <span className="spx-silver-text block">Drop Attacks at the Edge.</span>
+                    <span className="bg-gradient-to-r from-[#06B6D4] via-[#8F9CFF] to-rose-400 bg-clip-text text-transparent block mt-1">
+                      Keep Clean Traffic Flying.
+                    </span>
+                  </h1>
 
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                {activeUser ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={onEnterClientArea}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#F9103A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#F9103A]/90 transition-all cursor-pointer shadow-[0_10px_28px_rgba(249,16,58,0.34)]"
-                    >
-                      <span>Go to Client Area</span>
-                      <ArrowRight className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onEnterDashboard}
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#10B981]/35 bg-[#10B981]/10 px-5 py-3 text-sm font-medium text-[#10B981] hover:bg-[#10B981]/20 transition-colors cursor-pointer"
-                    >
-                      <ShieldCheck className="size-4" />
-                      <span>Open SOC Dashboard</span>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onOpenAuthModal("signin")}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#F9103A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#F9103A]/90 transition-all cursor-pointer shadow-[0_10px_28px_rgba(249,16,58,0.34)]"
-                    >
-                      <Lock className="size-4" />
-                      <span>Sign In to Client Area</span>
-                      <ArrowRight className="size-4" />
-                    </button>
+                  <p className="max-w-2xl text-sm sm:text-base text-zinc-400 leading-relaxed">
+                    Autonomous Layer 3/4/7 DDoS mitigation, managed OWASP WAF rules, origin IP cloaking, and AI prompt-injection guardrails engineered for websites, APIs, and production servers.
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3">
                     <a
                       href="#shield-scanner"
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#F4F6FA]/14 bg-[#111520] px-5 py-3 text-sm font-medium text-[#F4F6FA]/85 hover:border-[#F4F6FA]/30 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8F9CFF] px-6 py-3.5 text-sm font-extrabold text-[#030407] shadow-[0_0_32px_rgba(6,182,212,0.35)]"
                     >
-                      <Globe className="size-4 text-[#F96246]" />
-                      <span>Run Free Header Audit</span>
+                      <Shield className="size-4" />
+                      <span>Run Free Domain Security Audit</span>
+                      <ArrowRight className="size-4" />
                     </a>
-                  </>
-                )}
-              </div>
+                    {activeUser ? (
+                      <button
+                        type="button"
+                        onClick={onEnterClientArea}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#141A29] bg-[#080B12] px-5 py-3.5 text-sm font-semibold text-white hover:border-[#06B6D4]/50 cursor-pointer"
+                      >
+                        <span>Enter Shield Client Area</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onOpenAuthModal("register")}
+                        className="inline-flex items-center gap-2 rounded-xl border border-[#141A29] bg-[#080B12] px-5 py-3.5 text-sm font-semibold text-white hover:border-[#06B6D4]/50 cursor-pointer"
+                      >
+                        <span>Protect My Domain</span>
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
 
-              <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[#F4F6FA]/[0.08] max-w-lg text-xs">
-                <div>
-                  <span className="block font-semibold text-[#F4F6FA]">Zero Fake Alerts</span>
-                  <span className="text-[#F4F6FA]/50 text-[11px]">Unconfigured modules stay OFF</span>
-                </div>
-                <div>
-                  <span className="block font-semibold text-[#F4F6FA]">SHA-256 Audit Chain</span>
-                  <span className="text-[#F4F6FA]/50 text-[11px]">Tamper-evident SOC logs</span>
-                </div>
-                <div>
-                  <span className="block font-semibold text-[#F4F6FA]">1-Click Export</span>
-                  <span className="text-[#F4F6FA]/50 text-[11px]">Cloudflare, AWS, NGINX, UFW</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Interactive Live Perimeter Audit Card + borderless floating 3D side shield */}
-            <div className="relative space-y-4 min-w-0 w-full">
-              <div
-                aria-hidden="true"
-                className="flex justify-center lg:justify-end -mb-2 pointer-events-none"
-              >
-                <div className="w-36 sm:w-44">
-                  <Floating3DVisual
-                    src="/3d/shield-waf-fortress.svg"
-                    alt=""
-                    accent="crimson"
-                    size="sm"
-                    priority="lcp"
-                    width={240}
-                    height={240}
+                <div className="lg:col-span-5">
+                  <ThreeModelViewer
+                    variant="shield-dome"
+                    heightClass="h-[340px] sm:h-[400px]"
+                    label="SPARROWX SHIELD · 3D HOLOGRAPHIC WAF"
                   />
                 </div>
               </div>
+            </section>
+          </GridCanvas>
 
-            <div
-              id="shield-scanner"
-              className="min-w-0 w-full max-w-full overflow-hidden rounded-2xl border border-[#F4F6FA]/[0.09] bg-[#0D1017]/95 p-5 sm:p-6 shadow-[0_24px_70px_rgba(0,0,0,0.75)] space-y-4"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#F4F6FA]">
-                    <Globe className="size-4 text-[#F96246]" /> Live Public Domain Perimeter Audit
-                  </span>
-                  <p className="text-[11px] text-[#F4F6FA]/50 mt-0.5">
-                    Real DNS, TLS, and HTTP security header verification — no synthetic data.
+          {/* LIVE WAF TRAFFIC SIMULATION */}
+          <section id="shield-traffic-sim" className="spx-scroll-reveal mx-auto max-w-7xl px-4 sm:px-6 py-16">
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+              <div className="space-y-1.5">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#06B6D4]">
+                  Interactive WAF Telemetry Demo
+                </p>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                  Live Traffic Filtering &amp; Packet Interception
+                </h2>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBurstMode((b) => !b)}
+                  className={`inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2 font-mono text-xs font-bold cursor-pointer transition-colors ${
+                    burstMode
+                      ? "border-rose-500 bg-rose-500/20 text-rose-300"
+                      : "border-[#141A29] bg-[#080B12] text-zinc-300 hover:border-rose-500/40"
+                  }`}
+                >
+                  <Zap className="size-3.5" />
+                  <span>{burstMode ? "Stop DDoS Burst" : "Simulate DDoS Burst"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSimPaused((p) => !p)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#141A29] bg-[#080B12] px-3.5 py-2 font-mono text-xs text-zinc-300 hover:text-white cursor-pointer"
+                >
+                  {simPaused ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+                  <span>{simPaused ? "Play Stream" : "Pause Stream"}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <InteractiveCard className="lg:col-span-4 p-5 space-y-4">
+                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-rose-300">
+                    Malicious Packets Dropped (Demo)
+                  </p>
+                  <p className="mt-1 font-display text-3xl font-extrabold text-rose-400 tabular-nums">
+                    {droppedCount.toLocaleString("en-IN")}
+                  </p>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    DDoS floods, SQLi, XSS &amp; prompt injections dropped at XDP edge
                   </p>
                 </div>
-                <span className="rounded-full border border-[#F4F6FA]/12 bg-[#131823] px-2.5 py-0.5 font-mono text-[10px] text-[#10B981]">
-                  {liveAudit ? `Score ${liveAudit.score}/100` : "Standby"}
-                </span>
+
+                <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/10 p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#10B981]">
+                    Legitimate Requests Passed (Demo)
+                  </p>
+                  <p className="mt-1 font-display text-3xl font-extrabold text-[#10B981] tabular-nums">
+                    {passedCount.toLocaleString("en-IN")}
+                  </p>
+                  <p className="mt-1 text-[11px] text-zinc-400">
+                    Clean users forwarded to origin with sub-15ms Mumbai latency
+                  </p>
+                </div>
+              </InteractiveCard>
+
+              <div className="lg:col-span-8 rounded-2xl border border-[#141A29] bg-[#080B12] p-5 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#141A29] pb-2.5 font-mono text-[11px] text-zinc-400">
+                  <span className="flex items-center gap-2">
+                    <Terminal className="size-3.5 text-[#06B6D4]" />
+                    <span>SPARROWX EDGE PACKET PIPELINE (SIMULATED STREAM)</span>
+                  </span>
+                  <span className={burstMode ? "text-rose-400 font-bold" : "text-[#10B981]"}>
+                    {burstMode ? "MITIGATING FLOOD" : "NOMINAL"}
+                  </span>
+                </div>
+
+                <div className="space-y-2 font-mono text-xs">
+                  {packets.map((pkt) => {
+                    const dropped = pkt.action === "DROPPED";
+                    return (
+                      <div
+                        key={pkt.id}
+                        className={`flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3.5 py-2.5 ${
+                          dropped
+                            ? "border-rose-500/35 bg-rose-500/10 text-rose-200"
+                            : "border-[#10B981]/25 bg-[#10B981]/5 text-emerald-100"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {dropped ? (
+                            <ShieldAlert className="size-4 text-rose-400 shrink-0" />
+                          ) : (
+                            <ShieldCheck className="size-4 text-[#10B981] shrink-0" />
+                          )}
+                          <span className="truncate">{pkt.label}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 text-[10px]">
+                          <span className="text-zinc-400">{pkt.source}</span>
+                          <span
+                            className={`rounded px-2 py-0.5 font-bold ${
+                              dropped ? "bg-rose-500 text-white" : "bg-[#10B981] text-[#030407]"
+                            }`}
+                          >
+                            {pkt.action}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* FEATURE BENTO */}
+          <section id="shield-features" className="spx-scroll-reveal border-y border-[#141A29] bg-[#05070D]/80 py-16">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6">
+              <div className="mb-8 space-y-1.5">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#8F9CFF]">
+                  Defense Architecture
+                </p>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                  Full-Stack Edge Protection
+                </h2>
+              </div>
+              <BentoGrid className="lg:grid-cols-4">
+                <BentoCard
+                  title="L3 / L4 / L7 DDoS Mitigation"
+                  description="Kernel XDP/eBPF scrubbing drops SYN floods, HTTP/2 rapid resets, and volumetric spikes before origin sockets saturate."
+                  badge="ALWAYS ON"
+                  accent="cyan"
+                  icon={<Activity className="size-5 text-[#06B6D4]" />}
+                />
+                <BentoCard
+                  title="Managed OWASP WAF Rules"
+                  description="Pre-tuned rulesets blocking SQL injection, XSS, SSRF, RCE, and credential stuffing out of the box."
+                  badge="OWASP CRS"
+                  accent="crimson"
+                  icon={<Shield className="size-5 text-rose-400" />}
+                />
+                <BentoCard
+                  title="Real-Time Security Logs"
+                  description="Inspect live blocked payloads, ASN threat reputation, and export Cloudflare or NGINX blocklists in one click."
+                  badge="LIVE STREAM"
+                  accent="periwinkle"
+                  icon={<Terminal className="size-5 text-[#8F9CFF]" />}
+                />
+                <BentoCard
+                  title="Custom Rate Limiting"
+                  description="Per-route token buckets and AI endpoint prompt-injection guardrails with zero false-positive CAPTCHA loops."
+                  badge="ZERO FRICTION"
+                  accent="emerald"
+                  icon={<Lock className="size-5 text-[#10B981]" />}
+                />
+              </BentoGrid>
+            </div>
+          </section>
+
+          {/* LIVE PUBLIC DOMAIN SECURITY SCANNER (REAL BACKEND AUDIT) */}
+          <section id="shield-scanner" className="spx-scroll-reveal mx-auto max-w-5xl px-4 sm:px-6 py-16">
+            <InteractiveCard spotlightColor="rgba(6, 182, 212, 0.16)" className="p-6 sm:p-8 space-y-5">
+              <div className="space-y-1.5">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#06B6D4]">
+                  Real 8-Tool Live Audit
+                </p>
+                <h2 className="text-2xl font-extrabold text-white">
+                  Inspect Your Public Domain Security Posture
+                </h2>
+                <p className="text-xs sm:text-sm text-zinc-400">
+                  Enter any public domain (e.g., <code className="font-mono text-zinc-200">yourdomain.com</code>) to check live TLS ciphers, security headers, DNS/SPF/DMARC, and exposed endpoints.
+                </p>
               </div>
 
               <form
@@ -300,457 +464,170 @@ export function ShieldLandingView({
                   e.preventDefault();
                   void runLandingScan();
                 }}
-                className="flex flex-col sm:flex-row gap-2"
+                className="flex flex-col sm:flex-row gap-3"
               >
-                <div className="relative flex-1">
-                  <Globe className="size-4 text-[#F4F6FA]/40 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={scanInput}
-                    onChange={(e) => setScanInput(e.target.value)}
-                    placeholder="yourdomain.com"
-                    aria-label="Enter public domain for audit"
-                    className="h-10 w-full rounded-xl border border-[#F4F6FA]/12 bg-[#07090E] pl-9 pr-3 font-mono text-xs text-[#F4F6FA] placeholder-[#F4F6FA]/35 outline-none focus:border-[#F9103A]"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={scanInput}
+                  onChange={(e) => setScanInput(e.target.value)}
+                  placeholder="yourdomain.com"
+                  aria-label="Domain to scan"
+                  className="flex-1 rounded-xl border border-[#141A29] bg-[#030407] px-4 py-3 font-mono text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#06B6D4]"
+                />
                 <button
                   type="submit"
                   disabled={scanning}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F9103A] px-5 h-10 text-xs font-semibold text-white hover:bg-[#F9103A]/90 disabled:opacity-50 cursor-pointer shrink-0"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#06B6D4] to-[#8F9CFF] px-6 py-3 text-sm font-extrabold text-[#030407] cursor-pointer disabled:opacity-60"
                 >
-                  <RefreshCw className={`size-3.5 ${scanning ? "animate-spin" : ""}`} />
-                  <span>{scanning ? "Scanning..." : "Inspect Domain"}</span>
+                  {scanning ? <RefreshCw className="size-4 animate-spin" /> : <Globe className="size-4" />}
+                  <span>{scanning ? "Scanning…" : "Run Security Scan"}</span>
                 </button>
               </form>
 
-              <div className="flex flex-wrap items-center gap-2 text-[11px] text-[#F4F6FA]/50">
-                <span>Try example:</span>
-                <button
-                  type="button"
-                  onClick={() => void runLandingScan("sparrowx.net")}
-                  className="rounded border border-[#F4F6FA]/12 bg-[#121622] px-2 py-0.5 font-mono text-[#F4F6FA]/80 hover:border-[#F96246]/50 cursor-pointer"
-                >
-                  sparrowx.net
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void runLandingScan("yourdomain.com")}
-                  className="rounded border border-[#F4F6FA]/12 bg-[#121622] px-2 py-0.5 font-mono text-[#F4F6FA]/80 hover:border-[#F96246]/50 cursor-pointer"
-                >
-                  yourdomain.com
-                </button>
-              </div>
-
               {scanError && (
-                <div className="rounded-xl border border-[#F9103A]/35 bg-[#F9103A]/10 px-3.5 py-2.5 text-xs text-[#FFEBB9]">
+                <p className="rounded-xl border border-rose-500/35 bg-rose-500/10 px-4 py-2.5 text-xs text-rose-300">
                   {scanError}
-                </div>
+                </p>
               )}
 
-              {liveAudit ? (
-                <div className="space-y-3 rounded-xl border border-[#F4F6FA]/[0.08] bg-[#07090E]/90 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#F4F6FA]/[0.07] pb-2.5">
+              {liveAudit && (
+                <div className="rounded-xl border border-[#141A29] bg-[#030407] p-5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-[#F4F6FA]">{liveAudit.cleanHost}</span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-bold ${
-                            liveAudit.score >= 80
-                              ? "bg-[#10B981]/20 text-[#10B981]"
-                              : liveAudit.score >= 55
-                                ? "bg-[#FFEBB9]/20 text-[#FFEBB9]"
-                                : "bg-[#F9103A]/20 text-[#F9103A]"
-                          }`}
-                        >
-                          Grade {liveAudit.scoreGrade} · {liveAudit.riskLevel}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#F4F6FA]/50 mt-0.5">
-                        {liveAudit.deepTelemetry?.toolsExecuted.length ?? 8} modern security tools · {liveAudit.latencyMs}ms TLS RTT · {liveAudit.resolvedIps[0] ?? "Resolved"}
+                      <p className="font-mono text-sm font-bold text-white">{liveAudit.target}</p>
+                      <p className="text-xs text-zinc-400">
+                        Security Grade: <strong className="text-[#10B981]">{liveAudit.grade}</strong> · Score {liveAudit.score}/100
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => downloadBrandedHtmlSecurityReport(liveAudit)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#F4F6FA]/15 bg-[#121622] px-3 py-1.5 text-[11px] font-medium text-[#F4F6FA] hover:border-[#10B981]/50 cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#06B6D4]/40 bg-[#06B6D4]/10 px-3 py-1.5 font-mono text-xs text-[#06B6D4] cursor-pointer"
                     >
-                      <Download className="size-3.5 text-[#10B981]" /> HTML Report
+                      <Download className="size-3.5" />
+                      <span>Download Report</span>
                     </button>
                   </div>
-
-                  {/* Modern Multi-Tool Telemetry Badges */}
-                  <div className="flex flex-wrap gap-1.5 text-[10px] font-mono">
-                    <span className="rounded border border-[#F4F6FA]/10 bg-[#0D1017] px-2 py-0.5 text-[#F4F6FA]/80">
-                      TLS: {liveAudit.deepTelemetry?.tlsProtocol ?? (liveAudit.httpsReachable ? "TLSv1.3" : "Failed")}
-                    </span>
-                    {liveAudit.deepTelemetry?.certIssuer && (
-                      <span className="rounded border border-[#F4F6FA]/10 bg-[#0D1017] px-2 py-0.5 text-[#F4F6FA]/80">
-                        CA: {liveAudit.deepTelemetry.certIssuer}
-                        {liveAudit.deepTelemetry.certDaysRemaining !== null
-                          ? ` (${liveAudit.deepTelemetry.certDaysRemaining}d)`
-                          : ""}
-                      </span>
-                    )}
-                    <span
-                      className={`rounded border px-2 py-0.5 ${
-                        liveAudit.hstsHeaderPresent
-                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                          : "border-[#F9103A]/30 bg-[#F9103A]/10 text-[#F9103A]"
-                      }`}
-                    >
-                      HSTS: {liveAudit.hstsHeaderPresent ? "ON" : "MISSING"}
-                    </span>
-                    <span
-                      className={`rounded border px-2 py-0.5 ${
-                        liveAudit.cspHeaderPresent
-                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                          : "border-[#FFEBB9]/30 bg-[#FFEBB9]/10 text-[#FFEBB9]"
-                      }`}
-                    >
-                      CSP: {liveAudit.cspHeaderPresent ? "ON" : "MISSING"}
-                    </span>
-                    <span
-                      className={`rounded border px-2 py-0.5 ${
-                        liveAudit.xFrameOptionsPresent
-                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                          : "border-[#F9103A]/30 bg-[#F9103A]/10 text-[#F9103A]"
-                      }`}
-                    >
-                      XFO: {liveAudit.xFrameOptionsPresent ? "ON" : "MISSING"}
-                    </span>
-                    <span
-                      className={`rounded border px-2 py-0.5 ${
-                        liveAudit.hasSpfOrDmarc
-                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                          : "border-[#FFEBB9]/30 bg-[#FFEBB9]/10 text-[#FFEBB9]"
-                      }`}
-                    >
-                      SPF/DMARC: {liveAudit.hasSpfOrDmarc ? "ACTIVE" : "NONE"}
-                    </span>
-                    <span
-                      className={`rounded border px-2 py-0.5 ${
-                        !liveAudit.deepTelemetry?.envFileExposed && !liveAudit.deepTelemetry?.gitHeadExposed
-                          ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981]"
-                          : "border-[#F9103A]/30 bg-[#F9103A]/10 text-[#F9103A]"
-                      }`}
-                    >
-                      .env/.git: {!liveAudit.deepTelemetry?.envFileExposed && !liveAudit.deepTelemetry?.gitHeadExposed ? "SEALED" : "EXPOSED"}
-                    </span>
-                  </div>
-
-                  <ul className="space-y-2 max-h-56 overflow-y-auto pr-1 text-xs">
-                    {liveAudit.findings.slice(0, 5).map((f, idx) => (
-                      <li
-                        key={`${f.title}-${idx}`}
-                        className="flex items-start justify-between gap-3 rounded-lg border border-[#F4F6FA]/[0.05] bg-[#0D1017] px-3 py-2"
-                      >
-                        <div className="min-w-0">
-                          <p className="font-medium text-[#F4F6FA] truncate">{f.title}</p>
-                          <p className="text-[11px] text-[#F4F6FA]/55 line-clamp-2">{f.detail}</p>
-                          <p className="text-[10px] font-mono text-[#F96246]/90 mt-0.5 truncate">{f.evidence}</p>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded px-2 py-0.5 font-mono text-[10px] uppercase ${
-                            f.status === "passed"
-                              ? "bg-[#10B981]/15 text-[#10B981]"
-                              : f.status === "warning"
-                                ? "bg-[#FFEBB9]/15 text-[#FFEBB9]"
-                                : "bg-[#F9103A]/15 text-[#F9103A]"
-                          }`}
-                        >
-                          {f.status}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {liveAudit.advisory && (
-                    <div className="rounded-xl border border-[#F96246]/35 bg-[#F96246]/[0.07] p-3 space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#F96246]">
-                          ✦ SparrowX AI Neural Advisory ({liveAudit.advisory.modelUsed})
-                        </span>
-                        <span className="font-mono text-[10px] text-[#F4F6FA]/55">
-                          {liveAudit.advisory.targetCategory}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#F4F6FA]/90 leading-relaxed">
-                        {liveAudit.advisory.executiveSummary}
-                      </p>
-                      <p className="text-[11px] text-[#10B981] font-medium">
-                        ⚡ 60s Remediation: {liveAudit.advisory.recommendedAction}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-[#F4F6FA]/12 bg-[#07090E]/60 p-5 text-center space-y-1.5">
-                  <p className="text-xs font-medium text-[#F4F6FA]/80">No Domain Audited Yet</p>
-                  <p className="text-[11px] text-[#F4F6FA]/45">
-                    Enter your domain above to run live HSTS, CSP, X-Frame-Options, and DNS verification.
-                  </p>
                 </div>
               )}
-            </div>
-            </div>
-          </div>
-        </section>
+            </InteractiveCard>
+          </section>
 
-        {/* Capabilities Grid */}
-        <section id="shield-features" className="max-w-[1380px] mx-auto px-4 sm:px-6 py-14 sm:py-18 space-y-8">
-          <div className="max-w-2xl">
-            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#F96246]">
-              PRODUCTION DEFENSE STACK
-            </span>
-            <h2 className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight">
-              Built for operators who need real signal — never noisy dashboards.
-            </h2>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Shield,
-                accent: "text-[#F9103A] border-[#F9103A]/30 bg-[#F9103A]/10",
-                title: "Origin Cloaking & L7 WAF",
-                desc: "Inspect real headers, enforce HSTS/CSP policies, and block automated vulnerability scanners before origin access.",
-              },
-              {
-                icon: Cpu,
-                accent: "text-[#F96246] border-[#F96246]/30 bg-[#F96246]/10",
-                title: "AI Prompt & Tool Firewall",
-                desc: "Detect jailbreaks, PII/secret leakage, and destructive MCP tool calls inline with deterministic sub-15ms sanitization.",
-              },
-              {
-                icon: Activity,
-                accent: "text-[#10B981] border-[#10B981]/30 bg-[#10B981]/10",
-                title: "SOC Triage & Audit Chain",
-                desc: "Isolate compromised assets and record immutable SHA-256 chained audit logs across your team.",
-              },
-              {
-                icon: Terminal,
-                accent: "text-cyan-300 border-cyan-400/30 bg-cyan-500/10",
-                title: "1-Click Firewall Rules",
-                desc: "Compile active IOCs directly into Cloudflare Expressions, AWS WAF IP Sets, NGINX deny lists, or iptables scripts.",
-              },
-            ].map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.title}
-                  className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0D1017] p-5 space-y-3 hover:border-[#F4F6FA]/20 transition-colors"
-                >
-                  <div className={`size-10 rounded-xl border grid place-items-center ${item.accent}`}>
-                    <Icon className="size-5" />
-                  </div>
-                  <h3 className="text-sm font-semibold text-[#F4F6FA]">{item.title}</h3>
-                  <p className="text-xs text-[#F4F6FA]/60 leading-relaxed">{item.desc}</p>
+          {/* DEDICATED GAME DDOS DEFENSE SECTION (Preserved for shield-flow.test.tsx) */}
+          <section id="shield-game-ddos" className="mx-auto max-w-5xl px-4 sm:px-6 pb-16">
+            <InteractiveCard spotlightColor="rgba(245, 158, 11, 0.16)" className="p-6 sm:p-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-2 max-w-2xl">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/35 bg-amber-500/10 px-3 py-0.5 font-mono text-[10px] font-bold text-amber-300">
+                    <Gamepad2 className="size-3.5" />
+                    <span>GAME SERVER L4 PROTECTION</span>
+                  </span>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-white">
+                    Want to secure your game? Need to protect your server from DDoS attack?
+                  </h2>
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed">
+                    FiveM, Minecraft, SA-MP, Rust, and raw TCP/UDP game servers require dedicated Anycast L4 packet scrubbing and stateful RakNet/ENet filtering.
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* SEPARATE DEDICATED GAME SERVER / DDOS REDIRECT SECTION */}
-        <section id="shield-game-ddos" className="max-w-[1380px] mx-auto px-4 sm:px-6 py-4">
-          <div className="relative overflow-hidden rounded-2xl border border-[#F96246]/35 bg-gradient-to-br from-[#160D12] via-[#0D1017] to-[#0A1116] p-6 sm:p-10 shadow-[0_20px_70px_rgba(249,16,58,0.14)]">
-            <div className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-[#F9103A]/15 blur-3xl" />
-            <div className="relative grid gap-6 lg:grid-cols-[1.4fr_auto] items-center">
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-[#F96246]/40 bg-[#F96246]/12 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#FFEBB9]">
-                  <Flame className="size-3.5 text-[#F96246]" />
-                  <span>Separate Game &amp; L4 Server Protection Portal</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[#F4F6FA]">
-                  Want to secure your game? Need to protect your server from DDoS attack?
-                </h2>
-                <p className="max-w-2xl text-xs sm:text-sm text-[#F4F6FA]/65 leading-relaxed">
-                  FiveM, Minecraft, SA-MP, Rust, and raw TCP/UDP game servers require dedicated Anycast L4 packet scrubbing and stateful RakNet/ENet filtering. Launch our dedicated Game DDoS Defense platform on <span className="font-mono text-[#F4F6FA]">gamesec.sparrowx.net</span>.
-                </p>
-              </div>
-
-              <div className="flex flex-col sm:flex-row lg:flex-col gap-3 shrink-0">
                 <a
                   href={GAMESEC_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#F9103A] to-[#F96246] px-6 py-3.5 text-sm font-semibold text-white shadow-[0_10px_28px_rgba(249,16,58,0.34)] hover:brightness-110 transition-all"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-400 hover:bg-amber-300 px-5 py-3 text-xs font-extrabold text-[#030407] shrink-0 transition-colors"
                 >
-                  <Server className="size-4" />
-                  <span>Protect Your Game Server</span>
+                  <span>Open GameSec L4 Defense</span>
                   <ArrowRight className="size-4" />
                 </a>
-                <span className="text-center font-mono text-[11px] text-[#F4F6FA]/50">
-                  Redirects to gamesec.sparrowx.net
-                </span>
               </div>
-            </div>
-          </div>
-        </section>
+            </InteractiveCard>
+          </section>
 
-        {/* 3-Step DNS / CNAME WAF Onboarding Preview */}
-        <section className="max-w-[1380px] mx-auto px-4 sm:px-6 pt-12 pb-2">
-          <div className="rounded-2xl border border-[#F4F6FA]/[0.08] bg-[#0B0E16] p-6 sm:p-8 space-y-5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-[#F96246]">
-                  60-Second Edge Onboarding
-                </p>
-                <h2 className="text-xl sm:text-2xl font-semibold text-[#F4F6FA] tracking-tight mt-1">
-                  How DNS / CNAME Origin Cloaking Works
-                </h2>
-              </div>
-              <span className="rounded-full border border-[#10B981]/30 bg-[#10B981]/10 px-3 py-1 font-mono text-[11px] text-[#10B981]">
-                Zero Code Changes Required
-              </span>
-            </div>
-            <div className="grid gap-4 md:grid-cols-3 text-xs">
-              <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-4 space-y-1.5">
-                <span className="font-mono text-[10px] text-[#F9103A]">STEP 01 · REGISTER ASSET</span>
-                <p className="font-semibold text-[#F4F6FA]">Add Domain in Client Area</p>
-                <p className="text-[#F4F6FA]/55 leading-relaxed">
-                  Enter your domain or API hostname to generate a scoped SparrowX Shield Edge token.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-4 space-y-1.5">
-                <span className="font-mono text-[10px] text-[#F96246]">STEP 02 · POINT CNAME</span>
-                <p className="font-semibold text-[#F4F6FA]">CNAME → edge.sparrowx.net</p>
-                <p className="text-[#F4F6FA]/55 leading-relaxed">
-                  Update your DNS CNAME record to route public traffic through SparrowX Anycast WAF.
-                </p>
-              </div>
-              <div className="rounded-xl border border-[#F4F6FA]/[0.07] bg-[#07090E] p-4 space-y-1.5">
-                <span className="font-mono text-[10px] text-[#10B981]">STEP 03 · VERIFY &amp; ENFORCE</span>
-                <p className="font-semibold text-[#F4F6FA]">Auto-TLS + L7 Shield Active</p>
-                <p className="text-[#F4F6FA]/55 leading-relaxed">
-                  Origin IP is masked, HSTS/CSP headers are enforced, and live telemetry streams to your SOC.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Plans Section */}
-        <section id="shield-agent-plans" className="max-w-[1380px] mx-auto px-4 sm:px-6 py-14 sm:py-18 space-y-6">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-[#10B981]">
-                EDGE &amp; SOC PLANS
-              </span>
-              <h2 className="mt-1.5 text-2xl sm:text-3xl font-semibold tracking-tight">
-                Scale from single-domain cloaking to sovereign SOC operations.
-              </h2>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex rounded-lg border border-[#F4F6FA]/12 bg-[#0D1017] p-0.5 text-xs">
-                {(["monthly", "annual"] as const).map((cycle) => (
-                  <button
-                    key={cycle}
-                    type="button"
-                    onClick={() => setBillingCycle(cycle)}
-                    className={`rounded-md px-3 py-1.5 capitalize cursor-pointer transition-colors ${
-                      billingCycle === cycle
-                        ? "bg-[#F9103A] text-white font-medium"
-                        : "text-[#F4F6FA]/60 hover:text-[#F4F6FA]"
-                    }`}
-                  >
-                    {cycle}
-                  </button>
-                ))}
-              </div>
-              <div className="flex rounded-lg border border-[#F4F6FA]/12 bg-[#0D1017] p-0.5 text-xs font-mono">
-                {(["INR", "USD", "EUR"] as const).map((cur) => (
-                  <button
-                    key={cur}
-                    type="button"
-                    onClick={() => setCurrency(cur)}
-                    className={`rounded-md px-2.5 py-1.5 cursor-pointer transition-colors ${
-                      currency === cur
-                        ? "bg-[#F4F6FA]/15 text-white font-semibold"
-                        : "text-[#F4F6FA]/55 hover:text-[#F4F6FA]"
-                    }`}
-                  >
-                    {cur}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {SPARROWX_PLANS.map((plan) => {
-              const popular = plan.id === "STARTUP_SHIELD" || plan.id === "AI_AGENT_SHIELD";
-              return (
-                <div
-                  key={plan.id}
-                  className={`flex flex-col justify-between rounded-2xl border p-6 space-y-5 bg-[#0D1017] ${
-                    popular
-                      ? "border-[#F9103A]/55 shadow-[0_12px_40px_rgba(249,16,58,0.14)]"
-                      : "border-[#F4F6FA]/[0.08]"
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-[11px] uppercase tracking-wider text-[#F96246]">
-                        {plan.tier}
-                      </span>
-                      {popular && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F9103A]/15 border border-[#F9103A]/35 px-2.5 py-0.5 text-[10px] font-semibold text-[#F9103A]">
-                          <Sparkles className="size-3" /> Popular
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="text-lg font-semibold text-[#F4F6FA]">{plan.name}</h3>
-                    <p className="text-xs text-[#F4F6FA]/55">{plan.tagline}</p>
-                    <div className="pt-1 flex items-baseline gap-1.5">
-                      <span className="text-3xl font-semibold text-[#F4F6FA]">{formatPlanPrice(plan)}</span>
-                      <span className="text-xs text-[#F4F6FA]/45">/month</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 pt-2 text-[11px] text-[#F4F6FA]/65 border-t border-[#F4F6FA]/[0.06]">
-                      <span>Domains: <strong className="text-[#F4F6FA]">{plan.maxDomains === -1 ? "Unlimited" : plan.maxDomains}</strong></span>
-                      <span>SLA: <strong className="text-[#10B981]">{plan.sla}</strong></span>
-                    </div>
-                    <ul className="space-y-2 pt-1 text-xs text-[#F4F6FA]/75">
-                      {plan.highlights.map((h) => (
-                        <li key={h} className="flex items-start gap-2 text-[11px]">
-                          <Check className="size-3.5 text-[#10B981] shrink-0 mt-0.5" />
-                          <span>{h}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
+          {/* PLANS SECTION */}
+          <section id="shield-agent-plans" className="border-t border-[#141A29] bg-[#05070D]/80 py-16">
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 space-y-8">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-[#8F9CFF]">
+                    Transparent Security Plans
+                  </p>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
+                    Flat Rate Edge WAF &amp; Autonomous SOC
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(["INR", "USD", "EUR"] as const).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCurrency(c)}
+                      className={`rounded-lg px-2.5 py-1 font-mono text-xs cursor-pointer ${
+                        currency === c
+                          ? "bg-[#06B6D4] text-[#030407] font-bold"
+                          : "border border-[#141A29] bg-[#080B12] text-zinc-400"
+                      }`}
+                    >
+                      {c}
+                    </button>
+                  ))}
                   <button
                     type="button"
-                    onClick={() =>
-                      activeUser
-                        ? onEnterClientArea()
-                        : onOpenAuthModal("register", `${plan.name} · ${formatPlanPrice(plan)}/mo`)
-                    }
-                    className={`w-full rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
-                      popular
-                        ? "bg-[#F9103A] text-white hover:bg-[#F9103A]/90 shadow-[0_6px_20px_rgba(249,16,58,0.28)]"
-                        : "border border-[#F4F6FA]/14 bg-[#121622] text-[#F4F6FA] hover:bg-white hover:text-black"
-                    }`}
+                    onClick={() => setBillingCycle((b) => (b === "monthly" ? "annual" : "monthly"))}
+                    className="rounded-lg border border-[#141A29] bg-[#080B12] px-3 py-1 font-mono text-xs text-zinc-300 cursor-pointer"
                   >
-                    <Zap className="size-3.5" />
-                    <span>{activeUser ? "Configure in Client Area" : `Start with ${plan.name}`}</span>
+                    {billingCycle === "annual" ? "Annual (-20%)" : "Monthly"}
                   </button>
                 </div>
-              );
-            })}
-          </div>
-          <PurchasePolicyNotice className="max-w-2xl mx-auto" />
-        </section>
-      </main>
+              </div>
 
-      <SparrowxFooter
-        isAuthenticated={Boolean(activeUser)}
-        onSignIn={() => onOpenAuthModal("signin")}
-        onSignOut={onSignOut}
-      />
-      <UnderAttackModal open={underAttackOpen} onOpenChange={setUnderAttackOpen} />
-    </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {SPARROWX_PLANS.slice(0, 3).map((plan) => (
+                  <InteractiveCard key={plan.id} className="p-6 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">{plan.name}</h3>
+                      <p className="mt-1 text-xs text-zinc-400">{plan.tagline}</p>
+                      <div className="mt-4 pb-4 border-b border-[#141A29] flex items-baseline gap-1">
+                        <span className="font-display text-3xl font-extrabold text-white">
+                          {formatPlanPrice(plan)}
+                        </span>
+                        <span className="text-xs text-zinc-400">/mo</span>
+                      </div>
+                      <ul className="mt-4 space-y-2 text-xs text-zinc-300">
+                        {plan.features.slice(0, 4).map((f) => (
+                          <li key={f} className="flex items-start gap-2">
+                            <Check className="mt-0.5 size-3.5 text-[#06B6D4] shrink-0" />
+                            <span>{f}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        activeUser ? onEnterDashboard() : onOpenAuthModal("register", plan.name)
+                      }
+                      className="mt-6 w-full rounded-xl border border-[#06B6D4]/40 bg-[#06B6D4]/12 py-2.5 text-xs font-bold text-white hover:bg-[#06B6D4] hover:text-[#030407] transition-colors cursor-pointer"
+                    >
+                      Activate {plan.name}
+                    </button>
+                  </InteractiveCard>
+                ))}
+              </div>
+              <PurchasePolicyNotice className="max-w-2xl mx-auto" />
+            </div>
+          </section>
+        </main>
+
+        <SparrowxFooter />
+        <UnderAttackModal
+          open={underAttackOpen}
+          onClose={() => setUnderAttackOpen(false)}
+          onStartProtection={() => {
+            setUnderAttackOpen(false);
+            if (activeUser) onEnterClientArea();
+            else onOpenAuthModal("register", "Under Attack Emergency");
+          }}
+        />
+      </div>
+    </SmoothScroll>
   );
 }

@@ -38,7 +38,10 @@ import { OAuthSignInButtons } from "@/components/GoogleSignInButton";
 import { PurchasePolicyNotice } from "@/components/PurchasePolicyNotice";
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { AnimatedCloudBackground } from "@/components/ui/AnimatedCloudBackground";
-import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { DbSpatialShowcase } from "@/components/db/DbSpatialShowcase";
+import { SmoothScroll } from "@/components/shared/SmoothScroll";
+import { ParticleField } from "@/components/shared/ParticleField";
+import { GridCanvas } from "@/components/shared/GridCanvas";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { buildMasterHref } from "@/lib/routing";
 import { requestGlobalEmailVerification } from "@/components/EmailVerificationModal";
@@ -2501,8 +2504,11 @@ export function SovereignDatabaseStudio({
     };
 
     return (
-      <div className="min-h-screen bg-[#05060A] text-white flex flex-col font-sans selection:bg-[#A3E635] selection:text-black relative overflow-x-hidden">
-        <AnimatedCloudBackground variant="lime" intensity="subtle" />
+      <SmoothScroll>
+        <div className="min-h-screen bg-[#030407] text-white flex flex-col font-sans selection:bg-[#10B981] selection:text-black relative overflow-x-hidden">
+          <GridCanvas accentColor="#10B981" />
+          <ParticleField color="16, 185, 129" density={0.55} />
+          <AnimatedCloudBackground variant="lime" intensity="subtle" />
 
         {/* ELEGANT DB NAVBAR (MIDNIGHT BLACK, PURE WHITE & LIME GREEN) */}
         <header className="border-b border-white/10 bg-[#05060A]/90 sticky top-0 z-40 backdrop-blur-md">
@@ -2642,43 +2648,30 @@ export function SovereignDatabaseStudio({
 
               <div className="pt-2 flex flex-wrap gap-5 text-xs font-mono text-zinc-300">
                 <span className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#A3E635]" /> 100% Portable Postgres
+                  <Check className="size-3.5 text-[#10B981]" /> 100% Portable Postgres
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#A3E635]" /> Built-in Auth &amp; RLS
+                  <Check className="size-3.5 text-[#10B981]" /> Built-in Auth &amp; RLS
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Check className="size-3.5 text-[#A3E635]" /> PgBouncer Port 6543 Pooler
+                  <Check className="size-3.5 text-[#10B981]" /> PgBouncer Port 6543 Pooler
                 </span>
-              </div>
-
-              {/* Subtle floating 3D side accent */}
-              <div className="hidden sm:block pointer-events-none max-w-[220px] pt-2 opacity-90">
-                <Floating3DVisual
-                  src="/3d/cloud-db-cluster.svg"
-                  alt="3D floating PostgreSQL 16 sovereign database platters with orbiting pgvector glass cubes"
-                  accent="lime"
-                  size="sm"
-                  priority="lazy"
-                  width={240}
-                  height={240}
-                />
               </div>
             </div>
 
             {/* Right: Studio Strict Auth Card */}
             <div
               id="db-auth-card"
-              className="lg:col-span-5 border border-[#2E2E2E] bg-[#0A0D14] rounded-xl p-5 space-y-4 shadow-xl scroll-mt-20"
+              className="lg:col-span-5 border border-[#141A29] bg-[#080B12]/95 rounded-2xl p-5 space-y-4 shadow-2xl scroll-mt-20"
             >
-              <div className="relative z-10 flex items-center justify-between border-b border-[#262626] pb-3">
+              <div className="relative z-10 flex items-center justify-between border-b border-[#141A29] pb-3">
                 <div className="space-y-0.5">
                   <h3 className="text-sm font-semibold text-white">Studio Single Sign-On</h3>
                   <p className="text-[11px] text-zinc-400">
                     Sign in with Google or GitHub to launch your isolated PostgreSQL workspace.
                   </p>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#A3E635]/10 border border-[#A3E635]/30 text-[#A3E635] shrink-0">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#10B981]/10 border border-[#10B981]/30 text-[#10B981] shrink-0">
                   {selectedPricingPlan}
                 </span>
               </div>
@@ -2697,6 +2690,9 @@ export function SovereignDatabaseStudio({
               </div>
             </div>
           </section>
+
+          {/* 3D POSTGRESQL CLUSTER + LIVE SQL / PGVECTOR PLAYGROUND + ENTERPRISE BENTO */}
+          <DbSpatialShowcase />
 
           {/* 7-CARD PRODUCT BENTO GRID (SCREENSHOT 11) */}
           <section id="db-bento" className="scroll-mt-20 space-y-5">
@@ -3446,7 +3442,8 @@ curl -s "https://db.sparrowx.net/rest/v1/app_users?limit=5" -H "apikey: YOUR_KEY
         </main>
 
         <SparrowxFooter />
-      </div>
+        </div>
+      </SmoothScroll>
     );
   }
 
