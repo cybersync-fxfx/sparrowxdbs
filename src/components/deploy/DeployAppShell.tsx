@@ -60,7 +60,6 @@ export function DeployAppShell({
   children,
 }: DeployAppShellProps) {
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [edgeOpen, setEdgeOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -71,7 +70,6 @@ export function DeployAppShell({
         setCmdOpen((open) => !open);
       } else if (e.key === "Escape") {
         setCmdOpen(false);
-        setEdgeOpen(false);
         setUserMenuOpen(false);
         setMobileNavOpen(false);
       }
@@ -161,56 +159,8 @@ export function DeployAppShell({
             </kbd>
           </button>
 
-          {/* Right: Edge Status Pill + Docs + User Avatar Menu */}
+          {/* Right: Docs + User Avatar Menu */}
           <div className="flex items-center gap-2 shrink-0 relative">
-            {/* BOM Edge Status Pill */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setEdgeOpen((v) => !v);
-                  setUserMenuOpen(false);
-                }}
-                className="hidden md:inline-flex h-8 items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/[0.08] hover:bg-emerald-500/[0.14] px-3 text-[11px] font-medium text-emerald-300 transition-colors cursor-pointer"
-              >
-                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="spx-mono">BOM Edge · Healthy</span>
-              </button>
-
-              {edgeOpen && (
-                <div className="absolute right-0 mt-2 w-72 rounded-xl spx-obsidian-card p-4 shadow-2xl z-50 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Edge Gateway Health</span>
-                    <span className="text-[10px] spx-mono text-emerald-400">99.98% SLA</span>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    {[
-                      { code: "BOM", label: "OVH Mumbai Edge", ms: "11ms" },
-                      { code: "MAA", label: "Chennai Relay", ms: "16ms" },
-                      { code: "SIN", label: "Singapore APAC", ms: "28ms" },
-                    ].map((r) => (
-                      <div
-                        key={r.code}
-                        className="flex items-center justify-between py-1.5 border-b border-white/[0.06] last:border-0"
-                      >
-                        <span className="flex items-center gap-2 text-zinc-300">
-                          <span className="size-1.5 rounded-full bg-emerald-400" />
-                          <span>{r.label}</span>
-                        </span>
-                        <span className="spx-mono text-[11px] text-zinc-400 tabular-nums">
-                          {r.code} · {r.ms}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="pt-1 text-[11px] text-zinc-400 flex items-center justify-between">
-                    <span>DDoS Scrubbing</span>
-                    <span className="spx-mono text-emerald-400">SparrowX NetSec</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
             <a
               href={buildMasterHref("/docs/infra")}
               className="hidden sm:inline-flex h-8 items-center gap-1.5 rounded-lg spx-ghost-btn px-2.5 text-xs font-medium"
@@ -225,7 +175,6 @@ export function DeployAppShell({
                 type="button"
                 onClick={() => {
                   setUserMenuOpen((v) => !v);
-                  setEdgeOpen(false);
                 }}
                 className="inline-flex h-8 items-center gap-2 rounded-lg spx-ghost-btn pl-1.5 pr-2.5 text-xs cursor-pointer"
               >
