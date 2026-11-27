@@ -137,6 +137,23 @@ export async function listSubscriptions(clientId: string): Promise<Subscription[
   return rows.map(subFromRow);
 }
 
+export async function listAllClients(limit = 250): Promise<ClientRow[]> {
+  return pg<ClientRow[]>(`/clients?order=created_at.desc&limit=${limit}`);
+}
+
+export async function listAllSubscriptions(limit = 400): Promise<SubRow[]> {
+  return pg<SubRow[]>(`/subscriptions?order=created_at.desc&limit=${limit}`);
+}
+
+export async function getSubscriptionById(id: string): Promise<SubRow | null> {
+  const rows = await pg<SubRow[]>(`/subscriptions?id=eq.${q(id)}&limit=1`);
+  return rows[0] ?? null;
+}
+
+export async function listRecentTransactions(limit = 60): Promise<TxRow[]> {
+  return pg<TxRow[]>(`/coin_transactions?order=created_at.desc&limit=${limit}`);
+}
+
 export async function insertSubscription(row: Omit<SubRow, "id" | "created_at">): Promise<Subscription> {
   const rows = await pg<SubRow[]>(`/subscriptions`, {
     method: "POST",
@@ -150,7 +167,7 @@ export async function insertSubscription(row: Omit<SubRow, "id" | "created_at">)
 
 export async function updateSubscription(
   id: string,
-  patch: Partial<Pick<SubRow, "status" | "expires_at" | "price_coins" | "plan_name">>,
+  patch: Partial<Pick<SubRow, "status" | "expires_at" | "price_coins" | "plan_name" | "service_type">>,
 ): Promise<Subscription> {
   const rows = await pg<SubRow[]>(`/subscriptions?id=eq.${q(id)}`, {
     method: "PATCH",

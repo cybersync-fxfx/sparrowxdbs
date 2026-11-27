@@ -14,6 +14,7 @@ import { PanelCredentials } from "@/components/dashboard/PanelCredentials";
 import { TopUpDialog } from "@/components/dashboard/TopUpDialog";
 import { DeployPlans } from "@/components/dashboard/DeployPlans";
 import { EggCatalogSection } from "@/components/dashboard/EggCatalogSection";
+import { AdminControlPanel } from "@/components/dashboard/AdminControlPanel";
 import { ServerList } from "@/components/dashboard/ServerList";
 import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager";
 import { Transactions } from "@/components/dashboard/Transactions";
@@ -104,6 +105,7 @@ function GameDashboard() {
   const [leaving, setLeaving] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [selectedDeployEgg, setSelectedDeployEgg] = useState<EggCatalogItem | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const qc = useQueryClient();
   const refresh = useRefreshAll();
   const navigate = useNavigate();
@@ -178,6 +180,22 @@ function GameDashboard() {
             <span className="rounded-md bg-primary/20 px-2 py-0.5 font-mono text-[10px] text-sheen">CLIENT AREA</span>
           </Link>
           <div className="flex items-center gap-2">
+            {data?.isAdmin && (
+              <Button
+                type="button"
+                variant={showAdminPanel ? "ivory" : "secondary"}
+                size="sm"
+                className={`h-9 rounded-full px-3.5 ${
+                  showAdminPanel
+                    ? "font-semibold"
+                    : "border border-emerald-400/45 text-emerald-200 hover:bg-emerald-500/15"
+                }`}
+                onClick={() => setShowAdminPanel((v) => !v)}
+              >
+                <ShieldCheck className="size-4 text-emerald-400" />
+                <span>{showAdminPanel ? "Back to Client Area" : "Admin Console"}</span>
+              </Button>
+            )}
             <Button asChild variant="secondary" size="sm" className="hidden h-9 rounded-full px-3.5 sm:inline-flex">
               <a href="https://php.sparrowx.net" target="_blank" rel="noreferrer">
                 <Database className="size-4 text-sky-400" /> phpMyAdmin <ExternalLink className="size-3.5" />
@@ -205,6 +223,8 @@ function GameDashboard() {
 
       <main className="relative mx-auto max-w-7xl space-y-6 px-5 py-8">
         {error && <p className="rounded-2xl border border-destructive/40 p-4 text-sm text-destructive">{errorText(error)}</p>}
+
+        {data?.isAdmin && showAdminPanel && <AdminControlPanel />}
 
         <div className="grid gap-6 lg:grid-cols-[1.45fr_1fr]">
           <section className="surface-3d rim-sheen relative flex flex-col justify-between overflow-hidden rounded-3xl p-6">

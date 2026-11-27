@@ -98,6 +98,7 @@ export type ServerConfigView = {
 
 export type DashboardData = {
   mode: "live";
+  isAdmin: boolean;
   user: {
     id: string;
     email: string;
@@ -119,4 +120,54 @@ export type DashboardData = {
     pteroLiveUsage: boolean;
     razorpay: boolean;
   };
+};
+
+export type AdminClientSummary = {
+  id: string;
+  email: string | null;
+  username: string;
+  pteroUserId: number | null;
+  pteroUsername: string | null;
+  coins: number;
+  createdAt: string;
+  subscriptionCount: number;
+  activeSubscriptions: number;
+};
+
+export type AdminSubscriptionSummary = {
+  id: string;
+  clientId: string;
+  clientEmail: string | null;
+  clientUsername: string;
+  pteroServerId: number | null;
+  serviceType: ServiceId;
+  planName: string;
+  priceCoins: number;
+  status: Subscription["status"];
+  expiresAt: string;
+  createdAt: string;
+};
+
+export type AdminTransactionSummary = {
+  id: string;
+  clientId: string;
+  clientEmail: string | null;
+  amount: number;
+  type: TxType;
+  description: string;
+  createdAt: string;
+};
+
+export type AdminOverviewData = {
+  adminEmail: string;
+  stats: {
+    totalClients: number;
+    totalCoins: number;
+    activeSubscriptions: number;
+    expiredSubscriptions: number;
+    monthlyCoinVolume: number;
+  };
+  clients: AdminClientSummary[];
+  subscriptions: AdminSubscriptionSummary[];
+  recentTransactions: AdminTransactionSummary[];
 };

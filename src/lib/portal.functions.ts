@@ -181,6 +181,67 @@ export const getPanelLaunchContext = createServerFn({ method: "GET" }).handler(a
   run(async () => (await import("./server/portal.server")).getPanelLaunchInfo()),
 );
 
+// ---------------- Game Client Area Admin Functions (atchukris@gmail.com) ----------------
+
+export const getAdminOverview = createServerFn({ method: "GET" }).handler(async () =>
+  run(async () => (await import("./server/portal.server")).adminGetOverview()),
+);
+
+export const adminAdjustCoins = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z
+      .object({
+        clientId: z.string().min(1).max(80),
+        mode: z.enum(["add", "deduct", "set"]),
+        amount: z.number().int().min(0).max(1_000_000),
+        note: z.string().max(140).optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).adminAdjustClientCoins(data)),
+  );
+
+export const adminUpdateSubscription = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z
+      .object({
+        subscriptionId: z.string().min(1).max(80),
+        status: z.enum(["active", "expired", "cancelled"]).optional(),
+        extendDays: z.number().int().min(-365).max(730).optional(),
+        expiresAt: z.string().max(64).optional(),
+        planId: z.string().min(1).max(40).optional(),
+        customPlanName: z.string().max(80).optional(),
+        customPriceCoins: z.number().int().min(0).max(500_000).optional(),
+        customRamMb: z.number().int().min(256).max(131072).optional(),
+        customCpuPercent: z.number().int().min(25).max(1600).optional(),
+        customDiskGb: z.number().int().min(2).max(2000).optional(),
+        syncPanelLimits: z.boolean().optional(),
+        syncPanelStatus: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).adminUpdateUserSubscription(data)),
+  );
+
+export const adminAssignSubscription = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z
+      .object({
+        clientId: z.string().min(1).max(80),
+        planId: z.string().min(1).max(40),
+        days: z.number().int().min(1).max(730),
+        customPlanName: z.string().max(80).optional(),
+        customPriceCoins: z.number().int().min(0).max(500_000).optional(),
+        pteroServerId: z.number().int().positive().nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).adminGrantSubscription(data)),
+  );
+
 export const logout = createServerFn({ method: "POST" }).handler(async () => {
   const { deleteCookie } = await import("@tanstack/react-start/server");
   const { getAppSession } = await import("./server/session.server");

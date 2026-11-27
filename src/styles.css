@@ -764,6 +764,77 @@ dialog.spx-native-dialog::backdrop {
   box-shadow: 0 0 0 1px rgb(248 113 113 / 40%);
 }
 
+/* Responsive accessible admin tables (modern-web-guidance: responsive-table) */
+.spx-admin-table-wrap {
+  overflow: auto;
+  max-inline-size: 100%;
+  max-block-size: min(560px, 72vh);
+  container-type: inline-size;
+  border-radius: 1rem;
+  border: 1px solid #1c2233;
+  background: #05060a;
+}
+
+.spx-admin-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+
+.spx-admin-table thead {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+  background: #0b0e17;
+}
+
+.spx-admin-table tbody th {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+  background: #05060a;
+}
+
+@container (width < 680px) {
+  .spx-admin-table,
+  .spx-admin-table thead,
+  .spx-admin-table tbody,
+  .spx-admin-table tr,
+  .spx-admin-table th,
+  .spx-admin-table td {
+    display: block;
+  }
+
+  .spx-admin-table thead {
+    display: none;
+  }
+
+  .spx-admin-table tbody tr {
+    margin-block-end: 0.75rem;
+    border-block-end: 1px solid #1c2233;
+    padding: 0.75rem;
+  }
+
+  .spx-admin-table tbody th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    background: #0b0e17;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    margin-block-end: 0.5rem;
+  }
+
+  .spx-admin-table tbody td[data-label]::before {
+    content: attr(data-label) ": ";
+    color: #94a3b8;
+    font-weight: 600;
+    margin-inline-end: 0.25rem;
+  }
+}
+
 @utility glass {
   background: var(--glass);
   backdrop-filter: blur(18px) saturate(140%);

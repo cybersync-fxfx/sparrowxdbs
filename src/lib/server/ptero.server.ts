@@ -159,8 +159,39 @@ export async function setUserPassword(userId: number, password: string) {
   return updated?.attributes ?? u;
 }
 
+export async function suspendServer(serverId: number): Promise<void> {
+  await app(`/servers/${serverId}/suspend`, { method: "POST" });
+}
+
 export async function unsuspendServer(serverId: number): Promise<void> {
   await app(`/servers/${serverId}/unsuspend`, { method: "POST" });
+}
+
+export async function updateServerBuildLimits(
+  serverId: number,
+  limits: { memoryMb: number; cpuPercent: number; diskGb: number },
+): Promise<void> {
+  const srv = await app<PServer>(`/servers/${serverId}`);
+  const a = srv.attributes;
+  if (!a.allocation) {
+    throw new Error("Could not resolve primary Pterodactyl allocation ID for build resize.");
+  }
+  await app(`/servers/${serverId}/build`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      allocation: a.allocation,
+      memory: limits.memoryMb,
+      swap: a.limits.swap ?? 0,
+      disk: limits.diskGb * 1024,
+      io: a.limits.io ?? 500,
+      cpu: limits.cpuPercent,
+      feature_limits: {
+        databases: a.feature_limits?.databases ?? 1,
+        allocations: a.feature_limits?.allocations ?? 1,
+        backups: a.feature_limits?.backups ?? 2,
+      },
+    }),
+  });
 }
 
 /** Egg per service, from env "PTERO_EGG_FIVEM" etc. formatted as "nestId:eggId". */
@@ -310,6 +341,7 @@ type PServer = {
     name: string;
     description?: string | null;
     user?: number;
+    allocation?: number;
     nest?: number;
     egg?: number;
     suspended: boolean;

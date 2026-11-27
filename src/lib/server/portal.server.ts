@@ -1,5 +1,5 @@
 import { getCookie, getRequestHeader } from "@tanstack/react-start/server";
-import { integrations, panelUrl } from "./config.server";
+import { env, integrations, panelUrl } from "./config.server";
 import { decryptText, encryptText, generatePassword, sanitizeUsername } from "./crypto.server";
 import * as db from "./db.server";
 import * as ptero from "./ptero.server";
@@ -11,7 +11,26 @@ import {
   type MasterSsoClaims,
 } from "./master-sso.server";
 import { findPlan, planCostCoins, RENEWAL_DAYS, type ServiceId } from "../services";
-import type { DashboardData, ServerView, Subscription, Transaction, TxType } from "../portal-types";
+import type {
+  AdminOverviewData,
+  DashboardData,
+  ServerView,
+  Subscription,
+  Transaction,
+  TxType,
+} from "../portal-types";
+
+const DEFAULT_GAME_ADMIN_EMAILS = ["atchukris@gmail.com"];
+
+export function isGameAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const clean = email.trim().toLowerCase();
+  const extra = (env("SPARROWX_GAME_ADMIN_EMAILS") ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return DEFAULT_GAME_ADMIN_EMAILS.includes(clean) || extra.includes(clean);
+}
 
 type DirectPteroCacheEntry = {
   pteroUserId: number;
@@ -27,7 +46,7 @@ const lastPteroSyncErrors = new Map<string, string>();
 
 export class PortalError extends Error {
   constructor(
-    public code: "UNAUTHENTICATED" | "INSUFFICIENT_COINS" | "NOT_FOUND" | "BAD_REQUEST" | "UNAVAILABLE",
+    public code: "UNAUTHENTICATED" | "FORBIDDEN" | "INSUFFICIENT_COINS" | "NOT_FOUND" | "BAD_REQUEST" | "UNAVAILABLE",
     message: string,
   ) {
     super(message);
@@ -291,6 +310,7 @@ export async function dashboard(): Promise<DashboardData> {
 
   return {
     mode: "live",
+    isAdmin: isGameAdminEmail(claims.email),
     user: {
       id: claims.sub,
       email: claims.email,
@@ -802,6 +822,294 @@ export async function powerAction(identifier: string, signal: "start" | "stop" |
   } catch (e) {
     throw new PortalError("UNAVAILABLE", e instanceof Error ? e.message : "Unable to send power signal");
   }
+}
+
+// ---------------- Game Client Area Admin Operations (atchukris@gmail.com) ----------------
+
+async function requireGameAdmin(): Promise<MasterSsoClaims> {
+  const claims = await requireGoogleUser();
+  if (!isGameAdminEmail(claims.email)) {
+    throw new PortalError("FORBIDDEN", "Admin privileges required.");
+  }
+  return claims;
+}
+
+export async function adminGetOverview(): Promise<AdminOverviewData> {
+  const admin = await requireGameAdmin();
+  if (!integrations().database) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required for admin management.");
+  }
+
+  const [clients, subscriptions, transactions] = await Promise.all([
+    db.listAllClients(250),
+    db.listAllSubscriptions(400),
+    db.listRecentTransactions(60),
+  ]);
+
+  const clientById = new Map(clients.map((c) => [c.id, c]));
+  const subCounts = new Map<string, { total: number; active: number }>();
+
+  let activeSubscriptions = 0;
+  let expiredSubscriptions = 0;
+  let monthlyCoinVolume = 0;
+
+  for (const s of subscriptions) {
+    const cur = subCounts.get(s.client_id) ?? { total: 0, active: 0 };
+    cur.total += 1;
+    if (s.status === "active") {
+      cur.active += 1;
+      activeSubscriptions += 1;
+      monthlyCoinVolume += s.price_coins;
+    } else {
+      expiredSubscriptions += 1;
+    }
+    subCounts.set(s.client_id, cur);
+  }
+
+  const totalCoins = clients.reduce((sum, c) => sum + (Number(c.coins) || 0), 0);
+
+  return {
+    adminEmail: admin.email,
+    stats: {
+      totalClients: clients.length,
+      totalCoins,
+      activeSubscriptions,
+      expiredSubscriptions,
+      monthlyCoinVolume,
+    },
+    clients: clients.map((c) => {
+      const counts = subCounts.get(c.id) ?? { total: 0, active: 0 };
+      return {
+        id: c.id,
+        email: c.email,
+        username: c.discord_username,
+        pteroUserId: c.ptero_user_id,
+        pteroUsername: c.ptero_username,
+        coins: c.coins,
+        createdAt: c.created_at,
+        subscriptionCount: counts.total,
+        activeSubscriptions: counts.active,
+      };
+    }),
+    subscriptions: subscriptions.map((s) => {
+      const owner = clientById.get(s.client_id);
+      return {
+        id: s.id,
+        clientId: s.client_id,
+        clientEmail: owner?.email ?? null,
+        clientUsername: owner?.discord_username ?? "Unknown Client",
+        pteroServerId: s.ptero_server_id,
+        serviceType: s.service_type,
+        planName: s.plan_name,
+        priceCoins: s.price_coins,
+        status: s.status,
+        expiresAt: s.expires_at,
+        createdAt: s.created_at,
+      };
+    }),
+    recentTransactions: transactions.map((t) => ({
+      id: t.id,
+      clientId: t.client_id,
+      clientEmail: clientById.get(t.client_id)?.email ?? null,
+      amount: t.amount,
+      type: t.type,
+      description: t.description,
+      createdAt: t.created_at,
+    })),
+  };
+}
+
+export async function adminAdjustClientCoins(input: {
+  clientId: string;
+  mode: "add" | "deduct" | "set";
+  amount: number;
+  note?: string;
+}) {
+  const admin = await requireGameAdmin();
+  if (!integrations().database) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required.");
+  }
+  const client = await db.getClient(input.clientId);
+  if (!client) {
+    throw new PortalError("NOT_FOUND", "Client account not found.");
+  }
+
+  const prev = Number(client.coins) || 0;
+  const cleanNote = (input.note?.trim() || `Admin adjustment by ${admin.email}`).slice(0, 140);
+  let delta = 0;
+
+  if (input.mode === "add") {
+    delta = Math.max(0, Math.floor(input.amount));
+  } else if (input.mode === "deduct") {
+    delta = -Math.min(prev, Math.max(0, Math.floor(input.amount)));
+  } else {
+    delta = Math.max(0, Math.floor(input.amount)) - prev;
+  }
+
+  let newCoins = prev;
+  if (delta > 0) {
+    const res = await db.creditCoins(client.id, delta, "bonus", cleanNote, `admin:${uid()}`);
+    newCoins = res.balance;
+  } else if (delta < 0) {
+    newCoins = await db.spendCoins(client.id, Math.abs(delta), cleanNote);
+  }
+
+  return {
+    ok: true,
+    clientId: client.id,
+    email: client.email,
+    previousCoins: prev,
+    newCoins,
+    delta,
+  };
+}
+
+export async function adminUpdateUserSubscription(input: {
+  subscriptionId: string;
+  status?: Subscription["status"];
+  extendDays?: number;
+  expiresAt?: string;
+  planId?: string;
+  customPlanName?: string;
+  customPriceCoins?: number;
+  customRamMb?: number;
+  customCpuPercent?: number;
+  customDiskGb?: number;
+  syncPanelLimits?: boolean;
+  syncPanelStatus?: boolean;
+}) {
+  await requireGameAdmin();
+  if (!integrations().database) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required.");
+  }
+  const existing = await db.getSubscriptionById(input.subscriptionId);
+  if (!existing) {
+    throw new PortalError("NOT_FOUND", "Subscription not found.");
+  }
+
+  const patch: Parameters<typeof db.updateSubscription>[1] = {};
+  let nextHardware: { memoryMb: number; cpuPercent: number; diskGb: number } | null = null;
+
+  if (input.planId) {
+    const found = findPlan(input.planId);
+    if (!found) throw new PortalError("BAD_REQUEST", `Unknown plan ID: ${input.planId}`);
+    patch.plan_name = input.customPlanName?.trim() || found.plan.name;
+    patch.price_coins = input.customPriceCoins ?? planCostCoins(found.plan);
+    patch.service_type = found.service.id;
+    nextHardware = {
+      memoryMb: found.plan.ramMb,
+      cpuPercent: Math.round(found.plan.vcpu * 100),
+      diskGb: found.plan.diskGb,
+    };
+  } else {
+    if (input.customPlanName?.trim()) patch.plan_name = input.customPlanName.trim();
+    if (typeof input.customPriceCoins === "number") patch.price_coins = Math.max(0, Math.floor(input.customPriceCoins));
+  }
+
+  if (input.customRamMb && input.customCpuPercent && input.customDiskGb) {
+    nextHardware = {
+      memoryMb: input.customRamMb,
+      cpuPercent: input.customCpuPercent,
+      diskGb: input.customDiskGb,
+    };
+  }
+
+  if (input.status) {
+    patch.status = input.status;
+  }
+
+  if (typeof input.extendDays === "number" && input.extendDays !== 0) {
+    const baseMs = Math.max(Date.now(), new Date(existing.expires_at).getTime());
+    patch.expires_at = new Date(baseMs + input.extendDays * 86400000).toISOString();
+    if (!patch.status && input.extendDays > 0 && existing.status === "expired") {
+      patch.status = "active";
+    }
+  } else if (input.expiresAt) {
+    const parsed = new Date(input.expiresAt);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new PortalError("BAD_REQUEST", "Invalid expiry date.");
+    }
+    patch.expires_at = parsed.toISOString();
+  }
+
+  const updated =
+    Object.keys(patch).length > 0 ? await db.updateSubscription(existing.id, patch) : {
+      id: existing.id,
+      pteroServerId: existing.ptero_server_id,
+      serviceType: existing.service_type,
+      planName: existing.plan_name,
+      priceCoins: existing.price_coins,
+      status: existing.status,
+      expiresAt: existing.expires_at,
+      createdAt: existing.created_at,
+    };
+
+  let panelSyncedLimits = false;
+  let panelSyncedStatus = false;
+  let panelWarning: string | null = null;
+
+  if (existing.ptero_server_id && integrations().pterodactyl) {
+    if (nextHardware && input.syncPanelLimits !== false) {
+      try {
+        await ptero.updateServerBuildLimits(existing.ptero_server_id, nextHardware);
+        panelSyncedLimits = true;
+      } catch (e) {
+        panelWarning = e instanceof Error ? e.message : "Could not resize Pterodactyl server limits.";
+      }
+    }
+
+    if (input.syncPanelStatus !== false && patch.status) {
+      try {
+        if (patch.status === "active") {
+          await ptero.unsuspendServer(existing.ptero_server_id);
+          panelSyncedStatus = true;
+        } else if (patch.status === "expired" || patch.status === "cancelled") {
+          await ptero.suspendServer(existing.ptero_server_id);
+          panelSyncedStatus = true;
+        }
+      } catch (e) {
+        panelWarning = panelWarning ?? (e instanceof Error ? e.message : "Could not sync Panel suspension state.");
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    subscription: updated,
+    panelSyncedLimits,
+    panelSyncedStatus,
+    panelWarning,
+  };
+}
+
+export async function adminGrantSubscription(input: {
+  clientId: string;
+  planId: string;
+  days: number;
+  customPlanName?: string;
+  customPriceCoins?: number;
+  pteroServerId?: number | null;
+}) {
+  await requireGameAdmin();
+  if (!integrations().database) {
+    throw new PortalError("UNAVAILABLE", "Database connection is required.");
+  }
+  const client = await db.getClient(input.clientId);
+  if (!client) throw new PortalError("NOT_FOUND", "Client account not found.");
+  const found = findPlan(input.planId);
+  if (!found) throw new PortalError("BAD_REQUEST", `Unknown plan ID: ${input.planId}`);
+
+  const created = await db.insertSubscription({
+    client_id: client.id,
+    ptero_server_id: input.pteroServerId ?? null,
+    service_type: found.service.id,
+    plan_name: input.customPlanName?.trim() || found.plan.name,
+    price_coins: input.customPriceCoins ?? planCostCoins(found.plan),
+    status: "active",
+    expires_at: daysFromNow(input.days),
+  });
+
+  return { ok: true, subscription: created };
 }
 
 export type { ServiceId };
