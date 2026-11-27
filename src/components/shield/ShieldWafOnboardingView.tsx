@@ -33,6 +33,8 @@ import {
   type Asset,
   type ClientTenant,
   type ProtectedService,
+  type ProtectionMode,
+  type ServiceCategory,
   type ServiceModuleId,
 } from "@/lib/supabase";
 import {
@@ -43,6 +45,7 @@ import {
 import { emitEngineToast } from "@/components/BackgroundEngineToaster";
 import { SparrowxFooter } from "@/components/SparrowxFooter";
 import { ShieldEdgeCheckingPage } from "./ShieldEdgeCheckingPage";
+import { EdgeTrafficFlowDiagram } from "./TacticalPrimitives";
 
 export interface ShieldWafOnboardingViewProps {
   activeUser: AppUser;
@@ -71,7 +74,7 @@ interface CloudflareConfigResult {
     proxied: boolean;
   }>;
   replacedRecords: Array<{ type: string; name: string; content: string; proxied?: boolean }>;
-  safetyNotice?: string;
+  safetyNotice?: string | undefined;
 }
 
 interface DnsVerifyResult {
@@ -119,7 +122,7 @@ const TARGET_STACKS: Array<{
   id: TargetCategory;
   label: string;
   desc: string;
-  serviceCategory: string;
+  serviceCategory: ServiceCategory;
   icon: React.ComponentType<{ className?: string }>;
 }> = [
   {
@@ -133,21 +136,21 @@ const TARGET_STACKS: Array<{
     id: "api",
     label: "REST / GraphQL API",
     desc: "Node, Go, Python & edge microservice APIs",
-    serviceCategory: "Backend API",
+    serviceCategory: "Cloud API & Microservice",
     icon: Server,
   },
   {
     id: "ai",
     label: "AI / LLM Endpoint",
     desc: "Prompt injection & PII redaction guardrails",
-    serviceCategory: "AI Agent & LLM",
+    serviceCategory: "AI Agent (LLM / MCP)",
     icon: Bot,
   },
   {
     id: "proxy",
     label: "Origin Server / VPS",
     desc: "Bare-metal VPS, Docker & custom backend origin",
-    serviceCategory: "Edge Origin Proxy",
+    serviceCategory: "Cloud API & Microservice",
     icon: Layers,
   },
 ];
@@ -270,6 +273,7 @@ export function ShieldWafOnboardingView({
   const [dnsChecking, setDnsChecking] = useState(false);
   const [dnsVerifyResult, setDnsVerifyResult] = useState<DnsVerifyResult | null>(null);
   const [dnsVerifyError, setDnsVerifyError] = useState<string | null>(null);
+  const [revealSensorKey, setRevealSensorKey] = useState(false);
 
   const toggleModule = (mod: ServiceModuleId) => {
     setSelectedModules((prev) => {
@@ -348,11 +352,11 @@ export function ShieldWafOnboardingView({
       const tenantId = `tnt-${nowSlug}`;
       const displayName = workspaceLabel.trim() || cleanHost;
       const stackMeta = TARGET_STACKS.find((s) => s.id === targetStack) ?? TARGET_STACKS[0]!;
-      const modeLabel =
+      const modeLabel: ProtectionMode =
         strictness === "strict"
-          ? "Strict Under-Attack Shield"
+          ? "Lockdown"
           : strictness === "monitor"
-            ? "Monitor & Inspect"
+            ? "Monitor Only"
             : "Active Shield";
 
       const newTenant: ClientTenant = {
@@ -360,7 +364,7 @@ export function ShieldWafOnboardingView({
         name: displayName,
         contactEmail: activeUser.email,
         primaryDomain: cleanHost,
-        planTier: "SparrowX Edge Shield",
+        planTier: "SparrowX Edge Core",
         status: "Active",
         enabledModules: selectedModules,
         apiKey,
@@ -390,13 +394,14 @@ export function ShieldWafOnboardingView({
 
       const newAsset: Asset = {
         id: `ast-${nowSlug}`,
-        name: displayName,
-        type: stackMeta.id === "api" ? "API Gateway" : stackMeta.id === "ai" ? "AI Service" : "Web Application",
-        endpoint: `https://${cleanHost}`,
+        hostname: cleanHost,
+        type: stackMeta.id === "api" || stackMeta.id === "ai" ? "API Gateway" : "Kubernetes Node",
+        ip: "edge.sparrowx.net",
+        environment: "Production",
         owner: activeUser.email,
         status: "Protected",
         riskScore: preflightAudit ? Math.max(5, 100 - preflightAudit.score) : 18,
-        lastScanned: "Just now",
+        lastCheckin: "Just now",
       };
 
       await Promise.all([
@@ -409,7 +414,7 @@ export function ShieldWafOnboardingView({
           body: JSON.stringify({
             action: "register_domain",
             domain: cleanHost,
-            wafMode,
+            wafMode: strictness,
             edgeCheckEnabled: true,
             sensorKey: apiKey,
           }),
@@ -1561,89 +1566,67 @@ export function ShieldWafOnboardingView({
                   </div>
                 )}
 
-                {/* LIVE DNS PROPAGATION VERIFIER STRIP */}
-                <div className="rounded-xl border border-white/12 bg-[#060910] p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="space-y-0.5">
-                      <div className="text-xs font-semibold text-white">
-                        Live DNS Propagation Check
-                      </div>
-                      <p className="text-[11px] text-zinc-400">
-                        Checks public DNS &amp; Cloudflare DoH in real time for your CNAME and TXT records.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={dnsChecking}
-                      onClick={() => void handleVerifyDnsLive()}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-60 px-3.5 text-xs font-semibold text-emerald-200 cursor-pointer"
-                    >
-                      <RefreshCw className={`size-3.5 ${dnsChecking ? "animate-spin" : ""}`} aria-hidden="true" />
-                      <span>{dnsChecking ? "Checking Live DNS..." : "Check DNS Live"}</span>
-                    </button>
-                  </div>
+                {/* LIVE DNS PROPAGATION VERIFIER STRIP + 3-NODE TRAFFIC FLOW */}
+                <div className="space-y-3">
+                  <EdgeTrafficFlowDiagram
+                    domain={provisionedTenant.primaryDomain}
+                    cnameVerified={Boolean(dnsVerifyResult?.cnameVerified)}
+                    txtVerified={Boolean(dnsVerifyResult?.txtVerified)}
+                    checking={dnsChecking}
+                    onCheckDnsLive={() => void handleVerifyDnsLive()}
+                  />
 
                   {dnsVerifyError && (
-                    <p role="alert" className="text-xs text-red-400 flex items-center gap-1.5">
-                      <AlertCircle className="size-3.5 shrink-0" aria-hidden="true" />
+                    <p role="alert" className="text-xs text-[#FDA4AF] flex items-center gap-1.5">
+                      <AlertCircle className="size-3.5 shrink-0 text-[#F43F5E]" aria-hidden="true" />
                       <span>{dnsVerifyError}</span>
                     </p>
                   )}
 
                   {dnsVerifyResult && (
-                    <div role="status" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
-                      <div
-                        className={`rounded-lg border px-3 py-2.5 flex items-center justify-between gap-2 ${
-                          dnsVerifyResult.cnameVerified
-                            ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200"
-                            : "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                        }`}
-                      >
-                        <span className="font-medium">
-                          CNAME → edge.sparrowx.net
-                          {dnsVerifyResult.flattenedMatch ? " (Flattened)" : ""}
-                        </span>
-                        <span className="font-mono font-bold">
-                          {dnsVerifyResult.cnameVerified ? "VERIFIED" : "PENDING"}
-                        </span>
-                      </div>
-                      <div
-                        className={`rounded-lg border px-3 py-2.5 flex items-center justify-between gap-2 ${
-                          dnsVerifyResult.txtVerified
-                            ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-200"
-                            : "border-amber-500/30 bg-amber-500/10 text-amber-200"
-                        }`}
-                      >
-                        <span className="font-medium">TXT _sparrowx-verify</span>
-                        <span className="font-mono font-bold">
-                          {dnsVerifyResult.txtVerified ? "VERIFIED" : "PENDING"}
-                        </span>
-                      </div>
+                    <div role="status" className="sr-only">
+                      {dnsVerifyResult.cnameVerified ? "CNAME VERIFIED" : "CNAME PENDING"}{" "}
+                      {dnsVerifyResult.txtVerified ? "TXT VERIFIED" : "TXT PENDING"}
                     </div>
                   )}
                 </div>
 
-                {/* Sensor Key Strip */}
+                {/* Masked Edge WAF Sensor Key Strip */}
                 <div className="rounded-xl border border-white/10 bg-[#060910] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
                       Edge WAF Sensor Key
                     </div>
-                    <div className="font-mono text-xs text-white truncate">{provisionedTenant.apiKey}</div>
+                    <div className="font-mono text-xs text-white truncate" translate="no">
+                      {revealSensorKey
+                        ? provisionedTenant.apiKey
+                        : `${provisionedTenant.apiKey.slice(0, 10)}${"•".repeat(12)}${provisionedTenant.apiKey.slice(-4)}`}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyValue("apikey", provisionedTenant.apiKey, "Sensor API key")}
-                    aria-label="Copy Edge WAF sensor API key"
-                    className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] px-3 text-xs text-zinc-200 cursor-pointer"
-                  >
-                    {copiedKey === "apikey" ? (
-                      <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
-                    ) : (
-                      <Copy className="size-3.5" aria-hidden="true" />
-                    )}
-                    <span>{copiedKey === "apikey" ? "Copied" : "Copy Key"}</span>
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setRevealSensorKey((prev) => !prev)}
+                      aria-pressed={revealSensorKey}
+                      aria-label={revealSensorKey ? "Hide Edge WAF sensor API key" : "Reveal Edge WAF sensor API key"}
+                      className="inline-flex size-8 items-center justify-center rounded-lg border border-white/15 bg-white/[0.05] hover:bg-white/[0.12] text-zinc-200 cursor-pointer"
+                    >
+                      {revealSensorKey ? <EyeOff className="size-3.5" aria-hidden="true" /> : <Eye className="size-3.5" aria-hidden="true" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyValue("apikey", provisionedTenant.apiKey, "Sensor API key")}
+                      aria-label="Copy Edge WAF sensor API key"
+                      className="inline-flex min-h-8 items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.06] hover:bg-white/[0.12] px-3 text-xs text-zinc-200 cursor-pointer"
+                    >
+                      {copiedKey === "apikey" ? (
+                        <Check className="size-3.5 text-emerald-400" aria-hidden="true" />
+                      ) : (
+                        <Copy className="size-3.5" aria-hidden="true" />
+                      )}
+                      <span>{copiedKey === "apikey" ? "Copied" : "Copy Key"}</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Bottom Launch Bar */}

@@ -373,7 +373,7 @@ export function SparrowxShieldEngine({
               ),
             ]);
             setServices((prev) => [service, ...prev.filter((s) => s.tenantId !== normalizedTenant.id)]);
-            setAssets((prev) => [asset, ...prev.filter((a) => a.endpoint !== asset.endpoint)]);
+            setAssets((prev) => [asset, ...prev.filter((a) => a.hostname !== asset.hostname)]);
             setBypassedWafOnboarding(true);
             handleSelectDomain(normalizedTenant.id);
           }}

@@ -228,20 +228,19 @@ export function WhatsAppPlansToaster() {
     return (
       <div
         data-whatsapp-toaster="pill"
-        className="fixed bottom-5 right-5 z-50"
+        className="fixed bottom-4 right-4 z-30"
       >
         <a
           href={whatsappUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 rounded-full border border-emerald-500/40 bg-[#071510]/95 px-3.5 py-2 text-xs font-semibold text-emerald-300 shadow-[0_10px_30px_rgba(16,185,129,0.28)] backdrop-blur-md transition-all hover:scale-[1.03] hover:border-emerald-400 hover:bg-emerald-950"
+          className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/35 bg-[#071510]/90 px-3 py-1.5 text-[11px] font-medium text-emerald-300 shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-md transition-[border-color,background-color] hover:border-emerald-400 hover:bg-emerald-950"
           aria-label={`Chat on WhatsApp ${WHATSAPP_SUPPORT_DISPLAY}`}
         >
-          <span className="relative flex size-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+          <span className="relative flex size-1.5">
+            <span className="relative inline-flex size-1.5 rounded-full bg-emerald-400" />
           </span>
-          <WhatsAppLogo className="size-4 text-[#25D366]" />
+          <WhatsAppLogo className="size-3.5 text-[#25D366]" />
           <span>WhatsApp · {WHATSAPP_SUPPORT_DISPLAY}</span>
         </a>
       </div>
@@ -253,7 +252,7 @@ export function WhatsAppPlansToaster() {
       data-whatsapp-toaster="open"
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] max-w-[350px] animate-in fade-in slide-in-from-right-6 duration-300"
+      className="fixed bottom-4 right-4 z-30 w-[calc(100vw-2rem)] max-w-[320px] animate-in fade-in slide-in-from-right-6 duration-300"
     >
       <div className="relative overflow-hidden rounded-2xl border border-emerald-500/40 bg-[#081310]/95 p-4 text-white shadow-[0_18px_50px_rgba(0,0,0,0.65),0_0_28px_rgba(16,185,129,0.22)] backdrop-blur-xl">
         <div className="pointer-events-none absolute -right-10 -top-10 size-32 rounded-full bg-emerald-500/20 blur-2xl" />
