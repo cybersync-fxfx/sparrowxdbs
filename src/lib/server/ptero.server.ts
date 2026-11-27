@@ -1,7 +1,7 @@
 // Pterodactyl Application API (and optional Client API for live usage). Server-only.
 import { env, panelUrl } from "./config.server";
 import type { Plan, ServiceId } from "../services";
-import type { ServerStatus } from "../portal-types";
+import type { EggDetailsView, EggVariableView, ServerConfigView, ServerStatus } from "../portal-types";
 
 export class PteroError extends Error {
   constructor(public status: number, public body: string) {
@@ -171,22 +171,111 @@ function eggFor(service: ServiceId): { nest: number; egg: number } {
   return { nest: Number(m[1]), egg: Number(m[2]) };
 }
 
+type EggVarAttr = {
+  name: string;
+  description: string;
+  env_variable: string;
+  default_value: string | number | boolean | null;
+  user_viewable?: boolean;
+  user_editable?: boolean;
+  rules?: string;
+};
+
 type EggResp = {
   attributes: {
+    id: number;
+    nest: number;
+    name: string;
+    description?: string | null;
     docker_image: string;
+    docker_images?: Record<string, string> | null;
     startup: string;
-    relationships: { variables: { data: { attributes: { env_variable: string; default_value: string } }[] } };
+    relationships?: { variables?: { data: { attributes: EggVarAttr }[] } };
   };
 };
 
-export async function createServer(input: { userId: number; name: string; service: ServiceId; plan: Plan }) {
-  const { nest, egg } = eggFor(input.service);
-  const eggInfo = (await app<EggResp>(`/nests/${nest}/eggs/${egg}?include=variables`)).attributes;
+export async function getEggDetails(nestId: number, eggId: number): Promise<EggDetailsView> {
+  const res = await app<EggResp>(`/nests/${nestId}/eggs/${eggId}?include=variables`);
+  const a = res.attributes;
+  const rawImages = a.docker_images && typeof a.docker_images === "object" ? a.docker_images : {};
+  const dockerImages: Record<string, string> =
+    Object.keys(rawImages).length > 0
+      ? rawImages
+      : a.docker_image
+        ? { Default: a.docker_image }
+        : {};
+
+  const vars: EggVariableView[] = (a.relationships?.variables?.data ?? []).map((item) => {
+    const v = item.attributes;
+    const defVal = v.default_value == null ? "" : String(v.default_value);
+    return {
+      name: v.name || v.env_variable,
+      description: v.description || "",
+      envVariable: v.env_variable,
+      defaultValue: defVal,
+      serverValue: defVal,
+      userViewable: v.user_viewable !== false,
+      userEditable: v.user_editable !== false,
+      rules: v.rules || "",
+    };
+  });
+
+  return {
+    nestId: a.nest ?? nestId,
+    eggId: a.id ?? eggId,
+    name: a.name || `Egg #${eggId}`,
+    description: a.description || "",
+    dockerImage: a.docker_image || Object.values(dockerImages)[0] || "",
+    dockerImages,
+    startup: a.startup || "",
+    variables: vars,
+  };
+}
+
+export async function createServer(input: {
+  userId: number;
+  name: string;
+  service: ServiceId;
+  plan: Plan;
+  eggOverride?: {
+    nestId: number;
+    eggId: number;
+    dockerImage?: string;
+    environment?: Record<string, string>;
+  };
+}) {
+  const { nest, egg } = input.eggOverride
+    ? { nest: input.eggOverride.nestId, egg: input.eggOverride.eggId }
+    : eggFor(input.service);
+
+  const eggInfo = await getEggDetails(nest, egg);
   const environment: Record<string, string> = {};
-  for (const v of eggInfo.relationships.variables.data) environment[v.attributes.env_variable] = v.attributes.default_value ?? "";
-  if (input.plan.slots) {
-    for (const k of ["MAX_PLAYERS", "MAX_CLIENTS", "SERVER_SLOTS"]) if (k in environment) environment[k] = String(input.plan.slots);
+  for (const v of eggInfo.variables) {
+    environment[v.envVariable] = v.defaultValue;
   }
+  if (input.plan.slots) {
+    for (const k of ["MAX_PLAYERS", "MAX_CLIENTS", "SERVER_SLOTS"]) {
+      if (k in environment) environment[k] = String(input.plan.slots);
+    }
+  }
+  if (input.eggOverride?.environment) {
+    for (const v of eggInfo.variables) {
+      if (!v.userEditable) continue;
+      if (Object.prototype.hasOwnProperty.call(input.eggOverride.environment, v.envVariable)) {
+        const val = input.eggOverride.environment[v.envVariable];
+        if (typeof val === "string") {
+          environment[v.envVariable] = val;
+        }
+      }
+    }
+  }
+
+  const allowedImages = new Set([eggInfo.dockerImage, ...Object.values(eggInfo.dockerImages)].filter(Boolean));
+  const selectedImage =
+    input.eggOverride?.dockerImage && allowedImages.has(input.eggOverride.dockerImage)
+      ? input.eggOverride.dockerImage
+      : eggInfo.dockerImage;
+
   const location = Number(env("PTERO_LOCATION_ID") ?? "1");
   const r = await app<{ attributes: { id: number; identifier: string } }>(`/servers`, {
     method: "POST",
@@ -194,7 +283,7 @@ export async function createServer(input: { userId: number; name: string; servic
       name: input.name,
       user: input.userId,
       egg,
-      docker_image: eggInfo.docker_image,
+      docker_image: selectedImage,
       startup: eggInfo.startup,
       environment,
       limits: { memory: input.plan.ramMb, swap: 0, disk: input.plan.diskGb * 1024, io: 500, cpu: Math.round(input.plan.vcpu * 100) },
@@ -211,10 +300,24 @@ type PServer = {
     id: number;
     identifier: string;
     name: string;
+    description?: string | null;
+    user?: number;
+    nest?: number;
+    egg?: number;
     suspended: boolean;
     status: string | null;
-    limits: { memory: number; cpu: number; disk: number };
-    relationships?: { allocations?: { data: { attributes: { ip: string; ip_alias: string | null; port: number; assigned: boolean } }[] } };
+    limits: { memory: number; swap?: number; cpu: number; disk: number; io?: number };
+    feature_limits?: { databases: number; allocations: number; backups: number };
+    container?: {
+      startup_command?: string;
+      image?: string;
+      environment?: Record<string, string | number | boolean | null>;
+    };
+    relationships?: {
+      allocations?: { data: { attributes: { ip: string; ip_alias: string | null; port: number; assigned: boolean } }[] };
+      egg?: { attributes: { id: number; nest: number; name: string; docker_image?: string; docker_images?: Record<string, string>; startup?: string } };
+      nest?: { attributes: { id: number; name: string } };
+    };
   };
 };
 
@@ -222,6 +325,11 @@ export type LiveServer = {
   id: number;
   identifier: string;
   name: string;
+  description: string | null;
+  nestId: number | null;
+  eggId: number | null;
+  eggName: string | null;
+  dockerImage: string | null;
   status: ServerStatus;
   address: string | null;
   ramLimitMb: number;
@@ -235,9 +343,7 @@ async function resources(identifier: string): Promise<{ state: string; mem: numb
   const key = env("PTERO_CLIENT_API_KEY");
   if (!key) return null;
   try {
-    const res = await fetch(`${panelUrl()}/api/client/servers/${identifier}/resources`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: "Application/vnd.pterodactyl.v1+json" },
-    });
+    const res = await fetchPteroEndpoint(`/servers/${identifier}/resources`, { method: "GET" }, key, "/api/client");
     if (!res.ok) return null;
     const j = (await res.json()) as { attributes: { current_state: string; resources: { memory_bytes: number; cpu_absolute: number } } };
     return { state: j.attributes.current_state, mem: j.attributes.resources.memory_bytes / 1048576, cpu: j.attributes.resources.cpu_absolute };
@@ -251,7 +357,7 @@ export async function listUserServers(userId: number): Promise<LiveServer[]> {
   const servers = u.attributes.relationships.servers.data;
   return Promise.all(
     servers.map(async (s) => {
-      const full = await app<PServer>(`/servers/${s.attributes.id}?include=allocations`).catch(() => s);
+      const full = await app<PServer>(`/servers/${s.attributes.id}?include=allocations,egg`).catch(() => s);
       const a = full.attributes;
       const alloc = a.relationships?.allocations?.data.find((x) => x.attributes.assigned)?.attributes;
       const live = await resources(a.identifier);
@@ -263,6 +369,11 @@ export async function listUserServers(userId: number): Promise<LiveServer[]> {
         id: a.id,
         identifier: a.identifier,
         name: a.name,
+        description: a.description ?? null,
+        nestId: a.nest ?? a.relationships?.egg?.attributes.nest ?? null,
+        eggId: a.egg ?? a.relationships?.egg?.attributes.id ?? null,
+        eggName: a.relationships?.egg?.attributes.name ?? null,
+        dockerImage: a.container?.image ?? a.relationships?.egg?.attributes.docker_image ?? null,
         status,
         address: alloc ? `${alloc.ip_alias || alloc.ip}:${alloc.port}` : null,
         ramLimitMb: a.limits.memory,
@@ -273,6 +384,147 @@ export async function listUserServers(userId: number): Promise<LiveServer[]> {
       };
     }),
   );
+}
+
+export async function getServerConfig(serverId: number): Promise<ServerConfigView> {
+  const srv = await app<PServer>(`/servers/${serverId}?include=allocations,egg,nest`);
+  const a = srv.attributes;
+  const nestId = a.nest ?? a.relationships?.egg?.attributes.nest ?? 1;
+  const eggId = a.egg ?? a.relationships?.egg?.attributes.id ?? 1;
+  const eggDetails = await getEggDetails(nestId, eggId);
+  const envMap = a.container?.environment ?? {};
+
+  const variables: EggVariableView[] = eggDetails.variables
+    .filter((v) => v.userViewable)
+    .map((v) => {
+      const currentVal = envMap[v.envVariable];
+      return {
+        ...v,
+        serverValue: currentVal == null ? v.defaultValue : String(currentVal),
+      };
+    });
+
+  const alloc = a.relationships?.allocations?.data.find((x) => x.attributes.assigned)?.attributes;
+  const activeImage = a.container?.image || eggDetails.dockerImage;
+  const dockerImages = { ...eggDetails.dockerImages };
+  if (activeImage && !Object.values(dockerImages).includes(activeImage)) {
+    dockerImages["Current Image"] = activeImage;
+  }
+
+  return {
+    serverId: a.id,
+    identifier: a.identifier,
+    name: a.name,
+    description: a.description ?? "",
+    nestId,
+    nestName: a.relationships?.nest?.attributes.name ?? `Nest #${nestId}`,
+    eggId,
+    eggName: a.relationships?.egg?.attributes.name ?? eggDetails.name,
+    startup: a.container?.startup_command || eggDetails.startup,
+    dockerImage: activeImage,
+    dockerImages,
+    variables,
+    limits: {
+      memory: a.limits.memory,
+      swap: a.limits.swap ?? 0,
+      disk: a.limits.disk,
+      io: a.limits.io ?? 500,
+      cpu: a.limits.cpu,
+    },
+    featureLimits: {
+      databases: a.feature_limits?.databases ?? 1,
+      allocations: a.feature_limits?.allocations ?? 1,
+      backups: a.feature_limits?.backups ?? 2,
+    },
+    address: alloc ? `${alloc.ip_alias || alloc.ip}:${alloc.port}` : null,
+    panelUrl: panelUrl(),
+  };
+}
+
+export async function updateServerStartupConfig(
+  serverId: number,
+  input: {
+    targetNestId?: number;
+    targetEggId?: number;
+    dockerImage?: string;
+    environment?: Record<string, string>;
+    skipScripts?: boolean;
+  },
+): Promise<ServerConfigView> {
+  const srv = await app<PServer>(`/servers/${serverId}?include=egg,nest`);
+  const a = srv.attributes;
+  const currentNestId = a.nest ?? a.relationships?.egg?.attributes.nest ?? 1;
+  const currentEggId = a.egg ?? a.relationships?.egg?.attributes.id ?? 1;
+
+  const isSwitchingEgg = Boolean(
+    input.targetEggId &&
+      input.targetNestId &&
+      (input.targetEggId !== currentEggId || input.targetNestId !== currentNestId),
+  );
+  const nextNestId = isSwitchingEgg ? input.targetNestId! : currentNestId;
+  const nextEggId = isSwitchingEgg ? input.targetEggId! : currentEggId;
+
+  const eggDetails = await getEggDetails(nextNestId, nextEggId);
+  const existingEnv = a.container?.environment ?? {};
+  const nextEnvironment: Record<string, string> = {};
+
+  for (const v of eggDetails.variables) {
+    const existingRaw = existingEnv[v.envVariable];
+    const baseVal = !isSwitchingEgg && existingRaw != null ? String(existingRaw) : v.defaultValue;
+    if (
+      v.userEditable &&
+      input.environment &&
+      Object.prototype.hasOwnProperty.call(input.environment, v.envVariable)
+    ) {
+      nextEnvironment[v.envVariable] = String(input.environment[v.envVariable] ?? "");
+    } else {
+      nextEnvironment[v.envVariable] = baseVal;
+    }
+  }
+
+  const allowedImages = new Set([eggDetails.dockerImage, ...Object.values(eggDetails.dockerImages)].filter(Boolean));
+  let nextImage = isSwitchingEgg ? eggDetails.dockerImage : a.container?.image || eggDetails.dockerImage;
+  if (input.dockerImage && allowedImages.has(input.dockerImage)) {
+    nextImage = input.dockerImage;
+  }
+
+  const nextStartup = isSwitchingEgg
+    ? eggDetails.startup
+    : a.container?.startup_command || eggDetails.startup;
+
+  await app(`/servers/${serverId}/startup`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      startup: nextStartup,
+      environment: nextEnvironment,
+      egg: nextEggId,
+      image: nextImage,
+      skip_scripts: Boolean(input.skipScripts),
+    }),
+  });
+
+  return getServerConfig(serverId);
+}
+
+export async function updateServerDetails(
+  serverId: number,
+  input: { name: string; description?: string },
+): Promise<void> {
+  const srv = await app<PServer>(`/servers/${serverId}`);
+  const ownerId = srv.attributes.user;
+  if (!ownerId) throw new Error("Unable to resolve Pterodactyl server owner ID");
+  await app(`/servers/${serverId}/details`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      name: input.name.trim(),
+      user: ownerId,
+      description: (input.description ?? srv.attributes.description ?? "").trim(),
+    }),
+  });
+}
+
+export async function reinstallServer(serverId: number): Promise<void> {
+  await app(`/servers/${serverId}/reinstall`, { method: "POST" });
 }
 
 export async function sendServerPower(
@@ -286,15 +538,15 @@ export async function sendServerPower(
   if (!/^[a-z0-9]{6,16}$/i.test(identifier)) {
     throw new Error("Invalid server identifier");
   }
-  const res = await fetch(`${panelUrl()}/api/client/servers/${identifier}/power`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      Accept: "Application/vnd.pterodactyl.v1+json",
-      "Content-Type": "application/json",
+  const res = await fetchPteroEndpoint(
+    `/servers/${identifier}/power`,
+    {
+      method: "POST",
+      body: JSON.stringify({ signal }),
     },
-    body: JSON.stringify({ signal }),
-  });
+    key,
+    "/api/client",
+  );
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`Pterodactyl power ${res.status}: ${text.slice(0, 180)}`);

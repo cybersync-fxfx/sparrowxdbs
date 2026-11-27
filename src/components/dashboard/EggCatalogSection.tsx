@@ -32,7 +32,15 @@ const SECTION_ICONS = {
 
 const PAGE_SIZE = 24;
 
-export function EggCatalogSection({ onSelectDeployPlans }: { onSelectDeployPlans?: () => void }) {
+export function EggCatalogSection({
+  onSelectDeployPlans,
+  onSelectEgg,
+  selectedEggId,
+}: {
+  onSelectDeployPlans?: () => void;
+  onSelectEgg?: (egg: EggCatalogItem) => void;
+  selectedEggId?: string | null;
+}) {
   const [activeSection, setActiveSection] = useState<"games" | "applications" | "generic">("games");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -323,13 +331,21 @@ export function EggCatalogSection({ onSelectDeployPlans }: { onSelectDeployPlans
                   <span className="font-mono text-[10px] text-muted-foreground truncate">
                     {egg.dockerImage || egg.category}
                   </span>
-                  {onSelectDeployPlans && (
+                  {(onSelectEgg || onSelectDeployPlans) && (
                     <button
                       type="button"
-                      onClick={onSelectDeployPlans}
-                      className="text-[11px] font-semibold text-sheen hover:underline shrink-0 cursor-pointer"
+                      onClick={() => {
+                        if (onSelectEgg) {
+                          onSelectEgg(egg);
+                        } else {
+                          onSelectDeployPlans?.();
+                        }
+                      }}
+                      className={`text-[11px] font-semibold hover:underline shrink-0 cursor-pointer ${
+                        selectedEggId === egg.id ? "text-emerald-300" : "text-sheen"
+                      }`}
                     >
-                      Deploy →
+                      {selectedEggId === egg.id ? "Selected ✓" : "Configure & Deploy →"}
                     </button>
                   )}
                 </div>

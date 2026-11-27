@@ -117,7 +117,13 @@ NODE_OPTIONS=--max-old-space-size=${heapMb}`,
   };
 }
 
-export function ServerSmartToolbox({ server }: { server: ServerView }) {
+export function ServerSmartToolbox({
+  server,
+  onOpenConfigurator,
+}: {
+  server: ServerView;
+  onOpenConfigurator?: (tab: "startup" | "egg-switch" | "profile" | "panel-map") => void;
+}) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"addons" | "ai-config" | "connections">("addons");
   const [installedIds, setInstalledIds] = useState<string[]>([]);
@@ -257,10 +263,24 @@ export function ServerSmartToolbox({ server }: { server: ServerView }) {
                   </p>
                   <p className="text-[11px] text-muted-foreground">{aiConfig.tip}</p>
                 </div>
-                <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={handleCopyAiConfig}>
-                  {copiedConfig ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
-                  <span>{copiedConfig ? "Copied" : "Copy"}</span>
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {onOpenConfigurator && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 text-[11px]"
+                      onClick={() => onOpenConfigurator("startup")}
+                    >
+                      <Sliders className="size-3 text-sky-400" />
+                      <span>Edit Live Vars</span>
+                    </Button>
+                  )}
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={handleCopyAiConfig}>
+                    {copiedConfig ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+                    <span>{copiedConfig ? "Copied" : "Copy"}</span>
+                  </Button>
+                </div>
               </div>
               <pre className="overflow-x-auto rounded-lg border border-border bg-black/70 p-3 font-mono text-[11px] leading-relaxed text-emerald-300">
                 {aiConfig.content}

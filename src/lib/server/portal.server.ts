@@ -454,8 +454,13 @@ export async function servers(): Promise<ServerView[]> {
       id: String(s.id),
       identifier: s.identifier,
       name: s.name,
+      description: s.description,
       service: sub?.serviceType ?? null,
       planName: sub?.planName ?? null,
+      nestId: s.nestId,
+      eggId: s.eggId,
+      eggName: s.eggName,
+      dockerImage: s.dockerImage,
       status: s.status,
       address: s.address,
       ramLimitMb: s.ramLimitMb,
@@ -469,7 +474,106 @@ export async function servers(): Promise<ServerView[]> {
   });
 }
 
-export async function deploy(planId: string, serverName: string) {
+async function requireOwnedServer(serverId: number): Promise<{ pteroUserId: number; server: ptero.LiveServer }> {
+  const claims = await requireGoogleUser();
+  const client = await resolveLiveClient(claims);
+  const direct = !client?.ptero_user_id ? await ensureDirectPteroAccount(claims) : null;
+  const pteroUserId = client?.ptero_user_id ?? direct?.pteroUserId ?? null;
+  if (!pteroUserId || !integrations().pterodactyl) {
+    throw new PortalError("NOT_FOUND", "Pterodactyl panel account is not linked yet.");
+  }
+  const owned = await ptero.listUserServers(pteroUserId);
+  const server = owned.find((s) => s.id === serverId);
+  if (!server) {
+    throw new PortalError("BAD_REQUEST", "Server does not belong to your account.");
+  }
+  return { pteroUserId, server };
+}
+
+export async function getEggDetails(nestId: number, eggId: number) {
+  await requireGoogleUser();
+  if (!integrations().pterodactyl) {
+    throw new PortalError("UNAVAILABLE", "Game panel API is not configured on this server.");
+  }
+  try {
+    const details = await ptero.getEggDetails(nestId, eggId);
+    return {
+      ...details,
+      variables: details.variables.filter((v) => v.userViewable),
+    };
+  } catch (e) {
+    throw new PortalError("UNAVAILABLE", e instanceof Error ? e.message : "Unable to load egg configuration");
+  }
+}
+
+export async function getServerConfig(serverId: number) {
+  await requireOwnedServer(serverId);
+  try {
+    return await ptero.getServerConfig(serverId);
+  } catch (e) {
+    throw new PortalError("UNAVAILABLE", e instanceof Error ? e.message : "Unable to load live server configuration");
+  }
+}
+
+export async function updateServerConfig(input: {
+  serverId: number;
+  name?: string;
+  description?: string;
+  targetNestId?: number;
+  targetEggId?: number;
+  dockerImage?: string;
+  environment?: Record<string, string>;
+  reinstallAfter?: boolean;
+  restartAfter?: boolean;
+}) {
+  const { server } = await requireOwnedServer(input.serverId);
+  try {
+    if (typeof input.name === "string" && input.name.trim().length > 0) {
+      await ptero.updateServerDetails(input.serverId, {
+        name: input.name.trim(),
+        description: input.description,
+      });
+    }
+
+    const updated = await ptero.updateServerStartupConfig(input.serverId, {
+      targetNestId: input.targetNestId,
+      targetEggId: input.targetEggId,
+      dockerImage: input.dockerImage,
+      environment: input.environment,
+    });
+
+    if (input.reinstallAfter) {
+      await ptero.reinstallServer(input.serverId);
+    } else if (input.restartAfter) {
+      await ptero.sendServerPower(server.identifier, "restart").catch(() => {});
+    }
+
+    return updated;
+  } catch (e) {
+    throw new PortalError("UNAVAILABLE", e instanceof Error ? e.message : "Unable to save server configuration to Panel");
+  }
+}
+
+export async function triggerServerReinstall(serverId: number) {
+  await requireOwnedServer(serverId);
+  try {
+    await ptero.reinstallServer(serverId);
+    return { ok: true, message: "Server reinstall queued in Pterodactyl Panel." };
+  } catch (e) {
+    throw new PortalError("UNAVAILABLE", e instanceof Error ? e.message : "Unable to reinstall server");
+  }
+}
+
+export async function deploy(
+  planId: string,
+  serverName: string,
+  eggOverride?: {
+    nestId: number;
+    eggId: number;
+    dockerImage?: string;
+    environment?: Record<string, string>;
+  },
+) {
   const found = findPlan(planId);
   if (!found) throw new PortalError("BAD_REQUEST", "Unknown plan");
   const { service, plan } = found;
@@ -496,7 +600,13 @@ export async function deploy(planId: string, serverName: string) {
   }
 
   try {
-    const srv = await ptero.createServer({ userId: client.ptero_user_id, name, service: service.id, plan });
+    const srv = await ptero.createServer({
+      userId: client.ptero_user_id,
+      name,
+      service: service.id,
+      plan,
+      ...(eggOverride ? { eggOverride } : {}),
+    });
     await db.insertSubscription({
       client_id: client.id,
       ptero_server_id: srv.id,

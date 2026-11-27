@@ -676,36 +676,92 @@ html {
   --font-display: "Unbounded", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --radius: 0.875rem;
-  --background: oklch(0.09 0.012 285);
-  --foreground: oklch(1 0 0);
-  --card: oklch(0.18 0.05 275);
-  --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.18 0.05 275);
-  --popover-foreground: oklch(1 0 0);
-  --discord: oklch(0.59 0.2 277);
-  --discord-deep: oklch(0.5 0.22 275);
-  --sheen: oklch(0.72 0.15 278);
-  --success: oklch(0.8 0.2 145);
-  --warning: oklch(0.78 0.16 75);
-  --primary: var(--discord);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.23 0.055 275);
-  --secondary-foreground: oklch(0.88 0.01 260);
-  --muted: oklch(0.22 0.05 275);
-  --muted-foreground: oklch(0.71 0.02 260);
-  --accent: oklch(0.26 0.07 275);
-  --accent-foreground: oklch(1 0 0);
-  --border: oklch(0.72 0.15 278 / 16%);
-  --input: oklch(0.72 0.15 278 / 22%);
-  --ring: var(--sheen);
-  --svc: var(--discord);
-  --glass: oklch(0.165 0.01 270 / 90%);
-  --shadow-discord: 0 0 0 1px color-mix(in oklab, var(--discord) 60%, transparent),
-    0 10px 40px -8px color-mix(in oklab, var(--discord) 70%, transparent);
-  --gradient-discord: linear-gradient(135deg, var(--discord), var(--discord-deep));
-  --gradient-card: linear-gradient(160deg, oklch(0.21 0.06 275) 0%, oklch(0.16 0.045 275) 55%, oklch(0.13 0.035 278) 100%);
-  --shadow-card: inset 0 1px 0 oklch(0.72 0.15 278 / 18%), 0 24px 60px -30px oklch(0 0 0 / 80%);
+  /* Harmonized with Pterodactyl Stellar Midnight Black (#05060a / #080a10 / #0e121d) */
+  --background: #05060a;
+  --foreground: #f4f6fa;
+  --card: #080a10;
+  --card-foreground: #f4f6fa;
+  --popover: #0b0e17;
+  --popover-foreground: #f4f6fa;
+  --discord: #3b82f6;
+  --discord-deep: #2563eb;
+  --sheen: #93c5fd;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #0f131f;
+  --secondary-foreground: #e2e8f0;
+  --muted: #0e121d;
+  --muted-foreground: #94a3b8;
+  --accent: #141b2d;
+  --accent-foreground: #f8fafc;
+  --border: #1c2233;
+  --input: #0e121d;
+  --ring: #60a5fa;
+  --svc: #3b82f6;
+  --glass: rgb(8 10 16 / 92%);
+  --shadow-discord: 0 0 0 1px rgb(59 130 246 / 38%),
+    0 10px 30px -10px rgb(37 99 235 / 45%);
+  --gradient-discord: linear-gradient(135deg, #2563eb, #1d4ed8);
+  --gradient-card: linear-gradient(180deg, #0b0e16 0%, #080a10 100%);
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 5%), 0 20px 50px -28px rgb(0 0 0 / 85%);
   font-family: var(--font-sans);
+}
+
+/* Native <dialog> top-layer modal scroll containment (modern-web-guidance: dialog) */
+dialog.spx-native-dialog:modal {
+  overscroll-behavior: contain;
+  margin: auto;
+  max-height: min(92dvh, 880px);
+  max-width: min(94vw, 960px);
+  width: 100%;
+  padding: 0;
+  background: #080a10;
+  color: #f4f6fa;
+  border: 1px solid #1c2233;
+  border-radius: 1.5rem;
+  box-shadow: 0 32px 90px -24px rgb(0 0 0 / 92%);
+}
+
+dialog.spx-native-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+dialog.spx-native-dialog::backdrop {
+  background: rgb(2 3 7 / 78%);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Accessible single-row tablist indicator using physical border (WCAG 1.4.1 / Forced Colors safe) */
+.spx-tablist {
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: inline proximity;
+}
+.spx-tablist::-webkit-scrollbar {
+  display: none;
+}
+.spx-tablist [role="tab"] {
+  position: relative;
+  flex: none;
+  scroll-snap-align: start;
+}
+.spx-tablist [role="tab"][aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  border-block-end: 2px solid #60a5fa;
+}
+
+/* Non-intrusive form validation feedback only after interaction */
+.spx-field-input:user-invalid {
+  border-color: #f87171;
+  box-shadow: 0 0 0 1px rgb(248 113 113 / 40%);
 }
 
 @utility glass {

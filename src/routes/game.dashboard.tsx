@@ -19,6 +19,7 @@ import { SubscriptionManager } from "@/components/dashboard/SubscriptionManager"
 import { Transactions } from "@/components/dashboard/Transactions";
 import { DashboardSubscriptionLock } from "@/components/DashboardSubscriptionLock";
 import { errorText, useDashboard, useRefreshAll, useServers } from "@/components/dashboard/hooks";
+import type { EggCatalogItem } from "@/routes/api/game/eggs-catalog";
 
 export const Route = createFileRoute("/game/dashboard")({
   ssr: false,
@@ -86,6 +87,7 @@ function GameDashboard() {
   const [topUp, setTopUp] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [promoCode, setPromoCode] = useState("");
+  const [selectedDeployEgg, setSelectedDeployEgg] = useState<EggCatalogItem | null>(null);
   const qc = useQueryClient();
   const refresh = useRefreshAll();
   const navigate = useNavigate();
@@ -113,8 +115,8 @@ function GameDashboard() {
 
   return (
     <div className="theme-dashboard min-h-screen bg-background text-foreground">
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-[420px] bg-gradient-to-b from-primary/15 to-transparent" />
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-[360px] bg-gradient-to-b from-sky-500/8 to-transparent" />
+      <header className="sticky top-0 z-40 border-b border-border bg-[#05060a]/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-3">
           <Link to="/game" search={{}} className="flex items-center gap-2.5">
             <img src="/sparrowx-logo.png" alt="SparrowX logo" width={34} height={34} className="size-8.5 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]" />
@@ -249,11 +251,21 @@ function GameDashboard() {
             <DeployPlans
               coins={data.coins}
               {...(deploy ? { initialPlanId: deploy } : {})}
+              selectedEgg={selectedDeployEgg}
+              onClearEgg={() => setSelectedDeployEgg(null)}
               onNeedCoins={() => setTopUp(true)}
             />
           </div>
         )}
         <EggCatalogSection
+          selectedEggId={selectedDeployEgg?.id ?? null}
+          onSelectEgg={(egg) => {
+            setSelectedDeployEgg(egg);
+            toast.success(`${egg.name} selected for deployment`, {
+              description: `Pick a plan above to pre-configure ${egg.name} startup variables and deploy into Panel.`,
+            });
+            document.getElementById("game-deploy-plans")?.scrollIntoView({ behavior: "smooth" });
+          }}
           onSelectDeployPlans={() =>
             document.getElementById("game-deploy-plans")?.scrollIntoView({ behavior: "smooth" })
           }

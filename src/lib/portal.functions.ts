@@ -58,9 +58,71 @@ export const resetPanelPassword = createServerFn({ method: "POST" })
 
 export const deployPlan = createServerFn({ method: "POST" })
   .validator((d) =>
-    z.object({ planId: z.string().min(1).max(40), serverName: z.string().max(60).regex(/^[\w .\-']*$/, "Letters, numbers, spaces, - . ' only") }).parse(d),
+    z
+      .object({
+        planId: z.string().min(1).max(40),
+        serverName: z.string().max(60).regex(/^[\w .\-']*$/, "Letters, numbers, spaces, - . ' only"),
+        eggOverride: z
+          .object({
+            nestId: z.number().int().positive(),
+            eggId: z.number().int().positive(),
+            dockerImage: z.string().max(260).optional(),
+            environment: z.record(z.string().max(80), z.string().max(1000)).optional(),
+          })
+          .optional(),
+      })
+      .parse(d),
   )
-  .handler(async ({ data }) => run(async () => (await import("./server/portal.server")).deploy(data.planId, data.serverName)));
+  .handler(async ({ data }) =>
+    run(async () =>
+      (await import("./server/portal.server")).deploy(data.planId, data.serverName, data.eggOverride),
+    ),
+  );
+
+export const getEggConfigDetails = createServerFn({ method: "GET" })
+  .validator((d) =>
+    z
+      .object({
+        nestId: z.number().int().positive(),
+        eggId: z.number().int().positive(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).getEggDetails(data.nestId, data.eggId)),
+  );
+
+export const getLiveServerConfig = createServerFn({ method: "GET" })
+  .validator((d) => z.object({ serverId: z.number().int().positive() }).parse(d))
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).getServerConfig(data.serverId)),
+  );
+
+export const saveLiveServerConfig = createServerFn({ method: "POST" })
+  .validator((d) =>
+    z
+      .object({
+        serverId: z.number().int().positive(),
+        name: z.string().trim().min(1).max(60).optional(),
+        description: z.string().max(250).optional(),
+        targetNestId: z.number().int().positive().optional(),
+        targetEggId: z.number().int().positive().optional(),
+        dockerImage: z.string().max(260).optional(),
+        environment: z.record(z.string().max(80), z.string().max(2000)).optional(),
+        reinstallAfter: z.boolean().optional(),
+        restartAfter: z.boolean().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).updateServerConfig(data)),
+  );
+
+export const reinstallLiveServer = createServerFn({ method: "POST" })
+  .validator((d) => z.object({ serverId: z.number().int().positive() }).parse(d))
+  .handler(async ({ data }) =>
+    run(async () => (await import("./server/portal.server")).triggerServerReinstall(data.serverId)),
+  );
 
 export const redeemPromo = createServerFn({ method: "POST" })
   .validator((d) => z.object({ code: z.string().trim().min(3).max(32).regex(/^[A-Za-z0-9_-]+$/) }).parse(d))

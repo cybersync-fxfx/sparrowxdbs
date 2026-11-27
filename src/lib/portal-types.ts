@@ -27,8 +27,13 @@ export type ServerView = {
   id: string;
   identifier: string;
   name: string;
+  description?: string | null;
   service: ServiceId | null;
   planName: string | null;
+  nestId?: number | null;
+  eggId?: number | null;
+  eggName?: string | null;
+  dockerImage?: string | null;
   status: ServerStatus;
   address: string | null;
   ramLimitMb: number;
@@ -38,6 +43,57 @@ export type ServerView = {
   diskLimitGb: number;
   expiresAt: string | null;
   manageUrl: string;
+};
+
+export type EggVariableView = {
+  name: string;
+  description: string;
+  envVariable: string;
+  defaultValue: string;
+  serverValue: string;
+  userViewable: boolean;
+  userEditable: boolean;
+  rules: string;
+};
+
+export type EggDetailsView = {
+  nestId: number;
+  eggId: number;
+  name: string;
+  description: string;
+  dockerImage: string;
+  dockerImages: Record<string, string>;
+  startup: string;
+  variables: EggVariableView[];
+};
+
+export type ServerConfigView = {
+  serverId: number;
+  identifier: string;
+  name: string;
+  description: string;
+  nestId: number;
+  nestName: string;
+  eggId: number;
+  eggName: string;
+  startup: string;
+  dockerImage: string;
+  dockerImages: Record<string, string>;
+  variables: EggVariableView[];
+  limits: {
+    memory: number;
+    swap: number;
+    disk: number;
+    io: number;
+    cpu: number;
+  };
+  featureLimits: {
+    databases: number;
+    allocations: number;
+    backups: number;
+  };
+  address: string | null;
+  panelUrl: string;
 };
 
 export type DashboardData = {
