@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" fill="none">
+  <defs>
+    <radialGradient id="cBg" cx="62%" cy="38%" r="68%">
+      <stop offset="0%" stop-color="#171429"/>
+      <stop offset="55%" stop-color="#090a13"/>
+      <stop offset="100%" stop-color="#05060a"/>
+    </radialGradient>
+    <linearGradient id="cMetal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b2234"/>
+      <stop offset="100%" stop-color="#080b12"/>
+    </linearGradient>
+    <linearGradient id="cPulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.1"/>
+      <stop offset="50%" stop-color="#60a5fa" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="0.1"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="600" fill="url(#cBg)"/>
+  <g>
+    <rect x="140" y="130" width="680" height="72" rx="16" fill="url(#cMetal)" stroke="#29354d" stroke-width="1.5"/>
+    <rect x="140" y="232" width="680" height="72" rx="16" fill="url(#cMetal)" stroke="#3b82f6" stroke-opacity="0.55" stroke-width="1.5"/>
+    <rect x="140" y="334" width="680" height="72" rx="16" fill="url(#cMetal)" stroke="#29354d" stroke-width="1.5"/>
+    <rect x="140" y="436" width="680" height="44" rx="12" fill="#090d16" stroke="#1e293b" stroke-width="1"/>
+  </g>
+  <g>
+    <rect x="176" y="158" width="210" height="16" rx="8" fill="#1e293b"/>
+    <rect x="176" y="158" width="142" height="16" rx="8" fill="#38bdf8" fill-opacity="0.7"/>
+    <rect x="176" y="260" width="320" height="16" rx="8" fill="#1e293b"/>
+    <rect x="176" y="260" width="265" height="16" rx="8" fill="url(#cPulse)"/>
+    <rect x="176" y="362" width="250" height="16" rx="8" fill="#1e293b"/>
+    <rect x="176" y="362" width="196" height="16" rx="8" fill="#34d399" fill-opacity="0.75"/>
+  </g>
+  <g>
+    <circle cx="770" cy="166" r="7" fill="#38bdf8"/>
+    <circle cx="770" cy="268" r="7" fill="#34d399"/>
+    <circle cx="770" cy="370" r="7" fill="#60a5fa"/>
+  </g>
+</svg>

@@ -1,20 +1,14 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSessionSummary } from "@/lib/portal.functions";
 import { verifySessionToken } from "@/lib/advanced-features";
 import { fetchMasterSsoUser } from "@/lib/developer-connection";
-import {
-  buildGoogleLoginHref,
-  buildGithubLoginHref,
-  GitHubBrandIcon,
-} from "@/components/GoogleSignInButton";
 import { buildMasterHref, buildProductHref } from "@/lib/routing";
 import type { ServiceId } from "@/lib/services";
-import { ServiceSwitcher } from "./ServiceSwitcher";
 
-export const LOGIN_HREF = "/api/auth/google/login?next=%2Fgame%2Fdashboard";
+export const LOGIN_HREF = "/login?next=%2Fgame%2Fdashboard";
 
 export function GoogleGIcon({ className = "size-4" }: { className?: string }) {
   return (
@@ -30,11 +24,19 @@ export function GoogleGIcon({ className = "size-4" }: { className?: string }) {
 export function Brand() {
   return (
     <span className="flex items-center gap-2.5">
-      <img src="/sparrowx-logo.png" alt="SparrowX logo" width={36} height={36} className="size-9 object-contain shrink-0 drop-shadow-[0_4px_12px_rgba(255,255,255,0.22)]" />
-      <span className="leading-none">
-        <span className="block font-display text-sm font-bold tracking-[0.18em]">SPARROWX</span>
-        <span className="block text-[10px] font-medium uppercase tracking-[0.22em] text-muted-foreground">
-          Game Infrastructure
+      <img
+        src="/sparrowx-logo.png"
+        alt="SparrowX logo"
+        width={34}
+        height={34}
+        className="size-8.5 object-contain shrink-0"
+      />
+      <span className="leading-tight">
+        <span className="block font-display text-sm font-bold tracking-[0.16em] text-white">
+          SPARROWX
+        </span>
+        <span className="block text-[11px] font-medium text-slate-400">
+          Game Hosting
         </span>
       </span>
     </span>
@@ -71,72 +73,59 @@ export function useSessionSummary() {
   });
 }
 
-export function Navbar({ service, onService }: { service: ServiceId; onService: (s: ServiceId) => void }) {
+export function Navbar({
+  service: _service,
+  onService: _onService,
+}: {
+  service?: ServiceId;
+  onService?: (s: ServiceId) => void;
+}) {
   const { data: me } = useSessionSummary();
   return (
-    <header className="fixed inset-x-0 top-0 z-50">
-      <div className="mx-auto mt-3 flex max-w-7xl items-center justify-between gap-3 rounded-2xl px-3 py-2.5 glass sm:px-5">
-        <Link to="/game" search={{}} aria-label="SparrowX home">
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-white/[0.06] bg-[#05060a]/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-3">
+        <Link to="/game" search={{}} aria-label="SparrowX Game Hosting home">
           <Brand />
         </Link>
-        <div className="hidden md:block">
-          <ServiceSwitcher value={service} onChange={onService} layoutId="nav-pill" />
-        </div>
-        <div className="flex items-center gap-2">
-          <a
-            href={buildMasterHref("/docs/game")}
-            className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Docs
+
+        <nav aria-label="Primary navigation" className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-300">
+          <a href="#catalog" className="hover:text-white transition-colors">
+            Games &amp; Apps
           </a>
-          <a
-            href={buildProductHref("shield")}
-            className="hidden lg:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            DDoS Defense
+          <a href="#features" className="hover:text-white transition-colors">
+            Features
           </a>
-          <a
-            href={buildMasterHref("/")}
-            className="hidden xl:inline-flex items-center rounded-xl border border-border/70 bg-background/50 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
+          <a href="#performance" className="hover:text-white transition-colors">
+            Benchmarks
+          </a>
+          <a href={buildProductHref("shield")} className="hover:text-white transition-colors">
+            DDoS Shield
+          </a>
+          <a href={buildMasterHref("/")} className="hover:text-white transition-colors">
             SparrowX Cloud
           </a>
+        </nav>
+
+        <div className="flex items-center gap-2 shrink-0">
           {me ? (
-            <Button asChild variant="ivory" size="sm" className="rounded-xl">
+            <Button asChild variant="ivory" size="sm" className="h-9 rounded-xl px-4 text-sm font-semibold">
               <Link to="/game/dashboard" search={{}}>
-                <span className="inline-flex size-5 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white">
+                <span className="inline-flex size-5 items-center justify-center rounded-full bg-zinc-900 text-xs font-bold text-white">
                   {me.username.slice(0, 1).toUpperCase()}
                 </span>
-                <span className="hidden sm:inline">Client Area</span>
-                <LayoutDashboard className="sm:hidden" />
+                <span>Client Area</span>
+                <LayoutDashboard className="size-3.5 sm:hidden" aria-hidden="true" />
               </Link>
             </Button>
           ) : (
-            <div className="flex items-center gap-1.5">
-              <Button asChild variant="ivory" size="sm" className="rounded-xl">
-                <a href={buildGoogleLoginHref("/game/dashboard")}>
-                  <GoogleGIcon className="size-4" />
-                  <span className="hidden sm:inline">Google</span>
-                  <span className="sm:hidden">Sign In</span>
-                </a>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="sm"
-                className="hidden sm:inline-flex rounded-xl border-white/15 bg-[#161B22] text-white hover:bg-[#1F2630]"
-              >
-                <a href={buildGithubLoginHref("/game/dashboard")}>
-                  <GitHubBrandIcon className="size-4" />
-                  <span>GitHub</span>
-                </a>
-              </Button>
-            </div>
+            <Button asChild variant="ivory" size="sm" className="h-9 rounded-xl px-4 text-sm font-semibold">
+              <a href={LOGIN_HREF}>
+                <LogIn className="size-4" aria-hidden="true" />
+                <span>Sign In</span>
+              </a>
+            </Button>
           )}
         </div>
-      </div>
-      <div className="mt-2 flex justify-center md:hidden">
-        <ServiceSwitcher value={service} onChange={onService} layoutId="nav-pill-mobile" />
       </div>
     </header>
   );

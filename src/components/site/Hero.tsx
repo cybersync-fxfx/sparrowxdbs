@@ -1,97 +1,151 @@
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, ShieldCheck, Zap } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Service, ServiceId } from "@/lib/services";
-import { ServiceSwitcher } from "./ServiceSwitcher";
-import { TelemetryCard } from "./TelemetryCard";
-import { Floating3DVisual } from "@/components/ui/Floating3DVisual";
+import { SERVICES, type Service, type ServiceId } from "@/lib/services";
+import { useSessionSummary } from "./Navbar";
 
-export function Hero({ service, onService }: { service: Service; onService: (s: ServiceId) => void }) {
+interface HeroScene {
+  id: string;
+  label: string;
+  image: string;
+  serviceId?: ServiceId;
+  eggQuery: string;
+  section: "games" | "applications" | "generic";
+}
+
+const HERO_SCENES: HeroScene[] = [
+  {
+    id: "minecraft",
+    label: "Minecraft",
+    image: SERVICES.minecraft.image,
+    serviceId: "minecraft",
+    eggQuery: "paper",
+    section: "games",
+  },
+  {
+    id: "fivem",
+    label: "FiveM",
+    image: SERVICES.fivem.image,
+    serviceId: "fivem",
+    eggQuery: "fivem",
+    section: "games",
+  },
+  {
+    id: "samp",
+    label: "SA-MP",
+    image: SERVICES.samp.image,
+    serviceId: "samp",
+    eggQuery: "samp",
+    section: "games",
+  },
+  {
+    id: "rust",
+    label: "Rust",
+    image: "/images/game-showcase/rust-hero.jpg",
+    eggQuery: "rust",
+    section: "games",
+  },
+  {
+    id: "apps",
+    label: "Apps & Runtimes",
+    image: "/images/game-showcase/apps-stack.jpg",
+    serviceId: "discord",
+    eggQuery: "python",
+    section: "generic",
+  },
+];
+
+export function Hero({
+  service,
+  onService,
+}: {
+  service: Service;
+  onService: (s: ServiceId) => void;
+}) {
+  const { data: me } = useSessionSummary();
+  const [sceneId, setSceneId] = useState<string>(
+    HERO_SCENES.find((s) => s.serviceId === service.id)?.id ?? "minecraft",
+  );
+
+  const activeScene = HERO_SCENES.find((s) => s.id === sceneId) ?? HERO_SCENES[0]!;
+  const targetDashboard = `/game/dashboard?egg=${encodeURIComponent(activeScene.eggQuery)}&section=${activeScene.section}`;
+  const primaryHref = me ? targetDashboard : `/login?next=${encodeURIComponent(targetDashboard)}`;
+
+  const handleSelectScene = (scene: HeroScene) => {
+    setSceneId(scene.id);
+    if (scene.serviceId) onService(scene.serviceId);
+  };
+
   return (
-    <section className="relative isolate flex min-h-[100svh] items-center overflow-hidden pb-16 pt-36 md:pt-32">
-      <AnimatePresence initial={false}>
-        <motion.img
-          key={service.id}
-          src={service.image}
-          alt=""
-          aria-hidden
-          fetchPriority="high"
-          decoding="sync"
-          initial={{ opacity: 0, scale: 1.04 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute inset-0 -z-20 h-full w-full object-cover"
-        />
-      </AnimatePresence>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background via-background/85 to-background/30" />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-background via-transparent to-background/60" />
+    <section className="relative isolate flex min-h-[92svh] flex-col justify-between overflow-hidden bg-[#05060a] pt-28 pb-10">
+      {/* Full-bleed atmospheric backdrop bleeding seamlessly behind navbar (y = 0) */}
+      <img
+        key={activeScene.id}
+        src={activeScene.image}
+        alt=""
+        aria-hidden="true"
+        fetchPriority="high"
+        decoding="sync"
+        className="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover opacity-55 transition-opacity duration-500 ease-out"
+      />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-48 top-1/4 -z-10 size-[680px] rounded-full"
-        style={{ background: "radial-gradient(circle at center, color-mix(in oklab, var(--svc) 24%, transparent), transparent 68%)" }}
+        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-[#05060a]/80 via-[#05060a]/55 to-[#05060a]"
       />
-      <div className="absolute inset-0 -z-10 grid-fade" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,transparent_25%,#05060a_92%)]"
+      />
 
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-12 px-5 lg:grid-cols-[1.3fr_1fr]">
-        <div>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={service.id}
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <span className="inline-flex items-center gap-2 rounded-full border border-svc/40 bg-svc/10 px-3.5 py-1.5 font-mono text-xs font-medium text-svc">
-                <span className="size-1.5 rounded-full bg-svc animate-pulse-dot" />
-                {service.badge}
-              </span>
-              <h1 className="mt-6 max-w-3xl text-4xl font-bold leading-[1.05] sm:text-5xl lg:text-6xl">
-                <span className="text-svc-gradient">{service.headline}</span>
-              </h1>
-              <p className="mt-6 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">{service.sub}</p>
-            </motion.div>
-          </AnimatePresence>
+      {/* Centered monumental display typography */}
+      <div className="mx-auto my-auto flex w-full max-w-5xl flex-col items-center px-5 text-center">
+        <h1 className="font-display text-[clamp(2.5rem,6.4vw,5.25rem)] font-bold leading-[0.98] tracking-[-0.03em] text-white">
+          Host 321+ Games, Bots and Cloud Runtimes
+        </h1>
+        <p className="mt-6 max-w-2xl text-base leading-relaxed text-slate-200 sm:text-lg">
+          Indian NVMe Gen4 nodes with automatic smart sizing, guided server setup, and instant panel sync.
+        </p>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
-            <Button asChild variant="ivory" size="xl">
-              <a href="#pricing">
-                View {service.name} plans <ArrowRight />
-              </a>
-            </Button>
-            <Button asChild variant="glass" size="xl">
-              <a href="#performance">Compare performance</a>
-            </Button>
-          </div>
-
-          <div className="mt-10 hidden sm:block">
-            <ServiceSwitcher value={service.id} onChange={onService} layoutId="hero-pill" size="lg" />
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-2"><Zap className="size-4 text-svc" /> Instant deploy</span>
-            <span className="flex items-center gap-2"><ShieldCheck className="size-4 text-svc" /> L7 DDoS shield</span>
-            <span className="flex items-center gap-2"><span className="font-mono text-svc">₹</span> Pay in INR or SparrowCoins</span>
-          </div>
+        <div className="mt-9">
+          <Button asChild variant="ivory" size="xl" className="h-13 rounded-2xl px-7 text-base font-semibold">
+            <a href={primaryHref}>
+              <span>{me ? "Open Client Area" : "Sign In to Launch Server"}</span>
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </a>
+          </Button>
         </div>
+      </div>
 
-        <div className="relative flex flex-col items-center lg:items-end gap-3" style={{ perspective: 1200 }}>
-          <div
-            aria-hidden="true"
-            className="w-36 sm:w-44 pointer-events-none"
-          >
-            <Floating3DVisual
-              src="/3d/game-server-node.svg"
-              alt=""
-              accent="orange"
-              size="sm"
-              priority="lcp"
-              width={240}
-              height={240}
-            />
-          </div>
-          <TelemetryCard service={service} />
+      {/* Interactive world backdrop switcher anchored cleanly along the lower horizon */}
+      <div className="mx-auto mt-12 w-full max-w-3xl px-5">
+        <div
+          role="radiogroup"
+          aria-label="Preview featured server worlds"
+          className="flex items-center justify-center gap-1 rounded-2xl border border-white/10 bg-[#080a10]/85 p-1.5 backdrop-blur-md overflow-x-auto"
+        >
+          {HERO_SCENES.map((scene) => {
+            const active = scene.id === activeScene.id;
+            return (
+              <label
+                key={scene.id}
+                className={`relative shrink-0 cursor-pointer rounded-xl px-4 py-2 text-sm font-medium transition-colors duration-200 ${
+                  active
+                    ? "bg-white text-zinc-950 font-semibold"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="hero-scene"
+                  value={scene.id}
+                  checked={active}
+                  onChange={() => handleSelectScene(scene)}
+                  className="sr-only"
+                />
+                <span>{scene.label}</span>
+              </label>
+            );
+          })}
         </div>
       </div>
     </section>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Coins, Database, ExternalLink, Gift, Loader2, LogOut, Plus, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -23,8 +23,20 @@ import type { EggCatalogItem } from "@/routes/api/game/eggs-catalog";
 
 export const Route = createFileRoute("/game/dashboard")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { deploy?: string | undefined; auth_error?: string | undefined } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): {
+    deploy?: string | undefined;
+    egg?: string | undefined;
+    section?: "games" | "applications" | "generic" | undefined;
+    auth_error?: string | undefined;
+  } => ({
     deploy: typeof s.deploy === "string" && /^[a-z0-9-]{1,40}$/.test(s.deploy) ? s.deploy : undefined,
+    egg: typeof s.egg === "string" && s.egg.trim().length > 0 ? s.egg.trim().slice(0, 80) : undefined,
+    section:
+      s.section === "games" || s.section === "applications" || s.section === "generic"
+        ? s.section
+        : undefined,
     auth_error: typeof s.auth_error === "string" ? s.auth_error.slice(0, 200) : undefined,
   }),
   beforeLoad: async ({ search }) => {
@@ -51,9 +63,13 @@ export const Route = createFileRoute("/game/dashboard")({
       }
     }
     if (!me) {
+      const nextParams = new URLSearchParams();
+      if (search.egg) nextParams.set("egg", search.egg);
+      if (search.section) nextParams.set("section", search.section);
+      if (search.deploy) nextParams.set("deploy", search.deploy);
+      const nextTarget = `/game/dashboard${nextParams.toString() ? `?${nextParams.toString()}` : ""}`;
       throw redirect({
-        to: "/game",
-        search: { auth_error: search.auth_error || "Please sign in with Google first" },
+        href: `/login?next=${encodeURIComponent(nextTarget)}`,
       });
     }
   },
@@ -81,7 +97,7 @@ export const Route = createFileRoute("/game/dashboard")({
 });
 
 function GameDashboard() {
-  const { deploy } = Route.useSearch();
+  const { deploy, egg: initialEggQuery, section: initialSection } = Route.useSearch();
   const { data, isLoading, error } = useDashboard();
   const { data: servers } = useServers();
   const [topUp, setTopUp] = useState(false);
@@ -91,6 +107,44 @@ function GameDashboard() {
   const qc = useQueryClient();
   const refresh = useRefreshAll();
   const navigate = useNavigate();
+
+  // Auto-select the egg passed from the /game landing page (?egg=...) and scroll straight to its 5 smart plans
+  useEffect(() => {
+    if (!initialEggQuery || selectedDeployEgg) return;
+    let cancelled = false;
+    fetch("/api/game/eggs-catalog", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload: { eggs?: EggCatalogItem[] } | null) => {
+        if (cancelled || !payload?.eggs?.length) return;
+        const q = initialEggQuery.toLowerCase();
+        const match =
+          payload.eggs.find((e) => e.id.toLowerCase() === q) ??
+          payload.eggs.find((e) => e.name.toLowerCase() === q) ??
+          payload.eggs.find(
+            (e) =>
+              (!initialSection || e.section === initialSection) &&
+              (e.name.toLowerCase().includes(q) ||
+                e.repoPath.toLowerCase().includes(q) ||
+                e.category.toLowerCase().includes(q)),
+          ) ??
+          payload.eggs.find(
+            (e) =>
+              e.name.toLowerCase().includes(q) ||
+              e.repoPath.toLowerCase().includes(q) ||
+              e.category.toLowerCase().includes(q),
+          );
+        if (match) {
+          setSelectedDeployEgg(match);
+          requestAnimationFrame(() => {
+            document.getElementById("game-deploy-plans")?.scrollIntoView({ behavior: "smooth" });
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [initialEggQuery, initialSection, selectedDeployEgg]);
 
   const quickPromo = useMutation({
     mutationFn: () => redeemPromo({ data: { code: promoCode } }),

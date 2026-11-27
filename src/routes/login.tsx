@@ -71,17 +71,20 @@ function SparrowxLoginPage() {
 
   const githubUrl = `/api/auth/github/login?scope=repo&next=${encodeURIComponent(nextPath)}`;
   const googleUrl = `/api/auth/google/login?next=${encodeURIComponent(nextPath)}`;
+  const isGameLogin = nextPath.startsWith("/game");
 
   return (
     <div className="min-h-screen bg-[#05060A] text-[#E2E8F0] font-sans antialiased flex flex-col justify-between p-4 sm:p-6">
       <header className="max-w-6xl w-full mx-auto flex items-center justify-between py-2">
-        <a href="/" className="flex items-center gap-2.5">
+        <a href={isGameLogin ? "/game" : "/"} className="flex items-center gap-2.5">
           <span className="size-7 rounded-md bg-gradient-to-b from-[#F3F6FA] to-[#CFD6E2] grid place-items-center">
             <svg viewBox="0 0 24 24" className="size-3.5 fill-[#05060A]" aria-hidden="true">
               <path d="M12 3L21 19H3L12 3Z" />
             </svg>
           </span>
-          <span className="text-sm font-semibold tracking-tight text-white">SparrowX Deploy</span>
+          <span className="text-sm font-semibold tracking-tight text-white">
+            {isGameLogin ? "SparrowX Game Hosting" : "SparrowX Deploy"}
+          </span>
         </a>
         <span className="inline-flex items-center gap-1.5 text-[11px] spx-mono text-zinc-400">
           <span className="size-1.5 rounded-full bg-emerald-400" />
@@ -97,12 +100,27 @@ function SparrowxLoginPage() {
               <span>SparrowX Unified SSO</span>
             </div>
             <h1 className="text-2xl font-semibold tracking-tight text-white">
-              {mode === "signin" ? "Sign in to SparrowX Deploy" : "Create your Deploy account"}
+              {mode === "signin"
+                ? isGameLogin
+                  ? "Sign in to Game Client Area"
+                  : "Sign in to SparrowX Deploy"
+                : isGameLogin
+                  ? "Create your Game Hosting account"
+                  : "Create your Deploy account"}
             </h1>
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Deploy Git repositories with Railpack zero-config builds, instant{" "}
-              <span className="spx-mono text-zinc-200">*.deploy.sparrowx.net</span> SSL, and live
-              build logs.
+              {isGameLogin ? (
+                <>
+                  Launch any of our 321+ games, bots, databases, and runtimes with smart 5-tier sizing and instant{" "}
+                  <span className="spx-mono text-zinc-200">game.panel.sparrowx.net</span> SSO.
+                </>
+              ) : (
+                <>
+                  Deploy Git repositories with Railpack zero-config builds, instant{" "}
+                  <span className="spx-mono text-zinc-200">*.deploy.sparrowx.net</span> SSL, and live
+                  build logs.
+                </>
+              )}
             </p>
           </div>
 

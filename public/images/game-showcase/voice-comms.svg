@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" fill="none">
+  <defs>
+    <radialGradient id="vBg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#0b2421"/>
+      <stop offset="55%" stop-color="#070c12"/>
+      <stop offset="100%" stop-color="#05060a"/>
+    </radialGradient>
+    <linearGradient id="vWave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0"/>
+      <stop offset="30%" stop-color="#34d399" stop-opacity="0.9"/>
+      <stop offset="70%" stop-color="#38bdf8" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="600" fill="url(#vBg)"/>
+  <g stroke="#34d399" stroke-opacity="0.22" stroke-width="1.5">
+    <circle cx="480" cy="300" r="85"/>
+    <circle cx="480" cy="300" r="150"/>
+    <circle cx="480" cy="300" r="220"/>
+    <circle cx="480" cy="300" r="290"/>
+  </g>
+  <path d="M70 300C150 300 185 215 240 215C295 215 320 385 375 385C430 385 445 180 480 180C515 180 530 420 585 420C640 420 665 225 720 225C775 225 810 300 890 300" stroke="url(#vWave)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="480" cy="300" r="36" fill="#07131a" stroke="#34d399" stroke-width="2.5"/>
+  <circle cx="480" cy="300" r="10" fill="#34d399"/>
+</svg>

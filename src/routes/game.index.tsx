@@ -4,7 +4,8 @@ import { toast } from "sonner";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/site/Navbar";
 import { Hero } from "@/components/site/Hero";
-import { Pricing } from "@/components/site/Pricing";
+import { GameHostingShowcase } from "@/components/site/GameHostingShowcase";
+import { PlatformFeatures } from "@/components/site/PlatformFeatures";
 import { Footer } from "@/components/site/Footer";
 import { SERVICE_IDS, SERVICES, type ServiceId } from "@/lib/services";
 import { buildRouteHeadFromProfile, SEO_PROFILES } from "@/lib/seo-profiles";
@@ -38,7 +39,7 @@ export const Route = createFileRoute("/game/")({
 function GameIndex() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/game/" });
-  const service = SERVICES[search.service ?? "fivem"];
+  const service = SERVICES[search.service ?? "minecraft"];
   const setService = (id: ServiceId) =>
     navigate({ search: (prev) => ({ ...prev, service: id }), replace: true, resetScroll: false });
 
@@ -58,17 +59,16 @@ function GameIndex() {
   }, [search.auth_error, navigate]);
 
   return (
-    <div data-service={service.id} className="theme-game min-h-screen bg-background text-foreground">
+    <div data-service={service.id} className="theme-game min-h-screen bg-[#05060a] text-foreground">
       <Navbar service={service.id} onService={setService} />
       <main>
         <Hero service={service} onService={setService} />
-        <div className="spx-defer-section">
+        <GameHostingShowcase />
+        <PlatformFeatures />
+        <div className="spx-defer-section border-t border-white/[0.06]">
           <Suspense fallback={<div id="performance" className="mx-auto max-w-7xl px-5 py-24 min-h-[540px]" />}>
             <Performance service={service} />
           </Suspense>
-        </div>
-        <div className="spx-defer-section">
-          <Pricing service={service} />
         </div>
       </main>
       <Footer />
